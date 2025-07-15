@@ -1,0 +1,23 @@
+{
+  "name": "@arach/speakeasy",
+  "version": "1.0.0",
+  "description": "SpeakEasy - Unified text-to-speech service with provider abstraction",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node dist/test.js",
+    "example": "npm run build && node examples/basic-usage.js"
+  },
+  "keywords": ["tts", "speech", "openai", "elevenlabs"],
+  "author": "arach",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

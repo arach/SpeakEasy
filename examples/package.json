@@ -1,0 +1,15 @@
+{
+  "name": "speech-service-examples",
+  "version": "1.0.0",
+  "description": "TypeScript examples for the speech service",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx advanced-typescript.ts",
+    "build": "tsc advanced-typescript.ts",
+    "run-examples": "npm run build && node advanced-typescript.js"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

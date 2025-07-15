@@ -1,0 +1,265 @@
+import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import fetch from 'node-fetch';
+
+const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speech');
+const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+
+interface GlobalConfig {
+  provider?: 'system' | 'openai' | 'elevenlabs';
+  systemVoice?: string;
+  openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  elevenlabsVoiceId?: string;
+  rate?: number;
+  apiKeys?: {
+    openai?: string;
+    elevenlabs?: string;
+  };
+  tempDir?: string;
+}
+
+function loadGlobalConfig(): GlobalConfig {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
+      return JSON.parse(configData);
+    }
+  } catch (error) {
+    console.warn('Failed to load global config:', error);
+  }
+  return {};
+}
+
+export interface SpeechConfig {
+  provider: 'system' | 'openai' | 'elevenlabs';
+  systemVoice?: string;
+  openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  elevenlabsVoiceId?: string;
+  rate?: number;
+  apiKeys?: {
+    openai?: string;
+    elevenlabs?: string;
+  };
+  tempDir?: string;
+}
+
+export interface SpeechOptions {
+  priority?: 'high' | 'normal' | 'low';
+  interrupt?: boolean;
+  cleanup?: boolean;
+}
+
+export class SpeechService {
+  private config: Required<SpeechConfig>;
+  private isPlaying = false;
+  private queue: Array<{ text: string; options: SpeechOptions }> = [];
+
+  constructor(config: SpeechConfig) {
+    const globalConfig = loadGlobalConfig();
+    
+    this.config = {
+      provider: config.provider || globalConfig.provider || 'system',
+      systemVoice: config.systemVoice || globalConfig.systemVoice || 'Samantha',
+      openaiVoice: config.openaiVoice || globalConfig.openaiVoice || 'nova',
+      elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL',
+      rate: config.rate || globalConfig.rate || 180,
+      apiKeys: {
+        openai: config.apiKeys?.openai || globalConfig.apiKeys?.openai || process.env.OPENAI_API_KEY,
+        elevenlabs: config.apiKeys?.elevenlabs || globalConfig.apiKeys?.elevenlabs || process.env.ELEVENLABS_API_KEY,
+      },
+      tempDir: config.tempDir || globalConfig.tempDir || '/tmp',
+    };
+  }
+
+  async speak(text: string, options: SpeechOptions = {}): Promise<void> {
+    const cleanText = this.cleanTextForSpeech(text);
+    
+    if (options.interrupt && this.isPlaying) {
+      this.stopSpeaking();
+    }
+
+    if (options.priority === 'high') {
+      this.queue.unshift({ text: cleanText, options });
+    } else {
+      this.queue.push({ text: cleanText, options });
+    }
+
+    if (!this.isPlaying) {
+      await this.processQueue();
+    }
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.queue.length === 0) return;
+
+    this.isPlaying = true;
+    const { text, options } = this.queue.shift()!;
+
+    try {
+      await this.speakText(text);
+    } catch (error) {
+      console.error('Speech error:', error);
+    } finally {
+      this.isPlaying = false;
+      // Process next item in queue
+      if (this.queue.length > 0) {
+        await this.processQueue();
+      }
+    }
+  }
+
+  private async speakText(text: string): Promise<void> {
+    switch (this.config.provider) {
+      case 'openai':
+        await this.speakWithOpenAI(text);
+        break;
+      case 'elevenlabs':
+        await this.speakWithElevenLabs(text);
+        break;
+      case 'system':
+      default:
+        await this.speakWithSystem(text);
+        break;
+    }
+  }
+
+  private cleanTextForSpeech(text: string): string {
+    return text
+      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, '')
+      .replace(/[^\w\s.,!?'-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private async speakWithSystem(text: string): Promise<void> {
+    try {
+      const command = `say -v ${this.config.systemVoice} -r ${this.config.rate} "${text.replace(/"/g, '\\"')}"`;
+      execSync(command);
+    } catch (error) {
+      throw new Error(`System TTS failed: ${error}`);
+    }
+  }
+
+  private async speakWithOpenAI(text: string): Promise<void> {
+    if (!this.config.apiKeys.openai) {
+      console.warn('No OpenAI API key, falling back to system voice');
+      return this.speakWithSystem(text);
+    }
+
+    try {
+      const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
+      
+      const response = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKeys.openai}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'tts-1',
+          voice: this.config.openaiVoice,
+          input: text,
+          speed: this.config.rate / 200,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const audioBuffer = await response.arrayBuffer();
+      fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
+
+      execSync(`afplay "${tempFile}"`);
+      
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    } catch (error) {
+      console.warn('OpenAI TTS failed, falling back to system voice:', error);
+      return this.speakWithSystem(text);
+    }
+  }
+
+  private async speakWithElevenLabs(text: string): Promise<void> {
+    if (!this.config.apiKeys.elevenlabs) {
+      console.warn('No ElevenLabs API key, falling back to system voice');
+      return this.speakWithSystem(text);
+    }
+
+    try {
+      const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
+      
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${this.config.elevenlabsVoiceId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': this.config.apiKeys.elevenlabs,
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`ElevenLabs API error: ${response.status}`);
+      }
+
+      const audioBuffer = await response.arrayBuffer();
+      fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
+
+      execSync(`afplay "${tempFile}"`);
+      
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    } catch (error) {
+      console.warn('ElevenLabs TTS failed, falling back to system voice:', error);
+      return this.speakWithSystem(text);
+    }
+  }
+
+  private stopSpeaking(): void {
+    try {
+      // Kill any running 'say' or 'afplay' processes
+      execSync('pkill -f "say|afplay"', { stdio: 'ignore' });
+    } catch (error) {
+      // Ignore if no processes to kill
+    }
+  }
+
+  clearQueue(): void {
+    this.queue = [];
+  }
+}
+
+// Factory function for common configurations
+export const createSpeechService = {
+  forNotifications: (): SpeechService => new SpeechService({
+    provider: 'openai',
+    openaiVoice: 'nova',
+    rate: 180,
+  }),
+  
+  forDevelopment: (): SpeechService => new SpeechService({
+    provider: 'system',
+    systemVoice: 'Samantha',
+    rate: 200,
+  }),
+  
+  forProduction: (): SpeechService => new SpeechService({
+    provider: 'elevenlabs',
+    elevenlabsVoiceId: 'EXAVITQu4vr4xnSDxMaL', // Bella
+    rate: 170,
+  }),
+};
+
+// Default instance
+export const defaultSpeechService = createSpeechService.forNotifications();
