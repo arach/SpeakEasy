@@ -3,20 +3,43 @@ import * as fs from 'fs';
 import * as path from 'path';
 import fetch from 'node-fetch';
 
-const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speech');
-const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
+export const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
 
 interface GlobalConfig {
-  provider?: 'system' | 'openai' | 'elevenlabs';
-  systemVoice?: string;
-  openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
-  elevenlabsVoiceId?: string;
-  rate?: number;
-  apiKeys?: {
-    openai?: string;
-    elevenlabs?: string;
+  providers?: {
+    openai?: {
+      enabled?: boolean;
+      voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+      model?: string;
+      apiKey?: string;
+    };
+    elevenlabs?: {
+      enabled?: boolean;
+      voiceId?: string;
+      modelId?: string;
+      apiKey?: string;
+    };
+    system?: {
+      enabled?: boolean;
+      voice?: string;
+    };
+    groq?: {
+      enabled?: boolean;
+      voice?: string;
+      model?: string;
+      apiKey?: string;
+    };
   };
-  tempDir?: string;
+  defaults?: {
+    provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
+    fallbackOrder?: string[];
+    rate?: number;
+  };
+  global?: {
+    tempDir?: string;
+    cleanup?: boolean;
+  };
 }
 
 function loadGlobalConfig(): GlobalConfig {
@@ -32,7 +55,7 @@ function loadGlobalConfig(): GlobalConfig {
 }
 
 export interface SpeakEasyConfig {
-  provider: 'system' | 'openai' | 'elevenlabs' | 'groq';
+  provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
   systemVoice?: string;
   openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
   elevenlabsVoiceId?: string;
@@ -40,6 +63,7 @@ export interface SpeakEasyConfig {
   apiKeys?: {
     openai?: string;
     elevenlabs?: string;
+    groq?: string;
   };
   tempDir?: string;
 }
@@ -59,17 +83,17 @@ export class SpeakEasy {
     const globalConfig = loadGlobalConfig();
     
     this.config = {
-      provider: config.provider || globalConfig.provider || 'system',
-      systemVoice: config.systemVoice || globalConfig.systemVoice || 'Samantha',
-      openaiVoice: config.openaiVoice || globalConfig.openaiVoice || 'nova',
-      elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL',
-      rate: config.rate || globalConfig.rate || 180,
+      provider: config.provider || globalConfig.defaults?.provider || 'system',
+      systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || 'Samantha',
+      openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || 'nova',
+      elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || 'EXAVITQu4vr4xnSDxMaL',
+      rate: config.rate || globalConfig.defaults?.rate || 180,
       apiKeys: {
-        openai: config.apiKeys?.openai || globalConfig.apiKeys?.openai || process.env.OPENAI_API_KEY,
-        elevenlabs: config.apiKeys?.elevenlabs || globalConfig.apiKeys?.elevenlabs || process.env.ELEVENLABS_API_KEY,
-        groq: config.apiKeys?.groq || globalConfig.apiKeys?.groq || process.env.GROQ_API_KEY,
+        openai: config.apiKeys?.openai || globalConfig.providers?.openai?.apiKey || process.env.OPENAI_API_KEY || '',
+        elevenlabs: config.apiKeys?.elevenlabs || globalConfig.providers?.elevenlabs?.apiKey || process.env.ELEVENLABS_API_KEY || '',
+        groq: config.apiKeys?.groq || globalConfig.providers?.groq?.apiKey || process.env.GROQ_API_KEY || '',
       },
-      tempDir: config.tempDir || globalConfig.tempDir || '/tmp',
+      tempDir: config.tempDir || globalConfig.global?.tempDir || '/tmp',
     };
   }
 
@@ -148,7 +172,13 @@ export class SpeakEasy {
   }
 
   private async speakWithOpenAI(text: string): Promise<void> {
-    if (!this.config.apiKeys.openai) {
+    const openaiKey = this.config.apiKeys.openai;
+    console.log('speakWithOpenAI: checking API key...');
+    console.log('  config.apiKeys.openai:', this.config.apiKeys.openai);
+    console.log('  resolved openaiKey:', openaiKey);
+    console.log('  process.env.OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
+    
+    if (!openaiKey) {
       console.warn('No OpenAI API key, falling back to system voice');
       return this.speakWithSystem(text);
     }
@@ -189,7 +219,13 @@ export class SpeakEasy {
   }
 
   private async speakWithElevenLabs(text: string): Promise<void> {
-    if (!this.config.apiKeys.elevenlabs) {
+    const elevenlabsKey = this.config.apiKeys.elevenlabs;
+    console.log('speakWithElevenLabs: checking API key...');
+    console.log('  config.apiKeys.elevenlabs:', this.config.apiKeys.elevenlabs);
+    console.log('  resolved elevenlabsKey:', elevenlabsKey);
+    console.log('  process.env.ELEVENLABS_API_KEY:', process.env.ELEVENLABS_API_KEY);
+    
+    if (!elevenlabsKey) {
       console.warn('No ElevenLabs API key, falling back to system voice');
       return this.speakWithSystem(text);
     }
@@ -204,7 +240,7 @@ export class SpeakEasy {
         headers: {
           'Accept': 'audio/mpeg',
           'Content-Type': 'application/json',
-          'xi-api-key': this.config.apiKeys.elevenlabs,
+          'xi-api-key': this.config.apiKeys.elevenlabs || '',
         },
         body: JSON.stringify({
           text: text,
@@ -235,23 +271,31 @@ export class SpeakEasy {
   }
 
   private async speakWithGroq(text: string): Promise<void> {
-    if (!this.config.apiKeys.groq) {
+    const groqKey = this.config.apiKeys.groq;
+    console.log('speakWithGroq - API key:', groqKey);
+    
+    if (!groqKey) {
       console.warn('No Groq API key, falling back to system voice');
       return this.speakWithSystem(text);
     }
 
+
+
     try {
       const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
       
+    
+    
+
       const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.config.apiKeys.groq}`,
+          'Authorization': `Bearer ${groqKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'tts-1',
-          voice: this.config.openaiVoice || 'nova',
+          model: 'playai-tts',
+          voice: 'Celeste-PlayAI',
           input: text,
           speed: this.config.rate / 200,
         }),
@@ -270,7 +314,7 @@ export class SpeakEasy {
         fs.unlinkSync(tempFile);
       }
     } catch (error) {
-      console.warn('Groq TTS failed, falling back to system voice:', error);
+      console.warn('***** Groq TTS failed, falling back to system voice:', error);
       return this.speakWithSystem(text);
     }
   }
@@ -289,7 +333,7 @@ export class SpeakEasy {
 }
 
 // Convenience functions with provider override
-export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs') => {
+export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs' | 'groq') => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Text argument is required for say()');
   }

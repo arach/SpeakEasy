@@ -30,7 +30,7 @@ await say('Hello!', 'groq');                  // Groq TTS
 
 ## Configuration
 
-SpeakEasy uses a clean nested configuration structure in `~/.config/speech/config.json`:
+SpeakEasy uses a clean nested configuration structure in `~/.config/speakeasy/settings.json`:
 
 ```json
 {
@@ -38,26 +38,33 @@ SpeakEasy uses a clean nested configuration structure in `~/.config/speech/confi
     "openai": {
       "enabled": true,
       "voice": "nova",
-      "model": "tts-1"
+      "model": "tts-1",
+      "apiKey": "sk-..."
     },
     "elevenlabs": {
       "enabled": true,
-      "voiceId": "EXAVITQu4vr4xnSDxMaL"
+      "voiceId": "EXAVITQu4vr4xnSDxMaL",
+      "apiKey": "sk-..."
     },
     "system": {
       "enabled": true,
       "voice": "Samantha"
     },
     "groq": {
-      "enabled": false,
-      "voice": "nova",
-      "model": "tts-1"
+      "enabled": true,
+      "voice": "onyx",
+      "model": "tts-1-hd",
+      "apiKey": "gsk-..."
     }
   },
   "defaults": {
-    "provider": "openai",
-    "fallbackOrder": ["openai", "elevenlabs", "system"],
+    "provider": "groq",
+    "fallbackOrder": ["groq", "openai", "elevenlabs", "system"],
     "rate": 180
+  },
+  "global": {
+    "tempDir": "/tmp",
+    "cleanup": true
   }
 }
 ```

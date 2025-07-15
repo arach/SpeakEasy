@@ -17,15 +17,15 @@
       "voice": "Samantha"
     },
     "groq": {
-      "enabled": false,
+      "enabled": true,
       "voice": "nova",
       "model": "tts-1",
       "apiKey": "$GROQ_API_KEY"
     }
   },
   "defaults": {
-    "provider": "system",
-    "fallbackOrder": ["openai", "elevenlabs", "groq", "system"],
+    "provider": "groq",
+    "fallbackOrder": ["groq", "openai", "elevenlabs", "system"],
     "rate": 180
   },
   "global": {
