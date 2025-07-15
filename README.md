@@ -20,10 +20,12 @@ npm install speakeasy
 ## Quick Start
 
 ```typescript
-import { createSpeechService } from 'speakeasy';
+import { say } from 'speakeasy';
 
-const speech = createSpeechService.forNotifications();
-await speech.speak('Hello world!');
+await say('Hello world!');                    // system voice
+await say('Hello!', 'openai');                // OpenAI TTS
+await say('Hello!', 'elevenlabs');            // ElevenLabs TTS  
+await say('Hello!', 'groq');                  // Groq TTS
 ```
 
 ## Configuration
@@ -73,38 +75,44 @@ export GROQ_API_KEY=your_groq_key
 ### Basic Usage
 
 ```typescript
-import { SpeechService, createSpeechService } from 'speakeasy';
+import { say, speak } from 'speakeasy';
 
-// Use pre-configured instances
-const speech = createSpeechService.forNotifications();
-await speech.speak('Hello world!');
+// Quick one-liners
+await say('Hello world!');                    // system voice
+await say('Hello!', 'openai');                // OpenAI TTS
+await say('Hello!', 'elevenlabs');            // ElevenLabs TTS
+await say('Hello!', 'groq');                  // Groq TTS
 
-// Or create custom instance
-const customSpeech = new SpeechService({
+// Full featured
+await speak('Hello world!', { priority: 'high' });
+await speak('Hello!', { provider: 'openai', priority: 'high' });
+
+// Custom configuration
+import { SpeakEasy } from 'speakeasy';
+const speech = new SpeakEasy({
   provider: 'openai',
   openaiVoice: 'nova',
   rate: 180,
 });
+await speech.speak('Hello world!');
 ```
 
 ### In Your Projects
 
 ```typescript
 // notifications.ts
-import { createSpeechService } from 'speakeasy';
-
-const speech = createSpeechService.forNotifications();
+import { say } from 'speakeasy';
 
 export async function speakNotification(message: string, project: string) {
-  await speech.speak(`In ${project}, ${message}`, { priority: 'high' });
+  await say(`In ${project}, ${message}`, { priority: 'high' });
 }
 ```
 
-### Factory Functions
-
-- `createSpeechService.forNotifications()` - Best available provider
-- `createSpeechService.forDevelopment()` - System voice
-- `createSpeechService.forProduction()` - ElevenLabs voice
+### Convenience
+- `say('text')` - One-liner with system voice
+- `say('text', 'openai' | 'elevenlabs' | 'groq')` - One-liner with provider
+- `speak('text', options)` - Full featured with options
+- `new SpeakEasy()` - Full control
 
 ## Examples
 

@@ -31,8 +31,8 @@ function loadGlobalConfig(): GlobalConfig {
   return {};
 }
 
-export interface SpeechConfig {
-  provider: 'system' | 'openai' | 'elevenlabs';
+export interface SpeakEasyConfig {
+  provider: 'system' | 'openai' | 'elevenlabs' | 'groq';
   systemVoice?: string;
   openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
   elevenlabsVoiceId?: string;
@@ -44,18 +44,18 @@ export interface SpeechConfig {
   tempDir?: string;
 }
 
-export interface SpeechOptions {
+export interface SpeakEasyOptions {
   priority?: 'high' | 'normal' | 'low';
   interrupt?: boolean;
   cleanup?: boolean;
 }
 
-export class SpeechService {
-  private config: Required<SpeechConfig>;
+export class SpeakEasy {
+  private config: Required<SpeakEasyConfig>;
   private isPlaying = false;
-  private queue: Array<{ text: string; options: SpeechOptions }> = [];
+  private queue: Array<{ text: string; options: SpeakEasyOptions }> = [];
 
-  constructor(config: SpeechConfig) {
+  constructor(config: SpeakEasyConfig) {
     const globalConfig = loadGlobalConfig();
     
     this.config = {
@@ -67,12 +67,13 @@ export class SpeechService {
       apiKeys: {
         openai: config.apiKeys?.openai || globalConfig.apiKeys?.openai || process.env.OPENAI_API_KEY,
         elevenlabs: config.apiKeys?.elevenlabs || globalConfig.apiKeys?.elevenlabs || process.env.ELEVENLABS_API_KEY,
+        groq: config.apiKeys?.groq || globalConfig.apiKeys?.groq || process.env.GROQ_API_KEY,
       },
       tempDir: config.tempDir || globalConfig.tempDir || '/tmp',
     };
   }
 
-  async speak(text: string, options: SpeechOptions = {}): Promise<void> {
+  async speak(text: string, options: SpeakEasyOptions = {}): Promise<void> {
     const cleanText = this.cleanTextForSpeech(text);
     
     if (options.interrupt && this.isPlaying) {
@@ -117,12 +118,17 @@ export class SpeechService {
       case 'elevenlabs':
         await this.speakWithElevenLabs(text);
         break;
+      case 'groq':
+        await this.speakWithGroq(text);
+        break;
       case 'system':
       default:
         await this.speakWithSystem(text);
         break;
     }
   }
+
+
 
   private cleanTextForSpeech(text: string): string {
     return text
@@ -188,6 +194,8 @@ export class SpeechService {
       return this.speakWithSystem(text);
     }
 
+    const BALANCED = 0.5;
+    const NATURAL = 0.5;
     try {
       const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
       
@@ -202,8 +210,8 @@ export class SpeechService {
           text: text,
           model_id: 'eleven_monolingual_v1',
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.5,
+            stability: BALANCED,
+            similarity_boost: NATURAL,
           },
         }),
       });
@@ -226,12 +234,52 @@ export class SpeechService {
     }
   }
 
+  private async speakWithGroq(text: string): Promise<void> {
+    if (!this.config.apiKeys.groq) {
+      console.warn('No Groq API key, falling back to system voice');
+      return this.speakWithSystem(text);
+    }
+
+    try {
+      const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
+      
+      const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKeys.groq}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'tts-1',
+          voice: this.config.openaiVoice || 'nova',
+          input: text,
+          speed: this.config.rate / 200,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Groq API error: ${response.status}`);
+      }
+
+      const audioBuffer = await response.arrayBuffer();
+      fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
+
+      execSync(`afplay "${tempFile}"`);
+      
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    } catch (error) {
+      console.warn('Groq TTS failed, falling back to system voice:', error);
+      return this.speakWithSystem(text);
+    }
+  }
+
   private stopSpeaking(): void {
     try {
       // Kill any running 'say' or 'afplay' processes
       execSync('pkill -f "say|afplay"', { stdio: 'ignore' });
     } catch (error) {
-      // Ignore if no processes to kill
     }
   }
 
@@ -240,26 +288,18 @@ export class SpeechService {
   }
 }
 
-// Factory function for common configurations
-export const createSpeechService = {
-  forNotifications: (): SpeechService => new SpeechService({
-    provider: 'openai',
-    openaiVoice: 'nova',
-    rate: 180,
-  }),
-  
-  forDevelopment: (): SpeechService => new SpeechService({
-    provider: 'system',
-    systemVoice: 'Samantha',
-    rate: 200,
-  }),
-  
-  forProduction: (): SpeechService => new SpeechService({
-    provider: 'elevenlabs',
-    elevenlabsVoiceId: 'EXAVITQu4vr4xnSDxMaL', // Bella
-    rate: 170,
-  }),
+// Convenience functions with provider override
+export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs') => {
+  if (typeof text !== 'string' || !text.trim()) {
+    throw new Error('Text argument is required for say()');
+  }
+  return new SpeakEasy({ provider: provider || 'system' }).speak(text);
 };
 
-// Default instance
-export const defaultSpeechService = createSpeechService.forNotifications();
+export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 'system' | 'openai' | 'elevenlabs' }) => {
+  if (typeof text !== 'string' || !text.trim()) {
+    throw new Error('Text argument is required for speak()');
+  }
+  const { provider, ...speakOptions } = options || {};
+  return new SpeakEasy({ provider: provider || 'system' }).speak(text, speakOptions);
+};
