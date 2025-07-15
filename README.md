@@ -1,66 +1,79 @@
-# Speakeasy 🎤
+# SpeakEasy 🎤
 
-A unified speech library for all your projects with support for multiple TTS providers.
+A unified speech library for all your projects with support for multiple TTS providers and clean configuration structure.
 
 ## Features
 
-- **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs
-- **Smart Fallbacks**: Automatically falls back to system voice if API fails
+- **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq
+- **Smart Fallbacks**: Automatically falls back to available providers
 - **Queue Management**: Handles multiple speech requests with priority
 - **Text Cleaning**: Removes emojis and normalizes text for better speech
 - **TypeScript**: Full type safety
+- **Clean Config**: Nested provider configuration
 
 ## Installation
 
 ```bash
-cd /Users/arach/dev/speech-service
-npm install
-npm run build
+npm install speakeasy
 ```
 
-## Global Configuration
+## Quick Start
 
-Set up a global config file to avoid managing API keys in each project:
+```typescript
+import { createSpeechService } from 'speakeasy';
 
-```bash
-# Create config directory
-mkdir -p ~/.config/speech
-
-# Copy sample config
-cp ~/.config/speech/config.json.sample ~/.config/speech/config.json
-
-# Edit with your API keys
-nano ~/.config/speech/config.json
+const speech = createSpeechService.forNotifications();
+await speech.speak('Hello world!');
 ```
 
-### Global Config Format
+## Configuration
 
-Create `~/.config/speech/config.json`:
+SpeakEasy uses a clean nested configuration structure in `~/.config/speech/config.json`:
 
 ```json
 {
-  "provider": "openai",
-  "openaiVoice": "nova",
-  "rate": 180,
-  "apiKeys": {
-    "openai": "your-openai-api-key",
-    "elevenlabs": "your-elevenlabs-api-key"
+  "providers": {
+    "openai": {
+      "enabled": true,
+      "voice": "nova",
+      "model": "tts-1"
+    },
+    "elevenlabs": {
+      "enabled": true,
+      "voiceId": "EXAVITQu4vr4xnSDxMaL"
+    },
+    "system": {
+      "enabled": true,
+      "voice": "Samantha"
+    },
+    "groq": {
+      "enabled": false,
+      "voice": "nova",
+      "model": "tts-1"
+    }
+  },
+  "defaults": {
+    "provider": "openai",
+    "fallbackOrder": ["openai", "elevenlabs", "system"],
+    "rate": 180
   }
 }
 ```
 
-Configuration priority (highest to lowest):
-1. Constructor parameters
-2. Global config file (`~/.config/speech/config.json`)
-3. Environment variables
-4. Built-in defaults
+### Environment Variables
+
+```bash
+export OPENAI_API_KEY=your_openai_key
+export ELEVENLABS_API_KEY=your_elevenlabs_key
+export GROQ_API_KEY=your_groq_key
+```
 
 ## Usage
 
 ### Basic Usage
 
 ```typescript
-import { SpeechService, createSpeechService } from '@arach/speakeasy';
+import { SpeechService, createSpeechService } from 'speakeasy';
 
 // Use pre-configured instances
 const speech = createSpeechService.forNotifications();
@@ -78,7 +91,7 @@ const customSpeech = new SpeechService({
 
 ```typescript
 // notifications.ts
-import { createSpeechService } from '@arach/speakeasy';
+import { createSpeechService } from 'speakeasy';
 
 const speech = createSpeechService.forNotifications();
 
@@ -87,61 +100,17 @@ export async function speakNotification(message: string, project: string) {
 }
 ```
 
-### Configuration
-
-```typescript
-const speech = new SpeechService({
-  provider: 'openai',           // 'system' | 'openai' | 'elevenlabs'
-  openaiVoice: 'nova',          // OpenAI voice
-  elevenlabsVoiceId: 'voice_id', // ElevenLabs voice ID
-  rate: 180,                    // Speech rate (words per minute)
-  apiKeys: {
-    openai: 'your-key',
-    elevenlabs: 'your-key',
-  },
-});
-```
-
-### Environment Variables
-
-```bash
-export OPENAI_API_KEY=your_openai_key
-export ELEVENLABS_API_KEY=your_elevenlabs_key
-```
-
-## API
-
-### `speak(text: string, options?: SpeechOptions)`
-
-Speak text with optional configuration:
-
-```typescript
-await speech.speak('Hello!', {
-  priority: 'high',    // 'high' | 'normal' | 'low'
-  interrupt: true,     // Interrupt current speech
-  cleanup: true,       // Clean up temp files
-});
-```
-
 ### Factory Functions
 
-- `createSpeechService.forNotifications()` - OpenAI Nova voice
-- `createSpeechService.forDevelopment()` - System Samantha voice  
-- `createSpeechService.forProduction()` - ElevenLabs Bella voice
+- `createSpeechService.forNotifications()` - Best available provider
+- `createSpeechService.forDevelopment()` - System voice
+- `createSpeechService.forProduction()` - ElevenLabs voice
 
 ## Examples
-
-Try the built-in examples:
 
 ```bash
 npm run example
 ```
-
-This will demonstrate:
-- Factory functions with global config
-- Custom configuration
-- Queue management with priorities
-- Different TTS providers
 
 ## Testing
 

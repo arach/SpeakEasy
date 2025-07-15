@@ -1,0 +1,35 @@
+{
+  "providers": {
+    "openai": {
+      "enabled": false,
+      "voice": "nova",
+      "model": "tts-1",
+      "apiKey": "$OPENAI_API_KEY"
+    },
+    "elevenlabs": {
+      "enabled": false,
+      "voiceId": "EXAVITQu4vr4xnSDxMaL",
+      "modelId": "eleven_monolingual_v1",
+      "apiKey": "$ELEVENLABS_API_KEY"
+    },
+    "system": {
+      "enabled": true,
+      "voice": "Samantha"
+    },
+    "groq": {
+      "enabled": false,
+      "voice": "nova",
+      "model": "tts-1",
+      "apiKey": "$GROQ_API_KEY"
+    }
+  },
+  "defaults": {
+    "provider": "system",
+    "fallbackOrder": ["openai", "elevenlabs", "groq", "system"],
+    "rate": 180
+  },
+  "global": {
+    "tempDir": "/tmp",
+    "cleanup": true
+  }
+}

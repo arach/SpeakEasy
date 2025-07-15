@@ -1,5 +1,5 @@
 {
-  "name": "@arach/speakeasy",
+  "name": "speakeasy",
   "version": "1.0.0",
   "description": "SpeakEasy - Unified text-to-speech service with provider abstraction",
   "main": "dist/index.js",
