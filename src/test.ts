@@ -22,7 +22,10 @@ async function testGroq() {
 
 async function testCaching() {
   console.log('\nTesting caching system...');
-  const speaker = new SpeakEasy({ provider: 'openai' }, true);
+  const speaker = new SpeakEasy({ 
+    provider: 'openai',
+    cache: { enabled: true }
+  });
   
   console.log('📊 Cache stats:', await speaker.getCacheStats());
   

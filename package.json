@@ -1,5 +1,5 @@
 {
-  "name": "speakeasy",
+  "name": "@arach/speakeasy",
   "version": "0.1.0",
   "description": "SpeakEasy - Unified text-to-speech service with provider abstraction",
   "private": false,
@@ -9,10 +9,14 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --dts",
+    "build": "tsup src/index.ts src/bin/speakeasy-cli.ts --dts",
     "dev": "tsc --watch",
     "test": "node dist/test.js",
-    "example": "npm run build && node examples/basic-usage.js"
+    "example": "npm run build && node examples/basic-usage.js",
+    "cli": "npm run build && node dist/bin/speakeasy-cli.js"
+  },
+  "bin": {
+    "speakeasy": "./dist/bin/speakeasy-cli.js"
   },
   "keywords": [
     "tts",

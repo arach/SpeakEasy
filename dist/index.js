@@ -35,7 +35,6 @@ __export(src_exports, {
   GroqProvider: () => GroqProvider,
   OpenAIProvider: () => OpenAIProvider,
   SpeakEasy: () => SpeakEasy,
-  SpeakEasyBuilder: () => SpeakEasyBuilder,
   SystemProvider: () => SystemProvider,
   say: () => say,
   speak: () => speak
@@ -273,20 +272,73 @@ var GroqProvider = class {
 
 // src/cache.ts
 var import_keyv = __toESM(require("keyv"));
+var import_sqlite = __toESM(require("@keyv/sqlite"));
 var path4 = __toESM(require("path"));
 var fs4 = __toESM(require("fs"));
 var crypto = __toESM(require("crypto"));
+
+// src/cache-config.ts
+function parseTTL(ttl) {
+  if (typeof ttl === "number")
+    return ttl;
+  const units = {
+    "ms": 1,
+    "s": 1e3,
+    "m": 60 * 1e3,
+    "h": 60 * 60 * 1e3,
+    "d": 24 * 60 * 60 * 1e3,
+    "w": 7 * 24 * 60 * 60 * 1e3,
+    "M": 30 * 24 * 60 * 60 * 1e3,
+    "y": 365 * 24 * 60 * 60 * 1e3
+  };
+  const match = ttl.toString().match(/^(\d+(?:\.\d+)?)([a-zA-Z]+)$/);
+  if (!match)
+    throw new Error(`Invalid TTL format: ${ttl}`);
+  const value = parseFloat(match[1]);
+  const unit = match[2];
+  if (!(unit in units)) {
+    throw new Error(`Invalid TTL unit: ${unit}. Use: ${Object.keys(units).join(", ")}`);
+  }
+  return value * units[unit];
+}
+function parseSize(size) {
+  if (typeof size === "number")
+    return size;
+  const units = {
+    "B": 1,
+    "KB": 1024,
+    "MB": 1024 * 1024,
+    "GB": 1024 * 1024 * 1024,
+    "b": 1,
+    "kb": 1024,
+    "mb": 1024 * 1024,
+    "gb": 1024 * 1024 * 1024
+  };
+  const match = size.toString().match(/^(\d+(?:\.\d+)?)([a-zA-Z]+)$/);
+  if (!match)
+    throw new Error(`Invalid size format: ${size}`);
+  const value = parseFloat(match[1]);
+  const unit = match[2];
+  if (!(unit in units)) {
+    throw new Error(`Invalid size unit: ${unit}. Use: ${Object.keys(units).join(", ")}`);
+  }
+  return value * units[unit];
+}
+
+// src/cache.ts
 var TTSCache = class {
   cache;
   cacheDir;
-  constructor(cacheDir) {
+  maxSize;
+  constructor(cacheDir, ttl = "7d", maxSize) {
     this.cacheDir = cacheDir || path4.join("/tmp", "speakeasy-cache");
     if (!fs4.existsSync(this.cacheDir)) {
       fs4.mkdirSync(this.cacheDir, { recursive: true });
     }
     const dbPath = path4.join(this.cacheDir, "tts-cache.sqlite");
-    this.cache = new import_keyv.default(`sqlite://${dbPath}`);
-    this.cache.opts.ttl = 7 * 24 * 60 * 60 * 1e3;
+    this.cache = new import_keyv.default({ store: new import_sqlite.default(`sqlite://${dbPath}`) });
+    this.cache.opts.ttl = parseTTL(ttl);
+    this.maxSize = maxSize ? parseSize(maxSize) : void 0;
   }
   async get(key) {
     try {
@@ -400,8 +452,8 @@ var SpeakEasy = class {
   isPlaying = false;
   queue = [];
   cache;
-  useCache;
-  constructor(config, useCache = true) {
+  useCache = false;
+  constructor(config) {
     const globalConfig = loadGlobalConfig();
     this.config = {
       provider: config.provider || globalConfig.defaults?.provider || "system",
@@ -416,19 +468,24 @@ var SpeakEasy = class {
       },
       tempDir: config.tempDir || globalConfig.global?.tempDir || "/tmp"
     };
-    this.useCache = useCache;
-    this.cache = new TTSCache(path5.join(this.config.tempDir, "speakeasy-cache"));
+    const cacheConfig = config.cache || globalConfig.cache;
+    this.useCache = cacheConfig?.enabled === true;
+    if (this.useCache && cacheConfig) {
+      const cacheDir = cacheConfig.dir || path5.join(this.config.tempDir || "/tmp", "speakeasy-cache");
+      this.cache = new TTSCache(
+        cacheDir,
+        cacheConfig.ttl || "7d",
+        cacheConfig.maxSize
+      );
+    }
     this.providers = /* @__PURE__ */ new Map();
     this.initializeProviders();
   }
   initializeProviders() {
-    this.providers.set("system", new SystemProvider(this.config.systemVoice));
-    this.providers.set("openai", new OpenAIProvider(this.config.apiKeys.openai || "", this.config.openaiVoice));
-    this.providers.set("elevenlabs", new ElevenLabsProvider(this.config.apiKeys.elevenlabs || "", this.config.elevenlabsVoiceId));
-    this.providers.set("groq", new GroqProvider(this.config.apiKeys.groq || ""));
-  }
-  static builder() {
-    return new SpeakEasyBuilder();
+    this.providers.set("system", new SystemProvider(this.config.systemVoice || "Samantha"));
+    this.providers.set("openai", new OpenAIProvider(this.config.apiKeys?.openai || "", this.config.openaiVoice || "nova"));
+    this.providers.set("elevenlabs", new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || "", this.config.elevenlabsVoiceId || "EXAVITQu4vr4xnSDxMaL"));
+    this.providers.set("groq", new GroqProvider(this.config.apiKeys?.groq || ""));
   }
   async speak(text, options = {}) {
     const cleanText = cleanTextForSpeech(text);
@@ -469,8 +526,9 @@ var SpeakEasy = class {
           const provider = this.providers.get(providerName);
           if (provider && provider.validateConfig()) {
             const voice = this.getVoiceForProvider(providerName);
-            const rate = this.config.rate;
-            if (this.useCache && providerName !== "system") {
+            const rate = this.config.rate || 180;
+            const tempDir = this.config.tempDir || "/tmp";
+            if (this.useCache && providerName !== "system" && this.cache) {
               const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
               const cachedEntry = await this.cache.get(cacheKey);
               if (cachedEntry) {
@@ -483,7 +541,7 @@ var SpeakEasy = class {
               await provider.speak({
                 text,
                 rate,
-                tempDir: this.config.tempDir,
+                tempDir,
                 voice,
                 apiKey: this.getApiKeyForProvider(providerName) || ""
               });
@@ -494,7 +552,7 @@ var SpeakEasy = class {
                 audioBuffer = await generateMethod.call(provider, {
                   text,
                   rate,
-                  tempDir: this.config.tempDir,
+                  tempDir,
                   voice,
                   apiKey: this.getApiKeyForProvider(providerName) || ""
                 });
@@ -502,14 +560,14 @@ var SpeakEasy = class {
                 await provider.speak({
                   text,
                   rate,
-                  tempDir: this.config.tempDir,
+                  tempDir,
                   voice,
                   apiKey: this.getApiKeyForProvider(providerName) || ""
                 });
                 return;
               }
             }
-            if (this.useCache && providerName !== "system" && audioBuffer) {
+            if (this.useCache && providerName !== "system" && this.cache && audioBuffer) {
               const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
               await this.cache.set(cacheKey, {
                 provider: providerName,
@@ -517,14 +575,14 @@ var SpeakEasy = class {
                 rate,
                 text
               }, audioBuffer);
-              const tempFile = path5.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
+              const tempFile = path5.join(tempDir, `speech_${Date.now()}.mp3`);
               fs5.writeFileSync(tempFile, audioBuffer);
               (0, import_child_process5.execSync)(`afplay "${tempFile}"`);
               if (fs5.existsSync(tempFile)) {
                 fs5.unlinkSync(tempFile);
               }
             } else if (audioBuffer) {
-              const tempFile = path5.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
+              const tempFile = path5.join(tempDir, `speech_${Date.now()}.mp3`);
               fs5.writeFileSync(tempFile, audioBuffer);
               (0, import_child_process5.execSync)(`afplay "${tempFile}"`);
               if (fs5.existsSync(tempFile)) {
@@ -547,9 +605,9 @@ var SpeakEasy = class {
     if (systemProvider) {
       await systemProvider.speak({
         text,
-        rate: this.config.rate,
-        tempDir: this.config.tempDir,
-        voice: this.config.systemVoice
+        rate: this.config.rate || 180,
+        tempDir: this.config.tempDir || "/tmp",
+        voice: this.config.systemVoice || "Samantha"
       });
     }
   }
@@ -560,25 +618,25 @@ var SpeakEasy = class {
   getVoiceForProvider(provider) {
     switch (provider) {
       case "openai":
-        return this.config.openaiVoice;
+        return this.config.openaiVoice || "nova";
       case "elevenlabs":
-        return this.config.elevenlabsVoiceId;
+        return this.config.elevenlabsVoiceId || "EXAVITQu4vr4xnSDxMaL";
       case "system":
-        return this.config.systemVoice;
+        return this.config.systemVoice || "Samantha";
       case "groq":
         return "Celeste-PlayAI";
       default:
-        return this.config.systemVoice;
+        return this.config.systemVoice || "Samantha";
     }
   }
   getApiKeyForProvider(provider) {
     switch (provider) {
       case "openai":
-        return this.config.apiKeys.openai || "";
+        return this.config.apiKeys?.openai || "";
       case "elevenlabs":
-        return this.config.apiKeys.elevenlabs || "";
+        return this.config.apiKeys?.elevenlabs || "";
       case "groq":
-        return this.config.apiKeys.groq || "";
+        return this.config.apiKeys?.groq || "";
       default:
         return "";
     }
@@ -589,75 +647,26 @@ var SpeakEasy = class {
     } catch (error) {
     }
   }
-  clearQueue() {
-    this.queue = [];
-  }
-  async clearCache() {
-    await this.cache.clear();
-  }
-  async cleanupCache(maxAge) {
-    await this.cache.cleanup(maxAge);
-  }
-  enableCache() {
-    this.useCache = true;
-  }
-  disableCache() {
-    this.useCache = false;
-  }
   getCacheStats() {
     return Promise.resolve({
       size: 0,
       // Keyv doesn't provide easy way to get size
-      dir: this.cache.getCacheDir()
+      dir: this.cache?.getCacheDir()
     });
   }
 };
-var SpeakEasyBuilder = class {
-  config = {};
-  withProvider(provider) {
-    this.config.provider = provider;
-    return this;
-  }
-  withSystemVoice(voice) {
-    this.config.systemVoice = voice;
-    return this;
-  }
-  withOpenAIVoice(voice) {
-    this.config.openaiVoice = voice;
-    return this;
-  }
-  withElevenLabsVoice(voiceId) {
-    this.config.elevenlabsVoiceId = voiceId;
-    return this;
-  }
-  withRate(rate) {
-    this.config.rate = rate;
-    return this;
-  }
-  withApiKeys(keys) {
-    this.config.apiKeys = { ...this.config.apiKeys, ...keys };
-    return this;
-  }
-  withTempDir(dir) {
-    this.config.tempDir = dir;
-    return this;
-  }
-  build() {
-    return new SpeakEasy(this.config);
-  }
-};
-var say = (text, provider, useCache = true) => {
+var say = (text, provider) => {
   if (typeof text !== "string" || !text.trim()) {
     throw new Error("Text argument is required for say()");
   }
-  return new SpeakEasy({ provider: provider || "system" }, useCache).speak(text);
+  return new SpeakEasy({ provider: provider || "system" }).speak(text);
 };
-var speak = (text, options, useCache = true) => {
+var speak = (text, options) => {
   if (typeof text !== "string" || !text.trim()) {
     throw new Error("Text argument is required for speak()");
   }
   const { provider, ...speakOptions } = options || {};
-  return new SpeakEasy({ provider: provider || "system" }, useCache).speak(text, speakOptions);
+  return new SpeakEasy({ provider: provider || "system" }).speak(text, speakOptions);
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
@@ -666,7 +675,6 @@ var speak = (text, options, useCache = true) => {
   GroqProvider,
   OpenAIProvider,
   SpeakEasy,
-  SpeakEasyBuilder,
   SystemProvider,
   say,
   speak

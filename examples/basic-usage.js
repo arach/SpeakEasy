@@ -1,25 +1,24 @@
 #!/usr/bin/env node
 
 // Basic usage example for the Speakeasy library
-const { SpeechService, createSpeechService } = require('../dist/index.js');
+const { SpeakEasy, say, speak } = require('../dist/index.js');
 
 async function demonstrateBasicUsage() {
   console.log('🎤 Speakeasy Library Examples\n');
 
-  // Example 1: Using factory functions (uses global config)
-  console.log('1️⃣  Using factory functions with global config:');
+  // Example 1: Simple say() function
+  console.log('1️⃣  Using the say() convenience function:');
   try {
-    const speech = createSpeechService.forNotifications();
-    await speech.speak('Hello from the speech service library!');
-    console.log('   ✅ Factory function worked\n');
+    await say('Hello from the say function!');
+    console.log('   ✅ say() function worked\n');
   } catch (error) {
-    console.log('   ⚠️  Factory function failed (probably no API keys):', error.message, '\n');
+    console.log('   ⚠️  say() function failed:', error.message, '\n');
   }
 
   // Example 2: Custom configuration
   console.log('2️⃣  Custom configuration:');
   try {
-    const customSpeech = new SpeechService({
+    const customSpeech = new SpeakEasy({
       provider: 'system',
       systemVoice: 'Alex',
       rate: 200
@@ -33,7 +32,7 @@ async function demonstrateBasicUsage() {
   // Example 3: Queue and priority
   console.log('3️⃣  Queue management with priorities:');
   try {
-    const queueSpeech = createSpeechService.forDevelopment();
+    const queueSpeech = new SpeakEasy({ provider: 'system' });
     
     // Queue multiple messages
     await queueSpeech.speak('This is normal priority message 1');
@@ -51,7 +50,7 @@ async function demonstrateBasicUsage() {
   
   for (const provider of providers) {
     try {
-      const speech = new SpeechService({ provider });
+      const speech = new SpeakEasy({ provider });
       await speech.speak(`Testing ${provider} provider`);
       console.log(`   ✅ ${provider} provider worked`);
     } catch (error) {

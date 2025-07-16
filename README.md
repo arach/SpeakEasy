@@ -118,9 +118,9 @@ export async function speakNotification(message: string, project: string) {
 
 ### Caching
 - **Enabled by default** for OpenAI, ElevenLabs, and Groq providers
-- **7-day TTL** with automatic cleanup
-- **Cache management** methods available on SpeakEasy instances
-- **Storage location**: `/tmp/speakeasy-cache/`
+- **Declarative TTL**: Configure with simple strings like `"7d"`, `"1h"`, `"30m"`
+- **Declarative max size**: Configure with strings like `"100mb"`, `"1gb"`
+- **Storage location**: `/tmp/speakeasy-cache/` by default
 
 ### Convenience
 - `say('text')` - One-liner with system voice and caching
@@ -134,22 +134,31 @@ export async function speakNotification(message: string, project: string) {
 npm run example
 ```
 
-## Cache Management
+## Declarative Caching Configuration
 
 ```typescript
 import { SpeakEasy } from 'speakeasy';
 
-const speaker = new SpeakEasy({ provider: 'openai' });
+// Simple declarative configuration
+const speaker = new SpeakEasy({
+  provider: 'openai',
+  cache: {
+    enabled: true,        // default: true
+    ttl: '7d',           // 7 days - '1h', '30m', '1w', '1M', etc.
+    maxSize: '100mb',    // '1gb', '500mb', etc.
+    dir: '/tmp/my-cache' // custom directory
+  }
+});
 
-// Cache control
-await speaker.clearCache();                    // Clear all cached audio
-await speaker.cleanupCache(24 * 60 * 60 * 1000); // Clean files older than 24h
-speaker.disableCache();                        // Disable caching
-speaker.enableCache();                         // Enable caching
-
-// Cache stats
-const stats = await speaker.getCacheStats();
-console.log('Cache directory:', stats.dir);
+// Using global config
+// ~/.config/speakeasy/settings.json
+{
+  "cache": {
+    "enabled": true,
+    "ttl": "1d",
+    "maxSize": "500mb"
+  }
+}
 ```
 
 ## Testing

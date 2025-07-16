@@ -1,7 +1,16 @@
 import Keyv from 'keyv';
+import KeyvSQLite from '@keyv/sqlite';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import { parseTTL, parseSize } from './cache-config';
+
+interface CacheLogger {
+  debug: (message: string, ...args: any[]) => void;
+  info: (message: string, ...args: any[]) => void;
+  warn: (message: string, ...args: any[]) => void;
+  error: (message: string, ...args: any[]) => void;
+}
 
 export interface CacheEntry {
   audioFilePath: string;
@@ -15,20 +24,37 @@ export interface CacheEntry {
 export class TTSCache {
   private cache: Keyv<CacheEntry>;
   private cacheDir: string;
+  private maxSize?: number;
+  private logger: CacheLogger;
 
-  constructor(cacheDir?: string) {
+  constructor(cacheDir: string, ttl: string | number = '7d', maxSize?: string | number, logger?: CacheLogger) {
     this.cacheDir = cacheDir || path.join('/tmp', 'speakeasy-cache');
+    this.logger = logger || this.createDefaultLogger();
+    
+    this.logger.debug('Initializing TTSCache with dir:', this.cacheDir, 'ttl:', ttl, 'maxSize:', maxSize);
     
     // Ensure cache directory exists
     if (!fs.existsSync(this.cacheDir)) {
+      this.logger.debug('Creating cache directory:', this.cacheDir);
       fs.mkdirSync(this.cacheDir, { recursive: true });
     }
 
     const dbPath = path.join(this.cacheDir, 'tts-cache.sqlite');
-    this.cache = new Keyv(`sqlite://${dbPath}`);
+    this.logger.debug('Database path:', dbPath);
+    this.cache = new Keyv({ store: new KeyvSQLite(`sqlite://${dbPath}`) });
     
-    // Set default TTL to 7 days
-    this.cache.opts.ttl = 7 * 24 * 60 * 60 * 1000;
+    // Set configurable TTL
+    this.cache.opts.ttl = parseTTL(ttl);
+    this.maxSize = maxSize ? parseSize(maxSize) : undefined;
+  }
+
+  private createDefaultLogger(): CacheLogger {
+    return {
+      debug: () => {}, // No logging by default
+      info: console.log,
+      warn: console.warn,
+      error: console.error
+    };
   }
 
   async get(key: string): Promise<CacheEntry | undefined> {

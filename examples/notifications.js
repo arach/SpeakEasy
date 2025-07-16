@@ -1,11 +1,11 @@
 // Notification system use case
 import { SpeakEasy } from 'speakeasy';
 
-const notificationSpeaker = SpeakEasy.builder()
-  .withProvider('system')
-  .withSystemVoice('Samantha')
-  .withRate(200)
-  .build();
+const notificationSpeaker = new SpeakEasy({
+  provider: 'system',
+  systemVoice: 'Samantha',
+  rate: 200
+});
 
 // Priority-based notifications
 export const notify = async (message, priority = 'normal') => {

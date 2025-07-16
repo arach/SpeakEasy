@@ -24,6 +24,12 @@ export interface SpeakEasyConfig {
     groq?: string;
   };
   tempDir?: string;
+  cache?: {
+    enabled?: boolean;
+    ttl?: string | number; // '7d', '1h', 86400000, etc.
+    maxSize?: string | number; // '100mb', '1gb', 104857600, etc.
+    dir?: string;
+  };
 }
 
 export interface SpeakEasyOptions {
@@ -65,5 +71,11 @@ export interface GlobalConfig {
   global?: {
     tempDir?: string;
     cleanup?: boolean;
+  };
+  cache?: {
+    enabled?: boolean;
+    ttl?: string | number; // '7d', '1h', 86400000, etc.
+    maxSize?: string | number; // '100mb', '1gb', 104857600, etc.
+    dir?: string;
   };
 }
