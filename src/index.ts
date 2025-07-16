@@ -1,46 +1,19 @@
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import fetch from 'node-fetch';
+import { 
+  SpeakEasyConfig, 
+  SpeakEasyOptions, 
+  GlobalConfig, 
+  Provider 
+} from './types';
+import { SystemProvider } from './providers/system';
+import { OpenAIProvider } from './providers/openai';
+import { ElevenLabsProvider } from './providers/elevenlabs';
+import { GroqProvider } from './providers/groq';
 
 const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
-
-interface GlobalConfig {
-  providers?: {
-    openai?: {
-      enabled?: boolean;
-      voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
-      model?: string;
-      apiKey?: string;
-    };
-    elevenlabs?: {
-      enabled?: boolean;
-      voiceId?: string;
-      modelId?: string;
-      apiKey?: string;
-    };
-    system?: {
-      enabled?: boolean;
-      voice?: string;
-    };
-    groq?: {
-      enabled?: boolean;
-      voice?: string;
-      model?: string;
-      apiKey?: string;
-    };
-  };
-  defaults?: {
-    provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
-    fallbackOrder?: string[];
-    rate?: number;
-  };
-  global?: {
-    tempDir?: string;
-    cleanup?: boolean;
-  };
-}
 
 function loadGlobalConfig(): GlobalConfig {
   try {
@@ -54,28 +27,17 @@ function loadGlobalConfig(): GlobalConfig {
   return {};
 }
 
-export interface SpeakEasyConfig {
-  provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
-  systemVoice?: string;
-  openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
-  elevenlabsVoiceId?: string;
-  rate?: number;
-  apiKeys?: {
-    openai?: string;
-    elevenlabs?: string;
-    groq?: string;
-  };
-  tempDir?: string;
-}
-
-export interface SpeakEasyOptions {
-  priority?: 'high' | 'normal' | 'low';
-  interrupt?: boolean;
-  cleanup?: boolean;
+function cleanTextForSpeech(text: string): string {
+  return text
+    .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, '')
+    .replace(/[^\w\s.,!?'-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export class SpeakEasy {
   private config: Required<SpeakEasyConfig>;
+  private providers: Map<string, Provider>;
   private isPlaying = false;
   private queue: Array<{ text: string; options: SpeakEasyOptions }> = [];
 
@@ -95,10 +57,24 @@ export class SpeakEasy {
       },
       tempDir: config.tempDir || globalConfig.global?.tempDir || '/tmp',
     };
+
+    this.providers = new Map();
+    this.initializeProviders();
+  }
+
+  private initializeProviders(): void {
+    this.providers.set('system', new SystemProvider(this.config.systemVoice));
+    this.providers.set('openai', new OpenAIProvider(this.config.apiKeys.openai || '', this.config.openaiVoice));
+    this.providers.set('elevenlabs', new ElevenLabsProvider(this.config.apiKeys.elevenlabs || '', this.config.elevenlabsVoiceId));
+    this.providers.set('groq', new GroqProvider(this.config.apiKeys.groq || ''));
+  }
+
+  static builder() {
+    return new SpeakEasyBuilder();
   }
 
   async speak(text: string, options: SpeakEasyOptions = {}): Promise<void> {
-    const cleanText = this.cleanTextForSpeech(text);
+    const cleanText = cleanTextForSpeech(text);
     
     if (options.interrupt && this.isPlaying) {
       this.stopSpeaking();
@@ -127,7 +103,6 @@ export class SpeakEasy {
       console.error('Speech error:', error);
     } finally {
       this.isPlaying = false;
-      // Process next item in queue
       if (this.queue.length > 0) {
         await this.processQueue();
       }
@@ -135,195 +110,71 @@ export class SpeakEasy {
   }
 
   private async speakText(text: string): Promise<void> {
-    switch (this.config.provider) {
-      case 'openai':
-        await this.speakWithOpenAI(text);
-        break;
-      case 'elevenlabs':
-        await this.speakWithElevenLabs(text);
-        break;
-      case 'groq':
-        await this.speakWithGroq(text);
-        break;
-      case 'system':
-      default:
-        await this.speakWithSystem(text);
-        break;
-    }
-  }
+    const providers = ['system', 'openai', 'elevenlabs', 'groq'];
+    let lastError: Error | null = null;
 
-
-
-  private cleanTextForSpeech(text: string): string {
-    return text
-      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, '')
-      .replace(/[^\w\s.,!?'-]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  private async speakWithSystem(text: string): Promise<void> {
-    try {
-      const command = `say -v ${this.config.systemVoice} -r ${this.config.rate} "${text.replace(/"/g, '\\"')}"`;
-      execSync(command);
-    } catch (error) {
-      throw new Error(`System TTS failed: ${error}`);
-    }
-  }
-
-  private async speakWithOpenAI(text: string): Promise<void> {
-    const openaiKey = this.config.apiKeys.openai;
-    console.log('speakWithOpenAI: checking API key...');
-    console.log('  config.apiKeys.openai:', this.config.apiKeys.openai);
-    console.log('  resolved openaiKey:', openaiKey);
-    console.log('  process.env.OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
-    
-    if (!openaiKey) {
-      console.warn('No OpenAI API key, falling back to system voice');
-      return this.speakWithSystem(text);
+    for (const providerName of providers) {
+      if (providerName === this.config.provider || lastError) {
+        try {
+          const provider = this.providers.get(providerName);
+          if (provider && provider.validateConfig()) {
+            await provider.speak({
+              text,
+              rate: this.config.rate,
+              tempDir: this.config.tempDir,
+              voice: this.getVoiceForProvider(providerName),
+              apiKey: this.getApiKeyForProvider(providerName) || ''
+            });
+            return;
+          }
+        } catch (error) {
+          console.warn(`${providerName} provider failed:`, error);
+          lastError = error as Error;
+          continue;
+        }
+      }
     }
 
-    try {
-      const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
-      
-      const response = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKeys.openai}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'tts-1',
-          voice: this.config.openaiVoice,
-          input: text,
-          speed: this.config.rate / 200,
-        }),
+    if (lastError) {
+      throw new Error(`All providers failed. Last error: ${lastError.message}`);
+    }
+
+    // Fallback to system voice
+    const systemProvider = this.providers.get('system');
+    if (systemProvider) {
+      await systemProvider.speak({
+        text,
+        rate: this.config.rate,
+        tempDir: this.config.tempDir,
+        voice: this.config.systemVoice
       });
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
-      }
-
-      const audioBuffer = await response.arrayBuffer();
-      fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
-
-      execSync(`afplay "${tempFile}"`);
-      
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
-    } catch (error) {
-      console.warn('OpenAI TTS failed, falling back to system voice:', error);
-      return this.speakWithSystem(text);
     }
   }
 
-  private async speakWithElevenLabs(text: string): Promise<void> {
-    const elevenlabsKey = this.config.apiKeys.elevenlabs;
-    console.log('speakWithElevenLabs: checking API key...');
-    console.log('  config.apiKeys.elevenlabs:', this.config.apiKeys.elevenlabs);
-    console.log('  resolved elevenlabsKey:', elevenlabsKey);
-    console.log('  process.env.ELEVENLABS_API_KEY:', process.env.ELEVENLABS_API_KEY);
-    
-    if (!elevenlabsKey) {
-      console.warn('No ElevenLabs API key, falling back to system voice');
-      return this.speakWithSystem(text);
-    }
-
-    const BALANCED = 0.5;
-    const NATURAL = 0.5;
-    try {
-      const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
-      
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${this.config.elevenlabsVoiceId}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': this.config.apiKeys.elevenlabs || '',
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: {
-            stability: BALANCED,
-            similarity_boost: NATURAL,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`ElevenLabs API error: ${response.status}`);
-      }
-
-      const audioBuffer = await response.arrayBuffer();
-      fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
-
-      execSync(`afplay "${tempFile}"`);
-      
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
-    } catch (error) {
-      console.warn('ElevenLabs TTS failed, falling back to system voice:', error);
-      return this.speakWithSystem(text);
+  private getVoiceForProvider(provider: string): string {
+    switch (provider) {
+      case 'openai': return this.config.openaiVoice;
+      case 'elevenlabs': return this.config.elevenlabsVoiceId;
+      case 'system': return this.config.systemVoice;
+      case 'groq': return 'Celeste-PlayAI';
+      default: return this.config.systemVoice;
     }
   }
 
-  private async speakWithGroq(text: string): Promise<void> {
-    const groqKey = this.config.apiKeys.groq;
-    console.log('speakWithGroq - API key:', groqKey);
-    
-    if (!groqKey) {
-      console.warn('No Groq API key, falling back to system voice');
-      return this.speakWithSystem(text);
-    }
-
-
-
-    try {
-      const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
-      
-    
-    
-
-      const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'playai-tts',
-          voice: 'Celeste-PlayAI',
-          input: text,
-          speed: this.config.rate / 200,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Groq API error: ${response.status}`);
-      }
-
-      const audioBuffer = await response.arrayBuffer();
-      fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
-
-      execSync(`afplay "${tempFile}"`);
-      
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
-    } catch (error) {
-      console.warn('***** Groq TTS failed, falling back to system voice:', error);
-      return this.speakWithSystem(text);
+  private getApiKeyForProvider(provider: string): string {
+    switch (provider) {
+      case 'openai': return this.config.apiKeys.openai || '';
+      case 'elevenlabs': return this.config.apiKeys.elevenlabs || '';
+      case 'groq': return this.config.apiKeys.groq || '';
+      default: return '';
     }
   }
 
   private stopSpeaking(): void {
     try {
-      // Kill any running 'say' or 'afplay' processes
       execSync('pkill -f "say|afplay"', { stdio: 'ignore' });
     } catch (error) {
+      // Ignore errors when killing processes
     }
   }
 
@@ -332,7 +183,50 @@ export class SpeakEasy {
   }
 }
 
-// Convenience functions with provider override
+export class SpeakEasyBuilder {
+  private config: SpeakEasyConfig = {};
+
+  withProvider(provider: 'system' | 'openai' | 'elevenlabs' | 'groq'): this {
+    this.config.provider = provider;
+    return this;
+  }
+
+  withSystemVoice(voice: string): this {
+    this.config.systemVoice = voice;
+    return this;
+  }
+
+  withOpenAIVoice(voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'): this {
+    this.config.openaiVoice = voice;
+    return this;
+  }
+
+  withElevenLabsVoice(voiceId: string): this {
+    this.config.elevenlabsVoiceId = voiceId;
+    return this;
+  }
+
+  withRate(rate: number): this {
+    this.config.rate = rate;
+    return this;
+  }
+
+  withApiKeys(keys: Partial<SpeakEasyConfig['apiKeys']>): this {
+    this.config.apiKeys = { ...this.config.apiKeys, ...keys };
+    return this;
+  }
+
+  withTempDir(dir: string): this {
+    this.config.tempDir = dir;
+    return this;
+  }
+
+  build(): SpeakEasy {
+    return new SpeakEasy(this.config);
+  }
+}
+
+// Convenience functions
 export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs' | 'groq') => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Text argument is required for say()');
@@ -340,10 +234,16 @@ export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs' 
   return new SpeakEasy({ provider: provider || 'system' }).speak(text);
 };
 
-export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 'system' | 'openai' | 'elevenlabs' }) => {
+export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' }) => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Text argument is required for speak()');
   }
   const { provider, ...speakOptions } = options || {};
   return new SpeakEasy({ provider: provider || 'system' }).speak(text, speakOptions);
 };
+
+export * from './types';
+export { SystemProvider } from './providers/system';
+export { OpenAIProvider } from './providers/openai';
+export { ElevenLabsProvider } from './providers/elevenlabs';
+export { GroqProvider } from './providers/groq';

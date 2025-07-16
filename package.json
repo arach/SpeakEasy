@@ -1,11 +1,15 @@
 {
   "name": "speakeasy",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "SpeakEasy - Unified text-to-speech service with provider abstraction",
+  "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup src/index.ts --dts",
     "dev": "tsc --watch",
     "test": "node dist/test.js",
     "example": "npm run build && node examples/basic-usage.js"
@@ -17,7 +21,8 @@
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "tsup": "^7.0.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
   }
 }

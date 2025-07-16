@@ -18,8 +18,8 @@ Each provider has automatic fallback to system voice if API keys are missing or 
 ## Key Components
 
 ### Core Classes
-- `SpeechService` (src/index.ts:25-211): Main service with queue management
-- Factory functions (src/index.ts:214-232): Pre-configured instances for common use cases
+- `SpeakEasy` (src/index.ts:77-321): Main class with queue management
+- Convenience functions: `say()` and `speak()` for quick usage
 
 ### Queue System
 - Priority-based queue (`high`, `normal`, `low`)
@@ -59,20 +59,22 @@ export ELEVENLABS_API_KEY=your_key
 
 ### Quick Start
 ```typescript
-import { createSpeechService } from '@arach/speech-service';
+import { SpeakEasy, say } from 'speakeasy';
 
-const speech = createSpeechService.forNotifications();
-await speech.speak('Hello world');
-```
+// One-liner
+await say('Hello world');
 
-### Custom Configuration
-```typescript
-const speech = new SpeechService({
+// With options
+await say('Hello world', 'openai');
+
+// Full configuration
+const speaker = new SpeakEasy({
   provider: 'openai',
   openaiVoice: 'nova',
   rate: 180,
   apiKeys: { openai: 'key' }
 });
+await speaker.speak('Hello world');
 ```
 
 ## Testing Strategy
