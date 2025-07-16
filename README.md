@@ -5,6 +5,7 @@ A unified speech library for all your projects with support for multiple TTS pro
 ## Features
 
 - **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq
+- **Smart Caching**: Caches generated audio for faster subsequent requests
 - **Smart Fallbacks**: Automatically falls back to available providers
 - **Queue Management**: Handles multiple speech requests with priority
 - **Text Cleaning**: Removes emojis and normalizes text for better speech
@@ -115,11 +116,17 @@ export async function speakNotification(message: string, project: string) {
 }
 ```
 
+### Caching
+- **Enabled by default** for OpenAI, ElevenLabs, and Groq providers
+- **7-day TTL** with automatic cleanup
+- **Cache management** methods available on SpeakEasy instances
+- **Storage location**: `/tmp/speakeasy-cache/`
+
 ### Convenience
-- `say('text')` - One-liner with system voice
-- `say('text', 'openai' | 'elevenlabs' | 'groq')` - One-liner with provider
-- `speak('text', options)` - Full featured with options
-- `new SpeakEasy()` - Full control
+- `say('text')` - One-liner with system voice and caching
+- `say('text', 'openai' | 'elevenlabs' | 'groq')` - One-liner with provider and caching
+- `say('text', provider, false)` - Disable caching for specific call
+- `speak('text', options, false)` - Full featured with caching control
 
 ## Examples
 
@@ -127,9 +134,28 @@ export async function speakNotification(message: string, project: string) {
 npm run example
 ```
 
+## Cache Management
+
+```typescript
+import { SpeakEasy } from 'speakeasy';
+
+const speaker = new SpeakEasy({ provider: 'openai' });
+
+// Cache control
+await speaker.clearCache();                    // Clear all cached audio
+await speaker.cleanupCache(24 * 60 * 60 * 1000); // Clean files older than 24h
+speaker.disableCache();                        // Disable caching
+speaker.enableCache();                         // Enable caching
+
+// Cache stats
+const stats = await speaker.getCacheStats();
+console.log('Cache directory:', stats.dir);
+```
+
 ## Testing
 
 ```bash
 npm run build
 npm test
+npm test cache  # Test caching specifically
 ```

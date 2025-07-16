@@ -14,6 +14,19 @@ export class ElevenLabsProvider implements Provider {
   }
 
   async speak(config: ProviderConfig): Promise<void> {
+    const audioBuffer = await this.generateAudio(config);
+    if (audioBuffer) {
+      const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
+      fs.writeFileSync(tempFile, audioBuffer);
+      execSync(`afplay "${tempFile}"`);
+      
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    }
+  }
+
+  async generateAudio(config: ProviderConfig): Promise<Buffer | null> {
     if (!this.apiKey) {
       throw new Error('ElevenLabs API key is required');
     }
@@ -22,8 +35,6 @@ export class ElevenLabsProvider implements Provider {
     const NATURAL = 0.5;
     
     try {
-      const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
-      
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${this.voiceId}`, {
         method: 'POST',
         headers: {
@@ -51,13 +62,7 @@ export class ElevenLabsProvider implements Provider {
       }
 
       const audioBuffer = await response.arrayBuffer();
-      fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
-
-      execSync(`afplay "${tempFile}"`);
-      
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
+      return Buffer.from(audioBuffer);
     } catch (error) {
       throw new Error(`ElevenLabs TTS failed: ${error}`);
     }

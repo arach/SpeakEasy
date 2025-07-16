@@ -77,6 +77,7 @@ declare class OpenAIProvider implements Provider {
     private voice;
     constructor(apiKey?: string, voice?: string);
     speak(config: ProviderConfig): Promise<void>;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
     validateConfig(): boolean;
     getErrorMessage(error: any): string;
 }
@@ -86,6 +87,7 @@ declare class ElevenLabsProvider implements Provider {
     private voiceId;
     constructor(apiKey?: string, voiceId?: string);
     speak(config: ProviderConfig): Promise<void>;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
     validateConfig(): boolean;
     getErrorMessage(error: any): string;
 }
@@ -95,6 +97,7 @@ declare class GroqProvider implements Provider {
     private voice;
     constructor(apiKey?: string, voice?: string);
     speak(config: ProviderConfig): Promise<void>;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
     validateConfig(): boolean;
     getErrorMessage(error: any): string;
 }
@@ -105,16 +108,27 @@ declare class SpeakEasy {
     private providers;
     private isPlaying;
     private queue;
-    constructor(config: SpeakEasyConfig);
+    private cache;
+    private useCache;
+    constructor(config: SpeakEasyConfig, useCache?: boolean);
     private initializeProviders;
     static builder(): SpeakEasyBuilder;
     speak(text: string, options?: SpeakEasyOptions): Promise<void>;
     private processQueue;
     private speakText;
+    private playCachedAudio;
     private getVoiceForProvider;
     private getApiKeyForProvider;
     private stopSpeaking;
     clearQueue(): void;
+    clearCache(): Promise<void>;
+    cleanupCache(maxAge?: number): Promise<void>;
+    enableCache(): void;
+    disableCache(): void;
+    getCacheStats(): Promise<{
+        size: number;
+        dir: string;
+    }>;
 }
 declare class SpeakEasyBuilder {
     private config;
@@ -127,9 +141,9 @@ declare class SpeakEasyBuilder {
     withTempDir(dir: string): this;
     build(): SpeakEasy;
 }
-declare const say: (text: string, provider?: "system" | "openai" | "elevenlabs" | "groq") => Promise<void>;
+declare const say: (text: string, provider?: "system" | "openai" | "elevenlabs" | "groq", useCache?: boolean) => Promise<void>;
 declare const speak: (text: string, options?: SpeakEasyOptions & {
     provider?: "system" | "openai" | "elevenlabs" | "groq";
-}) => Promise<void>;
+}, useCache?: boolean) => Promise<void>;
 
-export { CONFIG_FILE, ElevenLabsProvider, type GlobalConfig, GroqProvider, OpenAIProvider, type Provider, type ProviderConfig, SpeakEasy, SpeakEasyBuilder, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, say, speak };
+export { CONFIG_FILE, ElevenLabsProvider, GlobalConfig, GroqProvider, OpenAIProvider, Provider, ProviderConfig, SpeakEasy, SpeakEasyBuilder, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, say, speak };

@@ -1,8 +1,8 @@
 {
   "name": "speakeasy",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "SpeakEasy - Unified text-to-speech service with provider abstraction",
-  "private": true,
+  "private": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -14,15 +14,22 @@
     "test": "node dist/test.js",
     "example": "npm run build && node examples/basic-usage.js"
   },
-  "keywords": ["tts", "speech", "openai", "elevenlabs"],
+  "keywords": [
+    "tts",
+    "speech",
+    "openai",
+    "elevenlabs"
+  ],
   "author": "arach",
   "license": "MIT",
   "dependencies": {
+    "@keyv/sqlite": "^4.0.5",
+    "keyv": "^5.3.4",
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "tsup": "^7.0.0",
-    "typescript": "^5.0.0",
-    "@types/node": "^20.0.0"
+    "typescript": "^5.0.0"
   }
 }

@@ -11,6 +11,7 @@ import { SystemProvider } from './providers/system';
 import { OpenAIProvider } from './providers/openai';
 import { ElevenLabsProvider } from './providers/elevenlabs';
 import { GroqProvider } from './providers/groq';
+import { TTSCache } from './cache';
 
 const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
@@ -40,8 +41,10 @@ export class SpeakEasy {
   private providers: Map<string, Provider>;
   private isPlaying = false;
   private queue: Array<{ text: string; options: SpeakEasyOptions }> = [];
+  private cache: TTSCache;
+  private useCache: boolean;
 
-  constructor(config: SpeakEasyConfig) {
+  constructor(config: SpeakEasyConfig, useCache = true) {
     const globalConfig = loadGlobalConfig();
     
     this.config = {
@@ -58,6 +61,8 @@ export class SpeakEasy {
       tempDir: config.tempDir || globalConfig.global?.tempDir || '/tmp',
     };
 
+    this.useCache = useCache;
+    this.cache = new TTSCache(path.join(this.config.tempDir, 'speakeasy-cache'));
     this.providers = new Map();
     this.initializeProviders();
   }
@@ -118,13 +123,87 @@ export class SpeakEasy {
         try {
           const provider = this.providers.get(providerName);
           if (provider && provider.validateConfig()) {
-            await provider.speak({
-              text,
-              rate: this.config.rate,
-              tempDir: this.config.tempDir,
-              voice: this.getVoiceForProvider(providerName),
-              apiKey: this.getApiKeyForProvider(providerName) || ''
-            });
+            const voice = this.getVoiceForProvider(providerName);
+            const rate = this.config.rate;
+            
+            // Check cache first if caching is enabled
+            if (this.useCache && providerName !== 'system') {
+              const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
+              const cachedEntry = await this.cache.get(cacheKey);
+              
+              if (cachedEntry) {
+                // Play cached audio file
+                await this.playCachedAudio(cachedEntry.audioFilePath);
+                return;
+              }
+            }
+
+            // Generate new audio
+            let audioBuffer: Buffer | null = null;
+            
+            if (providerName === 'system') {
+              // System provider doesn't support caching, use speak directly
+              await provider.speak({
+                text,
+                rate,
+                tempDir: this.config.tempDir,
+                voice,
+                apiKey: this.getApiKeyForProvider(providerName) || ''
+              });
+              return;
+            } else {
+              // Use generateAudio for cacheable providers
+              const generateMethod = (provider as any).generateAudio;
+              if (generateMethod) {
+                audioBuffer = await generateMethod.call(provider, {
+                  text,
+                  rate,
+                  tempDir: this.config.tempDir,
+                  voice,
+                  apiKey: this.getApiKeyForProvider(providerName) || ''
+                });
+              } else {
+                // Fallback for providers without generateAudio
+                await provider.speak({
+                  text,
+                  rate,
+                  tempDir: this.config.tempDir,
+                  voice,
+                  apiKey: this.getApiKeyForProvider(providerName) || ''
+                });
+                return;
+              }
+            }
+
+            // Cache the audio if enabled and buffer was returned
+            if (this.useCache && providerName !== 'system' && audioBuffer) {
+              const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
+              await this.cache.set(cacheKey, {
+                provider: providerName,
+                voice,
+                rate,
+                text
+              }, audioBuffer);
+              
+              // Play the generated audio
+              const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
+              fs.writeFileSync(tempFile, audioBuffer);
+              execSync(`afplay "${tempFile}"`);
+              
+              if (fs.existsSync(tempFile)) {
+                fs.unlinkSync(tempFile);
+              }
+            } else if (audioBuffer) {
+              // Play directly if no caching
+              const tempFile = path.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
+              fs.writeFileSync(tempFile, audioBuffer);
+              execSync(`afplay "${tempFile}"`);
+              
+              if (fs.existsSync(tempFile)) {
+                fs.unlinkSync(tempFile);
+              }
+            }
+
             return;
           }
         } catch (error) {
@@ -139,7 +218,7 @@ export class SpeakEasy {
       throw new Error(`All providers failed. Last error: ${lastError.message}`);
     }
 
-    // Fallback to system voice
+    // Fallback to system voice (never cached)
     const systemProvider = this.providers.get('system');
     if (systemProvider) {
       await systemProvider.speak({
@@ -149,6 +228,12 @@ export class SpeakEasy {
         voice: this.config.systemVoice
       });
     }
+  }
+
+  private async playCachedAudio(audioFilePath: string): Promise<void> {
+    // Play cached audio file using system audio player
+    const { execSync } = require('child_process');
+    execSync(`afplay "${audioFilePath}"`, { stdio: 'inherit' });
   }
 
   private getVoiceForProvider(provider: string): string {
@@ -180,6 +265,29 @@ export class SpeakEasy {
 
   clearQueue(): void {
     this.queue = [];
+  }
+
+  async clearCache(): Promise<void> {
+    await this.cache.clear();
+  }
+
+  async cleanupCache(maxAge?: number): Promise<void> {
+    await this.cache.cleanup(maxAge);
+  }
+
+  enableCache(): void {
+    this.useCache = true;
+  }
+
+  disableCache(): void {
+    this.useCache = false;
+  }
+
+  getCacheStats(): Promise<{ size: number, dir: string }> {
+    return Promise.resolve({
+      size: 0, // Keyv doesn't provide easy way to get size
+      dir: this.cache.getCacheDir()
+    });
   }
 }
 
@@ -227,19 +335,19 @@ export class SpeakEasyBuilder {
 }
 
 // Convenience functions
-export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs' | 'groq') => {
+export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs' | 'groq', useCache = true) => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Text argument is required for say()');
   }
-  return new SpeakEasy({ provider: provider || 'system' }).speak(text);
+  return new SpeakEasy({ provider: provider || 'system' }, useCache).speak(text);
 };
 
-export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' }) => {
+export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' }, useCache = true) => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Text argument is required for speak()');
   }
   const { provider, ...speakOptions } = options || {};
-  return new SpeakEasy({ provider: provider || 'system' }).speak(text, speakOptions);
+  return new SpeakEasy({ provider: provider || 'system' }, useCache).speak(text, speakOptions);
 };
 
 export * from './types';

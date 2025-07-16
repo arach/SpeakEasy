@@ -42,8 +42,8 @@ __export(src_exports, {
 });
 module.exports = __toCommonJS(src_exports);
 var import_child_process5 = require("child_process");
-var fs4 = __toESM(require("fs"));
-var path4 = __toESM(require("path"));
+var fs5 = __toESM(require("fs"));
+var path5 = __toESM(require("path"));
 
 // src/providers/system.ts
 var import_child_process = require("child_process");
@@ -81,11 +81,21 @@ var OpenAIProvider = class {
     this.voice = voice;
   }
   async speak(config) {
+    const audioBuffer = await this.generateAudio(config);
+    if (audioBuffer) {
+      const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
+      fs.writeFileSync(tempFile, audioBuffer);
+      (0, import_child_process2.execSync)(`afplay "${tempFile}"`);
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    }
+  }
+  async generateAudio(config) {
     if (!this.apiKey) {
       throw new Error("OpenAI API key is required");
     }
     try {
-      const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
       const response = await (0, import_node_fetch.default)("https://api.openai.com/v1/audio/speech", {
         method: "POST",
         headers: {
@@ -108,11 +118,7 @@ var OpenAIProvider = class {
         throw new Error(`OpenAI API error: ${response.status}. Check your API key and rate limits.`);
       }
       const audioBuffer = await response.arrayBuffer();
-      fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
-      (0, import_child_process2.execSync)(`afplay "${tempFile}"`);
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
+      return Buffer.from(audioBuffer);
     } catch (error) {
       throw new Error(`OpenAI TTS failed: ${error}`);
     }
@@ -141,13 +147,23 @@ var ElevenLabsProvider = class {
     this.voiceId = voiceId;
   }
   async speak(config) {
+    const audioBuffer = await this.generateAudio(config);
+    if (audioBuffer) {
+      const tempFile = path2.join(config.tempDir, `speech_${Date.now()}.mp3`);
+      fs2.writeFileSync(tempFile, audioBuffer);
+      (0, import_child_process3.execSync)(`afplay "${tempFile}"`);
+      if (fs2.existsSync(tempFile)) {
+        fs2.unlinkSync(tempFile);
+      }
+    }
+  }
+  async generateAudio(config) {
     if (!this.apiKey) {
       throw new Error("ElevenLabs API key is required");
     }
     const BALANCED = 0.5;
     const NATURAL = 0.5;
     try {
-      const tempFile = path2.join(config.tempDir, `speech_${Date.now()}.mp3`);
       const response = await (0, import_node_fetch2.default)(`https://api.elevenlabs.io/v1/text-to-speech/${this.voiceId}`, {
         method: "POST",
         headers: {
@@ -173,11 +189,7 @@ var ElevenLabsProvider = class {
         throw new Error(`ElevenLabs API error: ${response.status}`);
       }
       const audioBuffer = await response.arrayBuffer();
-      fs2.writeFileSync(tempFile, Buffer.from(audioBuffer));
-      (0, import_child_process3.execSync)(`afplay "${tempFile}"`);
-      if (fs2.existsSync(tempFile)) {
-        fs2.unlinkSync(tempFile);
-      }
+      return Buffer.from(audioBuffer);
     } catch (error) {
       throw new Error(`ElevenLabs TTS failed: ${error}`);
     }
@@ -206,11 +218,21 @@ var GroqProvider = class {
     this.voice = voice;
   }
   async speak(config) {
+    const audioBuffer = await this.generateAudio(config);
+    if (audioBuffer) {
+      const tempFile = path3.join(config.tempDir, `speech_${Date.now()}.mp3`);
+      fs3.writeFileSync(tempFile, audioBuffer);
+      (0, import_child_process4.execSync)(`afplay "${tempFile}"`);
+      if (fs3.existsSync(tempFile)) {
+        fs3.unlinkSync(tempFile);
+      }
+    }
+  }
+  async generateAudio(config) {
     if (!this.apiKey) {
       throw new Error("Groq API key is required");
     }
     try {
-      const tempFile = path3.join(config.tempDir, `speech_${Date.now()}.mp3`);
       const response = await (0, import_node_fetch3.default)("https://api.groq.com/openai/v1/audio/speech", {
         method: "POST",
         headers: {
@@ -233,11 +255,7 @@ var GroqProvider = class {
         throw new Error(`Groq API error: ${response.status}`);
       }
       const audioBuffer = await response.arrayBuffer();
-      fs3.writeFileSync(tempFile, Buffer.from(audioBuffer));
-      (0, import_child_process4.execSync)(`afplay "${tempFile}"`);
-      if (fs3.existsSync(tempFile)) {
-        fs3.unlinkSync(tempFile);
-      }
+      return Buffer.from(audioBuffer);
     } catch (error) {
       throw new Error(`Groq TTS failed: ${error}`);
     }
@@ -253,13 +271,119 @@ var GroqProvider = class {
   }
 };
 
+// src/cache.ts
+var import_keyv = __toESM(require("keyv"));
+var path4 = __toESM(require("path"));
+var fs4 = __toESM(require("fs"));
+var crypto = __toESM(require("crypto"));
+var TTSCache = class {
+  cache;
+  cacheDir;
+  constructor(cacheDir) {
+    this.cacheDir = cacheDir || path4.join("/tmp", "speakeasy-cache");
+    if (!fs4.existsSync(this.cacheDir)) {
+      fs4.mkdirSync(this.cacheDir, { recursive: true });
+    }
+    const dbPath = path4.join(this.cacheDir, "tts-cache.sqlite");
+    this.cache = new import_keyv.default(`sqlite://${dbPath}`);
+    this.cache.opts.ttl = 7 * 24 * 60 * 60 * 1e3;
+  }
+  async get(key) {
+    try {
+      const entry = await this.cache.get(key);
+      if (entry && this.isValidEntry(entry)) {
+        if (fs4.existsSync(entry.audioFilePath)) {
+          return entry;
+        } else {
+          await this.delete(key);
+        }
+      }
+    } catch (error) {
+      console.warn("Cache retrieval error:", error);
+    }
+    return void 0;
+  }
+  async set(key, entry, audioBuffer) {
+    try {
+      const audioFilePath = path4.join(this.cacheDir, `${key}.mp3`);
+      fs4.writeFileSync(audioFilePath, audioBuffer);
+      const cacheEntry = {
+        ...entry,
+        audioFilePath,
+        timestamp: Date.now()
+      };
+      return await this.cache.set(key, cacheEntry);
+    } catch (error) {
+      console.warn("Cache storage error:", error);
+      return false;
+    }
+  }
+  async delete(key) {
+    try {
+      const entry = await this.cache.get(key);
+      if (entry && entry.audioFilePath) {
+        if (fs4.existsSync(entry.audioFilePath)) {
+          fs4.unlinkSync(entry.audioFilePath);
+        }
+      }
+      return await this.cache.delete(key);
+    } catch (error) {
+      console.warn("Cache deletion error:", error);
+      return false;
+    }
+  }
+  async clear() {
+    try {
+      const files = fs4.readdirSync(this.cacheDir);
+      for (const file of files) {
+        if (file.endsWith(".mp3")) {
+          fs4.unlinkSync(path4.join(this.cacheDir, file));
+        }
+      }
+      await this.cache.clear();
+    } catch (error) {
+      console.warn("Cache clear error:", error);
+    }
+  }
+  async cleanup(maxAge) {
+    try {
+      const cutoff = Date.now() - (maxAge || 7 * 24 * 60 * 60 * 1e3);
+      const files = fs4.readdirSync(this.cacheDir);
+      for (const file of files) {
+        if (file.endsWith(".mp3")) {
+          const filePath = path4.join(this.cacheDir, file);
+          const stats = fs4.statSync(filePath);
+          if (stats.mtime.getTime() < cutoff) {
+            fs4.unlinkSync(filePath);
+            const key = file.replace(".mp3", "");
+            await this.cache.delete(key);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Cache cleanup error:", error);
+    }
+  }
+  isValidEntry(entry) {
+    return entry && typeof entry.audioFilePath === "string" && typeof entry.provider === "string" && typeof entry.voice === "string" && typeof entry.rate === "number" && typeof entry.timestamp === "number" && typeof entry.text === "string";
+  }
+  generateCacheKey(text, provider, voice, rate) {
+    const normalizedText = text.trim().toLowerCase();
+    const keyData = `${normalizedText}|${provider}|${voice}|${rate}`;
+    return crypto.createHash("sha256").update(keyData).digest("hex").slice(0, 16);
+  }
+  getCacheDir() {
+    return this.cacheDir;
+  }
+};
+
 // src/index.ts
-var CONFIG_DIR = path4.join(require("os").homedir(), ".config", "speakeasy");
-var CONFIG_FILE = path4.join(CONFIG_DIR, "settings.json");
+var CONFIG_DIR = path5.join(require("os").homedir(), ".config", "speakeasy");
+var CONFIG_FILE = path5.join(CONFIG_DIR, "settings.json");
 function loadGlobalConfig() {
   try {
-    if (fs4.existsSync(CONFIG_FILE)) {
-      const configData = fs4.readFileSync(CONFIG_FILE, "utf8");
+    if (fs5.existsSync(CONFIG_FILE)) {
+      const configData = fs5.readFileSync(CONFIG_FILE, "utf8");
       return JSON.parse(configData);
     }
   } catch (error) {
@@ -275,7 +399,9 @@ var SpeakEasy = class {
   providers;
   isPlaying = false;
   queue = [];
-  constructor(config) {
+  cache;
+  useCache;
+  constructor(config, useCache = true) {
     const globalConfig = loadGlobalConfig();
     this.config = {
       provider: config.provider || globalConfig.defaults?.provider || "system",
@@ -290,6 +416,8 @@ var SpeakEasy = class {
       },
       tempDir: config.tempDir || globalConfig.global?.tempDir || "/tmp"
     };
+    this.useCache = useCache;
+    this.cache = new TTSCache(path5.join(this.config.tempDir, "speakeasy-cache"));
     this.providers = /* @__PURE__ */ new Map();
     this.initializeProviders();
   }
@@ -340,13 +468,69 @@ var SpeakEasy = class {
         try {
           const provider = this.providers.get(providerName);
           if (provider && provider.validateConfig()) {
-            await provider.speak({
-              text,
-              rate: this.config.rate,
-              tempDir: this.config.tempDir,
-              voice: this.getVoiceForProvider(providerName),
-              apiKey: this.getApiKeyForProvider(providerName) || ""
-            });
+            const voice = this.getVoiceForProvider(providerName);
+            const rate = this.config.rate;
+            if (this.useCache && providerName !== "system") {
+              const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
+              const cachedEntry = await this.cache.get(cacheKey);
+              if (cachedEntry) {
+                await this.playCachedAudio(cachedEntry.audioFilePath);
+                return;
+              }
+            }
+            let audioBuffer = null;
+            if (providerName === "system") {
+              await provider.speak({
+                text,
+                rate,
+                tempDir: this.config.tempDir,
+                voice,
+                apiKey: this.getApiKeyForProvider(providerName) || ""
+              });
+              return;
+            } else {
+              const generateMethod = provider.generateAudio;
+              if (generateMethod) {
+                audioBuffer = await generateMethod.call(provider, {
+                  text,
+                  rate,
+                  tempDir: this.config.tempDir,
+                  voice,
+                  apiKey: this.getApiKeyForProvider(providerName) || ""
+                });
+              } else {
+                await provider.speak({
+                  text,
+                  rate,
+                  tempDir: this.config.tempDir,
+                  voice,
+                  apiKey: this.getApiKeyForProvider(providerName) || ""
+                });
+                return;
+              }
+            }
+            if (this.useCache && providerName !== "system" && audioBuffer) {
+              const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
+              await this.cache.set(cacheKey, {
+                provider: providerName,
+                voice,
+                rate,
+                text
+              }, audioBuffer);
+              const tempFile = path5.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
+              fs5.writeFileSync(tempFile, audioBuffer);
+              (0, import_child_process5.execSync)(`afplay "${tempFile}"`);
+              if (fs5.existsSync(tempFile)) {
+                fs5.unlinkSync(tempFile);
+              }
+            } else if (audioBuffer) {
+              const tempFile = path5.join(this.config.tempDir, `speech_${Date.now()}.mp3`);
+              fs5.writeFileSync(tempFile, audioBuffer);
+              (0, import_child_process5.execSync)(`afplay "${tempFile}"`);
+              if (fs5.existsSync(tempFile)) {
+                fs5.unlinkSync(tempFile);
+              }
+            }
             return;
           }
         } catch (error) {
@@ -368,6 +552,10 @@ var SpeakEasy = class {
         voice: this.config.systemVoice
       });
     }
+  }
+  async playCachedAudio(audioFilePath) {
+    const { execSync: execSync6 } = require("child_process");
+    execSync6(`afplay "${audioFilePath}"`, { stdio: "inherit" });
   }
   getVoiceForProvider(provider) {
     switch (provider) {
@@ -404,6 +592,25 @@ var SpeakEasy = class {
   clearQueue() {
     this.queue = [];
   }
+  async clearCache() {
+    await this.cache.clear();
+  }
+  async cleanupCache(maxAge) {
+    await this.cache.cleanup(maxAge);
+  }
+  enableCache() {
+    this.useCache = true;
+  }
+  disableCache() {
+    this.useCache = false;
+  }
+  getCacheStats() {
+    return Promise.resolve({
+      size: 0,
+      // Keyv doesn't provide easy way to get size
+      dir: this.cache.getCacheDir()
+    });
+  }
 };
 var SpeakEasyBuilder = class {
   config = {};
@@ -439,18 +646,18 @@ var SpeakEasyBuilder = class {
     return new SpeakEasy(this.config);
   }
 };
-var say = (text, provider) => {
+var say = (text, provider, useCache = true) => {
   if (typeof text !== "string" || !text.trim()) {
     throw new Error("Text argument is required for say()");
   }
-  return new SpeakEasy({ provider: provider || "system" }).speak(text);
+  return new SpeakEasy({ provider: provider || "system" }, useCache).speak(text);
 };
-var speak = (text, options) => {
+var speak = (text, options, useCache = true) => {
   if (typeof text !== "string" || !text.trim()) {
     throw new Error("Text argument is required for speak()");
   }
   const { provider, ...speakOptions } = options || {};
-  return new SpeakEasy({ provider: provider || "system" }).speak(text, speakOptions);
+  return new SpeakEasy({ provider: provider || "system" }, useCache).speak(text, speakOptions);
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

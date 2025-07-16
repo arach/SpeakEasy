@@ -14,13 +14,24 @@ export class GroqProvider implements Provider {
   }
 
   async speak(config: ProviderConfig): Promise<void> {
+    const audioBuffer = await this.generateAudio(config);
+    if (audioBuffer) {
+      const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
+      fs.writeFileSync(tempFile, audioBuffer);
+      execSync(`afplay "${tempFile}"`);
+      
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    }
+  }
+
+  async generateAudio(config: ProviderConfig): Promise<Buffer | null> {
     if (!this.apiKey) {
       throw new Error('Groq API key is required');
     }
 
     try {
-      const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
-      
       const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
         method: 'POST',
         headers: {
@@ -45,13 +56,7 @@ export class GroqProvider implements Provider {
       }
 
       const audioBuffer = await response.arrayBuffer();
-      fs.writeFileSync(tempFile, Buffer.from(audioBuffer));
-
-      execSync(`afplay "${tempFile}"`);
-      
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
+      return Buffer.from(audioBuffer);
     } catch (error) {
       throw new Error(`Groq TTS failed: ${error}`);
     }
