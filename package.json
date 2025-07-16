@@ -28,8 +28,10 @@
   "license": "MIT",
   "dependencies": {
     "@keyv/sqlite": "^4.0.5",
+    "@types/uuid": "^10.0.0",
     "keyv": "^5.3.4",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

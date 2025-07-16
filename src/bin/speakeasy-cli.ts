@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { SpeakEasy, SpeakEasyConfig } from '../dist/index.js';
+import { SpeakEasy, SpeakEasyConfig } from '../index';
 import * as path from 'path';
 import * as fs from 'fs';
-import { TTSCache } from '../dist/cache.js';
+import { TTSCache } from '../cache';
 
 const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');

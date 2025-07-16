@@ -3,6 +3,7 @@ import KeyvSQLite from '@keyv/sqlite';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import { v5 as uuidv5 } from 'uuid';
 import { parseTTL, parseSize } from './cache-config';
 
 interface CacheLogger {
@@ -21,8 +22,20 @@ export interface CacheEntry {
   text: string;
 }
 
+export interface CacheMetadata {
+  cacheKey: string;
+  originalText: string;
+  provider: string;
+  voice: string;
+  rate: number;
+  timestamp: number;
+  fileSize: number;
+  filePath: string;
+}
+
 export class TTSCache {
   private cache: Keyv<CacheEntry>;
+  private metadataStore: Keyv<CacheMetadata>;
   private cacheDir: string;
   private maxSize?: number;
   private logger: CacheLogger;
@@ -41,7 +54,12 @@ export class TTSCache {
 
     const dbPath = path.join(this.cacheDir, 'tts-cache.sqlite');
     this.logger.debug('Database path:', dbPath);
+    
+    // Main cache storage
     this.cache = new Keyv({ store: new KeyvSQLite(`sqlite://${dbPath}`) });
+    
+    // Metadata storage for reverse lookups (separate namespace)
+    this.metadataStore = new Keyv({ store: new KeyvSQLite(`sqlite://${dbPath}`), namespace: 'metadata' });
     
     // Set configurable TTL
     this.cache.opts.ttl = parseTTL(ttl);
@@ -81,17 +99,104 @@ export class TTSCache {
       const audioFilePath = path.join(this.cacheDir, `${key}.mp3`);
       fs.writeFileSync(audioFilePath, audioBuffer);
 
+      const timestamp = Date.now();
       const cacheEntry: CacheEntry = {
         ...entry,
         audioFilePath,
-        timestamp: Date.now(),
+        timestamp,
       };
       
-      return await this.cache.set(key, cacheEntry);
+      // Store main cache entry
+      const cacheResult = await this.cache.set(key, cacheEntry);
+      
+      // Store metadata for reverse lookup
+      const metadata: CacheMetadata = {
+        cacheKey: key,
+        originalText: entry.text,
+        provider: entry.provider,
+        voice: entry.voice,
+        rate: entry.rate,
+        timestamp,
+        fileSize: audioBuffer.length,
+        filePath: audioFilePath,
+      };
+      
+      await this.addMetadata(metadata);
+      
+      this.logger.debug('Cache entry stored:', metadata);
+      return cacheResult;
     } catch (error) {
-      console.warn('Cache storage error:', error);
+      this.logger.warn('Cache storage error:', error);
       return false;
     }
+  }
+
+  private async addMetadata(metadata: CacheMetadata): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `INSERT OR REPLACE INTO cache_metadata (cache_key, original_text, provider, voice, rate, timestamp, file_size, file_path)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [metadata.cacheKey, metadata.originalText, metadata.provider, metadata.voice, metadata.rate, metadata.timestamp, metadata.fileSize, metadata.filePath],
+        (error) => {
+          if (error) {
+            this.logger.warn('Metadata storage error:', error);
+            reject(error);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  async getCacheMetadata(): Promise<CacheMetadata[]> {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT * FROM cache_metadata ORDER BY timestamp DESC`,
+        (error, rows) => {
+          if (error) {
+            this.logger.warn('Metadata retrieval error:', error);
+            reject(error);
+          } else {
+            resolve(rows as CacheMetadata[]);
+          }
+        }
+      );
+    });
+  }
+
+  async findByText(text: string): Promise<CacheMetadata[]> {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT * FROM cache_metadata WHERE original_text LIKE ? ORDER BY timestamp DESC`,
+        [`%${text.toLowerCase()}%`],
+        (error, rows) => {
+          if (error) {
+            this.logger.warn('Find by text error:', error);
+            reject(error);
+          } else {
+            resolve(rows as CacheMetadata[]);
+          }
+        }
+      );
+    });
+  }
+
+  async findByProvider(provider: string): Promise<CacheMetadata[]> {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT * FROM cache_metadata WHERE provider = ? ORDER BY timestamp DESC`,
+        [provider],
+        (error, rows) => {
+          if (error) {
+            this.logger.warn('Find by provider error:', error);
+            reject(error);
+          } else {
+            resolve(rows as CacheMetadata[]);
+          }
+        }
+      );
+    });
   }
 
   async delete(key: string): Promise<boolean> {
@@ -103,11 +208,32 @@ export class TTSCache {
           fs.unlinkSync(entry.audioFilePath);
         }
       }
+      
+      // Delete metadata
+      await this.deleteMetadata(key);
+      
       return await this.cache.delete(key);
     } catch (error) {
       console.warn('Cache deletion error:', error);
       return false;
     }
+  }
+
+  private async deleteMetadata(key: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `DELETE FROM cache_metadata WHERE cache_key = ?`,
+        [key],
+        (error) => {
+          if (error) {
+            this.logger.warn('Metadata deletion error:', error);
+            reject(error);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
   }
 
   async clear(): Promise<void> {
@@ -165,8 +291,8 @@ export class TTSCache {
     const normalizedText = text.trim().toLowerCase();
     const keyData = `${normalizedText}|${provider}|${voice}|${rate}`;
     
-    // Use SHA-256 for consistent hashing
-    return crypto.createHash('sha256').update(keyData).digest('hex').slice(0, 16);
+    // Use UUID v5 for deterministic, collision-resistant keys (128 bits)
+    return uuidv5(keyData, 'speakeasy-cache-namespace');
   }
 
   getCacheDir(): string {
