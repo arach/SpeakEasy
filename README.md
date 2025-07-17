@@ -161,10 +161,68 @@ const speaker = new SpeakEasy({
 }
 ```
 
+## CLI Usage
+
+Install globally for command-line access:
+
+```bash
+npm install -g speakeasy
+
+# Basic usage
+speakeasy "Hello world"
+speakeasy --text "Hello from CLI" --provider openai --voice nova
+
+# With caching
+speakeasy --cache --text "Hello cached world"
+
+# Cache management
+speakeasy --cache --list
+speakeasy --cache --find "hello"
+speakeasy --cache --provider openai
+speakeasy --clear-cache
+speakeasy --config
+
+# List all available voices
+speakeasy --help
+```
+
+## Cache Inspection
+
+### Programmatic
+```typescript
+const speaker = new SpeakEasy({ cache: { enabled: true } });
+
+// Get all cached entries
+const metadata = await speaker.getCacheMetadata();
+console.log(metadata);
+
+// Find by text
+const found = await speaker.findByText('hello world');
+
+// Find by provider
+const openaiEntries = await speaker.findByProvider('openai');
+```
+
+### CLI
+```bash
+# List all cached entries
+speakeasy --cache --list
+
+# Search by text
+speakeasy --cache --find "hello"
+
+# Filter by provider
+speakeasy --cache --provider openai
+
+# Show cache stats
+speakeasy --cache --stats
+```
+
 ## Testing
 
 ```bash
 npm run build
 npm test
 npm test cache  # Test caching specifically
+npm run cli -- --help  # Test CLI
 ```

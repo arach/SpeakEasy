@@ -1,5 +1,4 @@
 import Keyv from 'keyv';
-import KeyvSQLite from '@keyv/sqlite';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
@@ -35,7 +34,6 @@ export interface CacheMetadata {
 
 export class TTSCache {
   private cache: Keyv<CacheEntry>;
-  private metadataStore: Keyv<CacheMetadata>;
   private cacheDir: string;
   private maxSize?: number;
   private logger: CacheLogger;
@@ -55,15 +53,15 @@ export class TTSCache {
     const dbPath = path.join(this.cacheDir, 'tts-cache.sqlite');
     this.logger.debug('Database path:', dbPath);
     
-    // Main cache storage
-    this.cache = new Keyv({ store: new KeyvSQLite(`sqlite://${dbPath}`) });
-    
-    // Metadata storage for reverse lookups (separate namespace)
-    this.metadataStore = new Keyv({ store: new KeyvSQLite(`sqlite://${dbPath}`), namespace: 'metadata' });
-    
-    // Set configurable TTL
-    this.cache.opts.ttl = parseTTL(ttl);
-    this.maxSize = maxSize ? parseSize(maxSize) : undefined;
+    try {
+      const KeyvSqlite = require('@keyv/sqlite');
+      this.cache = new Keyv({ store: new KeyvSqlite(dbPath) });
+      this.cache.opts.ttl = parseTTL(ttl);
+      this.maxSize = maxSize ? parseSize(maxSize) : undefined;
+    } catch (error) {
+      this.logger.warn('SQLite not available, using in-memory cache:', error);
+      this.cache = new Keyv();
+    }
   }
 
   private createDefaultLogger(): CacheLogger {
@@ -132,71 +130,63 @@ export class TTSCache {
   }
 
   private async addMetadata(metadata: CacheMetadata): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db.run(
-        `INSERT OR REPLACE INTO cache_metadata (cache_key, original_text, provider, voice, rate, timestamp, file_size, file_path)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [metadata.cacheKey, metadata.originalText, metadata.provider, metadata.voice, metadata.rate, metadata.timestamp, metadata.fileSize, metadata.filePath],
-        (error) => {
-          if (error) {
-            this.logger.warn('Metadata storage error:', error);
-            reject(error);
-          } else {
-            resolve();
-          }
-        }
-      );
-    });
+    try {
+      await this.metadataStore.set(metadata.cacheKey, metadata);
+    } catch (error) {
+      this.logger.warn('Metadata storage error:', error);
+      throw error;
+    }
+  }
+
+  private loadMetadataIndex(): CacheMetadata[] {
+    try {
+      if (fs.existsSync(this.metadataFile)) {
+        const data = fs.readFileSync(this.metadataFile, 'utf8');
+        return JSON.parse(data);
+      }
+    } catch (error) {
+      this.logger.warn('Error loading metadata index:', error);
+    }
+    return [];
+  }
+
+  private saveMetadataIndex(metadata: CacheMetadata[]): void {
+    try {
+      fs.writeFileSync(this.metadataFile, JSON.stringify(metadata, null, 2));
+    } catch (error) {
+      this.logger.warn('Error saving metadata index:', error);
+    }
   }
 
   async getCacheMetadata(): Promise<CacheMetadata[]> {
-    return new Promise((resolve, reject) => {
-      this.db.all(
-        `SELECT * FROM cache_metadata ORDER BY timestamp DESC`,
-        (error, rows) => {
-          if (error) {
-            this.logger.warn('Metadata retrieval error:', error);
-            reject(error);
-          } else {
-            resolve(rows as CacheMetadata[]);
-          }
-        }
-      );
-    });
+    try {
+      return this.loadMetadataIndex();
+    } catch (error) {
+      this.logger.warn('Metadata retrieval error:', error);
+      throw error;
+    }
   }
 
   async findByText(text: string): Promise<CacheMetadata[]> {
-    return new Promise((resolve, reject) => {
-      this.db.all(
-        `SELECT * FROM cache_metadata WHERE original_text LIKE ? ORDER BY timestamp DESC`,
-        [`%${text.toLowerCase()}%`],
-        (error, rows) => {
-          if (error) {
-            this.logger.warn('Find by text error:', error);
-            reject(error);
-          } else {
-            resolve(rows as CacheMetadata[]);
-          }
-        }
+    try {
+      const metadata = this.loadMetadataIndex();
+      return metadata.filter(entry => 
+        entry.originalText.toLowerCase().includes(text.toLowerCase())
       );
-    });
+    } catch (error) {
+      this.logger.warn('Find by text error:', error);
+      throw error;
+    }
   }
 
   async findByProvider(provider: string): Promise<CacheMetadata[]> {
-    return new Promise((resolve, reject) => {
-      this.db.all(
-        `SELECT * FROM cache_metadata WHERE provider = ? ORDER BY timestamp DESC`,
-        [provider],
-        (error, rows) => {
-          if (error) {
-            this.logger.warn('Find by provider error:', error);
-            reject(error);
-          } else {
-            resolve(rows as CacheMetadata[]);
-          }
-        }
-      );
-    });
+    try {
+      const metadata = this.loadMetadataIndex();
+      return metadata.filter(entry => entry.provider === provider);
+    } catch (error) {
+      this.logger.warn('Find by provider error:', error);
+      throw error;
+    }
   }
 
   async delete(key: string): Promise<boolean> {
@@ -220,20 +210,12 @@ export class TTSCache {
   }
 
   private async deleteMetadata(key: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db.run(
-        `DELETE FROM cache_metadata WHERE cache_key = ?`,
-        [key],
-        (error) => {
-          if (error) {
-            this.logger.warn('Metadata deletion error:', error);
-            reject(error);
-          } else {
-            resolve();
-          }
-        }
-      );
-    });
+    try {
+      await this.metadataStore.delete(key);
+    } catch (error) {
+      this.logger.warn('Metadata deletion error:', error);
+      throw error;
+    }
   }
 
   async clear(): Promise<void> {

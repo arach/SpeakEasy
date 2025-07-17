@@ -5,9 +5,6 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -29,407 +26,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
-// node_modules/file-uri-to-path/index.js
-var require_file_uri_to_path = __commonJS({
-  "node_modules/file-uri-to-path/index.js"(exports, module2) {
-    "use strict";
-    var sep = require("path").sep || "/";
-    module2.exports = fileUriToPath;
-    function fileUriToPath(uri) {
-      if ("string" != typeof uri || uri.length <= 7 || "file://" != uri.substring(0, 7)) {
-        throw new TypeError("must pass in a file:// URI to convert to a file path");
-      }
-      var rest = decodeURI(uri.substring(7));
-      var firstSlash = rest.indexOf("/");
-      var host = rest.substring(0, firstSlash);
-      var path6 = rest.substring(firstSlash + 1);
-      if ("localhost" == host)
-        host = "";
-      if (host) {
-        host = sep + sep + host;
-      }
-      path6 = path6.replace(/^(.+)\|/, "$1:");
-      if (sep == "\\") {
-        path6 = path6.replace(/\//g, "\\");
-      }
-      if (/^.+\:/.test(path6)) {
-      } else {
-        path6 = sep + path6;
-      }
-      return host + path6;
-    }
-  }
-});
-
-// node_modules/bindings/bindings.js
-var require_bindings = __commonJS({
-  "node_modules/bindings/bindings.js"(exports, module2) {
-    "use strict";
-    var fs6 = require("fs");
-    var path6 = require("path");
-    var fileURLToPath = require_file_uri_to_path();
-    var join6 = path6.join;
-    var dirname = path6.dirname;
-    var exists = fs6.accessSync && function(path7) {
-      try {
-        fs6.accessSync(path7);
-      } catch (e) {
-        return false;
-      }
-      return true;
-    } || fs6.existsSync || path6.existsSync;
-    var defaults = {
-      arrow: process.env.NODE_BINDINGS_ARROW || " \u2192 ",
-      compiled: process.env.NODE_BINDINGS_COMPILED_DIR || "compiled",
-      platform: process.platform,
-      arch: process.arch,
-      nodePreGyp: "node-v" + process.versions.modules + "-" + process.platform + "-" + process.arch,
-      version: process.versions.node,
-      bindings: "bindings.node",
-      try: [
-        // node-gyp's linked version in the "build" dir
-        ["module_root", "build", "bindings"],
-        // node-waf and gyp_addon (a.k.a node-gyp)
-        ["module_root", "build", "Debug", "bindings"],
-        ["module_root", "build", "Release", "bindings"],
-        // Debug files, for development (legacy behavior, remove for node v0.9)
-        ["module_root", "out", "Debug", "bindings"],
-        ["module_root", "Debug", "bindings"],
-        // Release files, but manually compiled (legacy behavior, remove for node v0.9)
-        ["module_root", "out", "Release", "bindings"],
-        ["module_root", "Release", "bindings"],
-        // Legacy from node-waf, node <= 0.4.x
-        ["module_root", "build", "default", "bindings"],
-        // Production "Release" buildtype binary (meh...)
-        ["module_root", "compiled", "version", "platform", "arch", "bindings"],
-        // node-qbs builds
-        ["module_root", "addon-build", "release", "install-root", "bindings"],
-        ["module_root", "addon-build", "debug", "install-root", "bindings"],
-        ["module_root", "addon-build", "default", "install-root", "bindings"],
-        // node-pre-gyp path ./lib/binding/{node_abi}-{platform}-{arch}
-        ["module_root", "lib", "binding", "nodePreGyp", "bindings"]
-      ]
-    };
-    function bindings(opts) {
-      if (typeof opts == "string") {
-        opts = { bindings: opts };
-      } else if (!opts) {
-        opts = {};
-      }
-      Object.keys(defaults).map(function(i2) {
-        if (!(i2 in opts))
-          opts[i2] = defaults[i2];
-      });
-      if (!opts.module_root) {
-        opts.module_root = exports.getRoot(exports.getFileName());
-      }
-      if (path6.extname(opts.bindings) != ".node") {
-        opts.bindings += ".node";
-      }
-      var requireFunc = typeof __webpack_require__ === "function" ? __non_webpack_require__ : require;
-      var tries = [], i = 0, l = opts.try.length, n, b, err;
-      for (; i < l; i++) {
-        n = join6.apply(
-          null,
-          opts.try[i].map(function(p) {
-            return opts[p] || p;
-          })
-        );
-        tries.push(n);
-        try {
-          b = opts.path ? requireFunc.resolve(n) : requireFunc(n);
-          if (!opts.path) {
-            b.path = n;
-          }
-          return b;
-        } catch (e) {
-          if (e.code !== "MODULE_NOT_FOUND" && e.code !== "QUALIFIED_PATH_RESOLUTION_FAILED" && !/not find/i.test(e.message)) {
-            throw e;
-          }
-        }
-      }
-      err = new Error(
-        "Could not locate the bindings file. Tried:\n" + tries.map(function(a) {
-          return opts.arrow + a;
-        }).join("\n")
-      );
-      err.tries = tries;
-      throw err;
-    }
-    module2.exports = exports = bindings;
-    exports.getFileName = function getFileName(calling_file) {
-      var origPST = Error.prepareStackTrace, origSTL = Error.stackTraceLimit, dummy = {}, fileName;
-      Error.stackTraceLimit = 10;
-      Error.prepareStackTrace = function(e, st) {
-        for (var i = 0, l = st.length; i < l; i++) {
-          fileName = st[i].getFileName();
-          if (fileName !== __filename) {
-            if (calling_file) {
-              if (fileName !== calling_file) {
-                return;
-              }
-            } else {
-              return;
-            }
-          }
-        }
-      };
-      Error.captureStackTrace(dummy);
-      dummy.stack;
-      Error.prepareStackTrace = origPST;
-      Error.stackTraceLimit = origSTL;
-      var fileSchema = "file://";
-      if (fileName.indexOf(fileSchema) === 0) {
-        fileName = fileURLToPath(fileName);
-      }
-      return fileName;
-    };
-    exports.getRoot = function getRoot(file) {
-      var dir = dirname(file), prev;
-      while (true) {
-        if (dir === ".") {
-          dir = process.cwd();
-        }
-        if (exists(join6(dir, "package.json")) || exists(join6(dir, "node_modules"))) {
-          return dir;
-        }
-        if (prev === dir) {
-          throw new Error(
-            'Could not find module root given file: "' + file + '". Do you have a `package.json` file? '
-          );
-        }
-        prev = dir;
-        dir = join6(dir, "..");
-      }
-    };
-  }
-});
-
-// node_modules/sqlite3/lib/sqlite3-binding.js
-var require_sqlite3_binding = __commonJS({
-  "node_modules/sqlite3/lib/sqlite3-binding.js"(exports, module2) {
-    "use strict";
-    module2.exports = require_bindings()("node_sqlite3.node");
-  }
-});
-
-// node_modules/sqlite3/lib/trace.js
-var require_trace = __commonJS({
-  "node_modules/sqlite3/lib/trace.js"(exports) {
-    "use strict";
-    var util = require("util");
-    function extendTrace(object, property, pos) {
-      const old = object[property];
-      object[property] = function() {
-        const error = new Error();
-        const name = object.constructor.name + "#" + property + "(" + Array.prototype.slice.call(arguments).map(function(el) {
-          return util.inspect(el, false, 0);
-        }).join(", ") + ")";
-        if (typeof pos === "undefined")
-          pos = -1;
-        if (pos < 0)
-          pos += arguments.length;
-        const cb = arguments[pos];
-        if (typeof arguments[pos] === "function") {
-          arguments[pos] = function replacement() {
-            const err = arguments[0];
-            if (err && err.stack && !err.__augmented) {
-              err.stack = filter(err).join("\n");
-              err.stack += "\n--> in " + name;
-              err.stack += "\n" + filter(error).slice(1).join("\n");
-              err.__augmented = true;
-            }
-            return cb.apply(this, arguments);
-          };
-        }
-        return old.apply(this, arguments);
-      };
-    }
-    exports.extendTrace = extendTrace;
-    function filter(error) {
-      return error.stack.split("\n").filter(function(line) {
-        return line.indexOf(__filename) < 0;
-      });
-    }
-  }
-});
-
-// node_modules/sqlite3/lib/sqlite3.js
-var require_sqlite3 = __commonJS({
-  "node_modules/sqlite3/lib/sqlite3.js"(exports, module2) {
-    "use strict";
-    var path6 = require("path");
-    var sqlite32 = require_sqlite3_binding();
-    var EventEmitter = require("events").EventEmitter;
-    module2.exports = exports = sqlite32;
-    function normalizeMethod(fn) {
-      return function(sql) {
-        let errBack;
-        const args = Array.prototype.slice.call(arguments, 1);
-        if (typeof args[args.length - 1] === "function") {
-          const callback = args[args.length - 1];
-          errBack = function(err) {
-            if (err) {
-              callback(err);
-            }
-          };
-        }
-        const statement = new Statement(this, sql, errBack);
-        return fn.call(this, statement, args);
-      };
-    }
-    function inherits(target, source) {
-      for (const k in source.prototype)
-        target.prototype[k] = source.prototype[k];
-    }
-    sqlite32.cached = {
-      Database: function(file, a, b) {
-        if (file === "" || file === ":memory:") {
-          return new Database2(file, a, b);
-        }
-        let db;
-        file = path6.resolve(file);
-        if (!sqlite32.cached.objects[file]) {
-          db = sqlite32.cached.objects[file] = new Database2(file, a, b);
-        } else {
-          db = sqlite32.cached.objects[file];
-          const callback = typeof a === "number" ? b : a;
-          if (typeof callback === "function") {
-            let cb2 = function() {
-              callback.call(db, null);
-            };
-            var cb = cb2;
-            if (db.open)
-              process.nextTick(cb2);
-            else
-              db.once("open", cb2);
-          }
-        }
-        return db;
-      },
-      objects: {}
-    };
-    var Database2 = sqlite32.Database;
-    var Statement = sqlite32.Statement;
-    var Backup = sqlite32.Backup;
-    inherits(Database2, EventEmitter);
-    inherits(Statement, EventEmitter);
-    inherits(Backup, EventEmitter);
-    Database2.prototype.prepare = normalizeMethod(function(statement, params) {
-      return params.length ? statement.bind.apply(statement, params) : statement;
-    });
-    Database2.prototype.run = normalizeMethod(function(statement, params) {
-      statement.run.apply(statement, params).finalize();
-      return this;
-    });
-    Database2.prototype.get = normalizeMethod(function(statement, params) {
-      statement.get.apply(statement, params).finalize();
-      return this;
-    });
-    Database2.prototype.all = normalizeMethod(function(statement, params) {
-      statement.all.apply(statement, params).finalize();
-      return this;
-    });
-    Database2.prototype.each = normalizeMethod(function(statement, params) {
-      statement.each.apply(statement, params).finalize();
-      return this;
-    });
-    Database2.prototype.map = normalizeMethod(function(statement, params) {
-      statement.map.apply(statement, params).finalize();
-      return this;
-    });
-    Database2.prototype.backup = function() {
-      let backup;
-      if (arguments.length <= 2) {
-        backup = new Backup(this, arguments[0], "main", "main", true, arguments[1]);
-      } else {
-        backup = new Backup(this, arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]);
-      }
-      backup.retryErrors = [sqlite32.BUSY, sqlite32.LOCKED];
-      return backup;
-    };
-    Statement.prototype.map = function() {
-      const params = Array.prototype.slice.call(arguments);
-      const callback = params.pop();
-      params.push(function(err, rows) {
-        if (err)
-          return callback(err);
-        const result = {};
-        if (rows.length) {
-          const keys = Object.keys(rows[0]);
-          const key = keys[0];
-          if (keys.length > 2) {
-            for (let i = 0; i < rows.length; i++) {
-              result[rows[i][key]] = rows[i];
-            }
-          } else {
-            const value = keys[1];
-            for (let i = 0; i < rows.length; i++) {
-              result[rows[i][key]] = rows[i][value];
-            }
-          }
-        }
-        callback(err, result);
-      });
-      return this.all.apply(this, params);
-    };
-    var isVerbose = false;
-    var supportedEvents = ["trace", "profile", "change"];
-    Database2.prototype.addListener = Database2.prototype.on = function(type) {
-      const val = EventEmitter.prototype.addListener.apply(this, arguments);
-      if (supportedEvents.indexOf(type) >= 0) {
-        this.configure(type, true);
-      }
-      return val;
-    };
-    Database2.prototype.removeListener = function(type) {
-      const val = EventEmitter.prototype.removeListener.apply(this, arguments);
-      if (supportedEvents.indexOf(type) >= 0 && !this._events[type]) {
-        this.configure(type, false);
-      }
-      return val;
-    };
-    Database2.prototype.removeAllListeners = function(type) {
-      const val = EventEmitter.prototype.removeAllListeners.apply(this, arguments);
-      if (supportedEvents.indexOf(type) >= 0) {
-        this.configure(type, false);
-      }
-      return val;
-    };
-    sqlite32.verbose = function() {
-      if (!isVerbose) {
-        const trace = require_trace();
-        [
-          "prepare",
-          "get",
-          "run",
-          "all",
-          "each",
-          "map",
-          "close",
-          "exec"
-        ].forEach(function(name) {
-          trace.extendTrace(Database2.prototype, name);
-        });
-        [
-          "bind",
-          "get",
-          "run",
-          "all",
-          "each",
-          "map",
-          "reset",
-          "finalize"
-        ].forEach(function(name) {
-          trace.extendTrace(Statement.prototype, name);
-        });
-        isVerbose = true;
-      }
-      return sqlite32;
-    };
-  }
-});
 
 // src/index.ts
 var src_exports = {};
@@ -676,7 +272,6 @@ var GroqProvider = class {
 
 // src/cache.ts
 var import_keyv = __toESM(require("keyv"));
-var import_sqlite = __toESM(require("@keyv/sqlite"));
 var path4 = __toESM(require("path"));
 var fs4 = __toESM(require("fs"));
 var import_uuid = require("uuid");
@@ -730,10 +325,8 @@ function parseSize(size) {
 }
 
 // src/cache.ts
-var sqlite3 = __toESM(require_sqlite3());
 var TTSCache = class {
   cache;
-  db;
   cacheDir;
   maxSize;
   logger;
@@ -747,33 +340,15 @@ var TTSCache = class {
     }
     const dbPath = path4.join(this.cacheDir, "tts-cache.sqlite");
     this.logger.debug("Database path:", dbPath);
-    this.db = new sqlite3.Database(dbPath);
-    this.initializeDatabase();
-    this.cache = new import_keyv.default({ store: new import_sqlite.default(`sqlite://${dbPath}`) });
-    this.cache.opts.ttl = parseTTL(ttl);
-    this.maxSize = maxSize ? parseSize(maxSize) : void 0;
-  }
-  initializeDatabase() {
-    this.db.serialize(() => {
-      this.db.run(`
-        CREATE TABLE IF NOT EXISTS cache_metadata (
-          cache_key TEXT PRIMARY KEY,
-          original_text TEXT NOT NULL,
-          provider TEXT NOT NULL,
-          voice TEXT NOT NULL,
-          rate INTEGER NOT NULL,
-          timestamp INTEGER NOT NULL,
-          file_size INTEGER NOT NULL,
-          file_path TEXT NOT NULL
-        )
-      `);
-      this.db.run(`
-        CREATE INDEX IF NOT EXISTS idx_provider ON cache_metadata(provider)
-      `);
-      this.db.run(`
-        CREATE INDEX IF NOT EXISTS idx_timestamp ON cache_metadata(timestamp)
-      `);
-    });
+    try {
+      const KeyvSqlite = require("@keyv/sqlite");
+      this.cache = new import_keyv.default({ store: new KeyvSqlite(dbPath) });
+      this.cache.opts.ttl = parseTTL(ttl);
+      this.maxSize = maxSize ? parseSize(maxSize) : void 0;
+    } catch (error) {
+      this.logger.warn("SQLite not available, using in-memory cache:", error);
+      this.cache = new import_keyv.default();
+    }
   }
   createDefaultLogger() {
     return {
@@ -831,11 +406,56 @@ var TTSCache = class {
   }
   async addMetadata(metadata) {
     try {
-      let allMetadata = await this.metadataStore.get("all_metadata") || [];
-      allMetadata.unshift(metadata);
-      await this.metadataStore.set("all_metadata", allMetadata);
+      await this.metadataStore.set(metadata.cacheKey, metadata);
     } catch (error) {
       this.logger.warn("Metadata storage error:", error);
+      throw error;
+    }
+  }
+  loadMetadataIndex() {
+    try {
+      if (fs4.existsSync(this.metadataFile)) {
+        const data = fs4.readFileSync(this.metadataFile, "utf8");
+        return JSON.parse(data);
+      }
+    } catch (error) {
+      this.logger.warn("Error loading metadata index:", error);
+    }
+    return [];
+  }
+  saveMetadataIndex(metadata) {
+    try {
+      fs4.writeFileSync(this.metadataFile, JSON.stringify(metadata, null, 2));
+    } catch (error) {
+      this.logger.warn("Error saving metadata index:", error);
+    }
+  }
+  async getCacheMetadata() {
+    try {
+      return this.loadMetadataIndex();
+    } catch (error) {
+      this.logger.warn("Metadata retrieval error:", error);
+      throw error;
+    }
+  }
+  async findByText(text) {
+    try {
+      const metadata = this.loadMetadataIndex();
+      return metadata.filter(
+        (entry) => entry.originalText.toLowerCase().includes(text.toLowerCase())
+      );
+    } catch (error) {
+      this.logger.warn("Find by text error:", error);
+      throw error;
+    }
+  }
+  async findByProvider(provider) {
+    try {
+      const metadata = this.loadMetadataIndex();
+      return metadata.filter((entry) => entry.provider === provider);
+    } catch (error) {
+      this.logger.warn("Find by provider error:", error);
+      throw error;
     }
   }
   async delete(key) {
@@ -846,10 +466,19 @@ var TTSCache = class {
           fs4.unlinkSync(entry.audioFilePath);
         }
       }
+      await this.deleteMetadata(key);
       return await this.cache.delete(key);
     } catch (error) {
       console.warn("Cache deletion error:", error);
       return false;
+    }
+  }
+  async deleteMetadata(key) {
+    try {
+      await this.metadataStore.delete(key);
+    } catch (error) {
+      this.logger.warn("Metadata deletion error:", error);
+      throw error;
     }
   }
   async clear() {
