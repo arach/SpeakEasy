@@ -298,3 +298,4 @@ export { SystemProvider } from './providers/system';
 export { OpenAIProvider } from './providers/openai';
 export { ElevenLabsProvider } from './providers/elevenlabs';
 export { GroqProvider } from './providers/groq';
+export { TTSCache } from './cache';

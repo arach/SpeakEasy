@@ -37,10 +37,13 @@ export class TTSCache {
   private cacheDir: string;
   private maxSize?: number;
   private logger: CacheLogger;
+  private metadataStore: Keyv<CacheMetadata>;
+  private metadataFile: string;
 
   constructor(cacheDir: string, ttl: string | number = '7d', maxSize?: string | number, logger?: CacheLogger) {
     this.cacheDir = cacheDir || path.join('/tmp', 'speakeasy-cache');
     this.logger = logger || this.createDefaultLogger();
+    this.metadataFile = path.join(this.cacheDir, 'metadata.json');
     
     this.logger.debug('Initializing TTSCache with dir:', this.cacheDir, 'ttl:', ttl, 'maxSize:', maxSize);
     
@@ -56,11 +59,13 @@ export class TTSCache {
     try {
       const KeyvSqlite = require('@keyv/sqlite');
       this.cache = new Keyv({ store: new KeyvSqlite(dbPath) });
+      this.metadataStore = new Keyv({ store: new KeyvSqlite(path.join(this.cacheDir, 'metadata.sqlite')) });
       this.cache.opts.ttl = parseTTL(ttl);
       this.maxSize = maxSize ? parseSize(maxSize) : undefined;
     } catch (error) {
       this.logger.warn('SQLite not available, using in-memory cache:', error);
       this.cache = new Keyv();
+      this.metadataStore = new Keyv();
     }
   }
 
@@ -274,7 +279,7 @@ export class TTSCache {
     const keyData = `${normalizedText}|${provider}|${voice}|${rate}`;
     
     // Use UUID v5 for deterministic, collision-resistant keys (128 bits)
-    return uuidv5(keyData, 'speakeasy-cache-namespace');
+    return uuidv5(keyData, '6ba7b810-9dad-11d1-80b4-00c04fd430c8');
   }
 
   getCacheDir(): string {

@@ -36,6 +36,7 @@ __export(src_exports, {
   OpenAIProvider: () => OpenAIProvider,
   SpeakEasy: () => SpeakEasy,
   SystemProvider: () => SystemProvider,
+  TTSCache: () => TTSCache,
   say: () => say,
   speak: () => speak
 });
@@ -330,9 +331,12 @@ var TTSCache = class {
   cacheDir;
   maxSize;
   logger;
+  metadataStore;
+  metadataFile;
   constructor(cacheDir, ttl = "7d", maxSize, logger) {
     this.cacheDir = cacheDir || path4.join("/tmp", "speakeasy-cache");
     this.logger = logger || this.createDefaultLogger();
+    this.metadataFile = path4.join(this.cacheDir, "metadata.json");
     this.logger.debug("Initializing TTSCache with dir:", this.cacheDir, "ttl:", ttl, "maxSize:", maxSize);
     if (!fs4.existsSync(this.cacheDir)) {
       this.logger.debug("Creating cache directory:", this.cacheDir);
@@ -343,11 +347,13 @@ var TTSCache = class {
     try {
       const KeyvSqlite = require("@keyv/sqlite");
       this.cache = new import_keyv.default({ store: new KeyvSqlite(dbPath) });
+      this.metadataStore = new import_keyv.default({ store: new KeyvSqlite(path4.join(this.cacheDir, "metadata.sqlite")) });
       this.cache.opts.ttl = parseTTL(ttl);
       this.maxSize = maxSize ? parseSize(maxSize) : void 0;
     } catch (error) {
       this.logger.warn("SQLite not available, using in-memory cache:", error);
       this.cache = new import_keyv.default();
+      this.metadataStore = new import_keyv.default();
     }
   }
   createDefaultLogger() {
@@ -519,7 +525,7 @@ var TTSCache = class {
   generateCacheKey(text, provider, voice, rate) {
     const normalizedText = text.trim().toLowerCase();
     const keyData = `${normalizedText}|${provider}|${voice}|${rate}`;
-    return (0, import_uuid.v5)(keyData, "speakeasy-cache-namespace");
+    return (0, import_uuid.v5)(keyData, "6ba7b810-9dad-11d1-80b4-00c04fd430c8");
   }
   getCacheDir() {
     return this.cacheDir;
@@ -773,6 +779,7 @@ var speak = (text, options) => {
   OpenAIProvider,
   SpeakEasy,
   SystemProvider,
+  TTSCache,
   say,
   speak
 });

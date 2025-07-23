@@ -114,6 +114,56 @@ declare class GroqProvider implements Provider {
     getErrorMessage(error: any): string;
 }
 
+interface CacheLogger {
+    debug: (message: string, ...args: any[]) => void;
+    info: (message: string, ...args: any[]) => void;
+    warn: (message: string, ...args: any[]) => void;
+    error: (message: string, ...args: any[]) => void;
+}
+interface CacheEntry {
+    audioFilePath: string;
+    provider: string;
+    voice: string;
+    rate: number;
+    timestamp: number;
+    text: string;
+}
+interface CacheMetadata {
+    cacheKey: string;
+    originalText: string;
+    provider: string;
+    voice: string;
+    rate: number;
+    timestamp: number;
+    fileSize: number;
+    filePath: string;
+}
+declare class TTSCache {
+    private cache;
+    private cacheDir;
+    private maxSize?;
+    private logger;
+    private metadataStore;
+    private metadataFile;
+    constructor(cacheDir: string, ttl?: string | number, maxSize?: string | number, logger?: CacheLogger);
+    private createDefaultLogger;
+    get(key: string): Promise<CacheEntry | undefined>;
+    set(key: string, entry: Omit<CacheEntry, 'timestamp' | 'audioFilePath'>, audioBuffer: Buffer): Promise<boolean>;
+    private addMetadata;
+    private loadMetadataIndex;
+    private saveMetadataIndex;
+    getCacheMetadata(): Promise<CacheMetadata[]>;
+    findByText(text: string): Promise<CacheMetadata[]>;
+    findByProvider(provider: string): Promise<CacheMetadata[]>;
+    delete(key: string): Promise<boolean>;
+    private deleteMetadata;
+    clear(): Promise<void>;
+    cleanup(maxAge?: number): Promise<void>;
+    private isValidEntry;
+    generateCacheKey(text: string, provider: string, voice: string, rate: number): string;
+    getCacheDir(): string;
+}
+
 declare const CONFIG_FILE: string;
 declare class SpeakEasy {
     private config;
@@ -141,4 +191,4 @@ declare const speak: (text: string, options?: SpeakEasyOptions & {
     provider?: "system" | "openai" | "elevenlabs" | "groq";
 }) => Promise<void>;
 
-export { CONFIG_FILE, ElevenLabsProvider, GlobalConfig, GroqProvider, OpenAIProvider, Provider, ProviderConfig, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, say, speak };
+export { CONFIG_FILE, ElevenLabsProvider, GlobalConfig, GroqProvider, OpenAIProvider, Provider, ProviderConfig, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSCache, say, speak };
