@@ -572,13 +572,15 @@ var SpeakEasy = class {
       tempDir: config.tempDir || globalConfig.global?.tempDir || "/tmp"
     };
     const cacheConfig = config.cache || globalConfig.cache;
-    this.useCache = cacheConfig?.enabled === true;
-    if (this.useCache && cacheConfig) {
-      const cacheDir = cacheConfig.dir || path5.join(this.config.tempDir || "/tmp", "speakeasy-cache");
+    const hasApiKeys = !!(this.config.apiKeys?.openai || this.config.apiKeys?.elevenlabs || this.config.apiKeys?.groq);
+    const cacheEnabled = cacheConfig?.enabled ?? (hasApiKeys && this.config.provider !== "system");
+    this.useCache = cacheEnabled;
+    if (this.useCache) {
+      const cacheDir = cacheConfig?.dir || path5.join(this.config.tempDir || "/tmp", "speakeasy-cache");
       this.cache = new TTSCache(
         cacheDir,
-        cacheConfig.ttl || "7d",
-        cacheConfig.maxSize
+        cacheConfig?.ttl || "7d",
+        cacheConfig?.maxSize
       );
     }
     this.providers = /* @__PURE__ */ new Map();

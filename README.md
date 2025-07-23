@@ -117,10 +117,19 @@ export async function speakNotification(message: string, project: string) {
 ```
 
 ### Caching
-- **Enabled by default** for OpenAI, ElevenLabs, and Groq providers
+- **Auto-enabled** when API keys are present (OpenAI, ElevenLabs, Groq)
+- **Deterministic UUID keys** - Same text+provider+voice+rate = identical cache key
+- **Collision-resistant** - Uses UUID v5 with deterministic construction
+- **Disabled for system voice** (macOS `say` command) - no benefit for local TTS
 - **Declarative TTL**: Configure with simple strings like `"7d"`, `"1h"`, `"30m"`
 - **Declarative max size**: Configure with strings like `"100mb"`, `"1gb"`
 - **Storage location**: `/tmp/speakeasy-cache/` by default
+
+**Cache Key Construction:**
+```
+UUID = SHA1(text|provider|voice|rate + namespace) → UUID v5
+```
+**Identical inputs always hit the same cache entry**
 
 ### Convenience
 - `say('text')` - One-liner with system voice and caching
@@ -143,7 +152,7 @@ import { SpeakEasy } from 'speakeasy';
 const speaker = new SpeakEasy({
   provider: 'openai',
   cache: {
-    enabled: true,        // default: true
+    enabled: true,        // auto: true when API keys present, false for system
     ttl: '7d',           // 7 days - '1h', '30m', '1w', '1M', etc.
     maxSize: '100mb',    // '1gb', '500mb', etc.
     dir: '/tmp/my-cache' // custom directory
@@ -154,7 +163,7 @@ const speaker = new SpeakEasy({
 // ~/.config/speakeasy/settings.json
 {
   "cache": {
-    "enabled": true,
+    "enabled": true,     // auto-enabled when API keys present
     "ttl": "1d",
     "maxSize": "500mb"
   }
