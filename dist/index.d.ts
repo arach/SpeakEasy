@@ -22,6 +22,7 @@ interface SpeakEasyConfig {
         groq?: string;
     };
     tempDir?: string;
+    debug?: boolean;
     cache?: {
         enabled?: boolean;
         ttl?: string | number;
@@ -172,11 +173,13 @@ declare class SpeakEasy {
     private queue;
     private cache?;
     private useCache;
+    private debug;
     constructor(config: SpeakEasyConfig);
     private initializeProviders;
     speak(text: string, options?: SpeakEasyOptions): Promise<void>;
     private processQueue;
     private speakText;
+    private printConfigDiagnostics;
     private playCachedAudio;
     private getVoiceForProvider;
     private getApiKeyForProvider;
