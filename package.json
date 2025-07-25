@@ -34,6 +34,7 @@
   "dependencies": {
     "@keyv/sqlite": "^3.6.7",
     "@types/uuid": "^10.0.0",
+    "better-sqlite3": "^12.2.0",
     "keyv": "^5.3.4",
     "node-fetch": "^3.3.2",
     "uuid": "^11.1.0"
