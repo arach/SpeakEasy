@@ -333,10 +333,15 @@ var TTSCache = class {
   logger;
   metadataStore;
   metadataFile;
+  statsFile;
+  cacheHits = 0;
+  cacheMisses = 0;
   constructor(cacheDir, ttl = "7d", maxSize, logger) {
     this.cacheDir = cacheDir || path4.join("/tmp", "speakeasy-cache");
     this.logger = logger || this.createDefaultLogger();
     this.metadataFile = path4.join(this.cacheDir, "metadata.json");
+    this.statsFile = path4.join(this.cacheDir, "stats.json");
+    this.loadStats();
     this.logger.debug("Initializing TTSCache with dir:", this.cacheDir, "ttl:", ttl, "maxSize:", maxSize);
     if (!fs4.existsSync(this.cacheDir)) {
       this.logger.debug("Creating cache directory:", this.cacheDir);
@@ -371,6 +376,8 @@ var TTSCache = class {
       const entry = await this.cache.get(key);
       if (entry && this.isValidEntry(entry)) {
         if (fs4.existsSync(entry.audioFilePath)) {
+          this.cacheHits++;
+          this.saveStats();
           return entry;
         } else {
           await this.delete(key);
@@ -379,9 +386,35 @@ var TTSCache = class {
     } catch (error) {
       console.warn("Cache retrieval error:", error);
     }
+    this.cacheMisses++;
+    this.saveStats();
     return void 0;
   }
-  async set(key, entry, audioBuffer) {
+  loadStats() {
+    try {
+      if (fs4.existsSync(this.statsFile)) {
+        const data = fs4.readFileSync(this.statsFile, "utf8");
+        const stats = JSON.parse(data);
+        this.cacheHits = stats.cacheHits || 0;
+        this.cacheMisses = stats.cacheMisses || 0;
+      }
+    } catch (error) {
+      this.logger.warn("Error loading stats:", error);
+    }
+  }
+  saveStats() {
+    try {
+      const stats = {
+        cacheHits: this.cacheHits,
+        cacheMisses: this.cacheMisses,
+        timestamp: Date.now()
+      };
+      fs4.writeFileSync(this.statsFile, JSON.stringify(stats, null, 2));
+    } catch (error) {
+      this.logger.warn("Error saving stats:", error);
+    }
+  }
+  async set(key, entry, audioBuffer, options) {
     try {
       const audioFilePath = path4.join(this.cacheDir, `${key}.mp3`);
       fs4.writeFileSync(audioFilePath, audioBuffer);
@@ -400,7 +433,19 @@ var TTSCache = class {
         rate: entry.rate,
         timestamp,
         fileSize: audioBuffer.length,
-        filePath: audioFilePath
+        filePath: audioFilePath,
+        // Enhanced metadata
+        model: options?.model || this.inferModel(entry.provider, entry.voice),
+        source: options?.source || this.getSource(),
+        sessionId: this.getSessionId(),
+        processId: process.pid.toString(),
+        hostname: require("os").hostname(),
+        user: require("os").userInfo().username,
+        workingDirectory: process.cwd(),
+        commandLine: process.argv.join(" "),
+        durationMs: options?.durationMs,
+        success: options?.success ?? true,
+        errorMessage: options?.errorMessage
       };
       await this.addMetadata(metadata);
       this.logger.debug("Cache entry stored:", metadata);
@@ -410,9 +455,41 @@ var TTSCache = class {
       return false;
     }
   }
+  inferModel(provider, voice) {
+    switch (provider) {
+      case "openai":
+        return "tts-1";
+      case "elevenlabs":
+        return "eleven_multilingual_v2";
+      case "groq":
+        return "tts-1-hd";
+      case "system":
+        return `macOS-${voice}`;
+      default:
+        return provider;
+    }
+  }
+  getSource() {
+    if (process.argv[1]?.includes("speakeasy-cli"))
+      return "cli";
+    if (process.env.NODE_ENV === "test")
+      return "test";
+    return "api";
+  }
+  getSessionId() {
+    return `${Date.now()}-${process.pid}`;
+  }
   async addMetadata(metadata) {
     try {
       await this.metadataStore.set(metadata.cacheKey, metadata);
+      const existing = this.loadMetadataIndex();
+      const index = existing.findIndex((e) => e.cacheKey === metadata.cacheKey);
+      if (index >= 0) {
+        existing[index] = metadata;
+      } else {
+        existing.push(metadata);
+      }
+      this.saveMetadataIndex(existing);
     } catch (error) {
       this.logger.warn("Metadata storage error:", error);
       throw error;
@@ -441,13 +518,13 @@ var TTSCache = class {
       return this.loadMetadataIndex();
     } catch (error) {
       this.logger.warn("Metadata retrieval error:", error);
-      throw error;
+      return [];
     }
   }
   async findByText(text) {
     try {
-      const metadata = this.loadMetadataIndex();
-      return metadata.filter(
+      const allMetadata = await this.getCacheMetadata();
+      return allMetadata.filter(
         (entry) => entry.originalText.toLowerCase().includes(text.toLowerCase())
       );
     } catch (error) {
@@ -457,10 +534,109 @@ var TTSCache = class {
   }
   async findByProvider(provider) {
     try {
-      const metadata = this.loadMetadataIndex();
-      return metadata.filter((entry) => entry.provider === provider);
+      const allMetadata = await this.getCacheMetadata();
+      return allMetadata.filter((entry) => entry.provider === provider);
     } catch (error) {
       this.logger.warn("Find by provider error:", error);
+      throw error;
+    }
+  }
+  async search(options = {}) {
+    try {
+      const metadata = this.loadMetadataIndex();
+      return metadata.filter((entry) => {
+        if (options.text && !entry.originalText.toLowerCase().includes(options.text.toLowerCase())) {
+          return false;
+        }
+        if (options.provider && entry.provider !== options.provider) {
+          return false;
+        }
+        if (options.model && entry.model !== options.model) {
+          return false;
+        }
+        if (options.source && entry.source !== options.source) {
+          return false;
+        }
+        if (options.fromDate && entry.timestamp < options.fromDate.getTime()) {
+          return false;
+        }
+        if (options.toDate && entry.timestamp > options.toDate.getTime()) {
+          return false;
+        }
+        if (options.minSize && entry.fileSize < options.minSize) {
+          return false;
+        }
+        if (options.maxSize && entry.fileSize > options.maxSize) {
+          return false;
+        }
+        if (options.success !== void 0 && entry.success !== options.success) {
+          return false;
+        }
+        if (options.workingDirectory && !entry.workingDirectory?.includes(options.workingDirectory)) {
+          return false;
+        }
+        if (options.user && entry.user !== options.user) {
+          return false;
+        }
+        if (options.sessionId && entry.sessionId !== options.sessionId) {
+          return false;
+        }
+        return true;
+      });
+    } catch (error) {
+      this.logger.warn("Search error:", error);
+      throw error;
+    }
+  }
+  async getStats() {
+    try {
+      const metadata = this.loadMetadataIndex();
+      if (metadata.length === 0) {
+        return {
+          totalEntries: 0,
+          totalSize: 0,
+          cacheHits: this.cacheHits,
+          cacheMisses: this.cacheMisses,
+          providers: {},
+          models: {},
+          sources: {},
+          dateRange: null,
+          avgFileSize: 0,
+          hitRate: this.cacheHits + this.cacheMisses > 0 ? this.cacheHits / (this.cacheHits + this.cacheMisses) : 0
+        };
+      }
+      const stats = {
+        totalEntries: metadata.length,
+        totalSize: metadata.reduce((sum, entry) => sum + entry.fileSize, 0),
+        cacheHits: this.cacheHits,
+        cacheMisses: this.cacheMisses,
+        providers: {},
+        models: {},
+        sources: {},
+        dateRange: {
+          earliest: new Date(Math.min(...metadata.map((e) => e.timestamp))),
+          latest: new Date(Math.max(...metadata.map((e) => e.timestamp)))
+        },
+        avgFileSize: metadata.reduce((sum, entry) => sum + entry.fileSize, 0) / metadata.length,
+        hitRate: this.cacheHits + this.cacheMisses > 0 ? this.cacheHits / (this.cacheHits + this.cacheMisses) : 0
+      };
+      metadata.forEach((entry) => {
+        stats.providers[entry.provider] = (stats.providers[entry.provider] || 0) + 1;
+        stats.models[entry.model || "unknown"] = (stats.models[entry.model || "unknown"] || 0) + 1;
+        stats.sources[entry.source || "unknown"] = (stats.sources[entry.source || "unknown"] || 0) + 1;
+      });
+      return stats;
+    } catch (error) {
+      this.logger.warn("Stats error:", error);
+      throw error;
+    }
+  }
+  async getRecent(limit = 10) {
+    try {
+      const metadata = this.loadMetadataIndex();
+      return metadata.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+    } catch (error) {
+      this.logger.warn("Recent error:", error);
       throw error;
     }
   }
@@ -717,12 +893,17 @@ var SpeakEasy = class {
             }
             if (this.useCache && providerName !== "system" && this.cache && audioBuffer) {
               const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
+              const startTime = Date.now();
               await this.cache.set(cacheKey, {
                 provider: providerName,
                 voice,
                 rate,
                 text
-              }, audioBuffer);
+              }, audioBuffer, {
+                model: this.inferModel(providerName),
+                durationMs: Date.now() - startTime,
+                success: true
+              });
               const tempFile = path5.join(tempDir, `speech_${Date.now()}.mp3`);
               fs5.writeFileSync(tempFile, audioBuffer);
               (0, import_child_process5.execSync)(`afplay "${tempFile}"`);
@@ -834,6 +1015,20 @@ var SpeakEasy = class {
         return this.config.apiKeys?.groq || "";
       default:
         return "";
+    }
+  }
+  inferModel(provider) {
+    switch (provider) {
+      case "openai":
+        return "tts-1";
+      case "elevenlabs":
+        return "eleven_multilingual_v2";
+      case "groq":
+        return "tts-1-hd";
+      case "system":
+        return "macOS-system";
+      default:
+        return provider;
     }
   }
   stopSpeaking() {

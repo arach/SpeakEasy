@@ -138,6 +138,32 @@ interface CacheMetadata {
     timestamp: number;
     fileSize: number;
     filePath: string;
+    model?: string;
+    source?: string;
+    sessionId?: string;
+    processId?: string;
+    hostname?: string;
+    user?: string;
+    workingDirectory?: string;
+    commandLine?: string;
+    durationMs?: number;
+    success?: boolean;
+    errorMessage?: string;
+}
+interface CacheStats {
+    totalEntries: number;
+    totalSize: number;
+    cacheHits: number;
+    cacheMisses: number;
+    providers: Record<string, number>;
+    models: Record<string, number>;
+    sources: Record<string, number>;
+    dateRange: {
+        earliest: Date;
+        latest: Date;
+    } | null;
+    avgFileSize: number;
+    hitRate: number;
 }
 declare class TTSCache {
     private cache;
@@ -146,16 +172,46 @@ declare class TTSCache {
     private logger;
     private metadataStore;
     private metadataFile;
+    private statsFile;
+    private cacheHits;
+    private cacheMisses;
     constructor(cacheDir: string, ttl?: string | number, maxSize?: string | number, logger?: CacheLogger);
     private createDefaultLogger;
     get(key: string): Promise<CacheEntry | undefined>;
-    set(key: string, entry: Omit<CacheEntry, 'timestamp' | 'audioFilePath'>, audioBuffer: Buffer): Promise<boolean>;
+    private loadStats;
+    private saveStats;
+    set(key: string, entry: Omit<CacheEntry, 'timestamp' | 'audioFilePath'>, audioBuffer: Buffer, options?: {
+        model?: string;
+        source?: string;
+        durationMs?: number;
+        success?: boolean;
+        errorMessage?: string;
+    }): Promise<boolean>;
+    private inferModel;
+    private getSource;
+    private getSessionId;
     private addMetadata;
     private loadMetadataIndex;
     private saveMetadataIndex;
     getCacheMetadata(): Promise<CacheMetadata[]>;
     findByText(text: string): Promise<CacheMetadata[]>;
     findByProvider(provider: string): Promise<CacheMetadata[]>;
+    search(options?: {
+        text?: string;
+        provider?: string;
+        model?: string;
+        source?: string;
+        fromDate?: Date;
+        toDate?: Date;
+        minSize?: number;
+        maxSize?: number;
+        success?: boolean;
+        workingDirectory?: string;
+        user?: string;
+        sessionId?: string;
+    }): Promise<CacheMetadata[]>;
+    getStats(): Promise<CacheStats>;
+    getRecent(limit?: number): Promise<CacheMetadata[]>;
     delete(key: string): Promise<boolean>;
     private deleteMetadata;
     clear(): Promise<void>;
@@ -183,6 +239,7 @@ declare class SpeakEasy {
     private playCachedAudio;
     private getVoiceForProvider;
     private getApiKeyForProvider;
+    private inferModel;
     private stopSpeaking;
     getCacheStats(): Promise<{
         size: number;

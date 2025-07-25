@@ -30,7 +30,35 @@ export interface CacheMetadata {
   timestamp: number;
   fileSize: number;
   filePath: string;
+  
+  // Enhanced metadata for navigation
+  model?: string;
+  source?: string;
+  sessionId?: string;
+  processId?: string;
+  hostname?: string;
+  user?: string;
+  workingDirectory?: string;
+  commandLine?: string;
+  durationMs?: number;
+  success?: boolean;
+  errorMessage?: string;
 }
+
+export interface CacheStats {
+  totalEntries: number;
+  totalSize: number;
+  cacheHits: number;
+  cacheMisses: number;
+  providers: Record<string, number>;
+  models: Record<string, number>;
+  sources: Record<string, number>;
+  dateRange: { earliest: Date; latest: Date } | null;
+  avgFileSize: number;
+  hitRate: number;
+}
+
+
 
 export class TTSCache {
   private cache: Keyv<CacheEntry>;
@@ -39,12 +67,17 @@ export class TTSCache {
   private logger: CacheLogger;
   private metadataStore: Keyv<CacheMetadata>;
   private metadataFile: string;
+  private statsFile: string;
+  private cacheHits: number = 0;
+  private cacheMisses: number = 0;
 
   constructor(cacheDir: string, ttl: string | number = '7d', maxSize?: string | number, logger?: CacheLogger) {
     this.cacheDir = cacheDir || path.join('/tmp', 'speakeasy-cache');
     this.logger = logger || this.createDefaultLogger();
     this.metadataFile = path.join(this.cacheDir, 'metadata.json');
+    this.statsFile = path.join(this.cacheDir, 'stats.json');
     
+    this.loadStats();
     this.logger.debug('Initializing TTSCache with dir:', this.cacheDir, 'ttl:', ttl, 'maxSize:', maxSize);
     
     // Ensure cache directory exists
@@ -84,6 +117,8 @@ export class TTSCache {
       if (entry && this.isValidEntry(entry)) {
         // Check if audio file still exists
         if (fs.existsSync(entry.audioFilePath)) {
+          this.cacheHits++;
+          this.saveStats();
           return entry;
         } else {
           // File missing, remove from cache
@@ -93,10 +128,44 @@ export class TTSCache {
     } catch (error) {
       console.warn('Cache retrieval error:', error);
     }
+    this.cacheMisses++;
+    this.saveStats();
     return undefined;
   }
 
-  async set(key: string, entry: Omit<CacheEntry, 'timestamp' | 'audioFilePath'>, audioBuffer: Buffer): Promise<boolean> {
+  private loadStats(): void {
+    try {
+      if (fs.existsSync(this.statsFile)) {
+        const data = fs.readFileSync(this.statsFile, 'utf8');
+        const stats = JSON.parse(data);
+        this.cacheHits = stats.cacheHits || 0;
+        this.cacheMisses = stats.cacheMisses || 0;
+      }
+    } catch (error) {
+      this.logger.warn('Error loading stats:', error);
+    }
+  }
+
+  private saveStats(): void {
+    try {
+      const stats = {
+        cacheHits: this.cacheHits,
+        cacheMisses: this.cacheMisses,
+        timestamp: Date.now(),
+      };
+      fs.writeFileSync(this.statsFile, JSON.stringify(stats, null, 2));
+    } catch (error) {
+      this.logger.warn('Error saving stats:', error);
+    }
+  }
+
+  async set(key: string, entry: Omit<CacheEntry, 'timestamp' | 'audioFilePath'>, audioBuffer: Buffer, options?: {
+    model?: string;
+    source?: string;
+    durationMs?: number;
+    success?: boolean;
+    errorMessage?: string;
+  }): Promise<boolean> {
     try {
       // Save audio file
       const audioFilePath = path.join(this.cacheDir, `${key}.mp3`);
@@ -122,6 +191,19 @@ export class TTSCache {
         timestamp,
         fileSize: audioBuffer.length,
         filePath: audioFilePath,
+        
+        // Enhanced metadata
+        model: options?.model || this.inferModel(entry.provider, entry.voice),
+        source: options?.source || this.getSource(),
+        sessionId: this.getSessionId(),
+        processId: process.pid.toString(),
+        hostname: require('os').hostname(),
+        user: require('os').userInfo().username,
+        workingDirectory: process.cwd(),
+        commandLine: process.argv.join(' '),
+        durationMs: options?.durationMs,
+        success: options?.success ?? true,
+        errorMessage: options?.errorMessage,
       };
       
       await this.addMetadata(metadata);
@@ -134,9 +216,41 @@ export class TTSCache {
     }
   }
 
+  private inferModel(provider: string, voice: string): string {
+    switch (provider) {
+      case 'openai': return 'tts-1';
+      case 'elevenlabs': return 'eleven_multilingual_v2';
+      case 'groq': return 'tts-1-hd';
+      case 'system': return `macOS-${voice}`;
+      default: return provider;
+    }
+  }
+
+  private getSource(): string {
+    // Determine if this came from CLI, API, or programmatic usage
+    if (process.argv[1]?.includes('speakeasy-cli')) return 'cli';
+    if (process.env.NODE_ENV === 'test') return 'test';
+    return 'api';
+  }
+
+  private getSessionId(): string {
+    // Create a session ID based on process start time
+    return `${Date.now()}-${process.pid}`;
+  }
+
   private async addMetadata(metadata: CacheMetadata): Promise<void> {
     try {
       await this.metadataStore.set(metadata.cacheKey, metadata);
+      
+      // Also update JSON index for backwards compatibility
+      const existing = this.loadMetadataIndex();
+      const index = existing.findIndex(e => e.cacheKey === metadata.cacheKey);
+      if (index >= 0) {
+        existing[index] = metadata;
+      } else {
+        existing.push(metadata);
+      }
+      this.saveMetadataIndex(existing);
     } catch (error) {
       this.logger.warn('Metadata storage error:', error);
       throw error;
@@ -165,17 +279,18 @@ export class TTSCache {
 
   async getCacheMetadata(): Promise<CacheMetadata[]> {
     try {
+      // For now, use the JSON-based approach which works with existing files
       return this.loadMetadataIndex();
     } catch (error) {
       this.logger.warn('Metadata retrieval error:', error);
-      throw error;
+      return [];
     }
   }
 
   async findByText(text: string): Promise<CacheMetadata[]> {
     try {
-      const metadata = this.loadMetadataIndex();
-      return metadata.filter(entry => 
+      const allMetadata = await this.getCacheMetadata();
+      return allMetadata.filter(entry => 
         entry.originalText.toLowerCase().includes(text.toLowerCase())
       );
     } catch (error) {
@@ -186,10 +301,133 @@ export class TTSCache {
 
   async findByProvider(provider: string): Promise<CacheMetadata[]> {
     try {
-      const metadata = this.loadMetadataIndex();
-      return metadata.filter(entry => entry.provider === provider);
+      const allMetadata = await this.getCacheMetadata();
+      return allMetadata.filter(entry => entry.provider === provider);
     } catch (error) {
       this.logger.warn('Find by provider error:', error);
+      throw error;
+    }
+  }
+
+  async search(options: {
+    text?: string;
+    provider?: string;
+    model?: string;
+    source?: string;
+    fromDate?: Date;
+    toDate?: Date;
+    minSize?: number;
+    maxSize?: number;
+    success?: boolean;
+    workingDirectory?: string;
+    user?: string;
+    sessionId?: string;
+  } = {}): Promise<CacheMetadata[]> {
+    try {
+      const metadata = this.loadMetadataIndex();
+      
+      return metadata.filter(entry => {
+        if (options.text && !entry.originalText.toLowerCase().includes(options.text.toLowerCase())) {
+          return false;
+        }
+        if (options.provider && entry.provider !== options.provider) {
+          return false;
+        }
+        if (options.model && entry.model !== options.model) {
+          return false;
+        }
+        if (options.source && entry.source !== options.source) {
+          return false;
+        }
+        if (options.fromDate && entry.timestamp < options.fromDate.getTime()) {
+          return false;
+        }
+        if (options.toDate && entry.timestamp > options.toDate.getTime()) {
+          return false;
+        }
+        if (options.minSize && entry.fileSize < options.minSize) {
+          return false;
+        }
+        if (options.maxSize && entry.fileSize > options.maxSize) {
+          return false;
+        }
+        if (options.success !== undefined && entry.success !== options.success) {
+          return false;
+        }
+        if (options.workingDirectory && !entry.workingDirectory?.includes(options.workingDirectory)) {
+          return false;
+        }
+        if (options.user && entry.user !== options.user) {
+          return false;
+        }
+        if (options.sessionId && entry.sessionId !== options.sessionId) {
+          return false;
+        }
+        return true;
+      });
+    } catch (error) {
+      this.logger.warn('Search error:', error);
+      throw error;
+    }
+  }
+
+  async getStats(): Promise<CacheStats> {
+    try {
+      const metadata = this.loadMetadataIndex();
+      
+      if (metadata.length === 0) {
+        return {
+          totalEntries: 0,
+          totalSize: 0,
+          cacheHits: this.cacheHits,
+          cacheMisses: this.cacheMisses,
+          providers: {},
+          models: {},
+          sources: {},
+          dateRange: null,
+          avgFileSize: 0,
+          hitRate: this.cacheHits + this.cacheMisses > 0 ? this.cacheHits / (this.cacheHits + this.cacheMisses) : 0,
+        };
+      }
+
+      const stats = {
+        totalEntries: metadata.length,
+        totalSize: metadata.reduce((sum, entry) => sum + entry.fileSize, 0),
+        cacheHits: this.cacheHits,
+        cacheMisses: this.cacheMisses,
+        providers: {} as Record<string, number>,
+        models: {} as Record<string, number>,
+        sources: {} as Record<string, number>,
+        dateRange: {
+          earliest: new Date(Math.min(...metadata.map(e => e.timestamp))),
+          latest: new Date(Math.max(...metadata.map(e => e.timestamp))),
+        },
+        avgFileSize: metadata.reduce((sum, entry) => sum + entry.fileSize, 0) / metadata.length,
+        hitRate: this.cacheHits + this.cacheMisses > 0 ? this.cacheHits / (this.cacheHits + this.cacheMisses) : 0,
+      };
+
+      // Count by provider
+      metadata.forEach(entry => {
+        stats.providers[entry.provider] = (stats.providers[entry.provider] || 0) + 1;
+        stats.models[entry.model || 'unknown'] = (stats.models[entry.model || 'unknown'] || 0) + 1;
+        stats.sources[entry.source || 'unknown'] = (stats.sources[entry.source || 'unknown'] || 0) + 1;
+      });
+
+      return stats;
+    } catch (error) {
+      this.logger.warn('Stats error:', error);
+      throw error;
+    }
+  }
+
+  async getRecent(limit: number = 10): Promise<CacheMetadata[]> {
+    try {
+      const metadata = this.loadMetadataIndex();
+      return metadata
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, limit);
+    } catch (error) {
+      this.logger.warn('Recent error:', error);
       throw error;
     }
   }

@@ -237,12 +237,17 @@ export class SpeakEasy {
             // Cache the audio if enabled and buffer was returned
             if (this.useCache && providerName !== 'system' && this.cache && audioBuffer) {
               const cacheKey = this.cache!.generateCacheKey(text, providerName, voice, rate);
+              const startTime = Date.now();
               await this.cache!.set(cacheKey, {
                 provider: providerName,
                 voice,
                 rate,
                 text
-              }, audioBuffer);
+              }, audioBuffer, {
+                model: this.inferModel(providerName),
+                durationMs: Date.now() - startTime,
+                success: true
+              });
               
               // Play the generated audio
               const tempFile = path.join(tempDir, `speech_${Date.now()}.mp3`);
@@ -369,6 +374,16 @@ export class SpeakEasy {
       case 'elevenlabs': return this.config.apiKeys?.elevenlabs || '';
       case 'groq': return this.config.apiKeys?.groq || '';
       default: return '';
+    }
+  }
+
+  private inferModel(provider: string): string {
+    switch (provider) {
+      case 'openai': return 'tts-1';
+      case 'elevenlabs': return 'eleven_multilingual_v2';
+      case 'groq': return 'tts-1-hd';
+      case 'system': return 'macOS-system';
+      default: return provider;
     }
   }
 
