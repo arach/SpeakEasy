@@ -556,6 +556,7 @@ var SpeakEasy = class {
   queue = [];
   cache;
   useCache = false;
+  debug = false;
   constructor(config) {
     const globalConfig = loadGlobalConfig();
     this.config = {
@@ -564,6 +565,7 @@ var SpeakEasy = class {
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || "nova",
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || "EXAVITQu4vr4xnSDxMaL",
       rate: config.rate || globalConfig.defaults?.rate || 180,
+      debug: config.debug || false,
       apiKeys: {
         openai: config.apiKeys?.openai || globalConfig.providers?.openai?.apiKey || process.env.OPENAI_API_KEY || "",
         elevenlabs: config.apiKeys?.elevenlabs || globalConfig.providers?.elevenlabs?.apiKey || process.env.ELEVENLABS_API_KEY || "",
@@ -585,6 +587,10 @@ var SpeakEasy = class {
     }
     this.providers = /* @__PURE__ */ new Map();
     this.initializeProviders();
+    this.debug = this.config.debug || false;
+    if (this.debug) {
+      this.printConfigDiagnostics();
+    }
   }
   initializeProviders() {
     this.providers.set("system", new SystemProvider(this.config.systemVoice || "Samantha"));
@@ -623,26 +629,63 @@ var SpeakEasy = class {
     }
   }
   async speakText(text) {
+    const requestedProvider = this.config.provider || "system";
+    if (this.debug) {
+      console.log(`\u{1F50D} Requested provider: ${requestedProvider}`);
+      console.log(`\u{1F50D} Text: "${text}"`);
+    }
+    const requestedProviderInstance = this.providers.get(requestedProvider);
+    if (requestedProvider !== "system" && requestedProviderInstance) {
+      if (!requestedProviderInstance.validateConfig()) {
+        const providerName = requestedProvider.charAt(0).toUpperCase() + requestedProvider.slice(1);
+        let envVarHelp = "";
+        switch (requestedProvider) {
+          case "openai":
+            envVarHelp = "export OPENAI_API_KEY=your_key_here";
+            break;
+          case "elevenlabs":
+            envVarHelp = "export ELEVENLABS_API_KEY=your_key_here";
+            break;
+          case "groq":
+            envVarHelp = "export GROQ_API_KEY=your_key_here";
+            break;
+        }
+        throw new Error(
+          `${providerName} API key is required. ${envVarHelp ? `Run: ${envVarHelp}` : ""}`
+        );
+      }
+    }
     const providers = ["system", "openai", "elevenlabs", "groq"];
     let lastError = null;
     for (const providerName of providers) {
-      if (providerName === this.config.provider || lastError) {
+      if (providerName === requestedProvider || lastError) {
         try {
           const provider = this.providers.get(providerName);
           if (provider && provider.validateConfig()) {
             const voice = this.getVoiceForProvider(providerName);
             const rate = this.config.rate || 180;
             const tempDir = this.config.tempDir || "/tmp";
+            if (this.debug) {
+              console.log(`\u2705 Using provider: ${providerName}`);
+              console.log(`\u{1F399}\uFE0F  Voice/model: ${voice}`);
+              console.log(`\u26A1 Rate: ${rate} WPM`);
+            }
             if (this.useCache && providerName !== "system" && this.cache) {
               const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
               const cachedEntry = await this.cache.get(cacheKey);
               if (cachedEntry) {
+                if (this.debug) {
+                  console.log(`\u{1F4E6} Using cached audio from: ${cachedEntry.audioFilePath}`);
+                }
                 await this.playCachedAudio(cachedEntry.audioFilePath);
                 return;
               }
             }
             let audioBuffer = null;
             if (providerName === "system") {
+              if (this.debug) {
+                console.log(`\u{1F399}\uFE0F  Using system voice: ${voice}`);
+              }
               await provider.speak({
                 text,
                 rate,
@@ -688,6 +731,9 @@ var SpeakEasy = class {
               }
             } else if (audioBuffer) {
               const tempFile = path5.join(tempDir, `speech_${Date.now()}.mp3`);
+              if (this.debug) {
+                console.log(`\u{1F3B5} Playing generated audio: ${tempFile}`);
+              }
               fs5.writeFileSync(tempFile, audioBuffer);
               (0, import_child_process5.execSync)(`afplay "${tempFile}"`);
               if (fs5.existsSync(tempFile)) {
@@ -704,17 +750,61 @@ var SpeakEasy = class {
       }
     }
     if (lastError) {
+      if (requestedProvider !== "system") {
+        throw new Error(
+          `${requestedProvider} failed: ${lastError.message}. Try using --provider system for macOS built-in voices.`
+        );
+      }
       throw new Error(`All providers failed. Last error: ${lastError.message}`);
     }
     const systemProvider = this.providers.get("system");
     if (systemProvider) {
-      await systemProvider.speak({
-        text,
-        rate: this.config.rate || 180,
-        tempDir: this.config.tempDir || "/tmp",
-        voice: this.config.systemVoice || "Samantha"
-      });
+      try {
+        if (this.debug) {
+          console.log(`\u{1F5E3}\uFE0F  Falling back to system voice: ${this.config.systemVoice || "Samantha"}`);
+        }
+        await systemProvider.speak({
+          text,
+          rate: this.config.rate || 180,
+          tempDir: this.config.tempDir || "/tmp",
+          voice: this.config.systemVoice || "Samantha"
+        });
+      } catch (error) {
+        throw new Error(`System voice failed: ${error}. Ensure you're on macOS.`);
+      }
     }
+  }
+  printConfigDiagnostics() {
+    console.log("\u{1F50D} Debug mode enabled");
+    console.log("\u{1F4CA} Current Configuration:");
+    console.log(`   Provider: ${this.config.provider}`);
+    console.log(`   Rate: ${this.config.rate} WPM`);
+    console.log(`   System Voice: ${this.config.systemVoice}`);
+    console.log(`   OpenAI Voice: ${this.config.openaiVoice}`);
+    console.log(`   ElevenLabs Voice: ${this.config.elevenlabsVoiceId}`);
+    console.log("\u{1F511} API Key Status:");
+    const providers = [
+      { name: "OpenAI", key: "openai", env: "OPENAI_API_KEY" },
+      { name: "ElevenLabs", key: "elevenlabs", env: "ELEVENLABS_API_KEY" },
+      { name: "Groq", key: "groq", env: "GROQ_API_KEY" }
+    ];
+    providers.forEach(({ name, key, env }) => {
+      const fromConfig = this.config.apiKeys?.[key];
+      const fromEnv = process.env[env];
+      if (fromConfig && fromConfig.length > 10) {
+        console.log(`   \u2705 ${name}: Available from config (${fromConfig.substring(0, 8)}...)`);
+      } else if (fromEnv && fromEnv.length > 10) {
+        console.log(`   \u2705 ${name}: Available from environment (${fromEnv.substring(0, 8)}...)`);
+      } else {
+        console.log(`   \u274C ${name}: Not available`);
+      }
+    });
+    console.log("\u{1F4E6} Cache Status:");
+    console.log(`   Enabled: ${this.useCache}`);
+    if (this.cache) {
+      console.log(`   Directory: ${this.cache.dir || "default"}`);
+    }
+    console.log("");
   }
   async playCachedAudio(audioFilePath) {
     const { execSync: execSync6 } = require("child_process");

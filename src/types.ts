@@ -24,6 +24,7 @@ export interface SpeakEasyConfig {
     groq?: string;
   };
   tempDir?: string;
+  debug?: boolean;
   cache?: {
     enabled?: boolean;
     ttl?: string | number; // '7d', '1h', 86400000, etc.

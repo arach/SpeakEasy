@@ -43,6 +43,7 @@ export class SpeakEasy {
   private queue: Array<{ text: string; options: SpeakEasyOptions }> = [];
   private cache?: TTSCache;
   private useCache = false;
+  private debug = false;
 
   constructor(config: SpeakEasyConfig) {
     const globalConfig = loadGlobalConfig();
@@ -54,6 +55,7 @@ export class SpeakEasy {
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || 'nova',
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || 'EXAVITQu4vr4xnSDxMaL',
       rate: config.rate || globalConfig.defaults?.rate || 180,
+      debug: config.debug || false,
       apiKeys: {
         openai: config.apiKeys?.openai || globalConfig.providers?.openai?.apiKey || process.env.OPENAI_API_KEY || '',
         elevenlabs: config.apiKeys?.elevenlabs || globalConfig.providers?.elevenlabs?.apiKey || process.env.ELEVENLABS_API_KEY || '',
@@ -79,6 +81,11 @@ export class SpeakEasy {
     }
     this.providers = new Map();
     this.initializeProviders();
+    
+    this.debug = this.config.debug || false;
+    if (this.debug) {
+      this.printConfigDiagnostics();
+    }
   }
 
   private initializeProviders(): void {
@@ -125,11 +132,41 @@ export class SpeakEasy {
   }
 
   private async speakText(text: string): Promise<void> {
+    const requestedProvider = this.config.provider || 'system';
+    
+    if (this.debug) {
+      console.log(`🔍 Requested provider: ${requestedProvider}`);
+      console.log(`🔍 Text: "${text}"`);
+    }
+    
+    // First, validate the requested provider
+    const requestedProviderInstance = this.providers.get(requestedProvider);
+    if (requestedProvider !== 'system' && requestedProviderInstance) {
+      if (!requestedProviderInstance.validateConfig()) {
+        const providerName = requestedProvider.charAt(0).toUpperCase() + requestedProvider.slice(1);
+        let envVarHelp = '';
+        switch (requestedProvider) {
+          case 'openai':
+            envVarHelp = 'export OPENAI_API_KEY=your_key_here';
+            break;
+          case 'elevenlabs':
+            envVarHelp = 'export ELEVENLABS_API_KEY=your_key_here';
+            break;
+          case 'groq':
+            envVarHelp = 'export GROQ_API_KEY=your_key_here';
+            break;
+        }
+        throw new Error(
+          `${providerName} API key is required. ${envVarHelp ? `Run: ${envVarHelp}` : ''}`
+        );
+      }
+    }
+
     const providers = ['system', 'openai', 'elevenlabs', 'groq'];
     let lastError: Error | null = null;
 
     for (const providerName of providers) {
-      if (providerName === this.config.provider || lastError) {
+      if (providerName === requestedProvider || lastError) {
         try {
           const provider = this.providers.get(providerName);
           if (provider && provider.validateConfig()) {
@@ -137,13 +174,21 @@ export class SpeakEasy {
             const rate = this.config.rate || 180;
             const tempDir = this.config.tempDir || '/tmp';
             
+            if (this.debug) {
+              console.log(`✅ Using provider: ${providerName}`);
+              console.log(`🎙️  Voice/model: ${voice}`);
+              console.log(`⚡ Rate: ${rate} WPM`);
+            }
+            
             // Check cache first if caching is enabled
             if (this.useCache && providerName !== 'system' && this.cache) {
               const cacheKey = this.cache!.generateCacheKey(text, providerName, voice, rate);
               const cachedEntry = await this.cache!.get(cacheKey);
               
               if (cachedEntry) {
-                // Play cached audio file
+                if (this.debug) {
+                  console.log(`📦 Using cached audio from: ${cachedEntry.audioFilePath}`);
+                }
                 await this.playCachedAudio(cachedEntry.audioFilePath);
                 return;
               }
@@ -154,6 +199,9 @@ export class SpeakEasy {
             
             if (providerName === 'system') {
               // System provider doesn't support caching, use speak directly
+              if (this.debug) {
+                console.log(`🎙️  Using system voice: ${voice}`);
+              }
               await provider.speak({
                 text,
                 rate,
@@ -207,6 +255,9 @@ export class SpeakEasy {
             } else if (audioBuffer) {
               // Play directly if no caching
               const tempFile = path.join(tempDir, `speech_${Date.now()}.mp3`);
+              if (this.debug) {
+                console.log(`🎵 Playing generated audio: ${tempFile}`);
+              }
               fs.writeFileSync(tempFile, audioBuffer);
               execSync(`afplay "${tempFile}"`);
               
@@ -226,19 +277,74 @@ export class SpeakEasy {
     }
 
     if (lastError) {
+      // If we tried a specific provider and it failed, provide better guidance
+      if (requestedProvider !== 'system') {
+        throw new Error(
+          `${requestedProvider} failed: ${lastError.message}. Try using --provider system for macOS built-in voices.`
+        );
+      }
       throw new Error(`All providers failed. Last error: ${lastError.message}`);
     }
 
     // Fallback to system voice (never cached)
     const systemProvider = this.providers.get('system');
     if (systemProvider) {
-      await systemProvider.speak({
-        text,
-        rate: this.config.rate || 180,
-        tempDir: this.config.tempDir || '/tmp',
-        voice: this.config.systemVoice || 'Samantha'
-      });
+      try {
+        if (this.debug) {
+          console.log(`🗣️  Falling back to system voice: ${this.config.systemVoice || 'Samantha'}`);
+        }
+        await systemProvider.speak({
+          text,
+          rate: this.config.rate || 180,
+          tempDir: this.config.tempDir || '/tmp',
+          voice: this.config.systemVoice || 'Samantha'
+        });
+      } catch (error) {
+        throw new Error(`System voice failed: ${error}. Ensure you're on macOS.`);
+      }
     }
+  }
+
+  private printConfigDiagnostics(): void {
+    console.log('🔍 Debug mode enabled');
+    
+    // Configuration summary
+    console.log('📊 Current Configuration:');
+    console.log(`   Provider: ${this.config.provider}`);
+    console.log(`   Rate: ${this.config.rate} WPM`);
+    console.log(`   System Voice: ${this.config.systemVoice}`);
+    console.log(`   OpenAI Voice: ${this.config.openaiVoice}`);
+    console.log(`   ElevenLabs Voice: ${this.config.elevenlabsVoiceId}`);
+    
+    // API Key status
+    console.log('🔑 API Key Status:');
+    const providers = [
+      { name: 'OpenAI', key: 'openai', env: 'OPENAI_API_KEY' },
+      { name: 'ElevenLabs', key: 'elevenlabs', env: 'ELEVENLABS_API_KEY' },
+      { name: 'Groq', key: 'groq', env: 'GROQ_API_KEY' }
+    ];
+    
+    providers.forEach(({ name, key, env }) => {
+      const fromConfig = this.config.apiKeys?.[key as keyof typeof this.config.apiKeys];
+      const fromEnv = process.env[env];
+      
+      if (fromConfig && fromConfig.length > 10) {
+        console.log(`   ✅ ${name}: Available from config (${fromConfig.substring(0, 8)}...)`);
+      } else if (fromEnv && fromEnv.length > 10) {
+        console.log(`   ✅ ${name}: Available from environment (${fromEnv.substring(0, 8)}...)`);
+      } else {
+        console.log(`   ❌ ${name}: Not available`);
+      }
+    });
+    
+    // Cache status
+    console.log('📦 Cache Status:');
+    console.log(`   Enabled: ${this.useCache}`);
+    if (this.cache) {
+      console.log(`   Directory: ${(this.cache as any).dir || 'default'}`);
+    }
+    
+    console.log('');
   }
 
   private async playCachedAudio(audioFilePath: string): Promise<void> {
