@@ -191,6 +191,11 @@ speakeasy --cache --provider openai
 speakeasy --clear-cache
 speakeasy --config
 
+# Diagnostics and health checks
+speakeasy --diagnose          # Show configuration diagnostics
+speakeasy --doctor           # Run comprehensive health check on config
+speakeasy --debug "test"     # Run with debug logging
+
 # List all available voices
 speakeasy --help
 ```
@@ -227,6 +232,65 @@ speakeasy --cache --provider openai
 speakeasy --cache --stats
 ```
 
+## Diagnostics and Health Checks
+
+SpeakEasy includes comprehensive diagnostic tools to help troubleshoot configuration issues:
+
+### CLI Health Check
+```bash
+# Quick health check of your configuration
+speakeasy --doctor
+
+# Detailed configuration diagnostics
+speakeasy --diagnose
+
+# Debug mode with detailed logging
+speakeasy --debug "test message"
+```
+
+### Health Check Features
+- **System compatibility** (macOS detection, required commands)
+- **Configuration file validation** (JSON syntax, permissions)
+- **API key detection** (both config file and environment variables)
+- **Voice configuration** (provider-specific settings)
+- **Cache configuration** (directory permissions, TTL settings)
+- **Actionable fixes** (specific commands to resolve issues)
+
+### Example Output
+```bash
+$ speakeasy --doctor
+🏥 Speakeasy Configuration Health Check
+
+🔍 System Compatibility:
+   ✅ macOS detected - system voice support available
+   ✅ `say` command available
+   ✅ `afplay` command available
+
+🔧 Configuration Health:
+   ✅ Config file exists
+   ✅ Config file is valid JSON
+   ✅ Config directory permissions OK
+
+🔑 API Key Configuration:
+   ✅ OpenAI: Configured via environment
+   ❌ ElevenLabs: Not configured
+   ✅ Groq: Configured in file
+
+🎙️  Voice Configuration:
+   system: Samantha
+   openai: nova
+   elevenlabs: EXAVITQu4vr4xnSDxMaL
+   groq: nova
+
+📦 Cache Configuration:
+   ✅ Cache enabled
+   📁 Cache dir: /tmp/speakeasy-cache
+   ✅ Cache directory accessible
+
+📋 Health Summary:
+   🎉 All checks passed! Speakeasy is healthy.
+```
+
 ## Testing
 
 ```bash
@@ -234,4 +298,5 @@ npm run build
 npm test
 npm test cache  # Test caching specifically
 npm run cli -- --help  # Test CLI
+npm run cli -- --doctor  # Test health check
 ```
