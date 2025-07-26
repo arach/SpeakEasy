@@ -63,12 +63,15 @@ export class OpenAIProvider implements Provider {
   }
 
   validateConfig(): boolean {
-    return !!this.apiKey;
+    return !!(this.apiKey && this.apiKey.length > 10);
   }
 
   getErrorMessage(error: any): string {
     if (error.message.includes('Invalid API key')) {
-      return '🔑 Invalid OpenAI API key. Set OPENAI_API_KEY environment variable or provide apiKeys.openai in config.';
+      return '🔑 Invalid OpenAI API key. Get yours at: https://platform.openai.com/api-keys';
+    }
+    if (error.message.includes('Rate limit')) {
+      return '⏰ OpenAI rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
     return `OpenAI TTS failed: ${error.message}`;
   }

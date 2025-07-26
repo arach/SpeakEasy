@@ -700,22 +700,50 @@ async function run(): Promise<void> {
     const errorMessage = (error as Error).message;
     
     // Provide better error guidance based on the provider used
-    if (options.provider === 'elevenlabs' && errorMessage.includes('API key')) {
-      console.error('❌ ElevenLabs Error:', errorMessage);
-      console.error('💡 To use ElevenLabs, set: export ELEVENLABS_API_KEY=your_key_here');
-    } else if (options.provider === 'openai' && errorMessage.includes('API key')) {
-      console.error('❌ OpenAI Error:', errorMessage);
-      console.error('💡 To use OpenAI, set: export OPENAI_API_KEY=your_key_here');
-    } else if (options.provider === 'groq' && errorMessage.includes('API key')) {
-      console.error('❌ Groq Error:', errorMessage);
-      console.error('💡 To use Groq, set: export GROQ_API_KEY=your_key_here');
+    const errorMsg = errorMessage.toLowerCase();
+    
+    console.error('❌ Error:', errorMessage);
+    console.error('');
+    
+    if (errorMsg.includes('api key') || errorMsg.includes('invalid') || errorMsg.includes('required')) {
+      console.error('🔑 Setup Guide:');
+      console.error('');
+      
+      if (options.provider === 'elevenlabs' || errorMsg.includes('elevenlabs')) {
+        console.error('   ElevenLabs:');
+        console.error('   1. Get API key: https://elevenlabs.io/app/settings/api-keys');
+        console.error('   2. Set: export ELEVENLABS_API_KEY=your_key_here');
+      } else if (options.provider === 'openai' || errorMsg.includes('openai')) {
+        console.error('   OpenAI:');
+        console.error('   1. Get API key: https://platform.openai.com/api-keys');
+        console.error('   2. Set: export OPENAI_API_KEY=your_key_here');
+      } else if (options.provider === 'groq' || errorMsg.includes('groq')) {
+        console.error('   Groq:');
+        console.error('   1. Get API key: https://console.groq.com/keys');
+        console.error('   2. Set: export GROQ_API_KEY=your_key_here');
+      }
+      
+      console.error('');
+      console.error('   🗣️  Quick fix: Use macOS built-in voices (no API key needed)');
+      console.error('   speakeasy "hello world" --provider system');
+      console.error('');
+      console.error('   🔧 Run: speakeasy --doctor for full setup help');
+    } else if (errorMsg.includes('rate limit')) {
+      console.error('⏰ Rate Limit Exceeded');
+      console.error('');
+      console.error('💡 Solutions:');
+      console.error('   • Wait 60 seconds and retry');
+      console.error('   • Use system voice: speakeasy "text" --provider system');
+      console.error('   • Check your provider dashboard for limits');
     } else {
-      console.error('❌ Error:', errorMessage);
+      console.error('💡 Try: speakeasy --doctor for troubleshooting help');
     }
     
     // Always suggest the system provider as fallback
     if (options.provider !== 'system') {
-      console.error('🗣️  Fallback: Use --provider system for macOS built-in voices (no API key needed)');
+      console.error('');
+      console.error('🗣️  Quick fix: Use macOS built-in voices (no API key needed)');
+      console.error('   speakeasy "text" --provider system');
     }
     
     process.exit(1);

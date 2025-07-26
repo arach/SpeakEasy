@@ -122,7 +122,11 @@ export class SpeakEasy {
     try {
       await this.speakText(text);
     } catch (error) {
-      console.error('Speech error:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('❌ Speech error:', errorMsg);
+      
+      // Re-throw to let CLI handle with better formatting
+      throw error;
     } finally {
       this.isPlaying = false;
       if (this.queue.length > 0) {
@@ -284,8 +288,25 @@ export class SpeakEasy {
     if (lastError) {
       // If we tried a specific provider and it failed, provide better guidance
       if (requestedProvider !== 'system') {
+        const providerName = requestedProvider.charAt(0).toUpperCase() + requestedProvider.slice(1);
+        let helpText = '';
+        
+        if (lastError.message.includes('API key')) {
+          switch (requestedProvider) {
+            case 'openai':
+              helpText = 'Get your API key: https://platform.openai.com/api-keys';
+              break;
+            case 'elevenlabs':
+              helpText = 'Get your API key: https://elevenlabs.io/app/settings/api-keys';
+              break;
+            case 'groq':
+              helpText = 'Get your API key: https://console.groq.com/keys';
+              break;
+          }
+        }
+        
         throw new Error(
-          `${requestedProvider} failed: ${lastError.message}. Try using --provider system for macOS built-in voices.`
+          `${providerName} failed: ${lastError.message}${helpText ? `\n💡 ${helpText}` : ''}\n🗣️  Try: speakeasy --text "hello world" --provider system`
         );
       }
       throw new Error(`All providers failed. Last error: ${lastError.message}`);

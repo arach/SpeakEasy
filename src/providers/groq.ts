@@ -63,12 +63,15 @@ export class GroqProvider implements Provider {
   }
 
   validateConfig(): boolean {
-    return !!this.apiKey;
+    return !!(this.apiKey && this.apiKey.length > 10);
   }
 
   getErrorMessage(error: any): string {
     if (error.message.includes('Invalid API key')) {
-      return '🔑 Invalid Groq API key. Set GROQ_API_KEY environment variable or provide apiKeys.groq in config.';
+      return '🔑 Invalid Groq API key. Get yours at: https://console.groq.com/keys';
+    }
+    if (error.message.includes('Rate limit')) {
+      return '⏰ Groq rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
     return `Groq TTS failed: ${error.message}`;
   }

@@ -124,11 +124,14 @@ var OpenAIProvider = class {
     }
   }
   validateConfig() {
-    return !!this.apiKey;
+    return !!(this.apiKey && this.apiKey.length > 10);
   }
   getErrorMessage(error) {
     if (error.message.includes("Invalid API key")) {
-      return "\u{1F511} Invalid OpenAI API key. Set OPENAI_API_KEY environment variable or provide apiKeys.openai in config.";
+      return "\u{1F511} Invalid OpenAI API key. Get yours at: https://platform.openai.com/api-keys";
+    }
+    if (error.message.includes("Rate limit")) {
+      return '\u23F0 OpenAI rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
     return `OpenAI TTS failed: ${error.message}`;
   }
@@ -186,7 +189,12 @@ var ElevenLabsProvider = class {
         } else if (response.status === 429) {
           throw new Error("ElevenLabs API error: Rate limit exceeded");
         }
-        throw new Error(`ElevenLabs API error: ${response.status}`);
+        if (response.status === 403) {
+          throw new Error(`ElevenLabs API error: Access forbidden - check your API key permissions`);
+        } else if (response.status === 422) {
+          throw new Error(`ElevenLabs API error: Invalid voice ID or parameters - check your configuration`);
+        }
+        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
       }
       const audioBuffer = await response.arrayBuffer();
       return Buffer.from(audioBuffer);
@@ -195,11 +203,17 @@ var ElevenLabsProvider = class {
     }
   }
   validateConfig() {
-    return !!this.apiKey;
+    return !!(this.apiKey && this.apiKey.length > 10);
   }
   getErrorMessage(error) {
     if (error.message.includes("Invalid API key")) {
-      return "\u{1F511} Invalid ElevenLabs API key. Set ELEVENLABS_API_KEY environment variable or provide apiKeys.elevenlabs in config.";
+      return "\u{1F511} Invalid ElevenLabs API key. Get yours at: https://elevenlabs.io/app/settings/api-keys";
+    }
+    if (error.message.includes("Access forbidden")) {
+      return "\u{1F512} ElevenLabs access forbidden. Ensure your API key has TTS permissions";
+    }
+    if (error.message.includes("Rate limit")) {
+      return '\u23F0 ElevenLabs rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
     return `ElevenLabs TTS failed: ${error.message}`;
   }
@@ -261,11 +275,14 @@ var GroqProvider = class {
     }
   }
   validateConfig() {
-    return !!this.apiKey;
+    return !!(this.apiKey && this.apiKey.length > 10);
   }
   getErrorMessage(error) {
     if (error.message.includes("Invalid API key")) {
-      return "\u{1F511} Invalid Groq API key. Set GROQ_API_KEY environment variable or provide apiKeys.groq in config.";
+      return "\u{1F511} Invalid Groq API key. Get yours at: https://console.groq.com/keys";
+    }
+    if (error.message.includes("Rate limit")) {
+      return '\u23F0 Groq rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
     return `Groq TTS failed: ${error.message}`;
   }
@@ -1080,7 +1097,9 @@ var SpeakEasy = class {
     try {
       await this.speakText(text);
     } catch (error) {
-      console.error("Speech error:", error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("\u274C Speech error:", errorMsg);
+      throw error;
     } finally {
       this.isPlaying = false;
       if (this.queue.length > 0) {
@@ -1216,8 +1235,25 @@ var SpeakEasy = class {
     }
     if (lastError) {
       if (requestedProvider !== "system") {
+        const providerName = requestedProvider.charAt(0).toUpperCase() + requestedProvider.slice(1);
+        let helpText = "";
+        if (lastError.message.includes("API key")) {
+          switch (requestedProvider) {
+            case "openai":
+              helpText = "Get your API key: https://platform.openai.com/api-keys";
+              break;
+            case "elevenlabs":
+              helpText = "Get your API key: https://elevenlabs.io/app/settings/api-keys";
+              break;
+            case "groq":
+              helpText = "Get your API key: https://console.groq.com/keys";
+              break;
+          }
+        }
         throw new Error(
-          `${requestedProvider} failed: ${lastError.message}. Try using --provider system for macOS built-in voices.`
+          `${providerName} failed: ${lastError.message}${helpText ? `
+\u{1F4A1} ${helpText}` : ""}
+\u{1F5E3}\uFE0F  Try: speakeasy --text "hello world" --provider system`
         );
       }
       throw new Error(`All providers failed. Last error: ${lastError.message}`);

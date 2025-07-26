@@ -58,7 +58,12 @@ export class ElevenLabsProvider implements Provider {
         } else if (response.status === 429) {
           throw new Error('ElevenLabs API error: Rate limit exceeded');
         }
-        throw new Error(`ElevenLabs API error: ${response.status}`);
+        if (response.status === 403) {
+        throw new Error(`ElevenLabs API error: Access forbidden - check your API key permissions`);
+      } else if (response.status === 422) {
+        throw new Error(`ElevenLabs API error: Invalid voice ID or parameters - check your configuration`);
+      }
+      throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
       }
 
       const audioBuffer = await response.arrayBuffer();
@@ -69,12 +74,18 @@ export class ElevenLabsProvider implements Provider {
   }
 
   validateConfig(): boolean {
-    return !!this.apiKey;
+    return !!(this.apiKey && this.apiKey.length > 10);
   }
 
   getErrorMessage(error: any): string {
     if (error.message.includes('Invalid API key')) {
-      return '🔑 Invalid ElevenLabs API key. Set ELEVENLABS_API_KEY environment variable or provide apiKeys.elevenlabs in config.';
+      return '🔑 Invalid ElevenLabs API key. Get yours at: https://elevenlabs.io/app/settings/api-keys';
+    }
+    if (error.message.includes('Access forbidden')) {
+      return '🔒 ElevenLabs access forbidden. Ensure your API key has TTS permissions';
+    }
+    if (error.message.includes('Rate limit')) {
+      return '⏰ ElevenLabs rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
     return `ElevenLabs TTS failed: ${error.message}`;
   }
