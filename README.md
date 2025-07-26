@@ -222,6 +222,21 @@ const openaiEntries = await speaker.findByProvider('openai');
 # List all cached entries
 speakeasy --cache --list
 
+# Example output:
+📋 Cache Entries (1)
+═══════════════════════
+
+1. 8c957870-4741-5394-a0ed-b3db062d3ec3
+   Text: "Hello world"
+   Provider: openai
+   Voice: nova
+   Size: 15.5 KB
+   Created: 2025-07-26, 2:09:57 p.m.
+   File: 8c957870-4741-5394-a0ed-b3db062d3ec3.mp3
+   Model: tts-1
+
+💡 Use --id KEY to see full details, --play KEY to play audio
+
 # Search by text
 speakeasy --cache --find "hello"
 
