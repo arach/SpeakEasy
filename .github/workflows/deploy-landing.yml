@@ -27,7 +27,7 @@ jobs:
         
     - name: Install dependencies
       working-directory: ./landing
-      run: npm ci
+      run: npm ci --legacy-peer-deps
       
     - name: Build and export landing page
       working-directory: ./landing
