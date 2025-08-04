@@ -138,8 +138,8 @@ export default function CodeExamples() {
           </div>
 
           {Object.entries(codeExamples).map(([key, example]) => (
-            <TabsContent key={key} value={key}>
-              <Card className="relative bg-slate-900 border-slate-700 overflow-hidden rounded-xl shadow-lg">
+            <TabsContent key={key} value={key} className="flex justify-center">
+              <Card className="relative bg-slate-900 border-slate-700 overflow-hidden rounded-xl shadow-lg w-full max-w-2xl">
                 <div className="flex items-center justify-between px-1.5 py-0.5 bg-slate-800 border-b border-slate-700">
                   <div className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
@@ -161,26 +161,27 @@ export default function CodeExamples() {
                   </Button>
                 </div>
                 <div className="overflow-x-auto">
-                  <SyntaxHighlighter
-                    language={example.language}
-                    style={vscDarkPlus}
-                    customStyle={{
-                      margin: 0,
-                      padding: '1rem',
-                      background: 'transparent',
-                      fontSize: '0.67rem',
-                      lineHeight: '1.3',
-                      fontWeight: '200'
-                    }}
-                    codeTagProps={{
-                      style: {
-                        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                  <div className="text-[0.67rem] md:text-[0.9rem]">
+                    <SyntaxHighlighter
+                      language={example.language}
+                      style={vscDarkPlus}
+                      customStyle={{
+                        margin: 0,
+                        padding: '1rem',
+                        background: 'transparent',
+                        lineHeight: '1.3',
                         fontWeight: '200'
-                      }
-                    }}
-                  >
-                    {example.code}
-                  </SyntaxHighlighter>
+                      }}
+                      codeTagProps={{
+                        style: {
+                          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                          fontWeight: '200'
+                        }
+                      }}
+                    >
+                      {example.code}
+                    </SyntaxHighlighter>
+                  </div>
                 </div>
               </Card>
             </TabsContent>
