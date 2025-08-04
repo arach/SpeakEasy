@@ -13,6 +13,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     
     steps:
     - name: Checkout
@@ -33,12 +37,19 @@ jobs:
       working-directory: ./landing
       run: npm run export
       
+    - name: Setup Pages
+      if: github.ref == 'refs/heads/master'
+      uses: actions/configure-pages@v4
+      
+    - name: Upload artifact
+      if: github.ref == 'refs/heads/master'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ./landing/out
+        
     - name: Deploy to GitHub Pages
       if: github.ref == 'refs/heads/master'
-      uses: peaceiris/actions-gh-pages@v4
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./landing/out
-        cname: speakeasy.arach.dev
+      id: deployment
+      uses: actions/deploy-pages@v4
 
 # Made with ❤️ and 🤖 by Arach
