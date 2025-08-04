@@ -4,6 +4,7 @@ export interface ProviderConfig {
   tempDir: string;
   voice?: string;
   apiKey?: string;
+  volume?: number;
 }
 
 export interface Provider {
@@ -18,6 +19,7 @@ export interface SpeakEasyConfig {
   openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
   elevenlabsVoiceId?: string;
   rate?: number;
+  volume?: number;
   apiKeys?: {
     openai?: string;
     elevenlabs?: string;
@@ -68,6 +70,7 @@ export interface GlobalConfig {
     provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
     fallbackOrder?: string[];
     rate?: number;
+    volume?: number;
   };
   global?: {
     tempDir?: string;

@@ -25,6 +25,7 @@ interface CLIOptions {
   provider?: string;
   voice?: string;
   rate?: number;
+  volume?: number;
   interrupt?: boolean;
   cache?: boolean;
   clearCache?: boolean;
@@ -56,6 +57,7 @@ Options:
   --provider, -p      Provider: system, openai, elevenlabs, groq
   --voice, -v         Voice to use (depends on provider)
   --rate, -r          Speech rate (words per minute)
+  --volume            Volume (0.0 to 1.0, default: 0.7)
   --interrupt, -i     Interrupt current speech
   --cache, -c         Enable caching
   --clear-cache       Clear the cache
@@ -75,6 +77,7 @@ Examples:
   speakeasy "Hello world"
   speakeasy --text "Hello world" --provider openai --voice nova
   speakeasy --text "Hello world" --provider elevenlabs --voice EXAVITQu4vr4xnSDxMaL
+  speakeasy --text "Hello world" --volume 0.5
   speakeasy --cache --text "Hello cached world"
   speakeasy --clear-cache
   speakeasy --list                    # List all cache entries
@@ -118,6 +121,7 @@ function diagnoseConfig(): void {
     console.log('📊 Settings Summary:');
     console.log(`   Default Provider: ${globalConfig.defaults?.provider || 'system'}`);
     console.log(`   Default Rate: ${globalConfig.defaults?.rate || 180} WPM`);
+    console.log(`   Default Volume: ${((globalConfig.defaults?.volume || 0.7) * 100).toFixed(0)}%`);
     console.log(`   Fallback Order: ${(globalConfig.defaults?.fallbackOrder || ['system']).join(' → ')}`);
     console.log(`   Temp Dir: ${globalConfig.global?.tempDir || '/tmp'}`);
     console.log(`   Auto-cleanup: ${globalConfig.global?.cleanup !== false}`);
@@ -560,6 +564,10 @@ async function run(): Promise<void> {
         options.rate = parseInt(args[++i]) || 180;
         break;
       
+      case '--volume':
+        options.volume = parseFloat(args[++i]) || 0.7;
+        break;
+      
       case '--interrupt':
       case '-i':
         options.interrupt = true;
@@ -669,6 +677,7 @@ async function run(): Promise<void> {
     const config: SpeakEasyConfig = {
       provider: (options.provider as any) || 'system',
       rate: options.rate || 180,
+      volume: options.volume !== undefined ? options.volume : undefined,
       debug: options.debug || false,
       ...(options.cache && { cache: { enabled: true } })
     };

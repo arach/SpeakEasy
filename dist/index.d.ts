@@ -4,6 +4,7 @@ interface ProviderConfig {
     tempDir: string;
     voice?: string;
     apiKey?: string;
+    volume?: number;
 }
 interface Provider {
     speak(config: ProviderConfig): Promise<void>;
@@ -16,6 +17,7 @@ interface SpeakEasyConfig {
     openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
     elevenlabsVoiceId?: string;
     rate?: number;
+    volume?: number;
     apiKeys?: {
         openai?: string;
         elevenlabs?: string;
@@ -64,6 +66,7 @@ interface GlobalConfig {
         provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
         fallbackOrder?: string[];
         rate?: number;
+        volume?: number;
     };
     global?: {
         tempDir?: string;
@@ -253,6 +256,7 @@ declare class SpeakEasy {
 declare const say: (text: string, provider?: "system" | "openai" | "elevenlabs" | "groq") => Promise<void>;
 declare const speak: (text: string, options?: SpeakEasyOptions & {
     provider?: "system" | "openai" | "elevenlabs" | "groq";
+    volume?: number;
 }) => Promise<void>;
 
 export { CONFIG_FILE, ElevenLabsProvider, GlobalConfig, GroqProvider, OpenAIProvider, Provider, ProviderConfig, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSCache, say, speak };

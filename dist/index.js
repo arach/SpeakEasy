@@ -54,8 +54,25 @@ var SystemProvider = class {
   }
   async speak(config) {
     try {
-      const command = `say -v ${this.voice} -r ${config.rate} "${config.text.replace(/"/g, '\\"')}"`;
-      (0, import_child_process.execSync)(command);
+      const volume = config.volume !== void 0 ? config.volume : 0.7;
+      const tempFile = `${config.tempDir}/system_speech_${Date.now()}.aiff`;
+      try {
+        const sayCommand = `say -v ${this.voice} -r ${config.rate} -o "${tempFile}" "${config.text.replace(/"/g, '\\"')}"`;
+        (0, import_child_process.execSync)(sayCommand);
+        const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+        const playCommand = `afplay${volumeFlag} "${tempFile}"`;
+        (0, import_child_process.execSync)(playCommand);
+        const fs6 = require("fs");
+        if (fs6.existsSync(tempFile)) {
+          fs6.unlinkSync(tempFile);
+        }
+      } catch (error) {
+        const fs6 = require("fs");
+        if (fs6.existsSync(tempFile)) {
+          fs6.unlinkSync(tempFile);
+        }
+        throw error;
+      }
     } catch (error) {
       throw new Error(`System TTS failed: ${error}`);
     }
@@ -85,7 +102,9 @@ var OpenAIProvider = class {
     if (audioBuffer) {
       const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
       fs.writeFileSync(tempFile, audioBuffer);
-      (0, import_child_process2.execSync)(`afplay "${tempFile}"`);
+      const volume = config.volume !== void 0 ? config.volume : 0.7;
+      const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+      (0, import_child_process2.execSync)(`afplay${volumeFlag} "${tempFile}"`);
       if (fs.existsSync(tempFile)) {
         fs.unlinkSync(tempFile);
       }
@@ -154,7 +173,9 @@ var ElevenLabsProvider = class {
     if (audioBuffer) {
       const tempFile = path2.join(config.tempDir, `speech_${Date.now()}.mp3`);
       fs2.writeFileSync(tempFile, audioBuffer);
-      (0, import_child_process3.execSync)(`afplay "${tempFile}"`);
+      const volume = config.volume !== void 0 ? config.volume : 0.7;
+      const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+      (0, import_child_process3.execSync)(`afplay${volumeFlag} "${tempFile}"`);
       if (fs2.existsSync(tempFile)) {
         fs2.unlinkSync(tempFile);
       }
@@ -236,7 +257,9 @@ var GroqProvider = class {
     if (audioBuffer) {
       const tempFile = path3.join(config.tempDir, `speech_${Date.now()}.mp3`);
       fs3.writeFileSync(tempFile, audioBuffer);
-      (0, import_child_process4.execSync)(`afplay "${tempFile}"`);
+      const volume = config.volume !== void 0 ? config.volume : 0.7;
+      const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+      (0, import_child_process4.execSync)(`afplay${volumeFlag} "${tempFile}"`);
       if (fs3.existsSync(tempFile)) {
         fs3.unlinkSync(tempFile);
       }
@@ -1042,6 +1065,7 @@ var SpeakEasy = class {
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || "nova",
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || "EXAVITQu4vr4xnSDxMaL",
       rate: config.rate || globalConfig.defaults?.rate || 180,
+      volume: config.volume !== void 0 ? config.volume : globalConfig.defaults?.volume !== void 0 ? globalConfig.defaults.volume : 0.7,
       debug: config.debug || false,
       apiKeys: {
         openai: config.apiKeys?.openai || globalConfig.providers?.openai?.apiKey || process.env.OPENAI_API_KEY || "",
@@ -1143,11 +1167,13 @@ var SpeakEasy = class {
           if (provider && provider.validateConfig()) {
             const voice = this.getVoiceForProvider(providerName);
             const rate = this.config.rate || 180;
+            const volume = this.config.volume !== void 0 ? this.config.volume : 0.7;
             const tempDir = this.config.tempDir || "/tmp";
             if (this.debug) {
               console.log(`\u2705 Using provider: ${providerName}`);
               console.log(`\u{1F399}\uFE0F  Voice/model: ${voice}`);
               console.log(`\u26A1 Rate: ${rate} WPM`);
+              console.log(`\u{1F50A} Volume: ${(volume * 100).toFixed(0)}%`);
             }
             if (this.useCache && providerName !== "system" && this.cache) {
               const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
@@ -1170,6 +1196,7 @@ var SpeakEasy = class {
                 rate,
                 tempDir,
                 voice,
+                volume,
                 apiKey: this.getApiKeyForProvider(providerName) || ""
               });
               return;
@@ -1181,6 +1208,7 @@ var SpeakEasy = class {
                   rate,
                   tempDir,
                   voice,
+                  volume,
                   apiKey: this.getApiKeyForProvider(providerName) || ""
                 });
               } else {
@@ -1189,6 +1217,7 @@ var SpeakEasy = class {
                   rate,
                   tempDir,
                   voice,
+                  volume,
                   apiKey: this.getApiKeyForProvider(providerName) || ""
                 });
                 return;
@@ -1209,7 +1238,8 @@ var SpeakEasy = class {
               });
               const tempFile = path5.join(tempDir, `speech_${Date.now()}.mp3`);
               fs5.writeFileSync(tempFile, audioBuffer);
-              (0, import_child_process5.execSync)(`afplay "${tempFile}"`);
+              const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+              (0, import_child_process5.execSync)(`afplay${volumeFlag} "${tempFile}"`);
               if (fs5.existsSync(tempFile)) {
                 fs5.unlinkSync(tempFile);
               }
@@ -1219,7 +1249,8 @@ var SpeakEasy = class {
                 console.log(`\u{1F3B5} Playing generated audio: ${tempFile}`);
               }
               fs5.writeFileSync(tempFile, audioBuffer);
-              (0, import_child_process5.execSync)(`afplay "${tempFile}"`);
+              const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+              (0, import_child_process5.execSync)(`afplay${volumeFlag} "${tempFile}"`);
               if (fs5.existsSync(tempFile)) {
                 fs5.unlinkSync(tempFile);
               }
@@ -1268,7 +1299,8 @@ var SpeakEasy = class {
           text,
           rate: this.config.rate || 180,
           tempDir: this.config.tempDir || "/tmp",
-          voice: this.config.systemVoice || "Samantha"
+          voice: this.config.systemVoice || "Samantha",
+          volume: this.config.volume !== void 0 ? this.config.volume : 0.7
         });
       } catch (error) {
         throw new Error(`System voice failed: ${error}. Ensure you're on macOS.`);
@@ -1280,6 +1312,7 @@ var SpeakEasy = class {
     console.log("\u{1F4CA} Current Configuration:");
     console.log(`   Provider: ${this.config.provider}`);
     console.log(`   Rate: ${this.config.rate} WPM`);
+    console.log(`   Volume: ${((this.config.volume || 0.7) * 100).toFixed(0)}%`);
     console.log(`   System Voice: ${this.config.systemVoice}`);
     console.log(`   OpenAI Voice: ${this.config.openaiVoice}`);
     console.log(`   ElevenLabs Voice: ${this.config.elevenlabsVoiceId}`);
@@ -1309,7 +1342,9 @@ var SpeakEasy = class {
   }
   async playCachedAudio(audioFilePath) {
     const { execSync: execSync6 } = require("child_process");
-    execSync6(`afplay "${audioFilePath}"`, { stdio: "inherit" });
+    const volume = this.config.volume !== void 0 ? this.config.volume : 0.7;
+    const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+    execSync6(`afplay${volumeFlag} "${audioFilePath}"`, { stdio: "inherit" });
   }
   getVoiceForProvider(provider) {
     switch (provider) {
@@ -1369,14 +1404,15 @@ var say = (text, provider) => {
   if (typeof text !== "string" || !text.trim()) {
     throw new Error("Text argument is required for say()");
   }
-  return new SpeakEasy({ provider: provider || "system" }).speak(text);
+  return new SpeakEasy(provider ? { provider } : {}).speak(text);
 };
 var speak = (text, options) => {
   if (typeof text !== "string" || !text.trim()) {
     throw new Error("Text argument is required for speak()");
   }
-  const { provider, ...speakOptions } = options || {};
-  return new SpeakEasy({ provider: provider || "system" }).speak(text, speakOptions);
+  const { provider, volume, ...speakOptions } = options || {};
+  const config = { provider, volume };
+  return new SpeakEasy(config).speak(text, speakOptions);
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

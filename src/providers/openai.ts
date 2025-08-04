@@ -18,7 +18,10 @@ export class OpenAIProvider implements Provider {
     if (audioBuffer) {
       const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
       fs.writeFileSync(tempFile, audioBuffer);
-      execSync(`afplay "${tempFile}"`);
+      
+      const volume = config.volume !== undefined ? config.volume : 0.7;
+      const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
+      execSync(`afplay${volumeFlag} "${tempFile}"`);
       
       if (fs.existsSync(tempFile)) {
         fs.unlinkSync(tempFile);
