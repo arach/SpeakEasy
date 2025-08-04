@@ -17,7 +17,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="py-8 px-4 bg-slate-50/50 border-t border-slate-200/50">
         <div className="max-w-6xl mx-auto text-center">
-          {/* Trigger deployment */}
+          {/* Trigger deployment - fix deps */}
           <p className="text-sm text-slate-600">
             Made with ❤️ and 🤖 by <a href="https://arach.dev" className="text-emerald-600 hover:text-emerald-700 font-medium transition-colors">Arach</a>
           </p>
