@@ -5,6 +5,7 @@ A unified speech library for all your projects with support for multiple TTS pro
 ## Features
 
 - **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq
+- **Volume Control**: Per-provider volume control (0.0-1.0) without affecting system volume
 - **Smart Caching**: Caches generated audio for faster subsequent requests
 - **Smart Fallbacks**: Automatically falls back to available providers
 - **Queue Management**: Handles multiple speech requests with priority
@@ -61,7 +62,8 @@ SpeakEasy uses a clean nested configuration structure in `~/.config/speakeasy/se
   "defaults": {
     "provider": "groq",
     "fallbackOrder": ["groq", "openai", "elevenlabs", "system"],
-    "rate": 180
+    "rate": 180,
+    "volume": 0.7
   },
   "global": {
     "tempDir": "/tmp",
@@ -91,9 +93,9 @@ await say('Hello!', 'openai');                // OpenAI TTS
 await say('Hello!', 'elevenlabs');            // ElevenLabs TTS
 await say('Hello!', 'groq');                  // Groq TTS
 
-// Full featured
-await speak('Hello world!', { priority: 'high' });
-await speak('Hello!', { provider: 'openai', priority: 'high' });
+// Full featured with volume control
+await speak('Hello world!', { priority: 'high', volume: 0.5 });
+await speak('Hello!', { provider: 'openai', priority: 'high', volume: 0.8 });
 
 // Custom configuration
 import { SpeakEasy } from 'speakeasy';
@@ -101,6 +103,7 @@ const speech = new SpeakEasy({
   provider: 'openai',
   openaiVoice: 'nova',
   rate: 180,
+  volume: 0.6, // 60% volume
 });
 await speech.speak('Hello world!');
 ```
@@ -112,9 +115,40 @@ await speech.speak('Hello world!');
 import { say } from 'speakeasy';
 
 export async function speakNotification(message: string, project: string) {
-  await say(`In ${project}, ${message}`, { priority: 'high' });
+  await say(`In ${project}, ${message}`, { priority: 'high', volume: 0.8 });
 }
 ```
+
+### Volume Control
+
+SpeakEasy provides granular volume control (0.0-1.0) that only affects speech playback without changing your system volume:
+
+```typescript
+import { say, speak, SpeakEasy } from 'speakeasy';
+
+// Quick volume control
+await say('Quiet message', 'openai', { volume: 0.3 });     // 30% volume
+await say('Normal message', 'system', { volume: 0.7 });    // 70% volume (default)
+await say('Loud message', 'elevenlabs', { volume: 1.0 });  // 100% volume
+
+// With speak function
+await speak('Custom volume', { provider: 'groq', volume: 0.5 });
+
+// Class instance with default volume
+const quietSpeaker = new SpeakEasy({
+  provider: 'openai',
+  volume: 0.4  // All speech will be at 40% volume by default
+});
+await quietSpeaker.speak('This will be quiet');
+await quietSpeaker.speak('This too', { volume: 0.9 }); // Override to 90%
+```
+
+**Volume Features:**
+- ✅ **Isolated**: Only affects SpeakEasy audio, never changes system volume
+- ✅ **Provider-agnostic**: Works with system voices, OpenAI, ElevenLabs, and Groq
+- ✅ **Global config**: Set default volume in `~/.config/speakeasy/settings.json`
+- ✅ **Per-call override**: Specify volume for individual speech requests
+- ✅ **Debug visibility**: Shows current volume percentage in debug mode
 
 ### Caching
 - **Auto-enabled** when API keys are present (OpenAI, ElevenLabs, Groq)
@@ -180,6 +214,10 @@ npm install -g speakeasy
 # Basic usage
 speakeasy "Hello world"
 speakeasy --text "Hello from CLI" --provider openai --voice nova
+
+# Volume control
+speakeasy "Quiet message" --volume 0.3
+speakeasy "Loud message" --provider openai --volume 0.9 --voice nova
 
 # With caching
 speakeasy --cache --text "Hello cached world"

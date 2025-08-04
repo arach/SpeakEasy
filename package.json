@@ -16,7 +16,7 @@
     "cli": "npm run build && node dist/bin/speakeasy-cli.js"
   },
   "bin": {
-    "speakeasy": "./dist/bin/speakeasy-cli.js"
+    "speakeasy": "dist/bin/speakeasy-cli.js"
   },
   "keywords": [
     "tts",
