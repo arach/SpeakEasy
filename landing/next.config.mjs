@@ -14,8 +14,8 @@ const nextConfig = {
     output: 'export',
     trailingSlash: true,
     distDir: 'out',
-    basePath: '',
-    assetPrefix: '',
+    basePath: '/SpeakEasy',
+    assetPrefix: '/SpeakEasy/',
   }),
 }
 
