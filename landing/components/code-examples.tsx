@@ -139,7 +139,7 @@ export default function CodeExamples() {
 
           {Object.entries(codeExamples).map(([key, example]) => (
             <TabsContent key={key} value={key} className="flex justify-center">
-              <Card className="relative bg-slate-900 border-slate-700 overflow-hidden rounded-xl shadow-lg w-full max-w-2xl">
+              <Card className="relative bg-slate-900 border-slate-700 overflow-hidden rounded-xl w-full max-w-2xl shadow-[0_8px_30px_rgb(0_0_0/0.12)] hover:shadow-[0_20px_40px_rgb(0_0_0/0.15)] transition-shadow duration-300">
                 <div className="flex items-center justify-between px-1.5 py-0.5 bg-slate-800 border-b border-slate-700">
                   <div className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500" />

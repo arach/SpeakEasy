@@ -1,0 +1,49 @@
+name: Deploy Landing Page
+
+on:
+  push:
+    branches: [ master ]
+    paths: 
+      - 'landing/**'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'landing/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'pnpm'
+        cache-dependency-path: 'landing/pnpm-lock.yaml'
+        
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: latest
+        
+    - name: Install dependencies
+      working-directory: ./landing
+      run: pnpm install
+      
+    - name: Build and export landing page
+      working-directory: ./landing
+      run: pnpm export
+      
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/master'
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./landing/out
+        cname: speakeasy.arach.dev
+
+# Made with ❤️ and 🤖 by Arach
