@@ -1,3 +1,7 @@
+import createMDX from '@next/mdx'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -14,9 +18,18 @@ const nextConfig = {
     output: 'export',
     trailingSlash: true,
     distDir: 'out',
-    basePath: '/SpeakEasy',
-    assetPrefix: '/SpeakEasy/',
+    // Remove basePath and assetPrefix for custom domain
+    // basePath: '/SpeakEasy',
+    // assetPrefix: '/SpeakEasy/',
   }),
+  pageExtensions: ['js', 'jsx', 'mdx', 'ts', 'tsx'],
 }
 
-export default nextConfig
+const withMDX = createMDX({
+  options: {
+    remarkPlugins: [remarkGfm],
+    rehypePlugins: [rehypeHighlight],
+  },
+})
+
+export default withMDX(nextConfig)
