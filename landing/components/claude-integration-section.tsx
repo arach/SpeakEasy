@@ -12,7 +12,7 @@ import AudioWaveformPlayer from './audio-waveform-player'
 const notificationExamples = [
   {
     trigger: "Claude needs your permission",
-    spoken: "In SpeakEasy, Claude is waiting for your permissions",
+    spoken: "In speakeasy, Claude is waiting for you",
     audioFile: "/audio/permission.mp3",
     icon: MessageSquare,
     color: "text-blue-600",
@@ -20,7 +20,7 @@ const notificationExamples = [
   },
   {
     trigger: "Claude is waiting for your input",
-    spoken: "In SpeakEasy, Claude is waiting for your input",
+    spoken: "In speakeasy, Claude is waiting for your input",
     audioFile: "/audio/waiting-input.mp3",
     icon: Bell,
     color: "text-amber-600",
@@ -28,7 +28,7 @@ const notificationExamples = [
   },
   {
     trigger: "Notification received",
-    spoken: "In SpeakEasy, notification received",
+    spoken: "In speakeasy, Notification received",
     audioFile: "/audio/build-complete.mp3",
     icon: Terminal,
     color: "text-green-600",
