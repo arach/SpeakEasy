@@ -41,6 +41,7 @@ interface CLIOptions {
   recent?: number;
   id?: string;
   play?: string;
+  out?: string;
 }
 
 function showHelp(): void {
@@ -75,6 +76,7 @@ Options:
   --recent N          Show N most recent cache entries
   --id KEY            Show detailed info for specific cache entry
   --play KEY          Play cached audio by ID
+  --out FILE          Save audio to file (in addition to playing)
 
 Examples:
   speakeasy "Hello world"
@@ -89,6 +91,7 @@ Examples:
   speakeasy --find "hello world"      # Find entries containing text
   speakeasy --id abc123-def456        # Show detailed entry info
   speakeasy --play abc123-def456      # Play cached audio by ID
+  speakeasy "Hello world" --out audio.mp3  # Save to file
 `);
 }
 
@@ -687,6 +690,10 @@ async function run(): Promise<void> {
         options.play = args[++i];
         break;
       
+      case '--out':
+        options.out = args[++i];
+        break;
+      
       default:
         // Positional argument (text)
         if (!text && !arg.startsWith('-')) {
@@ -751,7 +758,7 @@ async function run(): Promise<void> {
       rate: options.rate || 180,
       volume: options.volume !== undefined ? options.volume : undefined,
       debug: options.debug || false,
-      ...(options.cache && { cache: { enabled: true } })
+      ...((options.cache || options.out) && { cache: { enabled: true } })
     };
 
     if (options.voice) {
@@ -772,6 +779,37 @@ async function run(): Promise<void> {
 
     const speaker = new SpeakEasy(config);
     await speaker.speak(text, { interrupt: options.interrupt });
+    
+    // Save to file if --out flag is provided
+    if (options.out) {
+      try {
+        const cacheStats = await speaker.getCacheStats();
+        if (cacheStats.dir) {
+          const { TTSCache } = require('../cache');
+          const cache = new TTSCache(cacheStats.dir, '7d');
+          const recentEntries = await cache.getRecent(1);
+          
+          if (recentEntries.length > 0) {
+            const latestEntry = recentEntries[0];
+            const fs = require('fs');
+            
+            if (fs.existsSync(latestEntry.filePath)) {
+              fs.copyFileSync(latestEntry.filePath, options.out);
+              const stats = fs.statSync(options.out);
+              console.log(`💾 Audio saved to: ${options.out} (${(stats.size / 1024).toFixed(1)} KB)`);
+            } else {
+              console.error(`❌ Audio file not found: ${latestEntry.filePath}`);
+            }
+          } else {
+            console.error('❌ No recent audio files found in cache');
+          }
+        } else {
+          console.error('❌ Cache not enabled - cannot save file');
+        }
+      } catch (error) {
+        console.error('❌ Error saving file:', (error as Error).message);
+      }
+    }
     
     if (options.cache) {
       console.log('🔍 Cache stats:', await speaker.getCacheStats());
