@@ -155,14 +155,6 @@ export default function ClaudeIntegrationSection() {
 
           {/* Implementation Section */}
           <div className="max-w-4xl mx-auto space-y-6">
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100/60 rounded-full text-sm text-emerald-800 border border-emerald-200/50">
-                <Terminal className="w-4 h-4" />
-                <span>Implementation</span>
-              </div>
-              <p className="text-slate-600 mt-2">How Hooked integrates with SpeakEasy</p>
-            </div>
-
             <Card className="relative bg-slate-900 border-slate-700 overflow-hidden rounded-xl shadow-[0_8px_30px_rgb(0_0_0/0.12)] hover:shadow-[0_20px_40px_rgb(0_0_0/0.15)]">
               <div className="flex items-center justify-between px-1.5 py-0.5 bg-slate-800 border-b border-slate-700">
                 <div className="flex items-center gap-1.5">
@@ -204,41 +196,47 @@ export default function ClaudeIntegrationSection() {
             </Card>
 
             <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-200/50">
-              <div className="text-sm text-slate-600 mb-3 font-medium">Learn more:</div>
-              <div className="flex flex-col gap-2">
-                <a 
-                  href="https://github.com/arach/hooked" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-slate-700 hover:text-blue-600 transition-colors group"
-                >
-                  <Terminal className="w-4 h-4" />
-                  <span>Hooked notification system</span>
-                  <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
+              <div className="text-center mb-4">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full text-sm text-blue-700 border border-blue-200">
+                  <ArrowRight className="w-4 h-4" />
+                  <span>Ready to make Claude audible? Install Hooked + SpeakEasy below</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="text-center">
+                  <a 
+                    href="https://github.com/arach/hooked" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+                  >
+                    <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.30.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    <span className="text-sm font-medium">Hooked</span>
+                    <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                  <p className="text-xs text-slate-500 mt-1">Ready-to-deploy handlers</p>
+                </div>
                 
-                <a 
-                  href="https://docs.anthropic.com/en/docs/claude-code/hooks" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-slate-700 hover:text-blue-600 transition-colors group"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Claude Code hooks documentation</span>
-                  <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </a>
+                <div className="text-center">
+                  <a 
+                    href="https://docs.anthropic.com/en/docs/claude-code/hooks" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+                  >
+                    <img src="https://wpforms.com/wp-content/uploads/2024/08/claude-logo.png" alt="Claude" className="w-8 h-8" />
+                    <span className="text-sm font-medium">Claude Hooks</span>
+                    <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                  <p className="text-xs text-slate-500 mt-1">Official documentation</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Bottom CTA */}
-        <div className="mt-12 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full text-sm text-blue-700 border border-blue-200">
-            <ArrowRight className="w-4 h-4" />
-            <span>Ready to make Claude audible? Install SpeakEasy below</span>
-          </div>
-        </div>
       </div>
     </section>
   )

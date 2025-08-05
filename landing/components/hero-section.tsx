@@ -9,6 +9,7 @@ import PackageManagerTabs from "@/components/package-manager-tabs"
 
 function TinyAudioPlayer() {
   const [isPlaying, setIsPlaying] = useState(false)
+  const [showCLI, setShowCLI] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
 
   const togglePlay = () => {
@@ -22,29 +23,46 @@ function TinyAudioPlayer() {
     }
   }
 
+  const handleDemoClick = () => {
+    setShowCLI(!showCLI)
+  }
+
   return (
-    <div className="flex items-center gap-2">
-      <audio 
-        ref={audioRef}
-        src="/audio/welcome-demo.mp3"
-        onEnded={() => setIsPlaying(false)}
-        onPause={() => setIsPlaying(false)}
-        onPlay={() => setIsPlaying(true)}
-      />
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={togglePlay}
-        className="h-7 px-3 text-xs bg-white/80 hover:bg-white border-emerald-200 text-emerald-700 hover:text-emerald-800 rounded-full"
-      >
-        {isPlaying ? (
-          <Pause className="w-3 h-3 mr-1.5" />
-        ) : (
-          <Play className="w-3 h-3 mr-1.5" />
-        )}
-        Demo
-      </Button>
-      <span className="text-xs text-slate-500">OpenAI Nova</span>
+    <div className="flex flex-col items-center gap-2">
+      <div className="flex items-center gap-2">
+        <audio 
+          ref={audioRef}
+          src="/audio/welcome-demo.mp3"
+          onEnded={() => setIsPlaying(false)}
+          onPause={() => setIsPlaying(false)}
+          onPlay={() => setIsPlaying(true)}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={togglePlay}
+          className="h-7 px-3 text-xs bg-white/80 hover:bg-white border-emerald-200 text-emerald-700 hover:text-emerald-800 rounded-full"
+        >
+          {isPlaying ? (
+            <Pause className="w-3 h-3 mr-1.5" />
+          ) : (
+            <Play className="w-3 h-3 mr-1.5" />
+          )}
+          Demo
+        </Button>
+        <button 
+          onClick={handleDemoClick}
+          className="text-xs text-slate-500 hover:text-slate-700 underline decoration-dotted cursor-pointer"
+        >
+          OpenAI Nova
+        </button>
+      </div>
+      {showCLI && (
+        <div className="mt-2 p-3 bg-slate-900 rounded-lg text-xs text-green-400 font-mono max-w-sm">
+          <div className="text-slate-400 mb-1">$ Generated with:</div>
+          <div>speakeasy "Welcome to SpeakEasy" --provider openai --voice nova --rate 180</div>
+        </div>
+      )}
     </div>
   )
 }
@@ -119,6 +137,7 @@ export default function HeroSection() {
         <div className="mb-6 flex justify-center">
           <TinyAudioPlayer />
         </div>
+
 
         <div className="flex flex-col items-center">
           <PackageManagerTabs />
