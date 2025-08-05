@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, MessageSquare, Volume2, ArrowRight, Terminal, Bell, Copy, ChevronLeft, ChevronRight } from "lucide-react"
+import { ExternalLink, MessageSquare, Volume2, ArrowRight, Terminal, Bell, Clock, Copy, ChevronLeft, ChevronRight } from "lucide-react"
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import AudioWaveformPlayer from './audio-waveform-player'
@@ -12,7 +12,7 @@ import AudioWaveformPlayer from './audio-waveform-player'
 const notificationExamples = [
   {
     trigger: "Claude needs your permission",
-    spoken: "In speakeasy, Claude is waiting for you",
+    spoken: "In SpeakEasy, Claude needs your permission",
     audioFile: "/audio/permission.mp3",
     icon: MessageSquare,
     color: "text-blue-600",
@@ -27,12 +27,12 @@ const notificationExamples = [
     hookType: "Input Idle Notification"
   },
   {
-    trigger: "Notification received",
-    spoken: "In speakeasy, Notification received",
-    audioFile: "/audio/build-complete.mp3",
-    icon: Terminal,
-    color: "text-green-600",
-    hookType: "General Notification"
+    trigger: "Claude is waiting for you",
+    spoken: "In speakeasy, Claude is waiting for you",
+    audioFile: "/audio/waiting-for-you.mp3",
+    icon: Clock,
+    color: "text-purple-600",
+    hookType: "General Waiting"
   }
 ]
 
