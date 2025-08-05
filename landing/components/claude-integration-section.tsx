@@ -12,7 +12,7 @@ import AudioWaveformPlayer from './audio-waveform-player'
 const notificationExamples = [
   {
     trigger: "Claude needs your permission",
-    spoken: "In SpeakEasy, Claude needs your permission",
+    spoken: "In SpeakEasy, Claude is waiting for your permissions",
     audioFile: "/audio/permission.mp3",
     icon: MessageSquare,
     color: "text-blue-600",
@@ -20,7 +20,7 @@ const notificationExamples = [
   },
   {
     trigger: "Claude is waiting for your input",
-    spoken: "Claude is waiting for your input",
+    spoken: "In SpeakEasy, Claude is waiting for your input",
     audioFile: "/audio/waiting-input.mp3",
     icon: Bell,
     color: "text-amber-600",
@@ -28,7 +28,7 @@ const notificationExamples = [
   },
   {
     trigger: "Notification received",
-    spoken: "Build completed successfully in your project",
+    spoken: "In SpeakEasy, notification received",
     audioFile: "/audio/build-complete.mp3",
     icon: Terminal,
     color: "text-green-600",
@@ -119,11 +119,6 @@ export default function ClaudeIntegrationSection() {
                     audioUrl={notificationExamples[currentExample].audioFile}
                     className="w-full"
                   />
-                  
-                  {/* Debug info - remove in production */}
-                  <div className="text-xs text-slate-400 mt-2">
-                    Playing: {notificationExamples[currentExample].audioFile} (Index: {currentExample})
-                  </div>
                 </div>
               </div>
 
