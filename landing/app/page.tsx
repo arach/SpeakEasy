@@ -3,12 +3,10 @@ import HeroSection from "@/components/hero-section"
 import FeaturesSection from "@/components/features-section"
 import CodeExamples from "@/components/code-examples"
 import ClaudeIntegrationSection from "@/components/claude-integration-section"
-import GitHubRibbon from "@/components/github-ribbon"
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 relative overflow-hidden">
-      <GitHubRibbon />
       <HeroSection />
       <Suspense fallback={<div className="h-96" />}>
         <CodeExamples />

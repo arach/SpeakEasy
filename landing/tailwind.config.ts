@@ -23,6 +23,7 @@ const config: Config = {
         display: ["var(--font-display)"],
         text: ["var(--font-text)"],
         sans: ["var(--font-text)"],
+        silkscreen: ["var(--font-silkscreen)", "monospace"],
       },
       fontWeight: {
         extralight: "200",

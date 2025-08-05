@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Silkscreen } from "next/font/google"
 import "./globals.css"
 
 const inter = Inter({
@@ -24,6 +24,13 @@ const sfProText = Inter({
   display: "swap",
 })
 
+const silkscreen = Silkscreen({
+  subsets: ["latin"],
+  variable: "--font-silkscreen",
+  weight: ["400"],
+  display: "swap",
+})
+
 export const metadata: Metadata = {
   title: "SpeakEasy — Unified Text-to-Speech Library",
   description: "Simple, unified text-to-speech for all your projects. Multiple providers, smart caching, volume control.",
@@ -43,7 +50,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${sfProDisplay.variable} ${sfProText.variable}`}>
+    <html lang="en" className={`${inter.variable} ${sfProDisplay.variable} ${sfProText.variable} ${silkscreen.variable}`}>
       <body className="font-text antialiased">{children}</body>
     </html>
   )

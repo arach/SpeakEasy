@@ -1,11 +1,58 @@
-# SpeakEasy Documentation
+# SpeakEasy 🎤
 
-Complete documentation for SpeakEasy - unified text-to-speech service with provider abstraction, intelligent caching, and queue management.
+A unified speech library for all your projects with support for multiple TTS providers and clean configuration structure.
+
+## ✨ Key Features
+
+### 🚀 **Intelligent Caching System**
+- **16x faster** repeated playback with SQLite-based cache
+- Automatic cache management with TTL and size limits
+- Content-aware deduplication prevents redundant API calls
+- Comprehensive analytics and cache inspection tools
+
+### ⚙️ **Centralized Configuration** 
+- **Single config file** at `~/.config/speakeasy/settings.json`
+- **No more scattered API keys** - configure once, use everywhere
+- Global defaults with per-call overrides
+- Environment variable integration
+
+### 🎯 **Core Capabilities**
+- **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq
+- **Smart Fallbacks**: Automatic provider switching on failure
+- **Volume Control**: Precise control without affecting system volume
+- **Queue Management**: Priority-based speech queue with interruption
+- **TypeScript**: Full type safety and IntelliSense support
+
+## Installation
+
+```bash
+npm install @arach/speakeasy
+```
+
+## Quick Start
+
+```typescript
+import { say } from '@arach/speakeasy';
+
+await say('Hello world!');                    // system voice
+await say('Hello!', 'openai');                // OpenAI TTS
+await say('Hello!', 'elevenlabs');            // ElevenLabs TTS  
+await say('Hello!', 'groq');                  // Groq TTS
+```
+
+## 🏃‍♂️ Performance Impact
+
+**Caching makes a dramatic difference:**
+
+| Provider | Without Cache | With Cache | Speedup |
+|----------|---------------|------------|---------|
+| OpenAI | ~800ms | ~50ms | **16x faster** |
+| ElevenLabs | ~1200ms | ~50ms | **24x faster** |
+| Groq | ~400ms | ~50ms | **8x faster** |
 
 ## 📚 Documentation Index
 
 ### Quick Start
-- **[Main README](../README.md)** - Overview, installation, and quick examples
 - **[CLI Reference](cli.md)** - Complete command-line documentation
 - **[SDK Guide](sdk.md)** - TypeScript SDK usage and examples
 
