@@ -26,7 +26,7 @@ A unified speech library for all your projects with support for multiple TTS pro
 ### 🎧 **Demo**
 Listen to SpeakEasy in action: [welcome-demo.mp3](examples/welcome-demo.mp3)
 
-*Generated with: `speakeasy "Welcome to SpeakEasy! This unified text-to-speech service makes it easy to add voice to your applications." --provider openai --voice nova --rate 185 --out welcome-demo.mp3`*
+*Generated with: `speakeasy "Welcome to SpeakEasy" --provider openai --voice nova --rate 185 --out welcome-demo.mp3`*
 
 ## Installation
 
