@@ -69,7 +69,15 @@ export default function AudioWaveformPlayer({ audioUrl, className = '' }: AudioW
     })
 
     return () => {
-      wavesurfer.destroy()
+      try {
+        if (wavesurfer && typeof wavesurfer.destroy === 'function') {
+          wavesurfer.destroy()
+        }
+      } catch (error) {
+        // Ignore cleanup errors - component is unmounting anyway
+        console.debug('WaveSurfer cleanup error (safe to ignore):', error)
+      }
+      wavesurferRef.current = null
     }
   }, [audioUrl])
 
