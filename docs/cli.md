@@ -53,6 +53,12 @@ speakeasy --text "text" [options]
 - `--interrupt, -i` - Interrupt any currently playing speech
 - Example: `speakeasy "Stop everything" --interrupt`
 
+### File Output
+- `--out <file>` - Save audio to file (in addition to playing)
+- Automatically enables caching when used
+- Example: `speakeasy "Welcome message" --out welcome.mp3`
+- Example: `speakeasy "Notification" --provider openai --voice nova --out notification.mp3`
+
 ## Cache Management
 
 ### Basic Cache Operations
@@ -130,6 +136,10 @@ speakeasy "Hello world" --provider openai --voice nova
 
 # Custom rate and volume
 speakeasy "Fast and quiet" --rate 250 --volume 0.4
+
+# Save to file (plays AND saves)
+speakeasy "Welcome message" --out welcome.mp3
+speakeasy "Meeting reminder" --provider openai --voice nova --out reminder.mp3
 ```
 
 ### Provider-Specific Examples

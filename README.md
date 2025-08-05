@@ -23,6 +23,11 @@ A unified speech library for all your projects with support for multiple TTS pro
 - **Queue Management**: Priority-based speech queue with interruption
 - **TypeScript**: Full type safety and IntelliSense support
 
+### 🎧 **Demo**
+Listen to SpeakEasy in action: [welcome-demo.mp3](examples/welcome-demo.mp3)
+
+*Generated with: `speakeasy "Welcome to SpeakEasy! This unified text-to-speech service makes it easy to add voice to your applications." --provider openai --voice nova --rate 185 --out welcome-demo.mp3`*
+
 ## Installation
 
 ```bash
@@ -246,6 +251,10 @@ speakeasy --text "Hello from CLI" --provider openai --voice nova
 # Volume control
 speakeasy "Quiet message" --volume 0.3
 speakeasy "Loud message" --provider openai --volume 0.9 --voice nova
+
+# Save to file (plays audio AND saves file)
+speakeasy "Welcome message" --out welcome.mp3
+speakeasy "Notification" --provider openai --voice nova --out notification.mp3
 
 # With caching
 speakeasy --cache --text "Hello cached world"
