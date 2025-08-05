@@ -145,10 +145,10 @@ export default async function DocPage({ params }: DocPageProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link 
-                href="/docs/overview"
+                href="/"
                 className="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1"
               >
-                ← Back to Overview
+                ← Back to Home
               </Link>
               <div className="h-4 w-px bg-slate-300" />
               <div className="flex items-center gap-2">
