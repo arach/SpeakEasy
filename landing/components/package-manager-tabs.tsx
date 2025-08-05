@@ -15,7 +15,7 @@ const packageManagers = {
   },
   pnpm: {
     icon: Zap,
-    command: "pnpm add @arach/speakeasy",
+    command: "pnpm install @arach/speakeasy",
     description: "Fast, disk space efficient"
   },
   yarn: {

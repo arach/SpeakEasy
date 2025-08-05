@@ -26,7 +26,7 @@ export default function InstallationSection() {
     {
       id: "pnpm",
       title: "PNPM",
-      command: "pnpm add @arach/speakeasy",
+      command: "pnpm install @arach/speakeasy",
       description: "Fast, disk space efficient"
     },
     {
