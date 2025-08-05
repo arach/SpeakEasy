@@ -119,6 +119,11 @@ export default function ClaudeIntegrationSection() {
                     audioUrl={notificationExamples[currentExample].audioFile}
                     className="w-full"
                   />
+                  
+                  {/* Debug info - remove in production */}
+                  <div className="text-xs text-slate-400 mt-2">
+                    Playing: {notificationExamples[currentExample].audioFile} (Index: {currentExample})
+                  </div>
                 </div>
               </div>
 
