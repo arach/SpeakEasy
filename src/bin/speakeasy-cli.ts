@@ -30,6 +30,7 @@ interface CLIOptions {
   cache?: boolean;
   clearCache?: boolean;
   config?: boolean;
+  edit?: boolean;
   diagnose?: boolean;
   doctor?: boolean;
   help?: boolean;
@@ -62,6 +63,8 @@ Options:
   --cache, -c         Enable caching
   --clear-cache       Clear the cache
   --config            Show current configuration
+  --config --edit     Edit configuration file in default editor
+  --edit              Edit configuration file (implies --config)
   --help, -h          Show this help
   --debug, -d         Enable debug logging
   --diagnose          Show configuration diagnostics
@@ -89,11 +92,64 @@ Examples:
 `);
 }
 
-function showConfig(): void {
+function showConfig(edit: boolean = false): void {
   try {
     console.log('📊 Configuration Location:');
     console.log(`   File: ${CONFIG_FILE}`);
     console.log('');
+    
+    if (edit) {
+      // Create config file if it doesn't exist
+      if (!fs.existsSync(CONFIG_FILE)) {
+        console.log('📝 Creating new configuration file...');
+        
+        // Ensure directory exists
+        if (!fs.existsSync(CONFIG_DIR)) {
+          fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        }
+        
+        // Create basic config
+        const defaultConfig = {
+          providers: {
+            system: {
+              enabled: true,
+              voice: "Samantha"
+            }
+          },
+          defaults: {
+            provider: "system",
+            rate: 180
+          },
+          global: {
+            tempDir: "/tmp",
+            cleanup: true
+          }
+        };
+        
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
+        console.log('✅ Created default configuration file');
+      }
+      
+      // Open in editor
+      const editor = process.env.EDITOR || process.env.VISUAL || 'nano';
+      console.log(`🔧 Opening config file with ${editor}...`);
+      
+      const { spawn } = require('child_process');
+      const child = spawn(editor, [CONFIG_FILE], { 
+        stdio: 'inherit',
+        detached: false 
+      });
+      
+      child.on('exit', (code: number) => {
+        if (code === 0) {
+          console.log('✅ Configuration file updated');
+        } else {
+          console.error(`❌ Editor exited with code ${code}`);
+        }
+      });
+      
+      return;
+    }
     
     if (fs.existsSync(CONFIG_FILE)) {
       const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
@@ -106,6 +162,8 @@ function showConfig(): void {
       console.log('💡 To create a config file:');
       console.log(`   mkdir -p ${CONFIG_DIR}`);
       console.log(`   echo '{"providers":{"system":{"voice":"Samantha"}}}' > ${CONFIG_FILE}`);
+      console.log('');
+      console.log('🔧 Or use: speakeasy --config --edit');
     }
   } catch (error) {
     console.error('❌ Error reading config:', (error as Error).message);
@@ -549,6 +607,11 @@ async function run(): Promise<void> {
         options.config = true;
         break;
       
+      case '--edit':
+        options.edit = true;
+        options.config = true; // Imply --config when --edit is used
+        break;
+      
       case '--clear-cache':
         options.clearCache = true;
         break;
@@ -639,7 +702,7 @@ async function run(): Promise<void> {
   }
 
   if (options.config) {
-    showConfig();
+    showConfig(options.edit);
     return;
   }
 
