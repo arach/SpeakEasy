@@ -31,13 +31,13 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.npm
-        key: ${{ runner.os }}-node-${{ hashFiles('landing/package-lock.json') }}
+        key: ${{ runner.os }}-node-${{ hashFiles('landing/package.json') }}
         restore-keys: |
           ${{ runner.os }}-node-
         
     - name: Install dependencies
       working-directory: ./landing
-      run: npm ci --legacy-peer-deps
+      run: npm install --legacy-peer-deps
       
     - name: Build and export landing page
       working-directory: ./landing
