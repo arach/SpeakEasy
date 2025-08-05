@@ -121,7 +121,8 @@ async function getDocContent(slug: string) {
 }
 
 export async function generateMetadata({ params }: DocPageProps): Promise<Metadata> {
-  const doc = getDocBySlug(params.slug);
+  const { slug } = await params;
+  const doc = getDocBySlug(slug);
   
   if (!doc) {
     return {
@@ -142,13 +143,14 @@ export async function generateStaticParams() {
 }
 
 export default async function DocPage({ params }: DocPageProps) {
-  const docContent = await getDocContent(params.slug);
+  const { slug } = await params;
+  const docContent = await getDocContent(slug);
   
   if (!docContent) {
     notFound();
   }
 
-  const { prev, next } = getDocNavigation(params.slug);
+  const { prev, next } = getDocNavigation(slug);
   const IconComponent = docContent.icon;
 
   return (
@@ -190,7 +192,7 @@ export default async function DocPage({ params }: DocPageProps) {
                   <div className="p-2">
                     {docsStructure.map((doc) => {
                       const DocIcon = doc.icon;
-                      const isActive = doc.slug === params.slug;
+                      const isActive = doc.slug === slug;
                       return (
                         <Link
                           key={doc.slug}
