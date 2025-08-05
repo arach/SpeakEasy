@@ -160,7 +160,7 @@ export default async function DocPage({ params }: DocPageProps) {
               </div>
             </div>
             <Badge variant="outline" className="text-xs">
-              Version 0.2.0
+              Version 0.2.1
             </Badge>
           </div>
         </div>
