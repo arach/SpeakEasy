@@ -2,18 +2,59 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Volume2, Github } from "lucide-react"
+import { Volume2, Github, BookOpen, ExternalLink } from "lucide-react"
+import Link from "next/link"
 import PackageManagerTabs from "@/components/package-manager-tabs"
 
 export default function HeroSection() {
   return (
-    <section className="relative py-12 md:py-16 flex items-center justify-center px-4 overflow-hidden">
-      {/* Subtle background elements */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(34,197,94,0.05),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(59,130,246,0.03),transparent_50%)]" />
+    <>
+      {/* Navigation Header */}
+      <nav className="relative z-20 border-b border-slate-200/50 bg-white/80 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Volume2 className="w-6 h-6 text-emerald-600" />
+              <span className="font-display font-semibold text-slate-900">SpeakEasy</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link href="/docs/overview">
+                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Documentation
+                </Button>
+              </Link>
+              <Link 
+                href="https://github.com/arach/SpeakEasy" 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
+                  <Github className="w-4 h-4 mr-2" />
+                  GitHub
+                </Button>
+              </Link>
+              <Link 
+                href="https://www.npmjs.com/package/@arach/speakeasy" 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  NPM
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
 
+      <section className="relative py-12 md:py-16 flex items-center justify-center px-4 overflow-hidden">
+        {/* Subtle background elements */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(34,197,94,0.05),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(59,130,246,0.03),transparent_50%)]" />
 
-      <div className="relative z-10 text-center max-w-4xl mx-auto">
+        <div className="relative z-10 text-center max-w-4xl mx-auto">
         <Badge variant="outline" className="mb-4 border-emerald-200 text-emerald-700 bg-emerald-50/50 backdrop-blur-sm rounded-xl">
           <Volume2 className="w-3 h-3 mr-2" />
           Open Source • v0.2.0
@@ -36,5 +77,6 @@ export default function HeroSection() {
         </div>
       </div>
     </section>
+    </>
   )
 }
