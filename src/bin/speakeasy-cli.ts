@@ -503,6 +503,7 @@ async function listCacheEntries(options: {
       console.log(`   Text: "${entry.originalText.substring(0, 50)}${entry.originalText.length > 50 ? '...' : ''}"`);
       console.log(`   Provider: ${entry.provider}`);
       console.log(`   Voice: ${entry.voice}`);
+      console.log(`   Rate: ${entry.rate} WPM`);
       console.log(`   Size: ${(entry.fileSize / 1024).toFixed(1)} KB`);
       console.log(`   Created: ${new Date(entry.timestamp).toLocaleString()}`);
       console.log(`   File: ${path.basename(entry.filePath)}`);

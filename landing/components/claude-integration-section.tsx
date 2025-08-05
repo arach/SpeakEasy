@@ -15,21 +15,24 @@ const notificationExamples = [
     spoken: "In SpeakEasy, Claude needs your permission",
     audioFile: "/audio/permission.mp3",
     icon: MessageSquare,
-    color: "text-blue-600"
+    color: "text-blue-600",
+    hookType: "Tool Permission Request"
   },
   {
-    trigger: "Build completed successfully", 
-    spoken: "Build completed successfully in your project",
-    audioFile: "/audio/build-complete.mp3",
-    icon: Terminal,
-    color: "text-green-600"
-  },
-  {
-    trigger: "Waiting for your input",
+    trigger: "Claude is waiting for your input",
     spoken: "Claude is waiting for your input",
     audioFile: "/audio/waiting-input.mp3",
     icon: Bell,
-    color: "text-amber-600"
+    color: "text-amber-600",
+    hookType: "Input Idle Notification"
+  },
+  {
+    trigger: "Notification received",
+    spoken: "Build completed successfully in your project",
+    audioFile: "/audio/build-complete.mp3",
+    icon: Terminal,
+    color: "text-green-600",
+    hookType: "General Notification"
   }
 ]
 
@@ -94,29 +97,19 @@ export default function ClaudeIntegrationSection() {
 
           {/* Centered Carousel Section */}
           <div className="max-w-4xl mx-auto mb-12">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100/60 rounded-full text-sm text-blue-800 border border-blue-200/50 mb-4">
-                <Terminal className="w-4 h-4" />
-                <span>Live Examples</span>
-              </div>
-              <p className="text-slate-600">See how notifications transform into speech</p>
-            </div>
 
             {/* Carousel */}
             <div className="relative">
-              <div className="bg-white rounded-3xl shadow-lg shadow-slate-200/40 p-8 mx-8">
-                <div className="space-y-6">
+              <div className="bg-white rounded-3xl shadow-lg shadow-slate-200/40 p-4 sm:p-8 mx-4 sm:mx-8">
+                <div className="space-y-4 sm:space-y-6">
                   {/* Header with icon and trigger */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex-shrink-0 p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100">
-                      <CurrentIcon className={`w-8 h-8 ${notificationExamples[currentExample].color}`} />
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-50 to-blue-100">
+                      <CurrentIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${notificationExamples[currentExample].color}`} />
                     </div>
                     <div className="flex-1">
-                      <div className="text-sm text-slate-500 mb-1 font-medium">
+                      <div className="text-xs sm:text-sm text-slate-500 mb-1 font-medium">
                         Trigger: "{notificationExamples[currentExample].trigger}"
-                      </div>
-                      <div className="text-lg text-slate-800 font-medium">
-                        Listen to the audio notification:
                       </div>
                     </div>
                   </div>
