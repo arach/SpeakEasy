@@ -1,10 +1,53 @@
 "use client"
 
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Volume2, Github, BookOpen, ExternalLink } from "lucide-react"
+import { Volume2, Github, BookOpen, ExternalLink, Play, Pause } from "lucide-react"
 import Link from "next/link"
 import PackageManagerTabs from "@/components/package-manager-tabs"
+
+function TinyAudioPlayer() {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause()
+      } else {
+        audioRef.current.play()
+      }
+      setIsPlaying(!isPlaying)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <audio 
+        ref={audioRef}
+        src="/audio/welcome-demo.mp3"
+        onEnded={() => setIsPlaying(false)}
+        onPause={() => setIsPlaying(false)}
+        onPlay={() => setIsPlaying(true)}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={togglePlay}
+        className="h-7 px-3 text-xs bg-white/80 hover:bg-white border-emerald-200 text-emerald-700 hover:text-emerald-800 rounded-full"
+      >
+        {isPlaying ? (
+          <Pause className="w-3 h-3 mr-1.5" />
+        ) : (
+          <Play className="w-3 h-3 mr-1.5" />
+        )}
+        Demo
+      </Button>
+      <span className="text-xs text-slate-500">OpenAI Nova</span>
+    </div>
+  )
+}
 
 export default function HeroSection() {
   return (
@@ -71,6 +114,11 @@ export default function HeroSection() {
         <p className="font-text text-sm sm:text-base md:text-lg text-slate-600 mb-4 max-w-2xl mx-auto leading-relaxed font-light px-4">
           Simple text-to-speech for all your projects. Multiple providers, smart caching, and volume control.
         </p>
+
+        {/* Tiny Demo Audio Player */}
+        <div className="mb-6 flex justify-center">
+          <TinyAudioPlayer />
+        </div>
 
         <div className="flex flex-col items-center">
           <PackageManagerTabs />
