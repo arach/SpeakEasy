@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import HeroSection from "@/components/hero-section"
 import FeaturesSection from "@/components/features-section"
 import CodeExamples from "@/components/code-examples"
+import ClaudeIntegrationSection from "@/components/claude-integration-section"
 import GitHubRibbon from "@/components/github-ribbon"
 
 export default function Home() {
@@ -12,6 +13,7 @@ export default function Home() {
       <Suspense fallback={<div className="h-96" />}>
         <CodeExamples />
       </Suspense>
+      <ClaudeIntegrationSection />
       <FeaturesSection />
       
       {/* Footer */}

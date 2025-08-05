@@ -1,0 +1,129 @@
+"use client"
+
+import { useEffect, useRef, useState } from 'react'
+import WaveSurfer from 'wavesurfer.js'
+import { Play, Pause, Volume2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+
+interface AudioWaveformPlayerProps {
+  audioUrl: string
+  className?: string
+}
+
+export default function AudioWaveformPlayer({ audioUrl, className = '' }: AudioWaveformPlayerProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const wavesurferRef = useRef<WaveSurfer | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [duration, setDuration] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    // Initialize WaveSurfer
+    const wavesurfer = WaveSurfer.create({
+      container: containerRef.current,
+      waveColor: '#e2e8f0',
+      progressColor: '#10b981',
+      cursorColor: '#6366f1',
+      barWidth: 2,
+      barRadius: 1,
+      barGap: 1,
+      height: 60,
+      normalize: true,
+      backend: 'WebAudio',
+      responsive: true
+    })
+
+    wavesurferRef.current = wavesurfer
+
+    // Load audio
+    wavesurfer.load(audioUrl)
+
+    // Event listeners
+    wavesurfer.on('ready', () => {
+      setIsLoading(false)
+      setDuration(wavesurfer.getDuration())
+    })
+
+    wavesurfer.on('play', () => {
+      setIsPlaying(true)
+    })
+
+    wavesurfer.on('pause', () => {
+      setIsPlaying(false)
+    })
+
+    wavesurfer.on('finish', () => {
+      setIsPlaying(false)
+      setCurrentTime(0)
+    })
+
+    wavesurfer.on('audioprocess', () => {
+      setCurrentTime(wavesurfer.getCurrentTime())
+    })
+
+    wavesurfer.on('seek', () => {
+      setCurrentTime(wavesurfer.getCurrentTime())
+    })
+
+    return () => {
+      wavesurfer.destroy()
+    }
+  }, [audioUrl])
+
+  const togglePlayPause = () => {
+    if (wavesurferRef.current) {
+      wavesurferRef.current.playPause()
+    }
+  }
+
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60)
+    const seconds = Math.floor(time % 60)
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  return (
+    <div className={`bg-white rounded-2xl p-4 border border-slate-200/50 shadow-sm ${className}`}>
+      {/* Controls */}
+      <div className="flex items-center gap-3 mb-3">
+        <Button
+          onClick={togglePlayPause}
+          disabled={isLoading}
+          size="sm"
+          className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white p-0"
+        >
+          {isLoading ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : isPlaying ? (
+            <Pause className="w-4 h-4" />
+          ) : (
+            <Play className="w-4 h-4 ml-0.5" />
+          )}
+        </Button>
+        
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <Volume2 className="w-4 h-4 text-emerald-600" />
+          <span className="font-medium">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
+        </div>
+      </div>
+
+      {/* Waveform */}
+      <div 
+        ref={containerRef} 
+        className="w-full cursor-pointer rounded-lg overflow-hidden bg-slate-50"
+        style={{ minHeight: '60px' }}
+      />
+      
+      {isLoading && (
+        <div className="flex items-center justify-center h-15 text-sm text-slate-500">
+          Loading waveform...
+        </div>
+      )}
+    </div>
+  )
+}
