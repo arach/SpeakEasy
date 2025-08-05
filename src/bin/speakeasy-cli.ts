@@ -91,13 +91,21 @@ Examples:
 
 function showConfig(): void {
   try {
+    console.log('📊 Configuration Location:');
+    console.log(`   File: ${CONFIG_FILE}`);
+    console.log('');
+    
     if (fs.existsSync(CONFIG_FILE)) {
       const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
       const config = JSON.parse(configData);
-      console.log('📊 Current configuration:');
+      console.log('📋 Current Configuration:');
       console.log(JSON.stringify(config, null, 2));
     } else {
-      console.log('📊 No configuration file found at:', CONFIG_FILE);
+      console.log('📊 No configuration file found');
+      console.log('');
+      console.log('💡 To create a config file:');
+      console.log(`   mkdir -p ${CONFIG_DIR}`);
+      console.log(`   echo '{"providers":{"system":{"voice":"Samantha"}}}' > ${CONFIG_FILE}`);
     }
   } catch (error) {
     console.error('❌ Error reading config:', (error as Error).message);
