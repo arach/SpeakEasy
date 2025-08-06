@@ -91,14 +91,22 @@ export default function AudioWaveformPlayer({ audioUrl, className = '' }: AudioW
       
       if (wavesurfer) {
         try {
-          // Stop any ongoing operations
-          if (wavesurfer.isPlaying && wavesurfer.isPlaying()) {
-            wavesurfer.pause()
+          // Stop any ongoing operations safely
+          try {
+            if (typeof wavesurfer.isPlaying === 'function' && wavesurfer.isPlaying()) {
+              wavesurfer.pause()
+            }
+          } catch (playError) {
+            // Ignore errors from checking play state
           }
-          // Destroy the instance
-          wavesurfer.destroy()
+          
+          // Destroy the instance safely
+          if (typeof wavesurfer.destroy === 'function') {
+            wavesurfer.destroy()
+          }
         } catch (error) {
-          // Silently ignore cleanup errors during component unmount
+          // Silently ignore all cleanup errors during component unmount
+          console.debug('WaveSurfer cleanup error (ignored):', error)
         }
       }
     }
@@ -106,7 +114,13 @@ export default function AudioWaveformPlayer({ audioUrl, className = '' }: AudioW
 
   const togglePlayPause = () => {
     if (wavesurferRef.current) {
-      wavesurferRef.current.playPause()
+      try {
+        if (typeof wavesurferRef.current.playPause === 'function') {
+          wavesurferRef.current.playPause()
+        }
+      } catch (error) {
+        console.debug('WaveSurfer playPause error (ignored):', error)
+      }
     }
   }
 
