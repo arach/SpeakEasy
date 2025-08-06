@@ -9,7 +9,7 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/bin/speakeasy-cli.ts --dts",
+    "build": "tsup src/index.ts src/bin/speakeasy-cli.ts --dts --format cjs",
     "dev": "tsc --watch",
     "test": "node dist/test.js",
     "example": "npm run build && node examples/basic-usage.js",
