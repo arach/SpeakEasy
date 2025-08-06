@@ -2,6 +2,70 @@
 
 A unified speech library for all your projects with support for multiple TTS providers and clean configuration structure.
 
+## 🎉 Welcome Experience
+
+When you first run SpeakEasy CLI, you're greeted with a professional welcome screen:
+
+```
++============================================================================+
+|                                                                            |
+| ███████╗██████╗ ███████╗ █████╗ ██╗  ██╗███████╗ █████╗ ███████╗██╗   ██╗ |
+| ██╔════╝██╔══██╗██╔════╝██╔══██╗██║ ██╔╝██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝ |
+| ███████╗██████╔╝█████╗  ███████║█████╔╝ █████╗  ███████║███████╗ ╚████╔╝  |
+| ╚════██║██╔═══╝ ██╔══╝  ██╔══██║██╔═██╗ ██╔══╝  ██╔══██║╚════██║  ╚██╔╝   |
+| ███████║██║     ███████╗██║  ██║██║  ██╗███████╗██║  ██║███████║   ██║    |
+| ╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝    |
+|                                                                            |
++============================================================================+
+
+🎉 Welcome to SpeakEasy!
+
+We didn't find a configuration file. Let's create one to get you started!
+
+📦 What is SpeakEasy?
+   A unified text-to-speech CLI that works with multiple providers.
+
+   Supported Providers:
+   • System Voices - macOS, Windows, Linux (no key needed)
+   • ElevenLabs - Premium voices (🔑 key required)
+   • OpenAI - High quality voices (🔑 key required)
+   • Groq - Fast & cheap (🔑 key required)
+
+🚀 Quick Start:
+   Try it now with built-in system voices:
+   
+   speakeasy "Hello! Welcome to SpeakEasy!" --provider system
+
+🔧 Setup API Keys (optional):
+   
+   For ElevenLabs:
+   export ELEVENLABS_API_KEY="your-api-key-here"
+   Get key: https://elevenlabs.io/app/settings/api-keys
+   
+   For OpenAI TTS:
+   export OPENAI_API_KEY="your-api-key-here"
+   Get key: https://platform.openai.com/api-keys
+   
+   For Groq (fast & cheap):
+   export GROQ_API_KEY="your-api-key-here"
+   Get key: https://console.groq.com/keys
+
+💾 Configuration:
+   Create config: speakeasy --config --edit
+   View settings: speakeasy --config
+
+🩺 Need Help?
+   Diagnose setup: speakeasy --doctor
+   Show all options: speakeasy --help
+
+────────────────────────────────────────────────────────────
+
+Built with ❤️ by Arach • https://arach.dev
+```
+
+**Experience the welcome screen:** `speakeasy --welcome`  
+**Get started instantly:** `speakeasy "Hello World!" --provider system`
+
 ## ✨ Key Features
 
 ### 🚀 **Intelligent Caching System**
