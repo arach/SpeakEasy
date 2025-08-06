@@ -20,7 +20,9 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeSlug from 'rehype-slug';
 import { CodeBlock } from '@/components/code-block';
+import { HeadingLink } from '@/components/heading-link';
 
 // Import highlight.js theme
 import 'highlight.js/styles/github.css';
@@ -245,16 +247,29 @@ export default async function DocPage({ params }: DocPageProps) {
                   [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeSlug]}
                     components={{
-                      // Custom heading styling with smaller typography
-                      h1: (props: any) => (
-                        <h1 className="text-2xl font-display font-light text-slate-900 mb-4 mt-5 leading-tight first:mt-0" {...props} />
+                      // Custom heading styling with smaller typography - preserve id for anchor links
+                      h1: ({ id, ...props }: any) => (
+                        <h1 id={id} className="text-2xl font-display font-light text-slate-900 mb-4 mt-5 leading-tight first:mt-0" {...props} />
                       ),
-                      h2: (props: any) => (
-                        <h2 className="text-lg font-display font-medium text-slate-800 mb-3 mt-5 border-b border-slate-200 pb-2" {...props} />
+                      h2: ({ id, children, ...props }: any) => (
+                        <h2 id={id} className="group text-lg font-display font-medium text-slate-800 mb-3 mt-5 border-b border-slate-200 pb-2 flex items-center gap-2" {...props}>
+                          {children}
+                          {id && <HeadingLink id={id} size="lg" />}
+                        </h2>
                       ),
-                      h3: (props: any) => (
-                        <h3 className="text-base font-display font-medium text-slate-700 mb-2 mt-4" {...props} />
+                      h3: ({ id, children, ...props }: any) => (
+                        <h3 id={id} className="group text-base font-display font-medium text-slate-700 mb-2 mt-4 flex items-center gap-2" {...props}>
+                          {children}
+                          {id && <HeadingLink id={id} size="md" />}
+                        </h3>
+                      ),
+                      h4: ({ id, children, ...props }: any) => (
+                        <h4 id={id} className="group text-sm font-display font-medium text-slate-600 mb-2 mt-3 flex items-center gap-2" {...props}>
+                          {children}
+                          {id && <HeadingLink id={id} size="sm" />}
+                        </h4>
                       ),
                       // Enhanced paragraph styling with smaller font
                       p: (props: any) => (

@@ -87,6 +87,9 @@ export default function ClaudeIntegrationSection() {
       <div className="py-16 px-4 bg-gradient-to-br from-blue-50/40 to-slate-50/60">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
+            <Badge variant="outline" className="mb-4 border-slate-200 text-slate-600 bg-white/50 rounded-xl hidden sm:inline-block">
+              Use Case Example
+            </Badge>
             <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-extralight mb-4 text-slate-900">
               Have <span className="font-light bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">Claude speak</span> to you
             </h2>

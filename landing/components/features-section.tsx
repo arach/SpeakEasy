@@ -12,6 +12,7 @@ export default function FeaturesSection() {
       description: "Automatic caching for API providers. Same text + voice = no API call, lower bills.",
       demo: ["Save Money"],
       isKeyboard: false,
+      href: "/docs/cache",
     },
     {
       icon: Settings,
@@ -19,6 +20,7 @@ export default function FeaturesSection() {
       description: "Set defaults once in ~/.config/speakeasy/settings.json. Override per-call when needed.",
       demo: ["JSON Config"],
       isKeyboard: false,
+      href: "/docs/configuration",
     },
     {
       icon: Zap,
@@ -26,6 +28,7 @@ export default function FeaturesSection() {
       description: "Full type safety, IntelliSense, and modern async/await patterns. Built for developer experience.",
       demo: ["100% Typed"],
       isKeyboard: false,
+      href: "/docs/sdk#advanced-usage",
     },
     {
       icon: Volume2,
@@ -34,6 +37,7 @@ export default function FeaturesSection() {
         "Precise volume control (0.0-1.0) without affecting your system. Isolated playback for every provider.",
       demo: ["0.5 Volume"],
       isKeyboard: false,
+      href: "/docs/sdk",
     },
     {
       icon: Cloud,
@@ -41,6 +45,7 @@ export default function FeaturesSection() {
       description: "System voices, OpenAI, ElevenLabs, and Groq. Smart fallbacks ensure your speech always works.",
       demo: ["4 Providers"],
       isKeyboard: false,
+      href: "/docs/providers",
     },
     {
       icon: Shield,
@@ -49,6 +54,7 @@ export default function FeaturesSection() {
         "Minimal footprint with smart fallbacks. Works offline with system voices, online with API providers.",
       demo: ["Lightweight"],
       isKeyboard: true,
+      href: "/docs/troubleshooting",
     },
   ]
 
@@ -75,9 +81,10 @@ export default function FeaturesSection() {
           {/* Interactive feature showcase */}
           <div className="relative grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 lg:gap-8">
             {features.map((feature, index) => (
-              <div
+              <a
                 key={index}
-                className="group relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl border border-white/20 rounded-2xl sm:rounded-3xl p-3 sm:p-6 lg:p-8 shadow-lg hover:shadow-xl transition-all duration-150 hover:scale-[1.002] overflow-hidden"
+                href={feature.href}
+                className="group relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl border border-white/20 rounded-2xl sm:rounded-3xl p-3 sm:p-6 lg:p-8 shadow-lg hover:shadow-xl transition-all duration-150 hover:scale-[1.002] overflow-hidden block"
               >
                 {/* Animated background on hover */}
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 to-blue-50/0 group-hover:from-emerald-50/2 group-hover:to-blue-50/1 transition-all duration-300 rounded-2xl sm:rounded-3xl" />
@@ -116,7 +123,7 @@ export default function FeaturesSection() {
 
                 {/* Subtle glow effect */}
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/0 to-blue-500/0 group-hover:from-emerald-500/20 group-hover:to-blue-500/20 rounded-2xl sm:rounded-3xl blur-sm opacity-0 group-hover:opacity-100 transition-all duration-500 -z-10" />
-              </div>
+              </a>
             ))}
           </div>
         </div>

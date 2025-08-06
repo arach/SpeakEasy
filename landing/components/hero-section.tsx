@@ -13,6 +13,7 @@ import GitHubRibbon from "@/components/github-ribbon"
 function TinyAudioPlayer() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showDemo, setShowDemo] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   
   const cliCommand = `speakeasy "Welcome to SpeakEasy! This unified text-to-speech service makes it easy to add voice to your applications" --provider openai --voice nova --rate 180`
@@ -36,75 +37,93 @@ function TinyAudioPlayer() {
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* Primary CTA - Command Display */}
-      <div className="w-full max-w-md">
-        <div className="relative bg-slate-900 rounded-xl border border-slate-700 overflow-hidden shadow-sm">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={copyCommand}
-            className="absolute top-2 right-2 text-slate-400 hover:text-white hover:bg-slate-700 h-6 w-6 p-0 rounded-md z-10"
-            title={copied ? "Copied!" : "Copy to clipboard"}
-          >
-            {copied ? (
-              <Check className="w-3 h-3" />
-            ) : (
-              <Copy className="w-3 h-3" />
-            )}
-          </Button>
-          <SyntaxHighlighter
-            language="bash"
-            style={vscDarkPlus}
-            customStyle={{
-              margin: 0,
-              padding: '12px 16px',
-              background: 'transparent',
-              fontSize: '0.75rem',
-              lineHeight: '1.4',
-              fontWeight: '300',
-              whiteSpace: 'pre-wrap',
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word'
-            }}
-            codeTagProps={{
-              style: {
-                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                fontWeight: '300',
-                whiteSpace: 'pre-wrap',
-                wordWrap: 'break-word',
-                overflowWrap: 'break-word'
-              }
-            }}
-            wrapLines={true}
-            wrapLongLines={true}
-          >
-            {cliCommand}
-          </SyntaxHighlighter>
+      {/* Show Example Command Button */}
+      <Button
+        onClick={() => setShowDemo(!showDemo)}
+        className="h-10 px-6 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white rounded-full font-medium text-sm shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+      >
+        <Play className="w-4 h-4 mr-2" />
+        {showDemo ? 'Hide Example' : 'Show Example Command'}
+      </Button>
+
+      {/* Animated Demo Container */}
+      <div className={`transition-all duration-500 ease-in-out overflow-hidden ${
+        showDemo 
+          ? 'max-h-96 opacity-100 transform translate-y-0' 
+          : 'max-h-0 opacity-0 transform -translate-y-4'
+      }`}>
+        <div className="flex flex-col items-center gap-3 pt-2">
+          {/* Primary CTA - Command Display */}
+          <div className="w-full max-w-md">
+            <div className="relative bg-slate-900 rounded-xl border border-slate-700 overflow-hidden shadow-sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={copyCommand}
+                className="absolute top-2 right-2 text-slate-400 hover:text-white hover:bg-slate-700 h-6 w-6 p-0 rounded-md z-10"
+                title={copied ? "Copied!" : "Copy to clipboard"}
+              >
+                {copied ? (
+                  <Check className="w-3 h-3" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+              </Button>
+              <SyntaxHighlighter
+                language="bash"
+                style={vscDarkPlus}
+                customStyle={{
+                  margin: 0,
+                  padding: '12px 16px',
+                  background: 'transparent',
+                  fontSize: '0.75rem',
+                  lineHeight: '1.4',
+                  fontWeight: '300',
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word'
+                }}
+                codeTagProps={{
+                  style: {
+                    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    fontWeight: '300',
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word'
+                  }
+                }}
+                wrapLines={true}
+                wrapLongLines={true}
+              >
+                {cliCommand}
+              </SyntaxHighlighter>
+            </div>
+          </div>
+          
+          {/* Secondary CTA - Play Result */}
+          <div className="flex items-center gap-2">
+            <audio 
+              ref={audioRef}
+              src="/audio/welcome-demo.mp3"
+              onEnded={() => setIsPlaying(false)}
+              onPause={() => setIsPlaying(false)}
+              onPlay={() => setIsPlaying(true)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={togglePlay}
+              className="h-7 px-3 text-xs bg-white/80 hover:bg-white border-emerald-200 text-emerald-700 hover:text-emerald-800 rounded-full"
+            >
+              {isPlaying ? (
+                <Pause className="w-3 h-3 mr-1.5" />
+              ) : (
+                <Play className="w-3 h-3 mr-1.5" />
+              )}
+              Play Result
+            </Button>
+          </div>
         </div>
-      </div>
-      
-      {/* Secondary CTA - Play Result */}
-      <div className="flex items-center gap-2">
-        <audio 
-          ref={audioRef}
-          src="/audio/welcome-demo.mp3"
-          onEnded={() => setIsPlaying(false)}
-          onPause={() => setIsPlaying(false)}
-          onPlay={() => setIsPlaying(true)}
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={togglePlay}
-          className="h-7 px-3 text-xs bg-white/80 hover:bg-white border-emerald-200 text-emerald-700 hover:text-emerald-800 rounded-full"
-        >
-          {isPlaying ? (
-            <Pause className="w-3 h-3 mr-1.5" />
-          ) : (
-            <Play className="w-3 h-3 mr-1.5" />
-          )}
-          Play Result
-        </Button>
       </div>
     </div>
   )
