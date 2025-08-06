@@ -2,7 +2,16 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Volume2, Layers, Zap, Cloud, Settings, Shield } from "lucide-react"
+import { Layers, Zap, Cloud, Settings, Shield } from "lucide-react"
+
+// Custom Volume2 icon to avoid hydration issues
+const Volume2Icon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+    <path d="m19.07 4.93-1.41 1.41A10 10 0 0 1 19.07 19.07l1.41 1.41A12 12 0 0 0 19.07 4.93z"></path>
+    <path d="m15.54 8.46-1.41 1.41a4 4 0 0 1 0 4.24l1.41 1.41a6 6 0 0 0 0-7.07z"></path>
+  </svg>
+)
 
 export default function FeaturesSection() {
   const features = [
@@ -31,7 +40,7 @@ export default function FeaturesSection() {
       href: "/docs/sdk#advanced-usage",
     },
     {
-      icon: Volume2,
+      icon: Volume2Icon,
       title: "Fine-Grained Audio Volume",
       description:
         "Precise volume control (0.0-1.0) without affecting your system. Isolated playback for every provider.",

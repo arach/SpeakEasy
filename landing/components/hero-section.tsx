@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Volume2, Github, BookOpen, ExternalLink, Play, Pause, Copy, Check, Star } from "lucide-react"
+import { ExternalLink, Star } from "lucide-react"
+import { Volume2, BookOpen, Play, Pause, Copy, Check } from "./icons"
 import Link from "next/link"
 import PackageManagerTabs from "@/components/package-manager-tabs"
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'

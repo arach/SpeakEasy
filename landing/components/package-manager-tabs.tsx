@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Copy, Check, Package, Zap, Shield, Download } from "lucide-react"
+import { Zap, Shield } from "lucide-react"
+import { Copy, Check, Download, Package } from "./icons"
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 

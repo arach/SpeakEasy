@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
-import { Play, Pause, Volume2 } from 'lucide-react'
+import { Play, Pause, Volume2 } from './icons'
 import { Button } from '@/components/ui/button'
 
 interface AudioWaveformPlayerProps {

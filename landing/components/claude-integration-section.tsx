@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, MessageSquare, Volume2, ArrowRight, Terminal, Bell, Clock, Copy, ChevronLeft, ChevronRight, Play } from "lucide-react"
+import { ExternalLink, MessageSquare, ArrowRight, Terminal, Bell, Clock, Copy, ChevronLeft, ChevronRight, Play } from "lucide-react"
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import AudioWaveformPlayer from './audio-waveform-player'
@@ -139,7 +139,11 @@ export default function ClaudeIntegrationSection() {
                     {/* Row 2: Audio Player */}
                     <div className="space-y-4">
                       <div className="flex items-center gap-2">
-                        <Volume2 className="w-4 h-4 text-slate-500" />
+                        <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                          <path d="m19.07 4.93-1.41 1.41A10 10 0 0 1 19.07 19.07l1.41 1.41A12 12 0 0 0 19.07 4.93z"></path>
+                          <path d="m15.54 8.46-1.41 1.41a4 4 0 0 1 0 4.24l1.41 1.41a6 6 0 0 0 0-7.07z"></path>
+                        </svg>
                         <span className="text-sm font-medium text-slate-700">Audio Result</span>
                       </div>
                       
