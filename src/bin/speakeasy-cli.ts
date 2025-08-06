@@ -811,9 +811,6 @@ async function run(): Promise<void> {
       }
     }
     
-    if (options.cache) {
-      console.log('🔍 Cache stats:', await speaker.getCacheStats());
-    }
     
   } catch (error) {
     const errorMessage = (error as Error).message;

@@ -1,27 +1,38 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const index_1 = require("./index");
+import { SpeakEasy, say } from './index';
 async function testSystem() {
     console.log('\nTesting system provider...');
-    await (0, index_1.say)('Testing system voice', 'system');
+    await say('Testing system voice', 'system');
 }
 async function testOpenAI() {
     console.log('\nTesting OpenAI provider...');
-    await (0, index_1.say)('Testing OpenAI voice', 'openai');
+    await say('Testing OpenAI voice', 'openai');
 }
 async function testElevenLabs() {
     console.log('\nTesting ElevenLabs provider...');
-    await (0, index_1.say)('Testing ElevenLabs voice', 'elevenlabs');
+    await say('Testing ElevenLabs voice', 'elevenlabs');
 }
 async function testGroq() {
     console.log('\nTesting Groq provider...');
-    await (0, index_1.say)('Testing Groq voice', 'groq');
+    await say('Testing Groq voice', 'groq');
+}
+async function testCaching() {
+    console.log('\nTesting caching system...');
+    const speaker = new SpeakEasy({
+        provider: 'openai',
+        cache: { enabled: true }
+    });
+    console.log('📊 Cache stats:', await speaker.getCacheStats());
+    // Test with a simple phrase
+    console.log('🗣️  Speaking with cache enabled...');
+    await speaker.speak('Testing caching functionality', { interrupt: false });
+    console.log('✅ Caching test complete!');
 }
 async function testAll() {
     await testSystem();
     await testOpenAI();
     await testElevenLabs();
     await testGroq();
+    await testCaching();
     console.log('Test complete!');
 }
 if (require.main === module) {
@@ -46,9 +57,12 @@ if (require.main === module) {
                 case 'groq':
                     await testGroq();
                     break;
+                case 'cache':
+                    await testCaching();
+                    break;
                 default:
                     console.log('Unknown provider:', provider);
-                    console.log('Providers: system, openai, elevenlabs, groq, all');
+                    console.log('Providers: system, openai, elevenlabs, groq, cache, all');
                     process.exit(1);
             }
         }
@@ -58,4 +72,3 @@ if (require.main === module) {
         }
     })();
 }
-//# sourceMappingURL=test.js.map

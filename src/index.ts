@@ -193,6 +193,7 @@ export class SpeakEasy {
               const cachedEntry = await this.cache!.get(cacheKey);
               
               if (cachedEntry) {
+                console.log(`(already cached)`);
                 if (this.debug) {
                   console.log(`📦 Using cached audio from: ${cachedEntry.audioFilePath}`);
                 }
@@ -258,6 +259,8 @@ export class SpeakEasy {
                 durationMs: Date.now() - startTime,
                 success: true
               });
+              
+              console.log('cached');
               
               // Play the generated audio
               const tempFile = path.join(tempDir, `speech_${Date.now()}.mp3`);

@@ -10,7 +10,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import GitHubRibbon from "@/components/github-ribbon"
 
-function HeroAudioPlayer() {
+function HeroAudioPlayer({ onPlayingChange }: { onPlayingChange?: (playing: boolean) => void }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
 
@@ -25,21 +25,27 @@ function HeroAudioPlayer() {
     }
   }
 
+  useEffect(() => {
+    onPlayingChange?.(isPlaying)
+  }, [isPlaying, onPlayingChange])
+
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 relative">
       <audio 
         ref={audioRef}
-        src="/audio/welcome-demo.mp3"
+        src="/audio/tagline-demo.mp3"
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
       />
+      
+      
       <Button
         onClick={togglePlay}
         size="sm"
-        className={`h-8 px-3 text-sm font-medium rounded-full transition-all duration-200 ${
+        className={`relative z-10 h-8 px-3 text-sm font-medium rounded-full transition-all duration-200 ${
           isPlaying 
-            ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse' 
+            ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
             : 'bg-emerald-600 hover:bg-emerald-700 text-white hover:scale-105'
         }`}
       >
@@ -192,6 +198,7 @@ function TinyAudioPlayer() {
 
 export default function HeroSection() {
   const [showHeader, setShowHeader] = useState(false)
+  const [isHeroPlaying, setIsHeroPlaying] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -256,9 +263,38 @@ export default function HeroSection() {
           </span>
         </h1>
 
-        <p className="font-text text-sm sm:text-base md:text-lg text-slate-600 mb-3 md:mb-4 max-w-2xl mx-auto leading-relaxed font-light px-4">
-          Simple text-to-speech for all your projects. Multiple providers, smart caching, and volume control.
-        </p>
+        <div className="font-text text-sm sm:text-base md:text-lg mb-3 md:mb-4 max-w-4xl mx-auto leading-relaxed font-light px-4">
+          <div className="text-center">
+            {/* First line: say("tagline") */}
+            <div className="flex items-baseline justify-center whitespace-nowrap">
+              {/* Code prefix */}
+              <span className={`font-mono text-emerald-600 font-medium tracking-tight transition-opacity duration-300 ${
+                isHeroPlaying ? 'opacity-100' : 'opacity-0'
+              }`}>
+                say("
+              </span>
+              {/* Main tagline text */}
+              <span className="text-slate-700 font-light">
+                Simple text-to-speech for all your projects. Multiple providers, smart caching, and volume control.
+              </span>
+              {/* Close quote */}
+              <span className={`font-mono text-emerald-600 font-medium tracking-tight transition-opacity duration-300 ${
+                isHeroPlaying ? 'opacity-100' : 'opacity-0'
+              }`}>
+                ",
+              </span>
+            </div>
+            
+            {/* Second line: parameters */}
+            <div className="flex justify-center mt-1">
+              <span className={`font-mono text-emerald-600 font-medium tracking-tight text-sm transition-opacity duration-300 ${
+                isHeroPlaying ? 'opacity-100' : 'opacity-0'
+              }`}>
+                &#123;&nbsp;provider:&nbsp;'openai',&nbsp;voice:&nbsp;'nova'&nbsp;&#125;)
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* Always Visible Mini Audio Demo */}
         <div className="mb-4 flex justify-center">
@@ -268,7 +304,7 @@ export default function HeroSection() {
                 <Volume2 className="w-4 h-4 mr-2 text-emerald-600" />
                 Try it now:
               </div>
-              <HeroAudioPlayer />
+              <HeroAudioPlayer onPlayingChange={setIsHeroPlaying} />
             </div>
           </div>
         </div>

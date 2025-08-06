@@ -967,6 +967,9 @@ var TTSCache = class {
           this.logger.warn("Error clearing metadata table:", error);
         }
       }
+      this.cacheHits = 0;
+      this.cacheMisses = 0;
+      this.saveStats();
       await this.cache.clear();
     } catch (error) {
       console.warn("Cache clear error:", error);
@@ -1179,6 +1182,7 @@ var SpeakEasy = class {
               const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
               const cachedEntry = await this.cache.get(cacheKey);
               if (cachedEntry) {
+                console.log(`(already cached)`);
                 if (this.debug) {
                   console.log(`\u{1F4E6} Using cached audio from: ${cachedEntry.audioFilePath}`);
                 }
@@ -1236,6 +1240,7 @@ var SpeakEasy = class {
                 durationMs: Date.now() - startTime,
                 success: true
               });
+              console.log("cached");
               const tempFile = path5.join(tempDir, `speech_${Date.now()}.mp3`);
               fs5.writeFileSync(tempFile, audioBuffer);
               const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";

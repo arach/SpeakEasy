@@ -759,6 +759,11 @@ export class TTSCache {
         }
       }
       
+      // Reset cache stats
+      this.cacheHits = 0;
+      this.cacheMisses = 0;
+      this.saveStats();
+      
       await this.cache.clear();
     } catch (error) {
       console.warn('Cache clear error:', error);
