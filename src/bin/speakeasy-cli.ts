@@ -70,6 +70,7 @@ We didn't find a configuration file. Let's create one to get you started!
    Get key: https://console.groq.com/keys
 
 💾 Configuration:
+   Config file: ${'\x1b[90m'}${CONFIG_FILE}${'\x1b[0m'}
    Create config: ${'\x1b[33m'}speakeasy --config --edit${'\x1b[0m'}
    View settings: ${'\x1b[33m'}speakeasy --config${'\x1b[0m'}
 

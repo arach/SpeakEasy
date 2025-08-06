@@ -1,0 +1,77 @@
+# Landing page and web assets
+landing/
+audio/
+*.html
+*.css
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.mp3
+*.wav
+*.m4a
+
+# Development and test files
+src/test.ts
+dist/test.js
+dist/test.d.ts
+dist/test.d.ts.map
+dist/test.js.map
+test-*.js
+generate-*.js
+examples/
+screenshots/
+.vscode/
+.github/
+
+# Claude and development tools
+.claude/
+playwright-*.js
+CNAME
+config.json.example
+
+# Build and development config
+tsconfig.json
+tsup.config.ts
+playwright.config.ts
+tailwind.config.js
+postcss.config.js
+vite.config.js
+next.config.js
+
+# Environment and local files
+.env*
+.DS_Store
+*.log
+logs/
+tmp/
+temp/
+
+# Documentation (keep README.md)
+docs/
+*.md
+!README.md
+
+# Git and version control
+.git/
+.gitignore
+.gitattributes
+
+# Package manager files (but keep package.json)
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+node_modules/
+
+# IDE and editor files
+.idea/
+*.swp
+*.swo
+*~
+.editorconfig
+
+# OS generated files
+Thumbs.db
+.DS_Store
