@@ -13,14 +13,20 @@ import GitHubRibbon from "@/components/github-ribbon"
 
 function HeroAudioPlayer({ onPlayingChange }: { onPlayingChange?: (playing: boolean) => void }) {
   const [isPlaying, setIsPlaying] = useState(false)
+  const [hasError, setHasError] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause()
       } else {
-        audioRef.current.play()
+        try {
+          await audioRef.current.play()
+        } catch (error) {
+          console.error('Audio playback failed:', error)
+          setHasError(true)
+        }
       }
       setIsPlaying(!isPlaying)
     }
@@ -34,23 +40,32 @@ function HeroAudioPlayer({ onPlayingChange }: { onPlayingChange?: (playing: bool
     <div className="flex items-center gap-2 relative">
       <audio 
         ref={audioRef}
-        src="/audio/tagline-demo.mp3"
+        src="/audio/tagline-demo-new.mp3"
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
+        onError={() => setHasError(true)}
       />
       
       
       <Button
         onClick={togglePlay}
         size="sm"
+        disabled={hasError}
         className={`relative z-10 h-8 px-3 text-sm font-medium rounded-full transition-all duration-200 ${
-          isPlaying 
-            ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-            : 'bg-emerald-600 hover:bg-emerald-700 text-white hover:scale-105'
+          hasError 
+            ? 'bg-slate-400 cursor-not-allowed text-white' 
+            : isPlaying 
+              ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white hover:scale-105'
         }`}
       >
-        {isPlaying ? (
+        {hasError ? (
+          <>
+            <Volume2 className="w-3 h-3 mr-1.5" />
+            Audio Unavailable
+          </>
+        ) : isPlaying ? (
           <>
             <Pause className="w-3 h-3 mr-1.5" />
             Playing
