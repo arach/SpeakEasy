@@ -21,63 +21,86 @@ export default function AudioWaveformPlayer({ audioUrl, className = '' }: AudioW
   useEffect(() => {
     if (!containerRef.current) return
 
-    // Initialize WaveSurfer
-    const wavesurfer = WaveSurfer.create({
-      container: containerRef.current,
-      waveColor: '#e2e8f0',
-      progressColor: '#10b981',
-      cursorColor: '#6366f1',
-      barWidth: 2,
-      barRadius: 1,
-      barGap: 1,
-      height: 40,
-      normalize: true,
-      backend: 'WebAudio',
-      responsive: true
-    })
+    let wavesurfer: WaveSurfer | null = null
+    let isDestroyed = false
 
-    wavesurferRef.current = wavesurfer
+    try {
+      // Initialize WaveSurfer
+      wavesurfer = WaveSurfer.create({
+        container: containerRef.current,
+        waveColor: '#e2e8f0',
+        progressColor: '#10b981',
+        cursorColor: '#6366f1',
+        barWidth: 2,
+        barRadius: 1,
+        barGap: 1,
+        height: 40,
+        normalize: true,
+        backend: 'WebAudio',
+        responsive: true
+      })
 
-    // Load audio
-    wavesurfer.load(audioUrl)
+      wavesurferRef.current = wavesurfer
 
-    // Event listeners
-    wavesurfer.on('ready', () => {
+      // Load audio
+      wavesurfer.load(audioUrl)
+
+      // Event listeners with cleanup checks
+      wavesurfer.on('ready', () => {
+        if (!isDestroyed && wavesurfer) {
+          setIsLoading(false)
+          setDuration(wavesurfer.getDuration())
+        }
+      })
+
+      wavesurfer.on('play', () => {
+        if (!isDestroyed) setIsPlaying(true)
+      })
+
+      wavesurfer.on('pause', () => {
+        if (!isDestroyed) setIsPlaying(false)
+      })
+
+      wavesurfer.on('finish', () => {
+        if (!isDestroyed) {
+          setIsPlaying(false)
+          setCurrentTime(0)
+        }
+      })
+
+      wavesurfer.on('audioprocess', () => {
+        if (!isDestroyed && wavesurfer) {
+          setCurrentTime(wavesurfer.getCurrentTime())
+        }
+      })
+
+      wavesurfer.on('seek', () => {
+        if (!isDestroyed && wavesurfer) {
+          setCurrentTime(wavesurfer.getCurrentTime())
+        }
+      })
+
+    } catch (error) {
+      console.debug('WaveSurfer initialization error:', error)
       setIsLoading(false)
-      setDuration(wavesurfer.getDuration())
-    })
-
-    wavesurfer.on('play', () => {
-      setIsPlaying(true)
-    })
-
-    wavesurfer.on('pause', () => {
-      setIsPlaying(false)
-    })
-
-    wavesurfer.on('finish', () => {
-      setIsPlaying(false)
-      setCurrentTime(0)
-    })
-
-    wavesurfer.on('audioprocess', () => {
-      setCurrentTime(wavesurfer.getCurrentTime())
-    })
-
-    wavesurfer.on('seek', () => {
-      setCurrentTime(wavesurfer.getCurrentTime())
-    })
+    }
 
     return () => {
-      try {
-        if (wavesurfer && typeof wavesurfer.destroy === 'function') {
-          wavesurfer.destroy()
-        }
-      } catch (error) {
-        // Ignore cleanup errors - component is unmounting anyway
-        console.debug('WaveSurfer cleanup error (safe to ignore):', error)
-      }
+      isDestroyed = true
       wavesurferRef.current = null
+      
+      if (wavesurfer) {
+        try {
+          // Stop any ongoing operations
+          if (wavesurfer.isPlaying && wavesurfer.isPlaying()) {
+            wavesurfer.pause()
+          }
+          // Destroy the instance
+          wavesurfer.destroy()
+        } catch (error) {
+          // Silently ignore cleanup errors during component unmount
+        }
+      }
     }
   }, [audioUrl])
 

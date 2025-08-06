@@ -4,10 +4,11 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, MessageSquare, Volume2, ArrowRight, Terminal, Bell, Clock, Copy, ChevronLeft, ChevronRight } from "lucide-react"
+import { ExternalLink, MessageSquare, Volume2, ArrowRight, Terminal, Bell, Clock, Copy, ChevronLeft, ChevronRight, Play } from "lucide-react"
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import AudioWaveformPlayer from './audio-waveform-player'
+import TerminalInterface from './terminal-interface'
 
 const notificationExamples = [
   {
@@ -16,7 +17,8 @@ const notificationExamples = [
     audioFile: "/audio/permission.mp3",
     icon: MessageSquare,
     color: "text-blue-600",
-    hookType: "Tool Permission Request"
+    hookType: "Tool Permission Request",
+    terminalType: "permission" as const
   },
   {
     trigger: "Claude is waiting for your input",
@@ -24,7 +26,8 @@ const notificationExamples = [
     audioFile: "/audio/waiting-input.mp3",
     icon: Bell,
     color: "text-amber-600",
-    hookType: "Input Idle Notification"
+    hookType: "Input Idle Notification",
+    terminalType: "input" as const
   },
   {
     trigger: "Claude is waiting for you",
@@ -32,7 +35,8 @@ const notificationExamples = [
     audioFile: "/audio/waiting-for-you.mp3",
     icon: Clock,
     color: "text-purple-600",
-    hookType: "General Waiting"
+    hookType: "General Waiting",
+    terminalType: "waiting" as const
   }
 ]
 
@@ -85,49 +89,79 @@ export default function ClaudeIntegrationSection() {
       <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-slate-900/5 to-transparent pointer-events-none" />
       
       <div className="py-16 px-4 bg-gradient-to-br from-blue-50/40 to-slate-50/60">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <Badge variant="outline" className="mb-4 border-slate-200 text-slate-600 bg-white/50 rounded-xl hidden sm:inline-block">
               Use Case Example
             </Badge>
-            <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-extralight mb-4 text-slate-900">
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-extralight mb-4 text-slate-900">
               Have <span className="font-light bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">Claude speak</span> to you
             </h2>
-            <p className="font-text text-base text-slate-600 max-w-2xl mx-auto font-light">
+            <p className="font-text text-lg text-slate-600 max-w-2xl mx-auto font-light">
               Never miss important notifications. Transform Claude Code's silent alerts into intelligent spoken updates.
             </p>
           </div>
 
-          {/* Centered Carousel Section */}
-          <div className="max-w-4xl mx-auto mb-12">
 
-            {/* Carousel */}
+          {/* Interactive Demo Carousel */}
+          <div className="max-w-4xl mx-auto mb-12">
             <div className="relative">
-              <div className="bg-white rounded-3xl shadow-lg shadow-slate-200/40 p-4 sm:p-8 mx-4 sm:mx-8">
-                <div className="space-y-4 sm:space-y-6">
-                  {/* Header with icon and trigger */}
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-50 to-blue-100">
-                      <CurrentIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${notificationExamples[currentExample].color}`} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-xs sm:text-sm text-slate-500 mb-1 font-medium">
-                        Trigger: "{notificationExamples[currentExample].trigger}"
+              <div className="bg-white rounded-3xl shadow-lg shadow-slate-200/40 p-6 sm:p-8">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                  {/* Left Column: Alert + Audio (2 rows) */}
+                  <div className="lg:col-span-2 space-y-6">
+                    {/* Row 1: Notification Alert */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100">
+                          <CurrentIcon className={`w-5 h-5 ${notificationExamples[currentExample].color}`} />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-slate-900 mb-1">
+                            {notificationExamples[currentExample].hookType}
+                          </h4>
+                          <div className="text-xs text-slate-500 font-medium">
+                            Trigger: "{notificationExamples[currentExample].trigger}"
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                        <div className="text-sm text-slate-700">
+                          <div className="font-medium mb-2">What Claude shows:</div>
+                          <div className="font-mono text-xs bg-white rounded-lg p-3 border border-slate-200">
+                            {notificationExamples[currentExample].trigger}
+                          </div>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Row 2: Audio Player */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Volume2 className="w-4 h-4 text-slate-500" />
+                        <span className="text-sm font-medium text-slate-700">Audio Result</span>
+                      </div>
+                      
+                      <AudioWaveformPlayer 
+                        audioUrl={notificationExamples[currentExample].audioFile}
+                        className="w-full shadow-md hover:shadow-lg transition-shadow duration-200"
+                      />
+                    </div>
                   </div>
-                  
-                  {/* Audio Demo Label */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <Volume2 className="w-4 h-4 text-emerald-600" />
-                    <span className="text-sm font-medium text-emerald-700">🔊 Audio Result</span>
+
+                  {/* Right Column: Terminal Interface (spans full height) */}
+                  <div className="lg:col-span-3 flex flex-col">
+                    <div className="text-sm font-semibold text-slate-900 mb-4">
+                      Visual Context
+                    </div>
+                    <div className="flex-1 flex items-start">
+                      <TerminalInterface 
+                        className="w-full" 
+                        notificationType={notificationExamples[currentExample].terminalType}
+                      />
+                    </div>
                   </div>
-                  
-                  {/* Audio Waveform Player */}
-                  <AudioWaveformPlayer 
-                    audioUrl={notificationExamples[currentExample].audioFile}
-                    className="w-full shadow-md hover:shadow-lg transition-shadow duration-200"
-                  />
                 </div>
               </div>
 
@@ -163,7 +197,7 @@ export default function ClaudeIntegrationSection() {
           </div>
 
           {/* Implementation Section */}
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-3xl mx-auto space-y-6">
             <Card className="relative bg-slate-900 border-slate-700 overflow-hidden rounded-xl shadow-[0_8px_30px_rgb(0_0_0/0.12)] hover:shadow-[0_20px_40px_rgb(0_0_0/0.15)]">
               <div className="flex items-center justify-between px-1.5 py-0.5 bg-slate-800 border-b border-slate-700">
                 <div className="flex items-center gap-1.5">
