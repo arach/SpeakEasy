@@ -20,6 +20,66 @@ function loadGlobalConfig() {
   return {};
 }
 
+function hasConfig(): boolean {
+  return fs.existsSync(CONFIG_FILE);
+}
+
+function showWelcome(): void {
+  console.log(`
+┌───────────────────────────────────────────────────────────┐
+│    _____ ____  _________    __ __ _________   _______  __ │
+│   / ___// __ \\/ ____/   |  / //_// ____/   | / ___/\\ \\/ / │
+│   \\__ \\/ /_/ / __/ / /| | / ,<  / __/ / /| | \\__ \\  \\  /  │
+│  ___/ / ____/ /___/ ___ |/ /| |/ /___/ ___ |___/ /  / /   │
+│ /____/_/   /_____/_/  |_/_/ |_/_____/_/  |_/____/  /_/    │
+│                                                           │
+│                🗣️  Text-to-Speech Made Simple             │
+└───────────────────────────────────────────────────────────┘
+
+🎉 Welcome to SpeakEasy!
+
+No configuration found. Let's get you set up for the best experience!
+
+📦 What is SpeakEasy?
+   A unified text-to-speech CLI that works with multiple providers.
+
+   Supported Providers:
+   • System Voices - macOS, Windows, Linux (no key needed)
+   • ElevenLabs - Premium voices (🔑 key required)
+   • OpenAI - High quality voices (🔑 key required)
+   • Groq - Fast & cheap (🔑 key required)
+
+🚀 Quick Start:
+   Try it now with built-in system voices:
+   
+   ${'\x1b[32m'}speakeasy "Hello! Welcome to SpeakEasy!" --provider system${'\x1b[0m'}
+
+🔧 Setup API Keys (optional):
+   
+   For ElevenLabs:
+   ${'\x1b[36m'}export ELEVENLABS_API_KEY="your-api-key-here"${'\x1b[0m'}
+   Get key: https://elevenlabs.io/app/settings/api-keys
+   
+   For OpenAI TTS:
+   ${'\x1b[36m'}export OPENAI_API_KEY="your-api-key-here"${'\x1b[0m'}
+   Get key: https://platform.openai.com/api-keys
+   
+   For Groq (fast & cheap):
+   ${'\x1b[36m'}export GROQ_API_KEY="your-api-key-here"${'\x1b[0m'}
+   Get key: https://console.groq.com/keys
+
+💾 Configuration:
+   Create config: ${'\x1b[33m'}speakeasy --config --edit${'\x1b[0m'}
+   View settings: ${'\x1b[33m'}speakeasy --config${'\x1b[0m'}
+
+🩺 Need Help?
+   Diagnose setup: ${'\x1b[33m'}speakeasy --doctor${'\x1b[0m'}
+   Show all options: ${'\x1b[33m'}speakeasy --help${'\x1b[0m'}
+
+${'\x1b[2m'}────────────────────────────────────────────────────────────${'\x1b[0m'}
+`);
+}
+
 interface CLIOptions {
   text?: string;
   provider?: string;
@@ -42,6 +102,7 @@ interface CLIOptions {
   id?: string;
   play?: string;
   out?: string;
+  welcome?: boolean;
 }
 
 function showHelp(): void {
@@ -70,6 +131,7 @@ Options:
   --debug, -d         Enable debug logging
   --diagnose          Show configuration diagnostics
   --doctor            Run health checks and provide fixes
+  --welcome           Show welcome screen (for demo/testing)
   --list              List all cache entries
   --find "text"       Find cache entries by text
   --stats             Show cache statistics
@@ -666,6 +728,10 @@ async function run(): Promise<void> {
         options.doctor = true;
         break;
       
+      case '--welcome':
+        options.welcome = true;
+        break;
+      
       case '--list':
         options.list = true;
         break;
@@ -705,6 +771,12 @@ async function run(): Promise<void> {
 
   if (options.help) {
     showHelp();
+    return;
+  }
+
+  // Show welcome screen if no config exists or --welcome flag is used
+  if (((!hasConfig() && !options.config && !options.help && !options.diagnose && !options.doctor) || options.welcome) && !options.help) {
+    showWelcome();
     return;
   }
 
