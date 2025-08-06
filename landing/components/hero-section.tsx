@@ -10,6 +10,55 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import GitHubRibbon from "@/components/github-ribbon"
 
+function HeroAudioPlayer() {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause()
+      } else {
+        audioRef.current.play()
+      }
+      setIsPlaying(!isPlaying)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <audio 
+        ref={audioRef}
+        src="/audio/welcome-demo.mp3"
+        onEnded={() => setIsPlaying(false)}
+        onPause={() => setIsPlaying(false)}
+        onPlay={() => setIsPlaying(true)}
+      />
+      <Button
+        onClick={togglePlay}
+        size="sm"
+        className={`h-8 px-3 text-sm font-medium rounded-full transition-all duration-200 ${
+          isPlaying 
+            ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse' 
+            : 'bg-emerald-600 hover:bg-emerald-700 text-white hover:scale-105'
+        }`}
+      >
+        {isPlaying ? (
+          <>
+            <Pause className="w-3 h-3 mr-1.5" />
+            Playing
+          </>
+        ) : (
+          <>
+            <Play className="w-3 h-3 mr-1.5" />
+            Play Demo
+          </>
+        )}
+      </Button>
+    </div>
+  )
+}
+
 function TinyAudioPlayer() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -42,8 +91,8 @@ function TinyAudioPlayer() {
         onClick={() => setShowDemo(!showDemo)}
         className="h-10 px-6 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white rounded-full font-medium text-sm shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
       >
-        <Play className="w-4 h-4 mr-2" />
-        {showDemo ? 'Hide Example' : 'Show Example Command'}
+        <Volume2 className="w-4 h-4 mr-2" />
+        {showDemo ? 'Hide Audio Demo' : '🔊 Hear SpeakEasy Demo'}
       </Button>
 
       {/* Animated Demo Container */}
@@ -113,14 +162,26 @@ function TinyAudioPlayer() {
               variant="outline"
               size="sm"
               onClick={togglePlay}
-              className="h-7 px-3 text-xs bg-white/80 hover:bg-white border-emerald-200 text-emerald-700 hover:text-emerald-800 rounded-full"
+              className={`h-8 px-4 text-sm font-medium bg-gradient-to-r from-emerald-50 to-blue-50 hover:from-emerald-100 hover:to-blue-100 border-2 border-emerald-300 text-emerald-700 hover:text-emerald-800 rounded-full shadow-md hover:shadow-lg transition-all duration-200 ${isPlaying ? 'animate-pulse border-emerald-500' : ''}`}
             >
               {isPlaying ? (
-                <Pause className="w-3 h-3 mr-1.5" />
+                <>
+                  <Pause className="w-4 h-4 mr-2" />
+                  <span className="flex items-center gap-1">
+                    Playing Audio
+                    <div className="flex gap-0.5">
+                      <div className="w-1 h-3 bg-emerald-600 rounded-full animate-bounce" style={{animationDelay: '0ms'}} />
+                      <div className="w-1 h-3 bg-emerald-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}} />
+                      <div className="w-1 h-3 bg-emerald-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}} />
+                    </div>
+                  </span>
+                </>
               ) : (
-                <Play className="w-3 h-3 mr-1.5" />
+                <>
+                  <Play className="w-4 h-4 mr-2" />
+                  🎧 Play Audio Result
+                </>
               )}
-              Play Result
             </Button>
           </div>
         </div>
@@ -198,6 +259,19 @@ export default function HeroSection() {
         <p className="font-text text-sm sm:text-base md:text-lg text-slate-600 mb-3 md:mb-4 max-w-2xl mx-auto leading-relaxed font-light px-4">
           Simple text-to-speech for all your projects. Multiple providers, smart caching, and volume control.
         </p>
+
+        {/* Always Visible Mini Audio Demo */}
+        <div className="mb-4 flex justify-center">
+          <div className="bg-white/80 backdrop-blur-sm rounded-full border border-emerald-200/50 shadow-sm hover:shadow-md transition-all duration-200 px-4 py-2">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center text-sm text-slate-600">
+                <Volume2 className="w-4 h-4 mr-2 text-emerald-600" />
+                Try it now:
+              </div>
+              <HeroAudioPlayer />
+            </div>
+          </div>
+        </div>
 
         {/* Demo Command & Audio Player */}
         <div className="mb-4 md:mb-6 flex justify-center">

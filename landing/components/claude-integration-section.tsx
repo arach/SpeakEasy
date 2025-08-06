@@ -117,10 +117,16 @@ export default function ClaudeIntegrationSection() {
                     </div>
                   </div>
                   
+                  {/* Audio Demo Label */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <Volume2 className="w-4 h-4 text-emerald-600" />
+                    <span className="text-sm font-medium text-emerald-700">🔊 Audio Result</span>
+                  </div>
+                  
                   {/* Audio Waveform Player */}
                   <AudioWaveformPlayer 
                     audioUrl={notificationExamples[currentExample].audioFile}
-                    className="w-full"
+                    className="w-full shadow-md hover:shadow-lg transition-shadow duration-200"
                   />
                 </div>
               </div>
