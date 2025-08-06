@@ -40,7 +40,7 @@ function HeroAudioPlayer({ onPlayingChange }: { onPlayingChange?: (playing: bool
     <div className="flex items-center gap-2 relative">
       <audio 
         ref={audioRef}
-        src="/audio/tagline-demo-new.mp3"
+        src="/audio/tagline-demo.mp3"
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}

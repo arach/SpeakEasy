@@ -17,7 +17,7 @@ try {
   
   // Generate the audio using the built CLI
   console.log('🔊 Generating audio...');
-  const command = `node dist/bin/speakeasy-cli.js "${text}" --provider openai --voice nova --output "${outputPath}"`;
+  const command = `node dist/bin/speakeasy-cli.js "${text}" --provider openai --voice nova --out "${outputPath}"`;
   console.log(`Running: ${command}`);
   
   execSync(command, { stdio: 'inherit' });
