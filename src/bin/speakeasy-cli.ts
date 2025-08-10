@@ -49,6 +49,7 @@ We didn't find a configuration file. Let's create one to get you started!
    • ElevenLabs - Premium voices (🔑 key required)
    • OpenAI - High quality voices (🔑 key required)
    • Groq - Fast & cheap (🔑 key required)
+   • Gemini - Google's AI voices (🔑 key required)
 
 🚀 Quick Start:
    Try it now with built-in system voices:
@@ -68,6 +69,10 @@ We didn't find a configuration file. Let's create one to get you started!
    For Groq (fast & cheap):
    ${'\x1b[36m'}export GROQ_API_KEY="your-api-key-here"${'\x1b[0m'}
    Get key: https://console.groq.com/keys
+   
+   For Gemini:
+   ${'\x1b[36m'}export GEMINI_API_KEY="your-api-key-here"${'\x1b[0m'}
+   Get key: https://makersuite.google.com/app/apikey
 
 💾 Configuration:
    Config file: ${'\x1b[90m'}${CONFIG_FILE}${'\x1b[0m'}
@@ -121,7 +126,7 @@ Usage:
 
 Options:
   --text, -t          Text to speak (can be positional argument)
-  --provider, -p      Provider: system, openai, elevenlabs, groq
+  --provider, -p      Provider: system, openai, elevenlabs, groq, gemini
   --voice, -v         Voice to use (depends on provider)
   --rate, -r          Speech rate (words per minute)
   --volume            Volume (0.0 to 1.0, default: 0.7)
@@ -267,7 +272,8 @@ function diagnoseConfig(): void {
     const providers = [
       { name: 'OpenAI', configKey: 'openai', envKey: 'OPENAI_API_KEY' },
       { name: 'ElevenLabs', configKey: 'elevenlabs', envKey: 'ELEVENLABS_API_KEY' },
-      { name: 'Groq', configKey: 'groq', envKey: 'GROQ_API_KEY' }
+      { name: 'Groq', configKey: 'groq', envKey: 'GROQ_API_KEY' },
+      { name: 'Gemini', configKey: 'gemini', envKey: 'GEMINI_API_KEY' }
     ];
     
     providers.forEach(({ name, configKey, envKey }) => {
@@ -293,6 +299,7 @@ function diagnoseConfig(): void {
     console.log(`   OpenAI: ${globalConfig.providers?.openai?.voice || 'nova'}`);
     console.log(`   ElevenLabs: ${globalConfig.providers?.elevenlabs?.voiceId || 'EXAVITQu4vr4xnSDxMaL'}`);
     console.log(`   Groq: ${globalConfig.providers?.groq?.voice || 'nova'}`);
+    console.log(`   Gemini: ${globalConfig.providers?.gemini?.model || 'gemini-2.5-pro-preview-tts'}`);
     
     console.log('');
     console.log('💡 Usage Tips:');
@@ -379,7 +386,8 @@ function runDoctor(): void {
   const providers = [
     { name: 'OpenAI', key: 'openai', env: 'OPENAI_API_KEY' },
     { name: 'ElevenLabs', key: 'elevenlabs', env: 'ELEVENLABS_API_KEY' },
-    { name: 'Groq', key: 'groq', env: 'GROQ_API_KEY' }
+    { name: 'Groq', key: 'groq', env: 'GROQ_API_KEY' },
+    { name: 'Gemini', key: 'gemini', env: 'GEMINI_API_KEY' }
   ];
   
   let configuredProviders = 0;
@@ -412,7 +420,8 @@ function runDoctor(): void {
     { provider: 'system', voice: globalConfig.providers?.system?.voice, default: 'Samantha' },
     { provider: 'openai', voice: globalConfig.providers?.openai?.voice, default: 'nova' },
     { provider: 'elevenlabs', voice: globalConfig.providers?.elevenlabs?.voiceId, default: 'EXAVITQu4vr4xnSDxMaL' },
-    { provider: 'groq', voice: globalConfig.providers?.groq?.voice, default: 'nova' }
+    { provider: 'groq', voice: globalConfig.providers?.groq?.voice, default: 'nova' },
+    { provider: 'gemini', voice: globalConfig.providers?.gemini?.model, default: 'gemini-2.5-pro-preview-tts' }
   ];
   
   voices.forEach(({ provider, voice, default: defaultVoice }) => {
@@ -848,6 +857,9 @@ async function run(): Promise<void> {
         case 'elevenlabs':
           config.elevenlabsVoiceId = options.voice;
           break;
+        case 'gemini':
+          config.geminiModel = options.voice;
+          break;
       }
     }
 
@@ -913,6 +925,10 @@ async function run(): Promise<void> {
         console.error('   Groq:');
         console.error('   1. Get API key: https://console.groq.com/keys');
         console.error('   2. Set: export GROQ_API_KEY=your_key_here');
+      } else if (options.provider === 'gemini' || errorMsg.includes('gemini')) {
+        console.error('   Gemini:');
+        console.error('   1. Get API key: https://makersuite.google.com/app/apikey');
+        console.error('   2. Set: export GEMINI_API_KEY=your_key_here');
       }
       
       console.error('');

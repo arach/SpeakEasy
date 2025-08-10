@@ -14,16 +14,18 @@ export interface Provider {
 }
 
 export interface SpeakEasyConfig {
-  provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
+  provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
   systemVoice?: string;
   openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
   elevenlabsVoiceId?: string;
+  geminiModel?: string;
   rate?: number;
   volume?: number;
   apiKeys?: {
     openai?: string;
     elevenlabs?: string;
     groq?: string;
+    gemini?: string;
   };
   tempDir?: string;
   debug?: boolean;
@@ -65,9 +67,14 @@ export interface GlobalConfig {
       model?: string;
       apiKey?: string;
     };
+    gemini?: {
+      enabled?: boolean;
+      model?: string;
+      apiKey?: string;
+    };
   };
   defaults?: {
-    provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
+    provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
     fallbackOrder?: string[];
     rate?: number;
     volume?: number;

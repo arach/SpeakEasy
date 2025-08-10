@@ -12,16 +12,18 @@ interface Provider {
     getErrorMessage(error: any): string;
 }
 interface SpeakEasyConfig {
-    provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
+    provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
     systemVoice?: string;
     openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
     elevenlabsVoiceId?: string;
+    geminiModel?: string;
     rate?: number;
     volume?: number;
     apiKeys?: {
         openai?: string;
         elevenlabs?: string;
         groq?: string;
+        gemini?: string;
     };
     tempDir?: string;
     debug?: boolean;
@@ -61,9 +63,14 @@ interface GlobalConfig {
             model?: string;
             apiKey?: string;
         };
+        gemini?: {
+            enabled?: boolean;
+            model?: string;
+            apiKey?: string;
+        };
     };
     defaults?: {
-        provider?: 'system' | 'openai' | 'elevenlabs' | 'groq';
+        provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
         fallbackOrder?: string[];
         rate?: number;
         volume?: number;
@@ -114,6 +121,20 @@ declare class GroqProvider implements Provider {
     constructor(apiKey?: string, voice?: string);
     speak(config: ProviderConfig): Promise<void>;
     generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    validateConfig(): boolean;
+    getErrorMessage(error: any): string;
+}
+
+declare class GeminiProvider implements Provider {
+    private apiKey;
+    private model;
+    private voiceName;
+    constructor(apiKey?: string, model?: string, voiceName?: string);
+    speak(config: ProviderConfig): Promise<void>;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    private convertToWav;
+    private parseMimeType;
+    private createWavHeader;
     validateConfig(): boolean;
     getErrorMessage(error: any): string;
 }
@@ -253,10 +274,10 @@ declare class SpeakEasy {
         dir?: string;
     }>;
 }
-declare const say: (text: string, provider?: "system" | "openai" | "elevenlabs" | "groq") => Promise<void>;
+declare const say: (text: string, provider?: "system" | "openai" | "elevenlabs" | "groq" | "gemini") => Promise<void>;
 declare const speak: (text: string, options?: SpeakEasyOptions & {
-    provider?: "system" | "openai" | "elevenlabs" | "groq";
+    provider?: "system" | "openai" | "elevenlabs" | "groq" | "gemini";
     volume?: number;
 }) => Promise<void>;
 
-export { CONFIG_FILE, ElevenLabsProvider, GlobalConfig, GroqProvider, OpenAIProvider, Provider, ProviderConfig, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSCache, say, speak };
+export { CONFIG_FILE, ElevenLabsProvider, GeminiProvider, GlobalConfig, GroqProvider, OpenAIProvider, Provider, ProviderConfig, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSCache, say, speak };

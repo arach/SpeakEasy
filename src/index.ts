@@ -11,6 +11,7 @@ import { SystemProvider } from './providers/system';
 import { OpenAIProvider } from './providers/openai';
 import { ElevenLabsProvider } from './providers/elevenlabs';
 import { GroqProvider } from './providers/groq';
+import { GeminiProvider } from './providers/gemini';
 import { TTSCache } from './cache';
 
 const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
@@ -54,6 +55,7 @@ export class SpeakEasy {
       systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || 'Samantha',
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || 'nova',
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || 'EXAVITQu4vr4xnSDxMaL',
+      geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || 'gemini-2.5-pro-preview-tts',
       rate: config.rate || globalConfig.defaults?.rate || 180,
       volume: config.volume !== undefined ? config.volume : (globalConfig.defaults?.volume !== undefined ? globalConfig.defaults.volume : 0.7),
       debug: config.debug || false,
@@ -61,6 +63,7 @@ export class SpeakEasy {
         openai: config.apiKeys?.openai || globalConfig.providers?.openai?.apiKey || process.env.OPENAI_API_KEY || '',
         elevenlabs: config.apiKeys?.elevenlabs || globalConfig.providers?.elevenlabs?.apiKey || process.env.ELEVENLABS_API_KEY || '',
         groq: config.apiKeys?.groq || globalConfig.providers?.groq?.apiKey || process.env.GROQ_API_KEY || '',
+        gemini: config.apiKeys?.gemini || globalConfig.providers?.gemini?.apiKey || process.env.GEMINI_API_KEY || '',
       },
       tempDir: config.tempDir || globalConfig.global?.tempDir || '/tmp',
     };
@@ -68,7 +71,7 @@ export class SpeakEasy {
     const cacheConfig = config.cache || globalConfig.cache;
     
     // Enable cache by default when API keys are present (for API-based providers)
-    const hasApiKeys = !!(this.config.apiKeys?.openai || this.config.apiKeys?.elevenlabs || this.config.apiKeys?.groq);
+    const hasApiKeys = !!(this.config.apiKeys?.openai || this.config.apiKeys?.elevenlabs || this.config.apiKeys?.groq || this.config.apiKeys?.gemini);
     const cacheEnabled = cacheConfig?.enabled ?? (hasApiKeys && this.config.provider !== 'system');
     
     this.useCache = cacheEnabled;
@@ -94,6 +97,7 @@ export class SpeakEasy {
     this.providers.set('openai', new OpenAIProvider(this.config.apiKeys?.openai || '', this.config.openaiVoice || 'nova'));
     this.providers.set('elevenlabs', new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || '', this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL'));
     this.providers.set('groq', new GroqProvider(this.config.apiKeys?.groq || ''));
+    this.providers.set('gemini', new GeminiProvider(this.config.apiKeys?.gemini || '', this.config.geminiModel || 'gemini-2.5-pro-preview-tts'));
   }
 
   async speak(text: string, options: SpeakEasyOptions = {}): Promise<void> {
@@ -160,6 +164,9 @@ export class SpeakEasy {
           case 'groq':
             envVarHelp = 'export GROQ_API_KEY=your_key_here';
             break;
+          case 'gemini':
+            envVarHelp = 'export GEMINI_API_KEY=your_key_here';
+            break;
         }
         throw new Error(
           `${providerName} API key is required. ${envVarHelp ? `Run: ${envVarHelp}` : ''}`
@@ -167,7 +174,7 @@ export class SpeakEasy {
       }
     }
 
-    const providers = ['system', 'openai', 'elevenlabs', 'groq'];
+    const providers = ['system', 'openai', 'elevenlabs', 'groq', 'gemini'];
     let lastError: Error | null = null;
 
     for (const providerName of providers) {
@@ -313,6 +320,9 @@ export class SpeakEasy {
             case 'groq':
               helpText = 'Get your API key: https://console.groq.com/keys';
               break;
+            case 'gemini':
+              helpText = 'Get your API key: https://makersuite.google.com/app/apikey';
+              break;
           }
         }
         
@@ -354,13 +364,15 @@ export class SpeakEasy {
     console.log(`   System Voice: ${this.config.systemVoice}`);
     console.log(`   OpenAI Voice: ${this.config.openaiVoice}`);
     console.log(`   ElevenLabs Voice: ${this.config.elevenlabsVoiceId}`);
+    console.log(`   Gemini Model: ${this.config.geminiModel}`);
     
     // API Key status
     console.log('🔑 API Key Status:');
     const providers = [
       { name: 'OpenAI', key: 'openai', env: 'OPENAI_API_KEY' },
       { name: 'ElevenLabs', key: 'elevenlabs', env: 'ELEVENLABS_API_KEY' },
-      { name: 'Groq', key: 'groq', env: 'GROQ_API_KEY' }
+      { name: 'Groq', key: 'groq', env: 'GROQ_API_KEY' },
+      { name: 'Gemini', key: 'gemini', env: 'GEMINI_API_KEY' }
     ];
     
     providers.forEach(({ name, key, env }) => {
@@ -400,6 +412,7 @@ export class SpeakEasy {
       case 'elevenlabs': return this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL';
       case 'system': return this.config.systemVoice || 'Samantha';
       case 'groq': return 'Celeste-PlayAI';
+      case 'gemini': return this.config.geminiModel || 'gemini-2.5-pro-preview-tts';
       default: return this.config.systemVoice || 'Samantha';
     }
   }
@@ -409,6 +422,7 @@ export class SpeakEasy {
       case 'openai': return this.config.apiKeys?.openai || '';
       case 'elevenlabs': return this.config.apiKeys?.elevenlabs || '';
       case 'groq': return this.config.apiKeys?.groq || '';
+      case 'gemini': return this.config.apiKeys?.gemini || '';
       default: return '';
     }
   }
@@ -418,6 +432,7 @@ export class SpeakEasy {
       case 'openai': return 'tts-1';
       case 'elevenlabs': return 'eleven_multilingual_v2';
       case 'groq': return 'tts-1-hd';
+      case 'gemini': return this.config.geminiModel || 'gemini-2.5-pro-preview-tts';
       case 'system': return 'macOS-system';
       default: return provider;
     }
@@ -440,14 +455,14 @@ export class SpeakEasy {
 }
 
 // Convenience functions
-export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs' | 'groq') => {
+export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini') => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Text argument is required for say()');
   }
   return new SpeakEasy(provider ? { provider } : {}).speak(text);
 };
 
-export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 'system' | 'openai' | 'elevenlabs' | 'groq', volume?: number }) => {
+export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini', volume?: number }) => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Text argument is required for speak()');
   }
@@ -461,4 +476,5 @@ export { SystemProvider } from './providers/system';
 export { OpenAIProvider } from './providers/openai';
 export { ElevenLabsProvider } from './providers/elevenlabs';
 export { GroqProvider } from './providers/groq';
+export { GeminiProvider } from './providers/gemini';
 export { TTSCache } from './cache';

@@ -32,6 +32,7 @@ var src_exports = {};
 __export(src_exports, {
   CONFIG_FILE: () => CONFIG_FILE,
   ElevenLabsProvider: () => ElevenLabsProvider,
+  GeminiProvider: () => GeminiProvider,
   GroqProvider: () => GroqProvider,
   OpenAIProvider: () => OpenAIProvider,
   SpeakEasy: () => SpeakEasy,
@@ -41,9 +42,9 @@ __export(src_exports, {
   speak: () => speak
 });
 module.exports = __toCommonJS(src_exports);
-var import_child_process5 = require("child_process");
-var fs5 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
+var import_child_process6 = require("child_process");
+var fs6 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
 
 // src/providers/system.ts
 var import_child_process = require("child_process");
@@ -62,14 +63,14 @@ var SystemProvider = class {
         const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
         const playCommand = `afplay${volumeFlag} "${tempFile}"`;
         (0, import_child_process.execSync)(playCommand);
-        const fs6 = require("fs");
-        if (fs6.existsSync(tempFile)) {
-          fs6.unlinkSync(tempFile);
+        const fs7 = require("fs");
+        if (fs7.existsSync(tempFile)) {
+          fs7.unlinkSync(tempFile);
         }
       } catch (error) {
-        const fs6 = require("fs");
-        if (fs6.existsSync(tempFile)) {
-          fs6.unlinkSync(tempFile);
+        const fs7 = require("fs");
+        if (fs7.existsSync(tempFile)) {
+          fs7.unlinkSync(tempFile);
         }
         throw error;
       }
@@ -311,10 +312,152 @@ var GroqProvider = class {
   }
 };
 
+// src/providers/gemini.ts
+var import_child_process5 = require("child_process");
+var fs4 = __toESM(require("fs"));
+var path4 = __toESM(require("path"));
+var import_generative_ai = require("@google/generative-ai");
+var GeminiProvider = class {
+  apiKey;
+  model;
+  voiceName;
+  constructor(apiKey = "", model = "gemini-2.5-pro-preview-tts", voiceName = "Aoede") {
+    this.apiKey = apiKey;
+    this.model = model;
+    this.voiceName = voiceName;
+  }
+  async speak(config) {
+    const audioBuffer = await this.generateAudio(config);
+    if (audioBuffer) {
+      const tempFile = path4.join(config.tempDir, `speech_${Date.now()}.wav`);
+      fs4.writeFileSync(tempFile, audioBuffer);
+      const volume = config.volume !== void 0 ? config.volume : 0.7;
+      const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+      (0, import_child_process5.execSync)(`afplay${volumeFlag} "${tempFile}"`);
+      if (fs4.existsSync(tempFile)) {
+        fs4.unlinkSync(tempFile);
+      }
+    }
+  }
+  async generateAudio(config) {
+    if (!this.apiKey) {
+      throw new Error("Gemini API key is required");
+    }
+    try {
+      const genAI = new import_generative_ai.GoogleGenerativeAI(this.apiKey);
+      const model = genAI.getGenerativeModel({
+        model: this.model
+      });
+      const result = await model.generateContent({
+        contents: [{
+          role: "user",
+          parts: [{
+            text: config.text
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          responseMimeType: "audio/wav"
+        }
+      });
+      const response = await result.response;
+      if (response.candidates && response.candidates[0]?.content?.parts?.[0]) {
+        const part = response.candidates[0].content.parts[0];
+        if ("inlineData" in part && part.inlineData) {
+          const audioData = part.inlineData.data;
+          const mimeType = part.inlineData.mimeType || "audio/wav";
+          const buffer = Buffer.from(audioData, "base64");
+          if (mimeType.includes("wav")) {
+            return buffer;
+          }
+          return this.convertToWav(buffer, mimeType);
+        }
+      }
+      throw new Error("No audio content received from Gemini API");
+    } catch (error) {
+      if (error.message?.includes("API key")) {
+        throw new Error(`Gemini API error: Invalid API key. Check your GEMINI_API_KEY environment variable.`);
+      } else if (error.message?.includes("quota") || error.message?.includes("rate")) {
+        throw new Error(`Gemini API error: Rate limit exceeded. Try again later or reduce request frequency.`);
+      } else if (error.message?.includes("model")) {
+        throw new Error(`Gemini API error: Model '${this.model}' may not support audio generation. Try 'gemini-2.5-pro-preview-tts' or check available models.`);
+      }
+      throw new Error(`Gemini TTS failed: ${error.message || error}`);
+    }
+  }
+  convertToWav(rawData, mimeType) {
+    const options = this.parseMimeType(mimeType);
+    const wavHeader = this.createWavHeader(rawData.length, options);
+    return Buffer.concat([wavHeader, rawData]);
+  }
+  parseMimeType(mimeType) {
+    const [fileType, ...params] = mimeType.split(";").map((s) => s.trim());
+    const [, format] = fileType.split("/");
+    const options = {
+      numChannels: 1,
+      sampleRate: 24e3,
+      // Default sample rate
+      bitsPerSample: 16
+      // Default bits per sample
+    };
+    if (format && format.startsWith("L")) {
+      const bits = parseInt(format.slice(1), 10);
+      if (!isNaN(bits)) {
+        options.bitsPerSample = bits;
+      }
+    }
+    for (const param of params) {
+      const [key, value] = param.split("=").map((s) => s.trim());
+      if (key === "rate") {
+        const rate = parseInt(value, 10);
+        if (!isNaN(rate)) {
+          options.sampleRate = rate;
+        }
+      }
+    }
+    return options;
+  }
+  createWavHeader(dataLength, options) {
+    const { numChannels, sampleRate, bitsPerSample } = options;
+    const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+    const blockAlign = numChannels * bitsPerSample / 8;
+    const buffer = Buffer.alloc(44);
+    buffer.write("RIFF", 0);
+    buffer.writeUInt32LE(36 + dataLength, 4);
+    buffer.write("WAVE", 8);
+    buffer.write("fmt ", 12);
+    buffer.writeUInt32LE(16, 16);
+    buffer.writeUInt16LE(1, 20);
+    buffer.writeUInt16LE(numChannels, 22);
+    buffer.writeUInt32LE(sampleRate, 24);
+    buffer.writeUInt32LE(byteRate, 28);
+    buffer.writeUInt16LE(blockAlign, 32);
+    buffer.writeUInt16LE(bitsPerSample, 34);
+    buffer.write("data", 36);
+    buffer.writeUInt32LE(dataLength, 40);
+    return buffer;
+  }
+  validateConfig() {
+    return !!(this.apiKey && this.apiKey.length > 10);
+  }
+  getErrorMessage(error) {
+    if (error.message.includes("Invalid API key")) {
+      return "\u{1F511} Invalid Gemini API key. Get yours at: https://aistudio.google.com/apikey";
+    }
+    if (error.message.includes("Rate limit") || error.message.includes("quota")) {
+      return '\u23F0 Gemini rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
+    }
+    if (error.message.includes("model")) {
+      return "\u274C Model not supported for audio. Try using gemini-2.5-pro-preview-tts or check available models.";
+    }
+    return `Gemini TTS failed: ${error.message}`;
+  }
+};
+
 // src/cache.ts
 var import_keyv = __toESM(require("keyv"));
-var path4 = __toESM(require("path"));
-var fs4 = __toESM(require("fs"));
+var path5 = __toESM(require("path"));
+var fs5 = __toESM(require("fs"));
 var import_uuid = require("uuid");
 
 // src/cache-config.ts
@@ -376,17 +519,17 @@ var TTSCache = class {
   cacheHits = 0;
   cacheMisses = 0;
   constructor(cacheDir, ttl = "7d", maxSize, logger) {
-    this.cacheDir = cacheDir || path4.join("/tmp", "speakeasy-cache");
+    this.cacheDir = cacheDir || path5.join("/tmp", "speakeasy-cache");
     this.logger = logger || this.createDefaultLogger();
-    this.statsFile = path4.join(this.cacheDir, "stats.json");
+    this.statsFile = path5.join(this.cacheDir, "stats.json");
     this.loadStats();
     this.logger.debug("Initializing TTSCache with dir:", this.cacheDir, "ttl:", ttl, "maxSize:", maxSize);
-    if (!fs4.existsSync(this.cacheDir)) {
+    if (!fs5.existsSync(this.cacheDir)) {
       this.logger.debug("Creating cache directory:", this.cacheDir);
-      fs4.mkdirSync(this.cacheDir, { recursive: true });
+      fs5.mkdirSync(this.cacheDir, { recursive: true });
     }
-    const dbPath = path4.join(this.cacheDir, "tts-cache.sqlite");
-    const metadataDbPath = path4.join(this.cacheDir, "metadata.sqlite");
+    const dbPath = path5.join(this.cacheDir, "tts-cache.sqlite");
+    const metadataDbPath = path5.join(this.cacheDir, "metadata.sqlite");
     this.logger.debug("Database path:", dbPath);
     this.logger.debug("Metadata DB path:", metadataDbPath);
     try {
@@ -458,7 +601,7 @@ var TTSCache = class {
     try {
       const entry = await this.cache.get(key);
       if (entry && this.isValidEntry(entry)) {
-        if (fs4.existsSync(entry.audioFilePath)) {
+        if (fs5.existsSync(entry.audioFilePath)) {
           this.cacheHits++;
           this.saveStats();
           return entry;
@@ -475,8 +618,8 @@ var TTSCache = class {
   }
   loadStats() {
     try {
-      if (fs4.existsSync(this.statsFile)) {
-        const data = fs4.readFileSync(this.statsFile, "utf8");
+      if (fs5.existsSync(this.statsFile)) {
+        const data = fs5.readFileSync(this.statsFile, "utf8");
         const stats = JSON.parse(data);
         this.cacheHits = stats.cacheHits || 0;
         this.cacheMisses = stats.cacheMisses || 0;
@@ -492,15 +635,15 @@ var TTSCache = class {
         cacheMisses: this.cacheMisses,
         timestamp: Date.now()
       };
-      fs4.writeFileSync(this.statsFile, JSON.stringify(stats, null, 2));
+      fs5.writeFileSync(this.statsFile, JSON.stringify(stats, null, 2));
     } catch (error) {
       this.logger.warn("Error saving stats:", error);
     }
   }
   async set(key, entry, audioBuffer, options) {
     try {
-      const audioFilePath = path4.join(this.cacheDir, `${key}.mp3`);
-      fs4.writeFileSync(audioFilePath, audioBuffer);
+      const audioFilePath = path5.join(this.cacheDir, `${key}.mp3`);
+      fs5.writeFileSync(audioFilePath, audioBuffer);
       const timestamp = Date.now();
       const cacheEntry = {
         ...entry,
@@ -931,8 +1074,8 @@ var TTSCache = class {
     try {
       const entry = await this.cache.get(key);
       if (entry && entry.audioFilePath) {
-        if (fs4.existsSync(entry.audioFilePath)) {
-          fs4.unlinkSync(entry.audioFilePath);
+        if (fs5.existsSync(entry.audioFilePath)) {
+          fs5.unlinkSync(entry.audioFilePath);
         }
       }
       if (this.metadataDb) {
@@ -953,10 +1096,10 @@ var TTSCache = class {
   }
   async clear() {
     try {
-      const files = fs4.readdirSync(this.cacheDir);
+      const files = fs5.readdirSync(this.cacheDir);
       for (const file of files) {
         if (file.endsWith(".mp3")) {
-          fs4.unlinkSync(path4.join(this.cacheDir, file));
+          fs5.unlinkSync(path5.join(this.cacheDir, file));
         }
       }
       if (this.metadataDb) {
@@ -983,8 +1126,8 @@ var TTSCache = class {
           const selectStmt = this.metadataDb.prepare("SELECT cache_key, file_path FROM metadata WHERE timestamp < ?");
           const oldEntries = selectStmt.all(cutoff);
           for (const entry of oldEntries) {
-            if (fs4.existsSync(entry.file_path)) {
-              fs4.unlinkSync(entry.file_path);
+            if (fs5.existsSync(entry.file_path)) {
+              fs5.unlinkSync(entry.file_path);
             }
           }
           const deleteStmt = this.metadataDb.prepare("DELETE FROM metadata WHERE timestamp < ?");
@@ -1006,13 +1149,13 @@ var TTSCache = class {
   }
   async cleanupFileBased(cutoff) {
     try {
-      const files = fs4.readdirSync(this.cacheDir);
+      const files = fs5.readdirSync(this.cacheDir);
       for (const file of files) {
         if (file.endsWith(".mp3")) {
-          const filePath = path4.join(this.cacheDir, file);
-          const stats = fs4.statSync(filePath);
+          const filePath = path5.join(this.cacheDir, file);
+          const stats = fs5.statSync(filePath);
           if (stats.mtime.getTime() < cutoff) {
-            fs4.unlinkSync(filePath);
+            fs5.unlinkSync(filePath);
             const key = file.replace(".mp3", "");
             await this.cache.delete(key);
           }
@@ -1036,12 +1179,12 @@ var TTSCache = class {
 };
 
 // src/index.ts
-var CONFIG_DIR = path5.join(require("os").homedir(), ".config", "speakeasy");
-var CONFIG_FILE = path5.join(CONFIG_DIR, "settings.json");
+var CONFIG_DIR = path6.join(require("os").homedir(), ".config", "speakeasy");
+var CONFIG_FILE = path6.join(CONFIG_DIR, "settings.json");
 function loadGlobalConfig() {
   try {
-    if (fs5.existsSync(CONFIG_FILE)) {
-      const configData = fs5.readFileSync(CONFIG_FILE, "utf8");
+    if (fs6.existsSync(CONFIG_FILE)) {
+      const configData = fs6.readFileSync(CONFIG_FILE, "utf8");
       return JSON.parse(configData);
     }
   } catch (error) {
@@ -1067,22 +1210,24 @@ var SpeakEasy = class {
       systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || "Samantha",
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || "nova",
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || "EXAVITQu4vr4xnSDxMaL",
+      geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || "gemini-2.5-pro-preview-tts",
       rate: config.rate || globalConfig.defaults?.rate || 180,
       volume: config.volume !== void 0 ? config.volume : globalConfig.defaults?.volume !== void 0 ? globalConfig.defaults.volume : 0.7,
       debug: config.debug || false,
       apiKeys: {
         openai: config.apiKeys?.openai || globalConfig.providers?.openai?.apiKey || process.env.OPENAI_API_KEY || "",
         elevenlabs: config.apiKeys?.elevenlabs || globalConfig.providers?.elevenlabs?.apiKey || process.env.ELEVENLABS_API_KEY || "",
-        groq: config.apiKeys?.groq || globalConfig.providers?.groq?.apiKey || process.env.GROQ_API_KEY || ""
+        groq: config.apiKeys?.groq || globalConfig.providers?.groq?.apiKey || process.env.GROQ_API_KEY || "",
+        gemini: config.apiKeys?.gemini || globalConfig.providers?.gemini?.apiKey || process.env.GEMINI_API_KEY || ""
       },
       tempDir: config.tempDir || globalConfig.global?.tempDir || "/tmp"
     };
     const cacheConfig = config.cache || globalConfig.cache;
-    const hasApiKeys = !!(this.config.apiKeys?.openai || this.config.apiKeys?.elevenlabs || this.config.apiKeys?.groq);
+    const hasApiKeys = !!(this.config.apiKeys?.openai || this.config.apiKeys?.elevenlabs || this.config.apiKeys?.groq || this.config.apiKeys?.gemini);
     const cacheEnabled = cacheConfig?.enabled ?? (hasApiKeys && this.config.provider !== "system");
     this.useCache = cacheEnabled;
     if (this.useCache) {
-      const cacheDir = cacheConfig?.dir || path5.join(this.config.tempDir || "/tmp", "speakeasy-cache");
+      const cacheDir = cacheConfig?.dir || path6.join(this.config.tempDir || "/tmp", "speakeasy-cache");
       this.cache = new TTSCache(
         cacheDir,
         cacheConfig?.ttl || "7d",
@@ -1101,6 +1246,7 @@ var SpeakEasy = class {
     this.providers.set("openai", new OpenAIProvider(this.config.apiKeys?.openai || "", this.config.openaiVoice || "nova"));
     this.providers.set("elevenlabs", new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || "", this.config.elevenlabsVoiceId || "EXAVITQu4vr4xnSDxMaL"));
     this.providers.set("groq", new GroqProvider(this.config.apiKeys?.groq || ""));
+    this.providers.set("gemini", new GeminiProvider(this.config.apiKeys?.gemini || "", this.config.geminiModel || "gemini-2.5-pro-preview-tts"));
   }
   async speak(text, options = {}) {
     const cleanText = cleanTextForSpeech(text);
@@ -1155,13 +1301,16 @@ var SpeakEasy = class {
           case "groq":
             envVarHelp = "export GROQ_API_KEY=your_key_here";
             break;
+          case "gemini":
+            envVarHelp = "export GEMINI_API_KEY=your_key_here";
+            break;
         }
         throw new Error(
           `${providerName} API key is required. ${envVarHelp ? `Run: ${envVarHelp}` : ""}`
         );
       }
     }
-    const providers = ["system", "openai", "elevenlabs", "groq"];
+    const providers = ["system", "openai", "elevenlabs", "groq", "gemini"];
     let lastError = null;
     for (const providerName of providers) {
       if (providerName === requestedProvider || lastError) {
@@ -1241,23 +1390,23 @@ var SpeakEasy = class {
                 success: true
               });
               console.log("cached");
-              const tempFile = path5.join(tempDir, `speech_${Date.now()}.mp3`);
-              fs5.writeFileSync(tempFile, audioBuffer);
+              const tempFile = path6.join(tempDir, `speech_${Date.now()}.mp3`);
+              fs6.writeFileSync(tempFile, audioBuffer);
               const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-              (0, import_child_process5.execSync)(`afplay${volumeFlag} "${tempFile}"`);
-              if (fs5.existsSync(tempFile)) {
-                fs5.unlinkSync(tempFile);
+              (0, import_child_process6.execSync)(`afplay${volumeFlag} "${tempFile}"`);
+              if (fs6.existsSync(tempFile)) {
+                fs6.unlinkSync(tempFile);
               }
             } else if (audioBuffer) {
-              const tempFile = path5.join(tempDir, `speech_${Date.now()}.mp3`);
+              const tempFile = path6.join(tempDir, `speech_${Date.now()}.mp3`);
               if (this.debug) {
                 console.log(`\u{1F3B5} Playing generated audio: ${tempFile}`);
               }
-              fs5.writeFileSync(tempFile, audioBuffer);
+              fs6.writeFileSync(tempFile, audioBuffer);
               const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-              (0, import_child_process5.execSync)(`afplay${volumeFlag} "${tempFile}"`);
-              if (fs5.existsSync(tempFile)) {
-                fs5.unlinkSync(tempFile);
+              (0, import_child_process6.execSync)(`afplay${volumeFlag} "${tempFile}"`);
+              if (fs6.existsSync(tempFile)) {
+                fs6.unlinkSync(tempFile);
               }
             }
             return;
@@ -1283,6 +1432,9 @@ var SpeakEasy = class {
               break;
             case "groq":
               helpText = "Get your API key: https://console.groq.com/keys";
+              break;
+            case "gemini":
+              helpText = "Get your API key: https://makersuite.google.com/app/apikey";
               break;
           }
         }
@@ -1321,11 +1473,13 @@ var SpeakEasy = class {
     console.log(`   System Voice: ${this.config.systemVoice}`);
     console.log(`   OpenAI Voice: ${this.config.openaiVoice}`);
     console.log(`   ElevenLabs Voice: ${this.config.elevenlabsVoiceId}`);
+    console.log(`   Gemini Model: ${this.config.geminiModel}`);
     console.log("\u{1F511} API Key Status:");
     const providers = [
       { name: "OpenAI", key: "openai", env: "OPENAI_API_KEY" },
       { name: "ElevenLabs", key: "elevenlabs", env: "ELEVENLABS_API_KEY" },
-      { name: "Groq", key: "groq", env: "GROQ_API_KEY" }
+      { name: "Groq", key: "groq", env: "GROQ_API_KEY" },
+      { name: "Gemini", key: "gemini", env: "GEMINI_API_KEY" }
     ];
     providers.forEach(({ name, key, env }) => {
       const fromConfig = this.config.apiKeys?.[key];
@@ -1346,10 +1500,10 @@ var SpeakEasy = class {
     console.log("");
   }
   async playCachedAudio(audioFilePath) {
-    const { execSync: execSync6 } = require("child_process");
+    const { execSync: execSync7 } = require("child_process");
     const volume = this.config.volume !== void 0 ? this.config.volume : 0.7;
     const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-    execSync6(`afplay${volumeFlag} "${audioFilePath}"`, { stdio: "inherit" });
+    execSync7(`afplay${volumeFlag} "${audioFilePath}"`, { stdio: "inherit" });
   }
   getVoiceForProvider(provider) {
     switch (provider) {
@@ -1361,6 +1515,8 @@ var SpeakEasy = class {
         return this.config.systemVoice || "Samantha";
       case "groq":
         return "Celeste-PlayAI";
+      case "gemini":
+        return this.config.geminiModel || "gemini-2.5-pro-preview-tts";
       default:
         return this.config.systemVoice || "Samantha";
     }
@@ -1373,6 +1529,8 @@ var SpeakEasy = class {
         return this.config.apiKeys?.elevenlabs || "";
       case "groq":
         return this.config.apiKeys?.groq || "";
+      case "gemini":
+        return this.config.apiKeys?.gemini || "";
       default:
         return "";
     }
@@ -1385,6 +1543,8 @@ var SpeakEasy = class {
         return "eleven_multilingual_v2";
       case "groq":
         return "tts-1-hd";
+      case "gemini":
+        return this.config.geminiModel || "gemini-2.5-pro-preview-tts";
       case "system":
         return "macOS-system";
       default:
@@ -1393,7 +1553,7 @@ var SpeakEasy = class {
   }
   stopSpeaking() {
     try {
-      (0, import_child_process5.execSync)('pkill -f "say|afplay"', { stdio: "ignore" });
+      (0, import_child_process6.execSync)('pkill -f "say|afplay"', { stdio: "ignore" });
     } catch (error) {
     }
   }
@@ -1423,6 +1583,7 @@ var speak = (text, options) => {
 0 && (module.exports = {
   CONFIG_FILE,
   ElevenLabsProvider,
+  GeminiProvider,
   GroqProvider,
   OpenAIProvider,
   SpeakEasy,
