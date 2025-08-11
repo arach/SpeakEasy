@@ -40,3 +40,9 @@ config.local.json
 .claude/
 .settings.json
 .settings.local.json
+
+# Test files
+test-*.js
+test-*.json
+gemini-*
+test-request.json

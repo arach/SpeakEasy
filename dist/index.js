@@ -316,12 +316,12 @@ var GroqProvider = class {
 var import_child_process5 = require("child_process");
 var fs4 = __toESM(require("fs"));
 var path4 = __toESM(require("path"));
-var import_generative_ai = require("@google/generative-ai");
+var import_node_fetch4 = __toESM(require("node-fetch"));
 var GeminiProvider = class {
   apiKey;
   model;
   voiceName;
-  constructor(apiKey = "", model = "gemini-2.5-pro-preview-tts", voiceName = "Aoede") {
+  constructor(apiKey = "", model = "gemini-2.5-flash-preview-tts", voiceName = "Puck") {
     this.apiKey = apiKey;
     this.model = model;
     this.voiceName = voiceName;
@@ -344,25 +344,53 @@ var GeminiProvider = class {
       throw new Error("Gemini API key is required");
     }
     try {
-      const genAI = new import_generative_ai.GoogleGenerativeAI(this.apiKey);
-      const model = genAI.getGenerativeModel({
-        model: this.model
-      });
-      const result = await model.generateContent({
-        contents: [{
-          role: "user",
-          parts: [{
-            text: config.text
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          responseMimeType: "audio/wav"
+      const response = await (0, import_node_fetch4.default)(
+        `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [{
+                text: config.text
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: this.voiceName
+                  }
+                }
+              }
+            }
+          })
         }
-      });
-      const response = await result.response;
-      if (response.candidates && response.candidates[0]?.content?.parts?.[0]) {
-        const part = response.candidates[0].content.parts[0];
+      );
+      if (!response.ok) {
+        const errorData = await response.text();
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const error = JSON.parse(errorData);
+          errorMessage = error.error?.message || errorMessage;
+        } catch {
+        }
+        if (response.status === 429) {
+          throw new Error("Rate limit exceeded");
+        } else if (response.status === 401 || response.status === 403) {
+          throw new Error("Invalid API key");
+        } else {
+          throw new Error(errorMessage);
+        }
+      }
+      const data = await response.json();
+      if (data.candidates && data.candidates[0]?.content?.parts?.[0]) {
+        const part = data.candidates[0].content.parts[0];
         if ("inlineData" in part && part.inlineData) {
           const audioData = part.inlineData.data;
           const mimeType = part.inlineData.mimeType || "audio/wav";
@@ -375,12 +403,12 @@ var GeminiProvider = class {
       }
       throw new Error("No audio content received from Gemini API");
     } catch (error) {
-      if (error.message?.includes("API key")) {
+      if (error.message?.includes("API key") || error.message?.includes("Invalid API key")) {
         throw new Error(`Gemini API error: Invalid API key. Check your GEMINI_API_KEY environment variable.`);
-      } else if (error.message?.includes("quota") || error.message?.includes("rate")) {
+      } else if (error.message?.includes("quota") || error.message?.includes("rate") || error.message?.includes("Rate limit")) {
         throw new Error(`Gemini API error: Rate limit exceeded. Try again later or reduce request frequency.`);
       } else if (error.message?.includes("model")) {
-        throw new Error(`Gemini API error: Model '${this.model}' may not support audio generation. Try 'gemini-2.5-pro-preview-tts' or check available models.`);
+        throw new Error(`Gemini API error: Model '${this.model}' may not support audio generation. Try 'gemini-2.5-flash-preview-tts' or check available models.`);
       }
       throw new Error(`Gemini TTS failed: ${error.message || error}`);
     }
@@ -448,7 +476,7 @@ var GeminiProvider = class {
       return '\u23F0 Gemini rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
     if (error.message.includes("model")) {
-      return "\u274C Model not supported for audio. Try using gemini-2.5-pro-preview-tts or check available models.";
+      return "\u274C Model not supported for audio. Try using gemini-2.5-flash-preview-tts or check available models.";
     }
     return `Gemini TTS failed: ${error.message}`;
   }
@@ -1210,7 +1238,7 @@ var SpeakEasy = class {
       systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || "Samantha",
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || "nova",
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || "EXAVITQu4vr4xnSDxMaL",
-      geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || "gemini-2.5-pro-preview-tts",
+      geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || "gemini-2.5-flash-preview-tts",
       rate: config.rate || globalConfig.defaults?.rate || 180,
       volume: config.volume !== void 0 ? config.volume : globalConfig.defaults?.volume !== void 0 ? globalConfig.defaults.volume : 0.7,
       debug: config.debug || false,
@@ -1246,7 +1274,7 @@ var SpeakEasy = class {
     this.providers.set("openai", new OpenAIProvider(this.config.apiKeys?.openai || "", this.config.openaiVoice || "nova"));
     this.providers.set("elevenlabs", new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || "", this.config.elevenlabsVoiceId || "EXAVITQu4vr4xnSDxMaL"));
     this.providers.set("groq", new GroqProvider(this.config.apiKeys?.groq || ""));
-    this.providers.set("gemini", new GeminiProvider(this.config.apiKeys?.gemini || "", this.config.geminiModel || "gemini-2.5-pro-preview-tts"));
+    this.providers.set("gemini", new GeminiProvider(this.config.apiKeys?.gemini || "", this.config.geminiModel || "gemini-2.5-flash-preview-tts"));
   }
   async speak(text, options = {}) {
     const cleanText = cleanTextForSpeech(text);
@@ -1390,7 +1418,8 @@ var SpeakEasy = class {
                 success: true
               });
               console.log("cached");
-              const tempFile = path6.join(tempDir, `speech_${Date.now()}.mp3`);
+              const fileExt = providerName === "gemini" ? "wav" : "mp3";
+              const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
               fs6.writeFileSync(tempFile, audioBuffer);
               const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
               (0, import_child_process6.execSync)(`afplay${volumeFlag} "${tempFile}"`);
@@ -1398,7 +1427,8 @@ var SpeakEasy = class {
                 fs6.unlinkSync(tempFile);
               }
             } else if (audioBuffer) {
-              const tempFile = path6.join(tempDir, `speech_${Date.now()}.mp3`);
+              const fileExt = providerName === "gemini" ? "wav" : "mp3";
+              const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
               if (this.debug) {
                 console.log(`\u{1F3B5} Playing generated audio: ${tempFile}`);
               }
@@ -1516,7 +1546,7 @@ var SpeakEasy = class {
       case "groq":
         return "Celeste-PlayAI";
       case "gemini":
-        return this.config.geminiModel || "gemini-2.5-pro-preview-tts";
+        return this.config.geminiModel || "gemini-2.5-flash-preview-tts";
       default:
         return this.config.systemVoice || "Samantha";
     }
@@ -1544,7 +1574,7 @@ var SpeakEasy = class {
       case "groq":
         return "tts-1-hd";
       case "gemini":
-        return this.config.geminiModel || "gemini-2.5-pro-preview-tts";
+        return this.config.geminiModel || "gemini-2.5-flash-preview-tts";
       case "system":
         return "macOS-system";
       default:
