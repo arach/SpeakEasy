@@ -6,6 +6,8 @@ import { hasConfig as hasConfigFile, showConfig as showConfigCmd, diagnoseConfig
 import { runDoctor as runDoctorCmd } from '../cli/doctor';
 import { clearCache as clearCacheCmd, playCachedAudio as playCachedAudioCmd, listCacheEntries as listCacheEntriesCmd } from '../cli/cache';
 import { Command } from 'commander';
+import { getPackageVersion } from '../cli/constants';
+import { parseAndValidate } from '../cli/args';
 
 interface CLIOptions {
   text?: string;
@@ -42,6 +44,7 @@ async function run(): Promise<void> {
   program
     .name('speakeasy')
     .helpOption('-H, --builtin-help', 'show built-in help')
+    .version(getPackageVersion(), '-V, --version', 'output the version number')
     .argument('[text]')
     .option('-t, --text <text>')
     .option('-p, --provider <provider>')
@@ -70,29 +73,7 @@ async function run(): Promise<void> {
   const parsed = program.opts();
   let text = parsed.text || program.args[0] || '';
 
-  const options: CLIOptions = {
-    provider: parsed.provider,
-    voice: parsed.voice,
-    rate: parsed.rate ? parseInt(parsed.rate, 10) : undefined,
-    volume: parsed.volume ? parseFloat(parsed.volume) : undefined,
-    interrupt: !!parsed.interrupt,
-    cache: !!parsed.cache,
-    clearCache: !!parsed.clearCache,
-    config: !!parsed.config,
-    edit: !!parsed.edit,
-    diagnose: !!parsed.diagnose,
-    doctor: !!parsed.doctor,
-    help: !!parsed.help,
-    debug: !!parsed.debug,
-    list: !!parsed.list,
-    find: parsed.find,
-    stats: !!parsed.stats,
-    recent: parsed.recent ? parseInt(parsed.recent, 10) : undefined,
-    id: parsed.id,
-    play: parsed.play,
-    out: parsed.out,
-    welcome: !!parsed.welcome,
-  };
+  const options = parseAndValidate({ ...parsed, text });
 
   if (options.help) {
     showHelpUI();

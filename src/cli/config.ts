@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { spawn } from 'child_process';
-import { CONFIG_DIR, CONFIG_FILE } from './constants';
+import { CONFIG_DIR, CONFIG_FILE, DEFAULTS } from './constants';
 
 export function loadGlobalConfig() {
   try {
@@ -40,8 +40,8 @@ export function showConfig(edit: boolean = false): void {
             },
           },
           defaults: {
-            provider: 'system',
-            rate: 180,
+            provider: DEFAULTS.provider,
+            rate: DEFAULTS.rate,
           },
           global: {
             tempDir: '/tmp',
@@ -105,9 +105,9 @@ export function diagnoseConfig(): void {
 
     console.log('');
     console.log('📊 Settings Summary:');
-    console.log(`   Default Provider: ${globalConfig.defaults?.provider || 'system'}`);
-    console.log(`   Default Rate: ${globalConfig.defaults?.rate || 180} WPM`);
-    console.log(`   Default Volume: ${((globalConfig.defaults?.volume || 0.7) * 100).toFixed(0)}%`);
+    console.log(`   Default Provider: ${globalConfig.defaults?.provider || DEFAULTS.provider}`);
+    console.log(`   Default Rate: ${globalConfig.defaults?.rate || DEFAULTS.rate} WPM`);
+    console.log(`   Default Volume: ${((globalConfig.defaults?.volume || DEFAULTS.volume) * 100).toFixed(0)}%`);
     console.log(`   Fallback Order: ${(globalConfig.defaults?.fallbackOrder || ['system']).join(' → ')}`);
     console.log(`   Temp Dir: ${globalConfig.global?.tempDir || '/tmp'}`);
     console.log(`   Auto-cleanup: ${globalConfig.global?.cleanup !== false}`);

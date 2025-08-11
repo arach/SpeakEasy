@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { CONFIG_DIR, CONFIG_FILE } from './constants';
+import { CONFIG_DIR, CONFIG_FILE, DEFAULT_VOICES, DEFAULTS, PROVIDERS } from './constants';
 import { loadGlobalConfig } from './config';
 
 export function runDoctor(): void {
@@ -68,17 +68,12 @@ export function runDoctor(): void {
   console.log('');
 
   console.log('🔑 API Key Configuration:');
-  const providers = [
-    { name: 'OpenAI', key: 'openai', env: 'OPENAI_API_KEY' },
-    { name: 'ElevenLabs', key: 'elevenlabs', env: 'ELEVENLABS_API_KEY' },
-    { name: 'Groq', key: 'groq', env: 'GROQ_API_KEY' },
-    { name: 'Gemini', key: 'gemini', env: 'GEMINI_API_KEY' },
-  ];
+  const providers = PROVIDERS;
 
   let configuredProviders = 0;
   providers.forEach(({ name, key, env }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fromConfig = (globalConfig as any).providers?.[key as keyof typeof (globalConfig as any).providers]?.apiKey;
+    const fromConfig = (globalConfig as any).providers?.[key]?.apiKey;
     const fromEnv = process.env[env];
 
     if (fromConfig && fromConfig.length > 10) {
@@ -103,15 +98,15 @@ export function runDoctor(): void {
   console.log('🎙️  Voice Configuration:');
   const voices = [
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { provider: 'system', voice: (globalConfig as any).providers?.system?.voice, default: 'Samantha' },
+    { provider: 'system', voice: (globalConfig as any).providers?.system?.voice, default: DEFAULT_VOICES.system },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { provider: 'openai', voice: (globalConfig as any).providers?.openai?.voice, default: 'nova' },
+    { provider: 'openai', voice: (globalConfig as any).providers?.openai?.voice, default: DEFAULT_VOICES.openai },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { provider: 'elevenlabs', voice: (globalConfig as any).providers?.elevenlabs?.voiceId, default: 'EXAVITQu4vr4xnSDxMaL' },
+    { provider: 'elevenlabs', voice: (globalConfig as any).providers?.elevenlabs?.voiceId, default: DEFAULT_VOICES.elevenlabs },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { provider: 'groq', voice: (globalConfig as any).providers?.groq?.voice, default: 'nova' },
+    { provider: 'groq', voice: (globalConfig as any).providers?.groq?.voice, default: DEFAULT_VOICES.groq },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { provider: 'gemini', voice: (globalConfig as any).providers?.gemini?.model, default: 'gemini-2.5-flash-preview-tts' },
+    { provider: 'gemini', voice: (globalConfig as any).providers?.gemini?.model, default: DEFAULT_VOICES.gemini },
   ];
 
   voices.forEach(({ provider, voice, default: defaultVoice }) => {
