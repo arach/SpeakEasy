@@ -55,7 +55,7 @@ export class SpeakEasy {
       systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || 'Samantha',
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || 'nova',
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || 'EXAVITQu4vr4xnSDxMaL',
-      geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || 'gemini-2.5-pro-preview-tts',
+      geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || 'gemini-2.5-flash-preview-tts',
       rate: config.rate || globalConfig.defaults?.rate || 180,
       volume: config.volume !== undefined ? config.volume : (globalConfig.defaults?.volume !== undefined ? globalConfig.defaults.volume : 0.7),
       debug: config.debug || false,
@@ -97,7 +97,7 @@ export class SpeakEasy {
     this.providers.set('openai', new OpenAIProvider(this.config.apiKeys?.openai || '', this.config.openaiVoice || 'nova'));
     this.providers.set('elevenlabs', new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || '', this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL'));
     this.providers.set('groq', new GroqProvider(this.config.apiKeys?.groq || ''));
-    this.providers.set('gemini', new GeminiProvider(this.config.apiKeys?.gemini || '', this.config.geminiModel || 'gemini-2.5-pro-preview-tts'));
+    this.providers.set('gemini', new GeminiProvider(this.config.apiKeys?.gemini || '', this.config.geminiModel || 'gemini-2.5-flash-preview-tts'));
   }
 
   async speak(text: string, options: SpeakEasyOptions = {}): Promise<void> {
@@ -270,7 +270,9 @@ export class SpeakEasy {
               console.log('cached');
               
               // Play the generated audio
-              const tempFile = path.join(tempDir, `speech_${Date.now()}.mp3`);
+              // Detect format from provider (Gemini returns WAV, others return MP3)
+              const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
+              const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
               fs.writeFileSync(tempFile, audioBuffer);
               const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
               execSync(`afplay${volumeFlag} "${tempFile}"`);
@@ -280,7 +282,9 @@ export class SpeakEasy {
               }
             } else if (audioBuffer) {
               // Play directly if no caching
-              const tempFile = path.join(tempDir, `speech_${Date.now()}.mp3`);
+              // Detect format from provider
+              const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
+              const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
               if (this.debug) {
                 console.log(`🎵 Playing generated audio: ${tempFile}`);
               }
@@ -412,7 +416,7 @@ export class SpeakEasy {
       case 'elevenlabs': return this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL';
       case 'system': return this.config.systemVoice || 'Samantha';
       case 'groq': return 'Celeste-PlayAI';
-      case 'gemini': return this.config.geminiModel || 'gemini-2.5-pro-preview-tts';
+      case 'gemini': return this.config.geminiModel || 'gemini-2.5-flash-preview-tts';
       default: return this.config.systemVoice || 'Samantha';
     }
   }
@@ -432,7 +436,7 @@ export class SpeakEasy {
       case 'openai': return 'tts-1';
       case 'elevenlabs': return 'eleven_multilingual_v2';
       case 'groq': return 'tts-1-hd';
-      case 'gemini': return this.config.geminiModel || 'gemini-2.5-pro-preview-tts';
+      case 'gemini': return this.config.geminiModel || 'gemini-2.5-flash-preview-tts';
       case 'system': return 'macOS-system';
       default: return provider;
     }

@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import fetch from 'node-fetch';
 import { Provider, ProviderConfig } from '../types';
 
 export class GeminiProvider implements Provider {
@@ -9,7 +9,7 @@ export class GeminiProvider implements Provider {
   private model: string;
   private voiceName: string;
 
-  constructor(apiKey: string = '', model: string = 'gemini-2.5-pro-preview-tts', voiceName: string = 'Aoede') {
+  constructor(apiKey: string = '', model: string = 'gemini-2.5-flash-preview-tts', voiceName: string = 'Puck') {
     this.apiKey = apiKey;
     this.model = model;
     this.voiceName = voiceName;
@@ -18,6 +18,7 @@ export class GeminiProvider implements Provider {
   async speak(config: ProviderConfig): Promise<void> {
     const audioBuffer = await this.generateAudio(config);
     if (audioBuffer) {
+      // Gemini returns WAV format audio
       const tempFile = path.join(config.tempDir, `speech_${Date.now()}.wav`);
       fs.writeFileSync(tempFile, audioBuffer);
       
@@ -37,32 +38,61 @@ export class GeminiProvider implements Provider {
     }
 
     try {
-      const genAI = new GoogleGenerativeAI(this.apiKey);
-      
-      // Use the text generation model with audio output capability
-      const model = genAI.getGenerativeModel({ 
-        model: this.model,
-      });
-
-      // Generate content with audio output
-      const result = await model.generateContent({
-        contents: [{
-          role: 'user',
-          parts: [{
-            text: config.text
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          responseMimeType: 'audio/wav',
+      // The JavaScript SDK doesn't support audio generation yet,
+      // so we use the REST API directly
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              role: 'user',
+              parts: [{
+                text: config.text
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: this.voiceName
+                  }
+                }
+              }
+            }
+          })
         }
-      });
+      );
 
-      const response = await result.response;
+      if (!response.ok) {
+        const errorData = await response.text();
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const error = JSON.parse(errorData);
+          errorMessage = error.error?.message || errorMessage;
+        } catch {
+          // Use raw error if not JSON
+        }
+        
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded');
+        } else if (response.status === 401 || response.status === 403) {
+          throw new Error('Invalid API key');
+        } else {
+          throw new Error(errorMessage);
+        }
+      }
+
+      const data = await response.json() as any;
       
       // Check if we have audio data in the response
-      if (response.candidates && response.candidates[0]?.content?.parts?.[0]) {
-        const part = response.candidates[0].content.parts[0];
+      if (data.candidates && data.candidates[0]?.content?.parts?.[0]) {
+        const part = data.candidates[0].content.parts[0];
         
         // Handle inline data (audio content)
         if ('inlineData' in part && part.inlineData) {
@@ -77,7 +107,7 @@ export class GeminiProvider implements Provider {
             return buffer;
           }
           
-          // Otherwise, convert to WAV
+          // Otherwise, convert to WAV (for L16 format)
           return this.convertToWav(buffer, mimeType);
         }
       }
@@ -85,12 +115,12 @@ export class GeminiProvider implements Provider {
       throw new Error('No audio content received from Gemini API');
     } catch (error: any) {
       // Check if it's an API error
-      if (error.message?.includes('API key')) {
+      if (error.message?.includes('API key') || error.message?.includes('Invalid API key')) {
         throw new Error(`Gemini API error: Invalid API key. Check your GEMINI_API_KEY environment variable.`);
-      } else if (error.message?.includes('quota') || error.message?.includes('rate')) {
+      } else if (error.message?.includes('quota') || error.message?.includes('rate') || error.message?.includes('Rate limit')) {
         throw new Error(`Gemini API error: Rate limit exceeded. Try again later or reduce request frequency.`);
       } else if (error.message?.includes('model')) {
-        throw new Error(`Gemini API error: Model '${this.model}' may not support audio generation. Try 'gemini-2.5-pro-preview-tts' or check available models.`);
+        throw new Error(`Gemini API error: Model '${this.model}' may not support audio generation. Try 'gemini-2.5-flash-preview-tts' or check available models.`);
       }
       throw new Error(`Gemini TTS failed: ${error.message || error}`);
     }
@@ -180,7 +210,7 @@ export class GeminiProvider implements Provider {
       return '⏰ Gemini rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
     if (error.message.includes('model')) {
-      return '❌ Model not supported for audio. Try using gemini-2.5-pro-preview-tts or check available models.';
+      return '❌ Model not supported for audio. Try using gemini-2.5-flash-preview-tts or check available models.';
     }
     return `Gemini TTS failed: ${error.message}`;
   }

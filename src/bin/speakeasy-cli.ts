@@ -299,7 +299,7 @@ function diagnoseConfig(): void {
     console.log(`   OpenAI: ${globalConfig.providers?.openai?.voice || 'nova'}`);
     console.log(`   ElevenLabs: ${globalConfig.providers?.elevenlabs?.voiceId || 'EXAVITQu4vr4xnSDxMaL'}`);
     console.log(`   Groq: ${globalConfig.providers?.groq?.voice || 'nova'}`);
-    console.log(`   Gemini: ${globalConfig.providers?.gemini?.model || 'gemini-2.5-pro-preview-tts'}`);
+    console.log(`   Gemini: ${globalConfig.providers?.gemini?.model || 'gemini-2.5-flash-preview-tts'}`);
     
     console.log('');
     console.log('💡 Usage Tips:');
@@ -421,7 +421,7 @@ function runDoctor(): void {
     { provider: 'openai', voice: globalConfig.providers?.openai?.voice, default: 'nova' },
     { provider: 'elevenlabs', voice: globalConfig.providers?.elevenlabs?.voiceId, default: 'EXAVITQu4vr4xnSDxMaL' },
     { provider: 'groq', voice: globalConfig.providers?.groq?.voice, default: 'nova' },
-    { provider: 'gemini', voice: globalConfig.providers?.gemini?.model, default: 'gemini-2.5-pro-preview-tts' }
+    { provider: 'gemini', voice: globalConfig.providers?.gemini?.model, default: 'gemini-2.5-flash-preview-tts' }
   ];
   
   voices.forEach(({ provider, voice, default: defaultVoice }) => {
