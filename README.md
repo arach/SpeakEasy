@@ -30,6 +30,7 @@ We didn't find a configuration file. Let's create one to get you started!
    • ElevenLabs - Premium voices (🔑 key required)
    • OpenAI - High quality voices (🔑 key required)
    • Groq - Fast & cheap (🔑 key required)
+   • Gemini - Google's advanced TTS (🔑 key required)
 
 🚀 Quick Start:
    Try it now with built-in system voices:
@@ -49,6 +50,10 @@ We didn't find a configuration file. Let's create one to get you started!
    For Groq (fast & cheap):
    export GROQ_API_KEY="your-api-key-here"
    Get key: https://console.groq.com/keys
+   
+   For Gemini (Google's TTS):
+   export GEMINI_API_KEY="your-api-key-here"
+   Get key: https://aistudio.google.com/apikey
 
 💾 Configuration:
    Create config: speakeasy --config --edit
@@ -81,7 +86,7 @@ Built with ❤️ by Arach • https://arach.dev
 - Environment variable integration
 
 ### 🎯 **Core Capabilities**
-- **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq
+- **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq, Gemini
 - **Smart Fallbacks**: Automatic provider switching on failure
 - **Volume Control**: Precise control without affecting system volume
 - **Queue Management**: Priority-based speech queue with interruption
@@ -107,6 +112,7 @@ await say('Hello world!');                    // system voice
 await say('Hello!', 'openai');                // OpenAI TTS
 await say('Hello!', 'elevenlabs');            // ElevenLabs TTS  
 await say('Hello!', 'groq');                  // Groq TTS
+await say('Hello!', 'gemini');                // Gemini TTS
 ```
 
 ## 🏃‍♂️ Performance Impact
@@ -118,6 +124,7 @@ await say('Hello!', 'groq');                  // Groq TTS
 | OpenAI | ~800ms | ~50ms | **16x faster** |
 | ElevenLabs | ~1200ms | ~50ms | **24x faster** |
 | Groq | ~400ms | ~50ms | **8x faster** |
+| Gemini | ~600ms | ~50ms | **12x faster** |
 
 *Cache automatically enabled for API providers when keys are present.*
 
@@ -150,11 +157,16 @@ await say('Hello!', 'groq');                  // Groq TTS
       "voice": "onyx",
       "model": "tts-1-hd",
       "apiKey": "gsk-..."
+    },
+    "gemini": {
+      "enabled": true,
+      "model": "gemini-2.5-flash-preview-tts",
+      "apiKey": "AIza..."
     }
   },
   "defaults": {
     "provider": "groq",
-    "fallbackOrder": ["groq", "openai", "elevenlabs", "system"],
+    "fallbackOrder": ["groq", "openai", "elevenlabs", "gemini", "system"],
     "rate": 180,
     "volume": 0.7
   },
@@ -175,6 +187,7 @@ await say('Hello!', 'groq');                  // Groq TTS
 export OPENAI_API_KEY=your_openai_key
 export ELEVENLABS_API_KEY=your_elevenlabs_key
 export GROQ_API_KEY=your_groq_key
+export GEMINI_API_KEY=your_gemini_key
 ```
 
 ## Usage
@@ -189,6 +202,7 @@ await say('Hello world!');                    // system voice
 await say('Hello!', 'openai');                // OpenAI TTS
 await say('Hello!', 'elevenlabs');            // ElevenLabs TTS
 await say('Hello!', 'groq');                  // Groq TTS
+await say('Hello!', 'gemini');                // Gemini TTS
 
 // Full featured with volume control
 await speak('Hello world!', { priority: 'high', volume: 0.5 });
@@ -242,13 +256,13 @@ await quietSpeaker.speak('This too', { volume: 0.9 }); // Override to 90%
 
 **Volume Features:**
 - ✅ **Isolated**: Only affects SpeakEasy audio, never changes system volume
-- ✅ **Provider-agnostic**: Works with system voices, OpenAI, ElevenLabs, and Groq
+- ✅ **Provider-agnostic**: Works with system voices, OpenAI, ElevenLabs, Groq, and Gemini
 - ✅ **Global config**: Set default volume in `~/.config/speakeasy/settings.json`
 - ✅ **Per-call override**: Specify volume for individual speech requests
 - ✅ **Debug visibility**: Shows current volume percentage in debug mode
 
 ### Caching
-- **Auto-enabled** when API keys are present (OpenAI, ElevenLabs, Groq)
+- **Auto-enabled** when API keys are present (OpenAI, ElevenLabs, Groq, Gemini)
 - **Deterministic UUID keys** - Same text+provider+voice+rate = identical cache key
 - **Collision-resistant** - Uses UUID v5 with deterministic construction
 - **Disabled for system voice** (macOS `say` command) - no benefit for local TTS
@@ -264,7 +278,7 @@ UUID = SHA1(text|provider|voice|rate + namespace) → UUID v5
 
 ### Convenience
 - `say('text')` - One-liner with system voice and caching
-- `say('text', 'openai' | 'elevenlabs' | 'groq')` - One-liner with provider and caching
+- `say('text', 'openai' | 'elevenlabs' | 'groq' | 'gemini')` - One-liner with provider and caching
 - `say('text', provider, false)` - Disable caching for specific call
 - `speak('text', options, false)` - Full featured with caching control
 
@@ -429,12 +443,14 @@ $ speakeasy --doctor
    ✅ OpenAI: Configured via environment
    ❌ ElevenLabs: Not configured
    ✅ Groq: Configured in file
+   ✅ Gemini: Configured in file
 
 🎙️  Voice Configuration:
    system: Samantha
    openai: nova
    elevenlabs: EXAVITQu4vr4xnSDxMaL
    groq: nova
+   gemini: Puck
 
 📦 Cache Configuration:
    ✅ Cache enabled

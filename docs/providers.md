@@ -4,7 +4,7 @@ Comprehensive documentation for all SpeakEasy TTS providers, including setup, co
 
 ## Overview
 
-SpeakEasy supports four TTS providers, each with unique characteristics:
+SpeakEasy supports five TTS providers, each with unique characteristics:
 
 | Provider | Type | API Key Required | Voices | Quality | Speed |
 |----------|------|------------------|---------|---------|-------|
@@ -12,6 +12,7 @@ SpeakEasy supports four TTS providers, each with unique characteristics:
 | **OpenAI** | API | ✅ Yes | 6 voices | High | Medium |
 | **ElevenLabs** | API | ✅ Yes | Custom | Very High | Medium |
 | **Groq** | API | ✅ Yes | 6 voices | High | Very Fast |
+| **Gemini** | API | ✅ Yes | Multiple | High | Fast |
 
 ## System Voice (macOS)
 
@@ -389,25 +390,128 @@ speed = rate / 200
 - ❌ **API key required**
 - ❌ **Limited voice selection** (6 voices)
 
+## Gemini TTS
+
+### Overview
+- **Google's TTS**: Advanced neural text-to-speech
+- **Multiple voices**: Diverse voice options including Puck, Kore, Charon, and more
+- **High quality**: Neural voice synthesis
+- **Model options**: Flash and Pro variants available
+
+### Setup
+
+**API key required:**
+```bash
+export GEMINI_API_KEY="AIza..."
+```
+
+**Global config:**
+```json
+{
+  "providers": {
+    "gemini": {
+      "enabled": true,
+      "model": "gemini-2.5-flash-preview-tts",
+      "apiKey": "AIza..."
+    }
+  }
+}
+```
+
+### Available Models
+
+| Model | Description | Notes |
+|-------|-------------|-------|
+| `gemini-2.5-flash-preview-tts` | Fast, efficient model | Recommended for most use cases |
+| `gemini-2.5-pro-preview-tts` | Higher quality, slower | May have stricter rate limits |
+
+### Available Voices
+
+Gemini offers multiple voice options:
+- `Puck` - Default voice, clear and friendly
+- `Kore` - Alternative voice option
+- `Charon` - Deeper voice variant
+- Additional voices available through the API
+
+### Usage Examples
+
+**SDK:**
+```typescript
+const speaker = new SpeakEasy({
+  provider: 'gemini',
+  geminiModel: 'gemini-2.5-flash-preview-tts',
+  rate: 180,
+  apiKeys: {
+    gemini: process.env.GEMINI_API_KEY
+  }
+});
+
+await speaker.speak('Hello from Gemini TTS');
+```
+
+**CLI:**
+```bash
+speakeasy "Hello world" --provider gemini
+speakeasy "Custom voice" --provider gemini --voice Puck
+```
+
+### Audio Format
+
+Gemini returns audio in WAV format (L16 PCM), which is automatically handled by SpeakEasy. The cache system supports both WAV and MP3 formats transparently.
+
+### Rate Control
+
+Gemini uses the standard WPM rate control through text preprocessing and speech configuration.
+
+### Advantages
+- ✅ **Google's technology** - Backed by Google's AI infrastructure
+- ✅ **Good quality** voices
+- ✅ **Multiple voice options**
+- ✅ **Fast generation** with Flash model
+- ✅ **Automatic caching** for repeated text
+
+### Limitations
+- ❌ **API key required** (Google Cloud/AI Studio)
+- ❌ **Rate limits** apply, especially for Pro model
+- ❌ **Network dependent**
+- ❌ **WAV format** (larger than MP3, but handled automatically)
+
+### Error Handling
+
+```typescript
+try {
+  await say('Hello', 'gemini');
+} catch (error) {
+  if (error.message.includes('API key')) {
+    console.error('Set GEMINI_API_KEY environment variable');
+  } else if (error.message.includes('Rate limit')) {
+    console.error('Rate limit exceeded, try Flash model');
+  }
+}
+```
+
 ## Provider Comparison
 
 ### Quality Ranking
 1. **ElevenLabs** - Premium, custom voices
 2. **OpenAI** - High quality, diverse voices
-3. **Groq** - Good quality, fast generation
-4. **System** - Good quality, built-in voices
+3. **Gemini** - High quality, Google's neural TTS
+4. **Groq** - Good quality, fast generation
+5. **System** - Good quality, built-in voices
 
 ### Speed Ranking
 1. **System** - Instant (local)
 2. **Groq** - Very fast API
-3. **OpenAI** - Medium speed API
-4. **ElevenLabs** - Slower (high quality processing)
+3. **Gemini** - Fast (Flash model)
+4. **OpenAI** - Medium speed API
+5. **ElevenLabs** - Slower (high quality processing)
 
 ### Cost Ranking (Free to Expensive)
 1. **System** - Free (built-in)
 2. **Groq** - Cost effective
-3. **OpenAI** - Standard pricing
-4. **ElevenLabs** - Premium pricing
+3. **Gemini** - Competitive pricing
+4. **OpenAI** - Standard pricing
+5. **ElevenLabs** - Premium pricing
 
 ## Fallback Strategy
 
@@ -418,7 +522,7 @@ SpeakEasy automatically falls back between providers:
 ```json
 {
   "defaults": {
-    "fallbackOrder": ["openai", "groq", "system"]
+    "fallbackOrder": ["openai", "groq", "gemini", "system"]
   }
 }
 ```
@@ -474,6 +578,12 @@ async function reliableSpeech(text: string) {
 - ✅ Good quality sufficient
 - ✅ Fast iteration needed
 
+### Choose **Gemini** when:
+- ✅ Google ecosystem preferred
+- ✅ High quality needed
+- ✅ Multiple voice options wanted
+- ✅ Fast generation with Flash model
+
 ## Troubleshooting Providers
 
 ### Common Issues
@@ -520,6 +630,7 @@ speakeasy "test system" --provider system
 speakeasy "test openai" --provider openai
 speakeasy "test elevenlabs" --provider elevenlabs
 speakeasy "test groq" --provider groq
+speakeasy "test gemini" --provider gemini
 ```
 
 For detailed configuration options, see [Configuration Guide](configuration.md).
