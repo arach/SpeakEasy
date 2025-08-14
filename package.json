@@ -1,6 +1,6 @@
 {
   "name": "@arach/speakeasy",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "SpeakEasy - Unified text-to-speech service with provider abstraction",
   "private": false,
   "main": "dist/index.js",
@@ -34,7 +34,6 @@
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.72",
     "@google/generative-ai": "^0.24.1",
-    "@keyv/sqlite": "^3.6.7",
     "@types/uuid": "^10.0.0",
     "better-sqlite3": "^12.2.0",
     "fluent-ffmpeg": "^2.1.3",

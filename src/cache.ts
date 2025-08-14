@@ -90,8 +90,42 @@ export class TTSCache {
     this.logger.debug('Metadata DB path:', metadataDbPath);
     
     try {
-      const KeyvSqlite = require('@keyv/sqlite');
-      this.cache = new Keyv({ store: new KeyvSqlite(dbPath) });
+      // Try to use better-sqlite3 adapter for Keyv
+      const Database = require('better-sqlite3');
+      const db = new Database(dbPath);
+      
+      // Create a simple adapter for Keyv using better-sqlite3
+      const store = {
+        get: async (key: string) => {
+          const row = db.prepare('SELECT value FROM keyv WHERE key = ?').get(key);
+          if (row) {
+            const data = JSON.parse(row.value);
+            if (data.expires && Date.now() > data.expires) {
+              db.prepare('DELETE FROM keyv WHERE key = ?').run(key);
+              return undefined;
+            }
+            return data.value;
+          }
+          return undefined;
+        },
+        set: async (key: string, value: any) => {
+          const expires = parseTTL(ttl) ? Date.now() + parseTTL(ttl) : null;
+          const data = JSON.stringify({ value, expires });
+          db.prepare('INSERT OR REPLACE INTO keyv (key, value) VALUES (?, ?)').run(key, data);
+        },
+        delete: async (key: string) => {
+          db.prepare('DELETE FROM keyv WHERE key = ?').run(key);
+          return true;
+        },
+        clear: async () => {
+          db.prepare('DELETE FROM keyv').run();
+        }
+      };
+      
+      // Create keyv table if it doesn't exist
+      db.prepare('CREATE TABLE IF NOT EXISTS keyv (key TEXT PRIMARY KEY, value TEXT)').run();
+      
+      this.cache = new Keyv({ store });
       this.metadataDb = this.initializeMetadataDb(metadataDbPath);
       this.cache.opts.ttl = parseTTL(ttl);
       this.maxSize = maxSize ? parseSize(maxSize) : undefined;

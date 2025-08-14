@@ -561,8 +561,36 @@ var TTSCache = class {
     this.logger.debug("Database path:", dbPath);
     this.logger.debug("Metadata DB path:", metadataDbPath);
     try {
-      const KeyvSqlite = require("@keyv/sqlite");
-      this.cache = new import_keyv.default({ store: new KeyvSqlite(dbPath) });
+      const Database = require("better-sqlite3");
+      const db = new Database(dbPath);
+      const store = {
+        get: async (key) => {
+          const row = db.prepare("SELECT value FROM keyv WHERE key = ?").get(key);
+          if (row) {
+            const data = JSON.parse(row.value);
+            if (data.expires && Date.now() > data.expires) {
+              db.prepare("DELETE FROM keyv WHERE key = ?").run(key);
+              return void 0;
+            }
+            return data.value;
+          }
+          return void 0;
+        },
+        set: async (key, value) => {
+          const expires = parseTTL(ttl) ? Date.now() + parseTTL(ttl) : null;
+          const data = JSON.stringify({ value, expires });
+          db.prepare("INSERT OR REPLACE INTO keyv (key, value) VALUES (?, ?)").run(key, data);
+        },
+        delete: async (key) => {
+          db.prepare("DELETE FROM keyv WHERE key = ?").run(key);
+          return true;
+        },
+        clear: async () => {
+          db.prepare("DELETE FROM keyv").run();
+        }
+      };
+      db.prepare("CREATE TABLE IF NOT EXISTS keyv (key TEXT PRIMARY KEY, value TEXT)").run();
+      this.cache = new import_keyv.default({ store });
       this.metadataDb = this.initializeMetadataDb(metadataDbPath);
       this.cache.opts.ttl = parseTTL(ttl);
       this.maxSize = maxSize ? parseSize(maxSize) : void 0;
