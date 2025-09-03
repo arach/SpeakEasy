@@ -172,15 +172,15 @@ export default function ClaudeIntegrationSection() {
               {/* Navigation arrows */}
               <button
                 onClick={prevExample}
-                className="absolute left-0 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                className="absolute left-0 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 hover:-translate-x-0.5 active:scale-95 active:shadow-md border border-slate-100 hover:border-slate-200"
               >
-                <ChevronLeft className="w-5 h-5 text-slate-600" />
+                <ChevronLeft className="w-5 h-5 text-slate-600 hover:text-slate-800 transition-all duration-150" />
               </button>
               <button
                 onClick={nextExample}
-                className="absolute right-0 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                className="absolute right-0 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 hover:translate-x-0.5 active:scale-95 active:shadow-md border border-slate-100 hover:border-slate-200"
               >
-                <ChevronRight className="w-5 h-5 text-slate-600" />
+                <ChevronRight className="w-5 h-5 text-slate-600 hover:text-slate-800 transition-all duration-150" />
               </button>
             </div>
 
