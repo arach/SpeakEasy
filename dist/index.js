@@ -250,7 +250,7 @@ var ElevenLabsProvider = class {
         },
         body: JSON.stringify({
           text: config.text,
-          model_id: "eleven_monolingual_v1",
+          model_id: "eleven_multilingual_v2",
           voice_settings: {
             stability: BALANCED,
             similarity_boost: NATURAL
@@ -258,15 +258,18 @@ var ElevenLabsProvider = class {
         })
       });
       if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
         if (response.status === 401) {
+          if (errorBody.includes("model_deprecated")) {
+            throw new Error("ElevenLabs API error: Model deprecated - updating to newer model");
+          }
           throw new Error("ElevenLabs API error: Invalid API key");
         } else if (response.status === 429) {
           throw new Error("ElevenLabs API error: Rate limit exceeded");
-        }
-        if (response.status === 403) {
-          throw new Error(`ElevenLabs API error: Access forbidden - check your API key permissions`);
+        } else if (response.status === 403) {
+          throw new Error("ElevenLabs API error: Access forbidden - check your API key permissions");
         } else if (response.status === 422) {
-          throw new Error(`ElevenLabs API error: Invalid voice ID or parameters - check your configuration`);
+          throw new Error("ElevenLabs API error: Invalid voice ID or parameters - check your configuration");
         }
         throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
       }
