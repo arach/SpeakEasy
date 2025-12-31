@@ -2,7 +2,7 @@
 
 import { SpeakEasy, SpeakEasyConfig } from '../index';
 import { showHelp as showHelpUI, showWelcome } from '../cli/ui';
-import { hasConfig as hasConfigFile, showConfig as showConfigCmd, diagnoseConfig as diagnoseConfigCmd } from '../cli/config';
+import { hasConfig as hasConfigFile, showConfig as showConfigCmd, diagnoseConfig as diagnoseConfigCmd, setApiKey as setApiKeyCmd, setDefaultProvider as setDefaultProviderCmd } from '../cli/config';
 import { runDoctor as runDoctorCmd } from '../cli/doctor';
 import { clearCache as clearCacheCmd, playCachedAudio as playCachedAudioCmd, listCacheEntries as listCacheEntriesCmd } from '../cli/cache';
 import { Command } from 'commander';
@@ -15,6 +15,7 @@ interface CLIOptions {
   voice?: string;
   rate?: number;
   volume?: number;
+  instructions?: string;
   interrupt?: boolean;
   cache?: boolean;
   clearCache?: boolean;
@@ -32,6 +33,9 @@ interface CLIOptions {
   play?: string;
   out?: string;
   welcome?: boolean;
+  silent?: boolean;
+  setKey?: string;
+  setDefault?: string;
 }
 
 async function run(): Promise<void> {
@@ -51,6 +55,7 @@ async function run(): Promise<void> {
     .option('-v, --voice <voice>')
     .option('-r, --rate <rate>')
     .option('--volume <volume>')
+    .option('--instructions <instructions>', 'OpenAI: voice steering instructions (accent, tone, style)')
     .option('-i, --interrupt')
     .option('-c, --cache')
     .option('--clear-cache')
@@ -67,7 +72,10 @@ async function run(): Promise<void> {
     .option('--recent <n>')
     .option('--id <key>')
     .option('--play <key>')
-    .option('--out <file>');
+    .option('--out <file>')
+    .option('-s, --silent')
+    .option('--set-key <provider>')
+    .option('--set-default <provider>');
 
   program.parse(process.argv);
   const parsed = program.opts();
@@ -106,6 +114,25 @@ async function run(): Promise<void> {
     return;
   }
 
+  if (options.setKey) {
+    if (!text) {
+      console.error('❌ API key required');
+      console.error('');
+      console.error('Usage: speakeasy --set-key <provider> <api-key>');
+      console.error('');
+      console.error('Example:');
+      console.error('   speakeasy --set-key elevenlabs sk-xxxxxxxxxxxx');
+      process.exit(1);
+    }
+    setApiKeyCmd(options.setKey, text);
+    return;
+  }
+
+  if (options.setDefault) {
+    setDefaultProviderCmd(options.setDefault);
+    return;
+  }
+
   if (options.play) {
     await playCachedAudioCmd(options.play);
     return;
@@ -136,6 +163,7 @@ async function run(): Promise<void> {
       provider: (options.provider as any) || 'system',
       rate: options.rate || 180,
       volume: options.volume !== undefined ? options.volume : undefined,
+      instructions: options.instructions,
       debug: options.debug || false,
       ...((options.cache || options.out) && { cache: { enabled: true } }),
     };
@@ -160,7 +188,7 @@ async function run(): Promise<void> {
     // Skip pre-validation - let the main class handle it properly with config file loading
 
     const speaker = new SpeakEasy(config);
-    await speaker.speak(text, { interrupt: options.interrupt });
+    await speaker.speak(text, { interrupt: options.interrupt, silent: options.silent });
 
     // Save to file if --out flag is provided
     if (options.out) {

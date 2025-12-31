@@ -58,6 +58,7 @@ export class SpeakEasy {
       geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || 'gemini-2.5-flash-preview-tts',
       rate: config.rate || globalConfig.defaults?.rate || 180,
       volume: config.volume !== undefined ? config.volume : (globalConfig.defaults?.volume !== undefined ? globalConfig.defaults.volume : 0.7),
+      instructions: config.instructions || globalConfig.providers?.openai?.instructions,
       debug: config.debug || false,
       apiKeys: {
         openai: config.apiKeys?.openai || globalConfig.providers?.openai?.apiKey || process.env.OPENAI_API_KEY || '',
@@ -94,7 +95,7 @@ export class SpeakEasy {
 
   private initializeProviders(): void {
     this.providers.set('system', new SystemProvider(this.config.systemVoice || 'Samantha'));
-    this.providers.set('openai', new OpenAIProvider(this.config.apiKeys?.openai || '', this.config.openaiVoice || 'nova'));
+    this.providers.set('openai', new OpenAIProvider(this.config.apiKeys?.openai || '', this.config.openaiVoice || 'nova', this.config.instructions));
     this.providers.set('elevenlabs', new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || '', this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL'));
     this.providers.set('groq', new GroqProvider(this.config.apiKeys?.groq || ''));
     this.providers.set('gemini', new GeminiProvider(this.config.apiKeys?.gemini || '', this.config.geminiModel || 'gemini-2.5-flash-preview-tts'));
@@ -125,7 +126,7 @@ export class SpeakEasy {
     const { text, options } = this.queue.shift()!;
 
     try {
-      await this.speakText(text);
+      await this.speakText(text, options);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('❌ Speech error:', errorMsg);
@@ -140,12 +141,14 @@ export class SpeakEasy {
     }
   }
 
-  private async speakText(text: string): Promise<void> {
+  private async speakText(text: string, options: SpeakEasyOptions = {}): Promise<void> {
     const requestedProvider = this.config.provider || 'system';
-    
+    const silent = options.silent || false;
+
     if (this.debug) {
       console.log(`🔍 Requested provider: ${requestedProvider}`);
       console.log(`🔍 Text: "${text}"`);
+      if (silent) console.log(`🔇 Silent mode: audio will not be played`);
     }
     
     // First, validate the requested provider
@@ -204,7 +207,9 @@ export class SpeakEasy {
                 if (this.debug) {
                   console.log(`📦 Using cached audio from: ${cachedEntry.audioFilePath}`);
                 }
-                await this.playCachedAudio(cachedEntry.audioFilePath);
+                if (!silent) {
+                  await this.playCachedAudio(cachedEntry.audioFilePath);
+                }
                 return;
               }
             }
@@ -214,6 +219,10 @@ export class SpeakEasy {
             
             if (providerName === 'system') {
               // System provider doesn't support caching, use speak directly
+              if (silent) {
+                console.log('⚠️  Silent mode not supported with system provider (no audio file generated)');
+                return;
+              }
               if (this.debug) {
                 console.log(`🎙️  Using system voice: ${voice}`);
               }
@@ -268,32 +277,36 @@ export class SpeakEasy {
               });
               
               console.log('cached');
-              
-              // Play the generated audio
-              // Detect format from provider (Gemini returns WAV, others return MP3)
-              const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
-              const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
-              fs.writeFileSync(tempFile, audioBuffer);
-              const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
-              execSync(`afplay${volumeFlag} "${tempFile}"`);
-              
-              if (fs.existsSync(tempFile)) {
-                fs.unlinkSync(tempFile);
+
+              if (!silent) {
+                // Play the generated audio
+                // Detect format from provider (Gemini returns WAV, others return MP3)
+                const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
+                const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
+                fs.writeFileSync(tempFile, audioBuffer);
+                const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
+                execSync(`afplay${volumeFlag} "${tempFile}"`);
+
+                if (fs.existsSync(tempFile)) {
+                  fs.unlinkSync(tempFile);
+                }
               }
             } else if (audioBuffer) {
-              // Play directly if no caching
-              // Detect format from provider
-              const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
-              const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
-              if (this.debug) {
-                console.log(`🎵 Playing generated audio: ${tempFile}`);
-              }
-              fs.writeFileSync(tempFile, audioBuffer);
-              const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
-              execSync(`afplay${volumeFlag} "${tempFile}"`);
-              
-              if (fs.existsSync(tempFile)) {
-                fs.unlinkSync(tempFile);
+              if (!silent) {
+                // Play directly if no caching
+                // Detect format from provider
+                const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
+                const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
+                if (this.debug) {
+                  console.log(`🎵 Playing generated audio: ${tempFile}`);
+                }
+                fs.writeFileSync(tempFile, audioBuffer);
+                const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
+                execSync(`afplay${volumeFlag} "${tempFile}"`);
+
+                if (fs.existsSync(tempFile)) {
+                  fs.unlinkSync(tempFile);
+                }
               }
             }
 
@@ -338,6 +351,10 @@ export class SpeakEasy {
     }
 
     // Fallback to system voice (never cached)
+    if (silent) {
+      console.log('⚠️  Silent mode not supported with system provider (no audio file generated)');
+      return;
+    }
     const systemProvider = this.providers.get('system');
     if (systemProvider) {
       try {
@@ -359,7 +376,7 @@ export class SpeakEasy {
 
   private printConfigDiagnostics(): void {
     console.log('🔍 Debug mode enabled');
-    
+
     // Configuration summary
     console.log('📊 Current Configuration:');
     console.log(`   Provider: ${this.config.provider}`);
@@ -369,6 +386,9 @@ export class SpeakEasy {
     console.log(`   OpenAI Voice: ${this.config.openaiVoice}`);
     console.log(`   ElevenLabs Voice: ${this.config.elevenlabsVoiceId}`);
     console.log(`   Gemini Model: ${this.config.geminiModel}`);
+    if (this.config.instructions) {
+      console.log(`   Instructions: "${this.config.instructions.substring(0, 50)}${this.config.instructions.length > 50 ? '...' : ''}"`);
+    }
     
     // API Key status
     console.log('🔑 API Key Status:');

@@ -13,6 +13,7 @@ export const cliSchema = z.object({
     .preprocess((v) => (typeof v === 'string' ? parseFloat(v) : v), z.number().min(0).max(1))
     .optional()
     .default(DEFAULTS.volume),
+  instructions: z.string().optional(), // OpenAI-only: steering instructions for voice style
   interrupt: z.boolean().optional(),
   cache: z.boolean().optional(),
   clearCache: z.boolean().optional(),
@@ -32,6 +33,9 @@ export const cliSchema = z.object({
   play: z.string().optional(),
   out: z.string().optional(),
   welcome: z.boolean().optional(),
+  silent: z.boolean().optional(),
+  setKey: z.string().optional(),
+  setDefault: z.string().optional(),
 });
 
 export type CliOptions = z.infer<typeof cliSchema>;

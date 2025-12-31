@@ -94,9 +94,11 @@ var import_node_fetch = __toESM(require("node-fetch"));
 var OpenAIProvider = class {
   apiKey;
   voice;
-  constructor(apiKey = "", voice = "nova") {
+  instructions;
+  constructor(apiKey = "", voice = "nova", instructions) {
     this.apiKey = apiKey;
     this.voice = voice;
+    this.instructions = instructions;
   }
   async speak(config) {
     const audioBuffer = await this.generateAudio(config);
@@ -114,6 +116,10 @@ var OpenAIProvider = class {
   async generateAudio(config) {
     if (!this.apiKey) {
       throw new Error("OpenAI API key is required");
+    }
+    const instructions = config.instructions || this.instructions;
+    if (instructions) {
+      return this.generateAudioWithInstructions(config, instructions);
     }
     try {
       const response = await (0, import_node_fetch.default)("https://api.openai.com/v1/audio/speech", {
@@ -141,6 +147,52 @@ var OpenAIProvider = class {
       return Buffer.from(audioBuffer);
     } catch (error) {
       throw new Error(`OpenAI TTS failed: ${error}`);
+    }
+  }
+  async generateAudioWithInstructions(config, instructions) {
+    try {
+      const response = await (0, import_node_fetch.default)("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-audio-preview",
+          modalities: ["text", "audio"],
+          audio: {
+            voice: this.voice,
+            format: "mp3"
+          },
+          messages: [
+            {
+              role: "system",
+              content: instructions
+            },
+            {
+              role: "user",
+              content: config.text
+            }
+          ]
+        })
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error(`OpenAI API error: Invalid API key. Check your OPENAI_API_KEY environment variable.`);
+        } else if (response.status === 429) {
+          throw new Error(`OpenAI API error: Rate limit exceeded. Try again later or reduce request frequency.`);
+        }
+        const errorBody = await response.text();
+        throw new Error(`OpenAI API error: ${response.status}. ${errorBody}`);
+      }
+      const data = await response.json();
+      const audioData = data.choices?.[0]?.message?.audio?.data;
+      if (!audioData) {
+        throw new Error("No audio data in OpenAI response");
+      }
+      return Buffer.from(audioData, "base64");
+    } catch (error) {
+      throw new Error(`OpenAI TTS with instructions failed: ${error}`);
     }
   }
   validateConfig() {
@@ -1269,6 +1321,7 @@ var SpeakEasy = class {
       geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || "gemini-2.5-flash-preview-tts",
       rate: config.rate || globalConfig.defaults?.rate || 180,
       volume: config.volume !== void 0 ? config.volume : globalConfig.defaults?.volume !== void 0 ? globalConfig.defaults.volume : 0.7,
+      instructions: config.instructions || globalConfig.providers?.openai?.instructions,
       debug: config.debug || false,
       apiKeys: {
         openai: config.apiKeys?.openai || globalConfig.providers?.openai?.apiKey || process.env.OPENAI_API_KEY || "",
@@ -1299,7 +1352,7 @@ var SpeakEasy = class {
   }
   initializeProviders() {
     this.providers.set("system", new SystemProvider(this.config.systemVoice || "Samantha"));
-    this.providers.set("openai", new OpenAIProvider(this.config.apiKeys?.openai || "", this.config.openaiVoice || "nova"));
+    this.providers.set("openai", new OpenAIProvider(this.config.apiKeys?.openai || "", this.config.openaiVoice || "nova", this.config.instructions));
     this.providers.set("elevenlabs", new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || "", this.config.elevenlabsVoiceId || "EXAVITQu4vr4xnSDxMaL"));
     this.providers.set("groq", new GroqProvider(this.config.apiKeys?.groq || ""));
     this.providers.set("gemini", new GeminiProvider(this.config.apiKeys?.gemini || "", this.config.geminiModel || "gemini-2.5-flash-preview-tts"));
@@ -1324,7 +1377,7 @@ var SpeakEasy = class {
     this.isPlaying = true;
     const { text, options } = this.queue.shift();
     try {
-      await this.speakText(text);
+      await this.speakText(text, options);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error("\u274C Speech error:", errorMsg);
@@ -1336,11 +1389,14 @@ var SpeakEasy = class {
       }
     }
   }
-  async speakText(text) {
+  async speakText(text, options = {}) {
     const requestedProvider = this.config.provider || "system";
+    const silent = options.silent || false;
     if (this.debug) {
       console.log(`\u{1F50D} Requested provider: ${requestedProvider}`);
       console.log(`\u{1F50D} Text: "${text}"`);
+      if (silent)
+        console.log(`\u{1F507} Silent mode: audio will not be played`);
     }
     const requestedProviderInstance = this.providers.get(requestedProvider);
     if (requestedProvider !== "system" && requestedProviderInstance) {
@@ -1391,12 +1447,18 @@ var SpeakEasy = class {
                 if (this.debug) {
                   console.log(`\u{1F4E6} Using cached audio from: ${cachedEntry.audioFilePath}`);
                 }
-                await this.playCachedAudio(cachedEntry.audioFilePath);
+                if (!silent) {
+                  await this.playCachedAudio(cachedEntry.audioFilePath);
+                }
                 return;
               }
             }
             let audioBuffer = null;
             if (providerName === "system") {
+              if (silent) {
+                console.log("\u26A0\uFE0F  Silent mode not supported with system provider (no audio file generated)");
+                return;
+              }
               if (this.debug) {
                 console.log(`\u{1F399}\uFE0F  Using system voice: ${voice}`);
               }
@@ -1446,25 +1508,29 @@ var SpeakEasy = class {
                 success: true
               });
               console.log("cached");
-              const fileExt = providerName === "gemini" ? "wav" : "mp3";
-              const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
-              fs6.writeFileSync(tempFile, audioBuffer);
-              const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-              (0, import_child_process6.execSync)(`afplay${volumeFlag} "${tempFile}"`);
-              if (fs6.existsSync(tempFile)) {
-                fs6.unlinkSync(tempFile);
+              if (!silent) {
+                const fileExt = providerName === "gemini" ? "wav" : "mp3";
+                const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
+                fs6.writeFileSync(tempFile, audioBuffer);
+                const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+                (0, import_child_process6.execSync)(`afplay${volumeFlag} "${tempFile}"`);
+                if (fs6.existsSync(tempFile)) {
+                  fs6.unlinkSync(tempFile);
+                }
               }
             } else if (audioBuffer) {
-              const fileExt = providerName === "gemini" ? "wav" : "mp3";
-              const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
-              if (this.debug) {
-                console.log(`\u{1F3B5} Playing generated audio: ${tempFile}`);
-              }
-              fs6.writeFileSync(tempFile, audioBuffer);
-              const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-              (0, import_child_process6.execSync)(`afplay${volumeFlag} "${tempFile}"`);
-              if (fs6.existsSync(tempFile)) {
-                fs6.unlinkSync(tempFile);
+              if (!silent) {
+                const fileExt = providerName === "gemini" ? "wav" : "mp3";
+                const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
+                if (this.debug) {
+                  console.log(`\u{1F3B5} Playing generated audio: ${tempFile}`);
+                }
+                fs6.writeFileSync(tempFile, audioBuffer);
+                const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
+                (0, import_child_process6.execSync)(`afplay${volumeFlag} "${tempFile}"`);
+                if (fs6.existsSync(tempFile)) {
+                  fs6.unlinkSync(tempFile);
+                }
               }
             }
             return;
@@ -1504,6 +1570,10 @@ var SpeakEasy = class {
       }
       throw new Error(`All providers failed. Last error: ${lastError.message}`);
     }
+    if (silent) {
+      console.log("\u26A0\uFE0F  Silent mode not supported with system provider (no audio file generated)");
+      return;
+    }
     const systemProvider = this.providers.get("system");
     if (systemProvider) {
       try {
@@ -1532,6 +1602,9 @@ var SpeakEasy = class {
     console.log(`   OpenAI Voice: ${this.config.openaiVoice}`);
     console.log(`   ElevenLabs Voice: ${this.config.elevenlabsVoiceId}`);
     console.log(`   Gemini Model: ${this.config.geminiModel}`);
+    if (this.config.instructions) {
+      console.log(`   Instructions: "${this.config.instructions.substring(0, 50)}${this.config.instructions.length > 50 ? "..." : ""}"`);
+    }
     console.log("\u{1F511} API Key Status:");
     const providers = [
       { name: "OpenAI", key: "openai", env: "OPENAI_API_KEY" },

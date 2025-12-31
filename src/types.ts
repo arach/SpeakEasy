@@ -5,6 +5,7 @@ export interface ProviderConfig {
   voice?: string;
   apiKey?: string;
   volume?: number;
+  instructions?: string; // OpenAI-only: steering instructions for voice style, accent, tone
 }
 
 export interface Provider {
@@ -21,6 +22,7 @@ export interface SpeakEasyConfig {
   geminiModel?: string;
   rate?: number;
   volume?: number;
+  instructions?: string; // OpenAI-only: steering instructions for voice style, accent, tone
   apiKeys?: {
     openai?: string;
     elevenlabs?: string;
@@ -41,6 +43,7 @@ export interface SpeakEasyOptions {
   priority?: 'high' | 'normal' | 'low';
   interrupt?: boolean;
   cleanup?: boolean;
+  silent?: boolean; // Generate audio without playing it
 }
 
 export interface GlobalConfig {
@@ -50,6 +53,7 @@ export interface GlobalConfig {
       voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
       model?: string;
       apiKey?: string;
+      instructions?: string; // Steering instructions for voice style, accent, tone
     };
     elevenlabs?: {
       enabled?: boolean;

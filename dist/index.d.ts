@@ -5,6 +5,7 @@ interface ProviderConfig {
     voice?: string;
     apiKey?: string;
     volume?: number;
+    instructions?: string;
 }
 interface Provider {
     speak(config: ProviderConfig): Promise<void>;
@@ -19,6 +20,7 @@ interface SpeakEasyConfig {
     geminiModel?: string;
     rate?: number;
     volume?: number;
+    instructions?: string;
     apiKeys?: {
         openai?: string;
         elevenlabs?: string;
@@ -38,6 +40,7 @@ interface SpeakEasyOptions {
     priority?: 'high' | 'normal' | 'low';
     interrupt?: boolean;
     cleanup?: boolean;
+    silent?: boolean;
 }
 interface GlobalConfig {
     providers?: {
@@ -46,6 +49,7 @@ interface GlobalConfig {
             voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
             model?: string;
             apiKey?: string;
+            instructions?: string;
         };
         elevenlabs?: {
             enabled?: boolean;
@@ -98,9 +102,11 @@ declare class SystemProvider implements Provider {
 declare class OpenAIProvider implements Provider {
     private apiKey;
     private voice;
-    constructor(apiKey?: string, voice?: string);
+    private instructions?;
+    constructor(apiKey?: string, voice?: string, instructions?: string);
     speak(config: ProviderConfig): Promise<void>;
     generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    private generateAudioWithInstructions;
     validateConfig(): boolean;
     getErrorMessage(error: any): string;
 }

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { spawn } from 'child_process';
-import { CONFIG_DIR, CONFIG_FILE, DEFAULTS } from './constants';
+import { CONFIG_DIR, CONFIG_FILE, DEFAULTS, PROVIDERS, ProviderKey } from './constants';
 
 export function loadGlobalConfig() {
   try {
@@ -154,6 +154,116 @@ export function diagnoseConfig(): void {
     console.log('   • Edit ~/.config/speakeasy/settings.json to configure defaults');
   } catch (error) {
     console.error('❌ Error reading config:', (error as Error).message);
+  }
+}
+
+export function setApiKey(provider: string, apiKey: string): void {
+  const validProviders = PROVIDERS.map(p => p.key);
+
+  if (!validProviders.includes(provider as Exclude<ProviderKey, 'system'>)) {
+    console.error(`❌ Invalid provider: ${provider}`);
+    console.error('');
+    console.error('Valid providers:');
+    PROVIDERS.forEach(p => {
+      console.error(`   • ${p.key} (${p.name})`);
+    });
+    process.exit(1);
+  }
+
+  if (!apiKey || apiKey.trim().length === 0) {
+    console.error('❌ API key cannot be empty');
+    process.exit(1);
+  }
+
+  try {
+    // Ensure config directory exists
+    if (!fs.existsSync(CONFIG_DIR)) {
+      fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+
+    // Load existing config or create new one
+    let config: Record<string, any> = {};
+    if (fs.existsSync(CONFIG_FILE)) {
+      const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
+      config = JSON.parse(configData);
+    }
+
+    // Initialize providers section if needed
+    if (!config.providers) {
+      config.providers = {};
+    }
+
+    // Initialize specific provider if needed
+    if (!config.providers[provider]) {
+      config.providers[provider] = {};
+    }
+
+    // Set the API key
+    config.providers[provider].apiKey = apiKey.trim();
+    config.providers[provider].enabled = true;
+
+    // Write config
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+
+    const providerInfo = PROVIDERS.find(p => p.key === provider);
+    console.log(`✅ ${providerInfo?.name || provider} API key saved to config`);
+    console.log('');
+    console.log('🎉 You can now use:');
+    console.log(`   speakeasy "Hello world" --provider ${provider}`);
+    console.log('');
+    console.log(`💡 To set as default provider:`);
+    console.log(`   speakeasy --set-default ${provider}`);
+  } catch (error) {
+    console.error('❌ Error saving API key:', (error as Error).message);
+    process.exit(1);
+  }
+}
+
+export function setDefaultProvider(provider: string): void {
+  const validProviders = ['system', ...PROVIDERS.map(p => p.key)];
+
+  if (!validProviders.includes(provider)) {
+    console.error(`❌ Invalid provider: ${provider}`);
+    console.error('');
+    console.error('Valid providers:');
+    console.error('   • system (macOS built-in)');
+    PROVIDERS.forEach(p => {
+      console.error(`   • ${p.key} (${p.name})`);
+    });
+    process.exit(1);
+  }
+
+  try {
+    // Ensure config directory exists
+    if (!fs.existsSync(CONFIG_DIR)) {
+      fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+
+    // Load existing config or create new one
+    let config: Record<string, any> = {};
+    if (fs.existsSync(CONFIG_FILE)) {
+      const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
+      config = JSON.parse(configData);
+    }
+
+    // Initialize defaults section if needed
+    if (!config.defaults) {
+      config.defaults = {};
+    }
+
+    // Set the default provider
+    config.defaults.provider = provider;
+
+    // Write config
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+
+    console.log(`✅ Default provider set to: ${provider}`);
+    console.log('');
+    console.log('🎉 Now you can simply run:');
+    console.log(`   speakeasy "Hello world"`);
+  } catch (error) {
+    console.error('❌ Error saving default provider:', (error as Error).message);
+    process.exit(1);
   }
 }
 

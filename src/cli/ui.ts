@@ -82,12 +82,15 @@ Options:
   --voice, -v         Voice to use (depends on provider)
   --rate, -r          Speech rate (words per minute)
   --volume            Volume (0.0 to 1.0, default: 0.7)
+  --instructions      Voice instructions (OpenAI only): accent, tone, style
   --interrupt, -i     Interrupt current speech
   --cache, -c         Enable caching
   --clear-cache       Clear the cache
   --config            Show current configuration
   --config --edit     Edit configuration file in default editor
   --edit              Edit configuration file (implies --config)
+  --set-key <p> <key> Save API key for provider (elevenlabs, openai, groq, gemini)
+  --set-default <p>   Set default provider
   --help, -h          Show this help
   --debug, -d         Enable debug logging
   --diagnose          Show configuration diagnostics
@@ -115,6 +118,16 @@ Examples:
   speakeasy --id abc123-def456        # Show detailed entry info
   speakeasy --play abc123-def456      # Play cached audio by ID
   speakeasy "Hello world" --out audio.mp3  # Save to file
+
+  # Quick setup for API keys:
+  speakeasy --set-key elevenlabs YOUR_API_KEY
+  speakeasy --set-key openai sk-xxxxxxxxxxxx
+  speakeasy --set-default elevenlabs  # Use elevenlabs by default
+
+  # Voice steering with instructions (OpenAI only, uses gpt-4o-audio-preview):
+  speakeasy "Hello!" --provider openai --instructions "Speak with a British accent"
+  speakeasy "Good morning" --provider openai --instructions "Speak slowly and calmly"
+  speakeasy "Welcome!" --provider openai --instructions "Sound excited and energetic"
 `);
 }
 
