@@ -3,6 +3,7 @@ import HeroSection from "@/components/hero-section"
 import FeaturesSection from "@/components/features-section"
 import CodeExamples from "@/components/code-examples"
 import ClaudeIntegrationSection from "@/components/claude-integration-section"
+import QuickStartSection from "@/components/quick-start-section"
 
 export default function Home() {
   return (
@@ -11,6 +12,7 @@ export default function Home() {
       <Suspense fallback={<div className="h-96" />}>
         <CodeExamples />
       </Suspense>
+      <QuickStartSection />
       <ClaudeIntegrationSection />
       <FeaturesSection />
       

@@ -1,11 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { CONFIG_DIR, CONFIG_FILE, DEFAULT_VOICES, DEFAULTS, PROVIDERS } from './constants';
+import { CONFIG_DIR, CONFIG_FILE, DEFAULT_VOICES, DEFAULTS, PROVIDERS, getPackageVersion } from './constants';
 import { loadGlobalConfig } from './config';
 
 export function runDoctor(): void {
-  console.log('🏥 Speakeasy Configuration Health Check');
+  const version = getPackageVersion();
+  console.log(`🏥 Speakeasy v${version} - Health Check`);
   console.log('');
 
   let issues = 0;
@@ -71,6 +72,13 @@ export function runDoctor(): void {
   const providers = PROVIDERS;
 
   let configuredProviders = 0;
+  const apiKeyUrls: Record<string, string> = {
+    openai: 'https://platform.openai.com/api-keys',
+    elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
+    groq: 'https://console.groq.com/keys',
+    gemini: 'https://makersuite.google.com/app/apikey',
+  };
+
   providers.forEach(({ name, key, env }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fromConfig = (globalConfig as any).providers?.[key]?.apiKey;
@@ -84,7 +92,8 @@ export function runDoctor(): void {
       configuredProviders++;
     } else {
       console.log(`   ❌ ${name}: Not configured`);
-      console.log(`   💡 Set: export ${env}=your_key_here`);
+      console.log(`      Get key: ${apiKeyUrls[key]}`);
+      console.log(`      Then run: speakeasy --set-key ${key} YOUR_API_KEY`);
     }
   });
 

@@ -45,18 +45,20 @@ await speech.speak('Custom configuration');`
 
   cli: {
     language: 'bash',
-    code: `# Basic usage
+    code: `# Install globally
+npm install -g @arach/speakeasy
+
+# Quick setup - save your API key
+speakeasy --set-key elevenlabs YOUR_API_KEY
+
+# Set as default provider
+speakeasy --set-default elevenlabs
+
+# Start speaking!
 speakeasy "Hello world"
 
-# With volume control
-speakeasy "Quiet message" --volume 0.3
-
-# Multiple providers
-speakeasy "Hello!" --provider openai --voice nova
-
-# Cache management
-speakeasy --cache --list
-speakeasy --clear-cache`
+# Or use system voice (no API key needed)
+speakeasy "Hello world" --provider system`
   },
 
   config: {

@@ -34,22 +34,22 @@ We didn't find a configuration file. Let's create one to get you started!
    ${chalk.green('speakeasy "Hello! Welcome to SpeakEasy!" --provider system')}
 
 🔧 Setup API Keys (optional):
-   
-   For ElevenLabs:
-   ${chalk.cyan('export ELEVENLABS_API_KEY="your-api-key-here"')}
-   Get key: https://elevenlabs.io/app/settings/api-keys
-   
-   For OpenAI TTS:
-   ${chalk.cyan('export OPENAI_API_KEY="your-api-key-here"')}
-   Get key: https://platform.openai.com/api-keys
-   
-   For Groq (fast & cheap):
-   ${chalk.cyan('export GROQ_API_KEY="your-api-key-here"')}
-   Get key: https://console.groq.com/keys
-   
-   For Gemini:
-   ${chalk.cyan('export GEMINI_API_KEY="your-api-key-here"')}
-   Get key: https://makersuite.google.com/app/apikey
+
+   ${chalk.bold('ElevenLabs')} - Premium voices
+   ${chalk.cyan('speakeasy --set-key elevenlabs YOUR_API_KEY')}
+   Get key: ${chalk.underline('https://elevenlabs.io/app/settings/api-keys')}
+
+   ${chalk.bold('OpenAI')} - High quality voices
+   ${chalk.cyan('speakeasy --set-key openai YOUR_API_KEY')}
+   Get key: ${chalk.underline('https://platform.openai.com/api-keys')}
+
+   ${chalk.bold('Groq')} - Fast & cheap
+   ${chalk.cyan('speakeasy --set-key groq YOUR_API_KEY')}
+   Get key: ${chalk.underline('https://console.groq.com/keys')}
+
+   ${chalk.bold('Gemini')} - Google's AI voices
+   ${chalk.cyan('speakeasy --set-key gemini YOUR_API_KEY')}
+   Get key: ${chalk.underline('https://makersuite.google.com/app/apikey')}
 
 💾 Configuration:
    Config file: ${chalk.gray(CONFIG_FILE)}
