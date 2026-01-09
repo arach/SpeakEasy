@@ -10,57 +10,62 @@ func createIcon(size: Int) -> NSImage {
     let rect = NSRect(x: 0, y: 0, width: size, height: size)
     let scale = CGFloat(size) / 512.0
 
-    // Background - rounded square with gradient
+    // Background - solid navy blue (matching SpeakEasy branding)
     let bgPath = NSBezierPath(roundedRect: rect.insetBy(dx: 20 * scale, dy: 20 * scale), xRadius: 90 * scale, yRadius: 90 * scale)
 
-    // Gradient background
-    let gradient = NSGradient(colors: [
-        NSColor(calibratedRed: 0.2, green: 0.5, blue: 0.9, alpha: 1.0),
-        NSColor(calibratedRed: 0.4, green: 0.3, blue: 0.8, alpha: 1.0)
-    ])!
-    gradient.draw(in: bgPath, angle: -45)
+    // Navy blue color from branding
+    let navyBlue = NSColor(calibratedRed: 0.12, green: 0.16, blue: 0.23, alpha: 1.0)
+    navyBlue.setFill()
+    bgPath.fill()
 
-    // Add glass highlight
-    let highlightPath = NSBezierPath(roundedRect: rect.insetBy(dx: 25 * scale, dy: 25 * scale), xRadius: 85 * scale, yRadius: 85 * scale)
-    let highlightGradient = NSGradient(colors: [
-        NSColor.white.withAlphaComponent(0.3),
-        NSColor.white.withAlphaComponent(0.0)
-    ])!
-    highlightGradient.draw(in: highlightPath, angle: 90)
-
-    // Speaker icon
-    NSColor.white.setFill()
-
+    // Pixel-art style speaker icon (inspired by SpeakEasy branding)
     let centerX = CGFloat(size) / 2
     let centerY = CGFloat(size) / 2
+    let pixelSize = 20 * scale
 
-    // Speaker body (trapezoid-ish)
-    let speakerPath = NSBezierPath()
-    speakerPath.move(to: NSPoint(x: centerX - 80 * scale, y: centerY - 50 * scale))
-    speakerPath.line(to: NSPoint(x: centerX - 80 * scale, y: centerY + 50 * scale))
-    speakerPath.line(to: NSPoint(x: centerX - 30 * scale, y: centerY + 50 * scale))
-    speakerPath.line(to: NSPoint(x: centerX + 30 * scale, y: centerY + 100 * scale))
-    speakerPath.line(to: NSPoint(x: centerX + 30 * scale, y: centerY - 100 * scale))
-    speakerPath.line(to: NSPoint(x: centerX - 30 * scale, y: centerY - 50 * scale))
-    speakerPath.close()
-    speakerPath.fill()
+    // Light cream/beige color for contrast (like the branding background)
+    let lightColor = NSColor(calibratedRed: 0.95, green: 0.95, blue: 0.93, alpha: 1.0)
+    lightColor.setFill()
 
-    // Sound waves
-    NSColor.white.setStroke()
+    // Draw pixelated speaker using rectangles
+    // Speaker base (left side)
+    let speakerPixels: [(x: Int, y: Int)] = [
+        (-4, -2), (-4, -1), (-4, 0), (-4, 1), (-4, 2),  // Left column
+        (-3, -2), (-3, -1), (-3, 0), (-3, 1), (-3, 2),  // Second column
+        (-2, -3), (-2, 3),                               // Top and bottom extensions
+        (-1, -4), (-1, 4),                               // Cone top/bottom
+        (0, -4), (0, 4),                                 // Cone continues
+        (1, -4), (1, 4)                                  // Cone end
+    ]
 
-    for i in 1...3 {
-        let waveRadius = CGFloat(50 + i * 35) * scale
-        let wavePath = NSBezierPath()
-        wavePath.appendArc(
-            withCenter: NSPoint(x: centerX + 40 * scale, y: centerY),
-            radius: waveRadius,
-            startAngle: -45,
-            endAngle: 45,
-            clockwise: false
+    for pixel in speakerPixels {
+        let pixelRect = NSRect(
+            x: centerX + CGFloat(pixel.x) * pixelSize,
+            y: centerY + CGFloat(pixel.y) * pixelSize,
+            width: pixelSize,
+            height: pixelSize
         )
-        wavePath.lineWidth = 20 * scale
-        wavePath.lineCapStyle = .round
-        wavePath.stroke()
+        NSBezierPath(rect: pixelRect).fill()
+    }
+
+    // Sound waves (pixelated arcs)
+    let wavePixels: [(x: Int, y: Int)] = [
+        // First wave
+        (3, -2), (4, -1), (4, 0), (4, 1), (3, 2),
+        // Second wave
+        (5, -3), (6, -2), (6, -1), (6, 0), (6, 1), (6, 2), (5, 3),
+        // Third wave
+        (7, -3), (8, -2), (8, -1), (8, 0), (8, 1), (8, 2), (7, 3)
+    ]
+
+    for pixel in wavePixels {
+        let pixelRect = NSRect(
+            x: centerX + CGFloat(pixel.x) * pixelSize,
+            y: centerY + CGFloat(pixel.y) * pixelSize,
+            width: pixelSize,
+            height: pixelSize
+        )
+        NSBezierPath(rect: pixelRect).fill()
     }
 
     image.unlockFocus()
