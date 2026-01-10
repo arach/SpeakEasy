@@ -316,6 +316,7 @@ class ConfigManager: ObservableObject {
             ensureHUD()
             config.hud?.enabled = newValue
             markUnsaved()
+            NotificationCenter.default.post(name: NSNotification.Name("ConfigDidChange"), object: nil)
         }
     }
 

@@ -205,6 +205,8 @@ struct SpeakEasyApp: App {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var timer: Timer?
+    var hudWindow: NSWindow?
+    private var hudWindowManager: HUDWindowManager?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Configure all windows immediately
@@ -214,10 +216,79 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.configureAllWindows()
         }
+
+        // Check if HUD should be started
+        checkAndStartHUD()
+
+        // Observe config changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(configDidChange),
+            name: NSNotification.Name("ConfigDidChange"),
+            object: nil
+        )
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         timer?.invalidate()
+        hudWindowManager?.stop()
+    }
+
+    @objc private func configDidChange() {
+        checkAndStartHUD()
+    }
+
+    private func checkAndStartHUD() {
+        let config = ConfigManager.shared
+
+        if config.hudEnabled && hudWindow == nil {
+            startHUD(position: config.hudPosition, opacity: config.hudOpacity, duration: TimeInterval(config.hudDuration) / 1000.0)
+        } else if !config.hudEnabled && hudWindow != nil {
+            stopHUD()
+        }
+    }
+
+    private func startHUD(position: String, opacity: Double, duration: TimeInterval) {
+        guard hudWindow == nil else { return }
+
+        let hudPosition = HUDPosition(rawValue: position) ?? .topRight
+        let manager = HUDWindowManager(duration: duration)
+        manager.start()
+        hudWindowManager = manager
+
+        // Create a floating, transparent window
+        let screen = NSScreen.main ?? NSScreen.screens.first!
+        let window = NSWindow(
+            contentRect: screen.frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.ignoresMouseEvents = true
+        window.hasShadow = false
+
+        let hostingView = NSHostingView(rootView:
+            HUDOverlayView(position: hudPosition, opacity: opacity)
+                .environmentObject(manager)
+        )
+        hostingView.frame = window.contentView!.bounds
+        hostingView.autoresizingMask = [.width, .height]
+        window.contentView = hostingView
+
+        window.orderFrontRegardless()
+        hudWindow = window
+    }
+
+    private func stopHUD() {
+        hudWindowManager?.stop()
+        hudWindowManager = nil
+        hudWindow?.close()
+        hudWindow = nil
     }
 
     private func configureAllWindows() {
@@ -438,7 +509,7 @@ struct ContentView: View {
 
                 // Tab selector
                 HStack(spacing: 4) {
-                    ForEach(Array(["Dashboard", "OpenAI", "ElevenLabs", "System", "Cache"].enumerated()), id: \.offset) { index, title in
+                    ForEach(Array(["Dashboard", "OpenAI", "ElevenLabs", "System", "Cache", "HUD"].enumerated()), id: \.offset) { index, title in
                         Button(action: {
                             withAnimation(.spring(duration: 0.25, bounce: 0.2)) {
                                 selectedTab = index
@@ -480,6 +551,7 @@ struct ContentView: View {
                         case 2: ElevenLabsPlaygroundView()
                         case 3: SystemSettingsView()
                         case 4: CacheManagementView()
+                        case 5: HUDSettingsView()
                         default: DashboardView(selectedTab: $selectedTab)
                         }
                     }
@@ -1901,5 +1973,211 @@ struct CacheManagementView: View {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
+    }
+}
+
+// MARK: - HUD Settings View
+
+struct HUDSettingsView: View {
+    @EnvironmentObject var config: ConfigManager
+    @Environment(\.theme) var theme
+    @State private var showHUDWindow = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            GlassSection(title: "HUD Settings", icon: "square.stack.3d.up.fill", color: .purple) {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Enable/Disable HUD
+                    Toggle(isOn: $config.hudEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enable HUD")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("Show a floating notification when audio plays")
+                                .font(.caption)
+                                .foregroundColor(theme.textSecondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+
+                    if config.hudEnabled {
+                        Divider()
+                            .background(theme.border)
+
+                        // Position
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Position")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(theme.textSecondary)
+
+                            Picker("Position", selection: $config.hudPosition) {
+                                Text("Top Left").tag("top-left")
+                                Text("Top Right").tag("top-right")
+                                Text("Bottom Left").tag("bottom-left")
+                                Text("Bottom Right").tag("bottom-right")
+                            }
+                            .pickerStyle(.segmented)
+                        }
+
+                        // Duration
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Display Duration")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(theme.textSecondary)
+
+                            HStack {
+                                Slider(value: Binding(
+                                    get: { Double(config.hudDuration) },
+                                    set: { config.hudDuration = Int($0) }
+                                ), in: 1000...10000, step: 500)
+
+                                Text("\(config.hudDuration / 1000)s")
+                                    .font(.caption)
+                                    .foregroundColor(theme.textSecondary)
+                                    .frame(width: 40)
+                            }
+                        }
+
+                        // Opacity
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Opacity")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(theme.textSecondary)
+
+                            HStack {
+                                Slider(value: $config.hudOpacity, in: 0.5...1.0, step: 0.05)
+
+                                Text("\(Int(config.hudOpacity * 100))%")
+                                    .font(.caption)
+                                    .foregroundColor(theme.textSecondary)
+                                    .frame(width: 40)
+                            }
+                        }
+
+                        Divider()
+                            .background(theme.border)
+
+                        // Test HUD button
+                        Button(action: testHUD) {
+                            Label("Test HUD", systemImage: "play.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glassCompat)
+                    }
+                }
+            }
+
+            // Info section
+            GlassSection(title: "How It Works", icon: "info.circle.fill", color: .blue) {
+                VStack(alignment: .leading, spacing: 12) {
+                    InfoRow(
+                        icon: "terminal",
+                        title: "CLI Integration",
+                        description: "When SpeakEasy CLI plays audio, it sends a notification to the HUD"
+                    )
+
+                    InfoRow(
+                        icon: "pipe.and.drop.fill",
+                        title: "Named Pipe",
+                        description: "Uses a Unix named pipe at /tmp/speakeasy-hud.fifo for IPC"
+                    )
+
+                    InfoRow(
+                        icon: "sparkles",
+                        title: "Non-Blocking",
+                        description: "CLI continues immediately if HUD isn't running - no delays"
+                    )
+                }
+            }
+        }
+        .sheet(isPresented: $showHUDWindow) {
+            HUDPreviewWindow()
+        }
+    }
+
+    private func testHUD() {
+        // Write a test message to the pipe
+        let testMessage = """
+        {"text":"This is a test of the HUD overlay system!","provider":"system","cached":false,"timestamp":\(Date().timeIntervalSince1970)}
+        """
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let pipePath = "/tmp/speakeasy-hud.fifo"
+
+            // Try to write to pipe (non-blocking)
+            guard let data = (testMessage + "\n").data(using: .utf8) else { return }
+
+            if let fileHandle = FileHandle(forWritingAtPath: pipePath) {
+                fileHandle.write(data)
+                fileHandle.closeFile()
+            }
+        }
+    }
+}
+
+struct InfoRow: View {
+    @Environment(\.theme) var theme
+    let icon: String
+    let title: String
+    let description: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(theme.text.opacity(0.6))
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(theme.text)
+
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(theme.textSecondary)
+            }
+        }
+    }
+}
+
+// MARK: - HUD Preview Window
+
+struct HUDPreviewWindow: View {
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.theme) var theme
+
+    var body: some View {
+        VStack {
+            Text("HUD Preview")
+                .font(.title2)
+                .fontWeight(.bold)
+
+            Spacer()
+
+            // Show sample HUD
+            HUDContent(
+                message: HUDMessage(
+                    text: "Hello! This is a preview of how the HUD will look.",
+                    provider: "openai",
+                    cached: true,
+                    timestamp: Date().timeIntervalSince1970
+                ),
+                theme: theme
+            )
+
+            Spacer()
+
+            Button("Close") {
+                dismiss()
+            }
+            .buttonStyle(.glassCompat)
+        }
+        .padding(40)
+        .frame(width: 600, height: 400)
     }
 }
