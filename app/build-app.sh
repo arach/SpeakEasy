@@ -60,6 +60,8 @@ echo ""
 
 if [ "$INSTALL" = true ]; then
     echo "Installing to /Applications..."
+    # Remove old version first
+    rm -rf "/Applications/$BUNDLE_NAME"
     cp -R "$APP_DIR" /Applications/
     echo "Installed to /Applications/$BUNDLE_NAME"
     echo ""

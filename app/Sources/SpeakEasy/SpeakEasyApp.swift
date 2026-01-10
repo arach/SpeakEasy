@@ -473,6 +473,7 @@ struct ContentView: View {
                             .font(.title2)
                             .fontWeight(.semibold)
                             .foregroundColor(theme.text)
+
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
@@ -575,6 +576,13 @@ struct ContentView: View {
                         .lineLimit(2)
                     }
                     Spacer()
+
+                    // Build indicator
+                    Text("Build: HUD-v2.0-\(Date().timeIntervalSince1970)")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(theme.textTertiary)
+                        .padding(.horizontal, 8)
+
                     Button {
                         config.loadConfig()
                     } label: {
