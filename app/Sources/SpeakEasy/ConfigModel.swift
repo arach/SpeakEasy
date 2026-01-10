@@ -5,6 +5,7 @@ struct GlobalConfig: Codable {
     var defaults: Defaults?
     var global: Global?
     var cache: Cache?
+    var hud: HUD?
 
     struct Providers: Codable {
         var openai: OpenAIConfig?
@@ -64,6 +65,13 @@ struct GlobalConfig: Codable {
         var ttl: String?
         var maxSize: String?
         var dir: String?
+    }
+
+    struct HUD: Codable {
+        var enabled: Bool?
+        var position: String? // "top-left", "top-right", "bottom-left", "bottom-right"
+        var duration: Int? // milliseconds to display after audio completes
+        var opacity: Double? // 0.0 to 1.0
     }
 }
 
@@ -301,6 +309,43 @@ class ConfigManager: ObservableObject {
         }
     }
 
+    // HUD
+    var hudEnabled: Bool {
+        get { config.hud?.enabled ?? false }
+        set {
+            ensureHUD()
+            config.hud?.enabled = newValue
+            markUnsaved()
+        }
+    }
+
+    var hudPosition: String {
+        get { config.hud?.position ?? "top-right" }
+        set {
+            ensureHUD()
+            config.hud?.position = newValue
+            markUnsaved()
+        }
+    }
+
+    var hudDuration: Int {
+        get { config.hud?.duration ?? 3000 }
+        set {
+            ensureHUD()
+            config.hud?.duration = newValue
+            markUnsaved()
+        }
+    }
+
+    var hudOpacity: Double {
+        get { config.hud?.opacity ?? 0.95 }
+        set {
+            ensureHUD()
+            config.hud?.opacity = newValue
+            markUnsaved()
+        }
+    }
+
     // Helper methods to ensure nested structures exist
     private func ensureDefaults() {
         if config.defaults == nil {
@@ -347,6 +392,12 @@ class ConfigManager: ObservableObject {
     private func ensureCache() {
         if config.cache == nil {
             config.cache = GlobalConfig.Cache()
+        }
+    }
+
+    private func ensureHUD() {
+        if config.hud == nil {
+            config.hud = GlobalConfig.HUD()
         }
     }
 }

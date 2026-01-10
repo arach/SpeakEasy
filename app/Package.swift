@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "SpeakEasyConfig",
+    name: "SpeakEasy",
     platforms: [
         .macOS(.v13)
     ],
     targets: [
         .executableTarget(
-            name: "SpeakEasyConfig",
-            path: "Sources/SpeakEasyConfig"
+            name: "SpeakEasy",
+            path: "Sources/SpeakEasy"
         )
     ]
 )

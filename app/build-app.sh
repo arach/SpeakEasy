@@ -37,7 +37,7 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
 # Copy executable
-cp "$BUILD_DIR/SpeakEasyConfig" "$APP_DIR/Contents/MacOS/"
+cp "$BUILD_DIR/SpeakEasy" "$APP_DIR/Contents/MacOS/SpeakEasy"
 
 # Copy Info.plist
 cp "$SCRIPT_DIR/Resources/Info.plist" "$APP_DIR/Contents/"

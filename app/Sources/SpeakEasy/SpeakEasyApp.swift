@@ -186,7 +186,7 @@ class SolidColorWindow: NSWindow {
 }
 
 @main
-struct SpeakEasyConfigApp: App {
+struct SpeakEasyApp: App {
     @StateObject private var configManager = ConfigManager.shared
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
