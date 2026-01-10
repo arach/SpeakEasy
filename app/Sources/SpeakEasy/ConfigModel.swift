@@ -72,6 +72,22 @@ struct GlobalConfig: Codable {
         var position: String? // "top-left", "top-right", "bottom-left", "bottom-right"
         var duration: Int? // milliseconds to display after audio completes
         var opacity: Double? // 0.0 to 1.0
+
+        // Appearance settings
+        var style: String? // "combined", "waveform", "text", "particles"
+        var waveform: WaveformConfig?
+        var text: TextConfig?
+    }
+
+    struct WaveformConfig: Codable {
+        var barCount: Int? // 20-60 bars
+        var amplitude: Double? // 0.5 to 2.0 multiplier
+        var color: String? // "white", "blue", "purple", "green", "orange" or hex "#RRGGBB"
+    }
+
+    struct TextConfig: Codable {
+        var font: String? // "system", "mono", "serif", "rounded"
+        var size: String? // "xs", "sm", "md", "lg", "xl"
     }
 }
 
@@ -347,6 +363,68 @@ class ConfigManager: ObservableObject {
         }
     }
 
+    // HUD Appearance
+    var hudStyle: String {
+        get { config.hud?.style ?? "combined" }
+        set {
+            ensureHUD()
+            config.hud?.style = newValue
+            markUnsaved()
+        }
+    }
+
+    // Waveform settings
+    var hudWaveformBarCount: Int {
+        get { config.hud?.waveform?.barCount ?? 40 }
+        set {
+            ensureHUD()
+            ensureWaveform()
+            config.hud?.waveform?.barCount = newValue
+            markUnsaved()
+        }
+    }
+
+    var hudWaveformAmplitude: Double {
+        get { config.hud?.waveform?.amplitude ?? 1.0 }
+        set {
+            ensureHUD()
+            ensureWaveform()
+            config.hud?.waveform?.amplitude = newValue
+            markUnsaved()
+        }
+    }
+
+    var hudWaveformColor: String {
+        get { config.hud?.waveform?.color ?? "white" }
+        set {
+            ensureHUD()
+            ensureWaveform()
+            config.hud?.waveform?.color = newValue
+            markUnsaved()
+        }
+    }
+
+    // Text settings
+    var hudTextFont: String {
+        get { config.hud?.text?.font ?? "system" }
+        set {
+            ensureHUD()
+            ensureText()
+            config.hud?.text?.font = newValue
+            markUnsaved()
+        }
+    }
+
+    var hudTextSize: String {
+        get { config.hud?.text?.size ?? "md" }
+        set {
+            ensureHUD()
+            ensureText()
+            config.hud?.text?.size = newValue
+            markUnsaved()
+        }
+    }
+
     // Helper methods to ensure nested structures exist
     private func ensureDefaults() {
         if config.defaults == nil {
@@ -399,6 +477,20 @@ class ConfigManager: ObservableObject {
     private func ensureHUD() {
         if config.hud == nil {
             config.hud = GlobalConfig.HUD()
+        }
+    }
+
+    private func ensureWaveform() {
+        ensureHUD()
+        if config.hud?.waveform == nil {
+            config.hud?.waveform = GlobalConfig.WaveformConfig()
+        }
+    }
+
+    private func ensureText() {
+        ensureHUD()
+        if config.hud?.text == nil {
+            config.hud?.text = GlobalConfig.TextConfig()
         }
     }
 }

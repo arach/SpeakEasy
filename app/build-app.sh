@@ -42,6 +42,11 @@ cp "$BUILD_DIR/SpeakEasy" "$APP_DIR/Contents/MacOS/SpeakEasy"
 # Copy Info.plist
 cp "$SCRIPT_DIR/Resources/Info.plist" "$APP_DIR/Contents/"
 
+# Copy audio resources
+if [ -f "$SCRIPT_DIR/Resources/hud-preview-sample.aiff" ]; then
+    cp "$SCRIPT_DIR/Resources/hud-preview-sample.aiff" "$APP_DIR/Contents/Resources/"
+fi
+
 # Generate icon
 echo "Generating app icon..."
 chmod +x "$SCRIPT_DIR/Scripts/generate_icon.swift"

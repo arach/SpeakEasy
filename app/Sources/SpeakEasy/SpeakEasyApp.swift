@@ -1989,7 +1989,6 @@ struct CacheManagementView: View {
 struct HUDSettingsView: View {
     @EnvironmentObject var config: ConfigManager
     @Environment(\.theme) var theme
-    @State private var showHUDWindow = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -2068,12 +2067,154 @@ struct HUDSettingsView: View {
                         Divider()
                             .background(theme.border)
 
-                        // Test HUD button
-                        Button(action: testHUD) {
-                            Label("Test HUD", systemImage: "play.circle")
-                                .frame(maxWidth: .infinity)
+                        // Preview and Test buttons
+                        HStack(spacing: 12) {
+                            Button(action: openPreviewWindow) {
+                                Label("Preview Styles", systemImage: "eye.circle")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.glassCompat)
+
+                            Button(action: testHUD) {
+                                Label("Test HUD", systemImage: "play.circle")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.glassCompat)
                         }
-                        .buttonStyle(.glassCompat)
+                    }
+                }
+            }
+
+            // Appearance settings (only show when HUD is enabled)
+            if config.hudEnabled {
+                GlassSection(title: "Appearance", icon: "paintbrush.fill", color: .pink) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Style selector
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Style")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(theme.textSecondary)
+
+                            Picker("Style", selection: $config.hudStyle) {
+                                Text("Combined").tag("combined")
+                                Text("Waveform").tag("waveform")
+                                Text("Spectrum").tag("spectrum")
+                                Text("Particles").tag("particles")
+                                Text("Text").tag("text")
+                            }
+                            .pickerStyle(.segmented)
+                        }
+
+                        Divider().background(theme.border)
+
+                        // Waveform Settings
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Waveform")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(theme.textSecondary)
+
+                            // Bar count
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Bar Count")
+                                        .font(.caption2)
+                                        .foregroundColor(theme.textSecondary)
+                                    Spacer()
+                                    Text("\(config.hudWaveformBarCount)")
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundColor(theme.textSecondary)
+                                }
+                                Slider(value: Binding(
+                                    get: { Double(config.hudWaveformBarCount) },
+                                    set: { config.hudWaveformBarCount = Int($0) }
+                                ), in: 20...60, step: 5)
+                            }
+
+                            // Amplitude
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Amplitude")
+                                        .font(.caption2)
+                                        .foregroundColor(theme.textSecondary)
+                                    Spacer()
+                                    Text(String(format: "%.1fx", config.hudWaveformAmplitude))
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundColor(theme.textSecondary)
+                                }
+                                Slider(value: $config.hudWaveformAmplitude, in: 0.5...2.0, step: 0.1)
+                            }
+
+                            // Color
+                            HStack {
+                                Text("Color")
+                                    .font(.caption2)
+                                    .foregroundColor(theme.textSecondary)
+                                Spacer()
+                                Picker("", selection: $config.hudWaveformColor) {
+                                    Label("White", systemImage: "circle.fill").tag("white")
+                                        .foregroundColor(.white)
+                                    Label("Blue", systemImage: "circle.fill").tag("blue")
+                                        .foregroundColor(.blue)
+                                    Label("Purple", systemImage: "circle.fill").tag("purple")
+                                        .foregroundColor(.purple)
+                                    Label("Green", systemImage: "circle.fill").tag("green")
+                                        .foregroundColor(.green)
+                                    Label("Orange", systemImage: "circle.fill").tag("orange")
+                                        .foregroundColor(.orange)
+                                    Label("Cyan", systemImage: "circle.fill").tag("cyan")
+                                        .foregroundColor(.cyan)
+                                    Label("Pink", systemImage: "circle.fill").tag("pink")
+                                        .foregroundColor(.pink)
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 120)
+                            }
+                        }
+
+                        Divider().background(theme.border)
+
+                        // Text Settings
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Text")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(theme.textSecondary)
+
+                            // Font
+                            HStack {
+                                Text("Font")
+                                    .font(.caption2)
+                                    .foregroundColor(theme.textSecondary)
+                                Spacer()
+                                Picker("", selection: $config.hudTextFont) {
+                                    Text("System").tag("system")
+                                    Text("Monospace").tag("mono")
+                                    Text("Serif").tag("serif")
+                                    Text("Rounded").tag("rounded")
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 120)
+                            }
+
+                            // Size
+                            HStack {
+                                Text("Size")
+                                    .font(.caption2)
+                                    .foregroundColor(theme.textSecondary)
+                                Spacer()
+                                Picker("", selection: $config.hudTextSize) {
+                                    Text("Extra Small").tag("xs")
+                                    Text("Small").tag("sm")
+                                    Text("Medium").tag("md")
+                                    Text("Large").tag("lg")
+                                    Text("Extra Large").tag("xl")
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 120)
+                            }
+                        }
                     }
                 }
             }
@@ -2101,9 +2242,10 @@ struct HUDSettingsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showHUDWindow) {
-            HUDPreviewWindow()
-        }
+    }
+
+    private func openPreviewWindow() {
+        PreviewWindowManager.shared.showPreview()
     }
 
     private func testHUD() {
@@ -2155,37 +2297,1201 @@ struct InfoRow: View {
 
 // MARK: - HUD Preview Window
 
-struct HUDPreviewWindow: View {
-    @Environment(\.dismiss) var dismiss
+import AVFoundation
+
+enum HUDStyleType {
+    case flowingText
+    case stackedText
+    case minimalWave
+    case particleField
+    case spectrum
+    case combined
+}
+
+class AudioPreviewPlayer: ObservableObject {
+    @Published var isPlaying = false
+    @Published var currentTime: TimeInterval = 0
+    @Published var duration: TimeInterval = 0
+    @Published var audioLevel: Float = 0 // 0.0 to 1.0, smoothed
+
+    private var audioPlayer: AVAudioPlayer?
+    private var timer: Timer?
+    private var rawAudioLevel: Float = 0
+    private let smoothingFactor: Float = 0.3 // Higher = more smoothing
+
+    let sampleText = "In SpeakEasy, Claude needs your permission to run bash commands. This allows the assistant to execute terminal operations, manage files, and interact with your development environment."
+
+    var words: [String] {
+        sampleText.components(separatedBy: " ")
+    }
+
+    var currentWordIndex: Int {
+        guard duration > 0 else { return 0 }
+        let progress = currentTime / duration
+        return min(Int(Double(words.count) * progress), words.count - 1)
+    }
+
+    init() {
+        setupAudio()
+    }
+
+    private func setupAudio() {
+        // Try to load from Resources or use system voice fallback
+        if let audioPath = Bundle.main.path(forResource: "hud-preview-sample", ofType: "aiff") {
+            do {
+                audioPlayer = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: audioPath))
+                audioPlayer?.prepareToPlay()
+                audioPlayer?.isMeteringEnabled = true
+                duration = audioPlayer?.duration ?? 0
+            } catch {
+                print("Failed to load audio: \(error)")
+                generateAudioFallback()
+            }
+        } else {
+            generateAudioFallback()
+        }
+    }
+
+    private func generateAudioFallback() {
+        // Use /tmp file we generated
+        if let audioPlayer = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: "/tmp/hud-preview-sample.aiff")) {
+            self.audioPlayer = audioPlayer
+            audioPlayer.prepareToPlay()
+            audioPlayer.isMeteringEnabled = true
+            duration = audioPlayer.duration
+        }
+    }
+
+    func play() {
+        guard let player = audioPlayer else { return }
+        player.play()
+        isPlaying = true
+
+        timer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.currentTime = player.currentTime
+
+            // Update audio level with smoothing
+            player.updateMeters()
+            let averagePower = player.averagePower(forChannel: 0)
+            // Convert from dB (-160 to 0) to 0.0-1.0
+            let normalized = pow(10, averagePower / 20)
+            self.rawAudioLevel = max(0, min(1, normalized))
+
+            // Apply exponential smoothing
+            self.audioLevel = self.audioLevel * (1 - self.smoothingFactor) + self.rawAudioLevel * self.smoothingFactor
+
+            if !player.isPlaying {
+                self.stop()
+            }
+        }
+    }
+
+    func pause() {
+        audioPlayer?.pause()
+        isPlaying = false
+        timer?.invalidate()
+    }
+
+    func stop() {
+        audioPlayer?.stop()
+        audioPlayer?.currentTime = 0
+        currentTime = 0
+        audioLevel = 0
+        rawAudioLevel = 0
+        isPlaying = false
+        timer?.invalidate()
+    }
+
+    func seek(to time: TimeInterval) {
+        audioPlayer?.currentTime = time
+        currentTime = time
+    }
+}
+
+class HUDPreviewController: ObservableObject {
+    let player: AudioPreviewPlayer
+    @Published var selectedStyle: HUDStyleType = .combined
+    @Published var showHUD = false
+
+    private var hudWindow: NSWindow?
+
+    init(player: AudioPreviewPlayer) {
+        self.player = player
+    }
+
+    func toggleHUD() {
+        if showHUD {
+            hideHUD()
+        } else {
+            createHUD()
+        }
+    }
+
+    private func createHUD() {
+        guard let screen = NSScreen.main else { return }
+
+        let window = NSWindow(
+            contentRect: screen.frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.ignoresMouseEvents = true
+        window.hasShadow = false
+        window.animationBehavior = .none
+
+        let hostingView = NSHostingView(rootView:
+            LiveHUDView(player: player)
+                .environmentObject(self)
+        )
+        window.contentView = hostingView
+        window.orderFrontRegardless()
+
+        hudWindow = window
+        showHUD = true
+    }
+
+    func hideHUD() {
+        hudWindow?.orderOut(nil)
+        hudWindow = nil
+        showHUD = false
+    }
+
+    func cleanup() {
+        player.stop()
+        hideHUD()
+    }
+}
+
+// MARK: - Preview Window Manager (Singleton to prevent crash)
+
+class PreviewWindowManager {
+    static let shared = PreviewWindowManager()
+
+    private var previewWindow: NSWindow?
+    private var controller: HUDPreviewController?
+
+    private init() {}
+
+    func showPreview() {
+        // Reuse existing window if available
+        if let window = previewWindow {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let player = AudioPreviewPlayer()
+        let ctrl = HUDPreviewController(player: player)
+        self.controller = ctrl
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 200),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "HUD Preview"
+        window.animationBehavior = .none
+        window.isReleasedWhenClosed = false  // Keep window alive
+        window.contentView = NSHostingView(rootView:
+            HUDPreviewControlPanel(controller: ctrl)
+                .environmentObject(ConfigManager.shared)
+        )
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        // Watch for window close
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleWindowClose()
+        }
+
+        self.previewWindow = window
+    }
+
+    private func handleWindowClose() {
+        controller?.cleanup()
+        // Don't nil out previewWindow - let it stay for reuse
+        // But reset controller state
+        controller = nil
+
+        // Delay cleanup to next run loop to avoid animation issues
+        DispatchQueue.main.async { [weak self] in
+            self?.previewWindow?.contentView = nil
+            self?.previewWindow = nil
+        }
+    }
+}
+
+struct HUDPreviewControlPanel: View {
+    @ObservedObject var controller: HUDPreviewController
     @Environment(\.theme) var theme
 
     var body: some View {
-        VStack {
-            Text("HUD Preview")
-                .font(.title2)
-                .fontWeight(.bold)
-
-            Spacer()
-
-            // Show sample HUD
-            HUDContent(
-                message: HUDMessage(
-                    text: "Hello! This is a preview of how the HUD will look.",
-                    provider: "openai",
-                    cached: true,
-                    timestamp: Date().timeIntervalSince1970
-                ),
-                theme: theme
+        VStack(spacing: 16) {
+            // Style Selector - horizontal tabs
+            HStack(spacing: 0) {
+                styleButton("Combined", style: .combined)
+                styleButton("Wave", style: .minimalWave)
+                styleButton("Spectrum", style: .spectrum)
+                styleButton("Particles", style: .particleField)
+                styleButton("Text", style: .flowingText)
+                styleButton("Stacked", style: .stackedText)
+            }
+            .padding(4)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(theme.surface.opacity(0.5))
             )
 
-            Spacer()
+            Divider().background(theme.border)
 
-            Button("Close") {
-                dismiss()
+            // Audio Controls
+            HStack(spacing: 16) {
+                Button(action: togglePlayback) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 44, height: 44)
+                        Image(systemName: controller.player.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    // Audio level bar
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(theme.surface)
+                                .frame(height: 4)
+
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.accentColor)
+                                .frame(width: geometry.size.width * CGFloat(controller.player.audioLevel), height: 4)
+                        }
+                    }
+                    .frame(height: 4)
+
+                    // Time
+                    HStack {
+                        Text(formatTime(controller.player.currentTime))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(theme.text)
+                        Text("/")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textTertiary)
+                        Text(formatTime(controller.player.duration))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(theme.textSecondary)
+                    }
+                }
             }
-            .buttonStyle(.glassCompat)
+
+            Divider().background(theme.border)
+
+            // HUD Toggle
+            Button(action: { controller.toggleHUD() }) {
+                HStack {
+                    Image(systemName: controller.showHUD ? "eye.slash" : "eye")
+                        .font(.system(size: 14))
+                    Text(controller.showHUD ? "Hide HUD" : "Show HUD")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(controller.showHUD ? Color.accentColor : theme.surface)
+                )
+                .foregroundColor(controller.showHUD ? .white : theme.text)
+            }
+            .buttonStyle(.plain)
         }
-        .padding(40)
-        .frame(width: 600, height: 400)
+        .padding(16)
+        .frame(width: 360, height: 200)
+        .background(theme.background)
+    }
+
+    @ViewBuilder
+    private func styleButton(_ name: String, style: HUDStyleType) -> some View {
+        Button(action: { controller.selectedStyle = style }) {
+            Text(name)
+                .font(.system(size: 11, weight: controller.selectedStyle == style ? .semibold : .regular))
+                .foregroundColor(controller.selectedStyle == style ? .white : theme.textSecondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(controller.selectedStyle == style ? Color.accentColor : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func togglePlayback() {
+        if controller.player.isPlaying {
+            controller.player.pause()
+        } else {
+            controller.player.play()
+        }
+    }
+
+    private func formatTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// Live HUD that appears as floating overlay
+struct LiveHUDView: View {
+    @ObservedObject var player: AudioPreviewPlayer
+    @EnvironmentObject var controller: HUDPreviewController
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Group {
+                    switch controller.selectedStyle {
+                    case .flowingText:
+                        FlowingTextHUDNew(
+                            words: player.words,
+                            currentIndex: player.currentWordIndex,
+                            isPlaying: player.isPlaying,
+                            audioLevel: player.audioLevel
+                        )
+                    case .stackedText:
+                        StackedTextHUDNew(
+                            words: player.words,
+                            currentIndex: player.currentWordIndex,
+                            isPlaying: player.isPlaying
+                        )
+                    case .minimalWave:
+                        MinimalWaveHUDNew(
+                            time: player.currentTime,
+                            isPlaying: player.isPlaying,
+                            audioLevel: player.audioLevel
+                        )
+                    case .particleField:
+                        ParticleFieldHUDNew(
+                            time: player.currentTime,
+                            isPlaying: player.isPlaying,
+                            audioLevel: player.audioLevel
+                        )
+                    case .spectrum:
+                        SpectrumHUDNew(
+                            time: player.currentTime,
+                            isPlaying: player.isPlaying,
+                            audioLevel: player.audioLevel
+                        )
+                    case .combined:
+                        CombinedTextWaveHUD(
+                            words: player.words,
+                            currentIndex: player.currentWordIndex,
+                            time: player.currentTime,
+                            isPlaying: player.isPlaying,
+                            audioLevel: player.audioLevel
+                        )
+                    }
+                }
+                .frame(width: 450, height: 120)
+                .background(
+                    ZStack {
+                        // Super dark black background with thin transparency
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.black.opacity(0.85))
+                        // Subtle border for definition
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                    }
+                )
+                .position(getHUDPosition(in: geometry.size))
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    private func getHUDPosition(in size: CGSize) -> CGPoint {
+        let padding: CGFloat = 20
+        let menuBarHeight: CGFloat = 28
+        let hudWidth: CGFloat = 450
+        let hudHeight: CGFloat = 120
+
+        // Top right by default
+        return CGPoint(
+            x: size.width - hudWidth / 2 - padding,
+            y: hudHeight / 2 + padding + menuBarHeight
+        )
+    }
+}
+
+// MARK: - HUD Style Components
+
+struct FlowingTextHUD: View {
+    let words: [String]
+    let currentIndex: Int
+    let isPlaying: Bool
+
+    var body: some View {
+        ZStack {
+            if currentIndex < words.count {
+                VStack(spacing: 20) {
+                    Text(words[currentIndex])
+                        .font(.system(size: 60, weight: .thin, design: .rounded))
+                        .foregroundColor(.white)
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity),
+                            removal: .opacity
+                        ))
+                        .id("word-\(currentIndex)")
+
+                    HStack(spacing: 8) {
+                        ForEach(max(0, currentIndex - 3)..<currentIndex, id: \.self) { index in
+                            if index >= 0 && index < words.count {
+                                Text(words[index])
+                                    .font(.system(size: 16, weight: .light))
+                                    .foregroundColor(.white.opacity(0.3 - Double(currentIndex - index) * 0.1))
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !isPlaying && currentIndex == 0 {
+                Text("Press play to start")
+                    .font(.system(size: 24, weight: .thin))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct MinimalWaveHUD: View {
+    let phase: Double
+    let isPlaying: Bool
+
+    var body: some View {
+        ZStack {
+            MinimalWavePath(phase: phase, amplitude: isPlaying ? 1.0 : 0.2)
+                .stroke(Color.white.opacity(0.9), lineWidth: 2)
+                .frame(height: 100)
+
+            if !isPlaying {
+                Text("Press play to start")
+                    .font(.system(size: 24, weight: .thin))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct MinimalWavePath: Shape {
+    var phase: Double
+    var amplitude: Double
+
+    var animatableData: AnimatablePair<Double, Double> {
+        get { AnimatablePair(phase, amplitude) }
+        set {
+            phase = newValue.first
+            amplitude = newValue.second
+        }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.width
+        let height = rect.height
+        let midHeight = height / 2
+        let wavelength = width / 3
+        let amp = height * 0.3 * amplitude
+
+        path.move(to: CGPoint(x: 0, y: midHeight))
+
+        for x in stride(from: 0, through: width, by: 2) {
+            let relativeX = x / wavelength
+            let normalizedPhase = phase / (.pi * 2)
+            let sine = sin((relativeX + normalizedPhase) * .pi * 2)
+            let y = midHeight + sine * amp
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+
+        return path
+    }
+}
+
+struct ParticleFieldHUD: View {
+    let particlePhases: [Double]
+    let isPlaying: Bool
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<50, id: \.self) { index in
+                ParticleView(
+                    index: index,
+                    phase: particlePhases[index],
+                    opacity: isPlaying ? 0.7 : 0.2
+                )
+            }
+
+            if !isPlaying {
+                Text("Press play to start")
+                    .font(.system(size: 24, weight: .thin))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct ParticleView: View {
+    let index: Int
+    let phase: Double
+    let opacity: Double
+
+    var body: some View {
+        Circle()
+            .fill(Color.white.opacity(opacity * 0.6))
+            .frame(width: CGFloat.random(in: 2...6), height: CGFloat.random(in: 2...6))
+            .position(particlePosition)
+            .blur(radius: 1)
+    }
+
+    private var particlePosition: CGPoint {
+        let baseX = CGFloat(index % 10) * 90 + 40
+        let baseY = CGFloat(index / 10) * 100 + 40
+
+        let offsetX = sin(phase + Double(index) * 0.5) * 30
+        let offsetY = cos(phase + Double(index) * 0.3) * 30
+
+        return CGPoint(x: baseX + offsetX, y: baseY + offsetY)
+    }
+}
+
+struct SpectrumHUD: View {
+    let phase: Double
+    let isPlaying: Bool
+
+    var body: some View {
+        ZStack {
+            HStack(spacing: 4) {
+                ForEach(0..<50, id: \.self) { index in
+                    SpectrumBar(
+                        index: index,
+                        phase: phase,
+                        multiplier: isPlaying ? 1.0 : 0.2
+                    )
+                }
+            }
+            .padding(.horizontal, 100)
+
+            if !isPlaying {
+                Text("Press play to start")
+                    .font(.system(size: 24, weight: .thin))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct SpectrumBar: View {
+    let index: Int
+    let phase: Double
+    let multiplier: Double
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(Color.white.opacity(0.9))
+            .frame(width: 8, height: barHeight)
+    }
+
+    private var barHeight: CGFloat {
+        let normalizedIndex = Double(index) / 50.0
+        let offset = normalizedIndex * .pi * 4
+        let sine = sin(phase + offset)
+        let normalized = (sine + 1) / 2
+        return 20 + normalized * 200 * multiplier
+    }
+}
+
+// MARK: - New Minimal HUD Styles (Audio-Reactive)
+
+struct FlowingTextHUDNew: View {
+    let words: [String]
+    let currentIndex: Int
+    let isPlaying: Bool
+    let audioLevel: Float
+
+    var body: some View {
+        ZStack {
+            if currentIndex < words.count && isPlaying {
+                Text(words[currentIndex])
+                    .font(.system(size: 42, weight: .ultraLight, design: .default))
+                    .foregroundColor(.white.opacity(0.95))
+                    .transition(.opacity)
+                    .id("word-\(currentIndex)")
+            } else if !isPlaying {
+                Text("Show HUD Overlay to see visualization")
+                    .font(.system(size: 16, weight: .ultraLight))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.easeInOut(duration: 0.15), value: currentIndex)
+    }
+}
+
+struct StackedTextHUDNew: View {
+    let words: [String]
+    let currentIndex: Int
+    let isPlaying: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if isPlaying {
+                // Paragraph-style: words flow horizontally and wrap
+                ParagraphFlowView(words: words, currentIndex: currentIndex)
+            } else {
+                Text("Show HUD Overlay to see visualization")
+                    .font(.system(size: 14, weight: .ultraLight))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(16)
+        .animation(.easeInOut(duration: 0.12), value: currentIndex)
+    }
+}
+
+struct ParagraphFlowView: View {
+    let words: [String]
+    let currentIndex: Int
+
+    // Show words from start up to current (building the paragraph)
+    private var visibleWords: [(index: Int, word: String)] {
+        guard currentIndex >= 0 else { return [] }
+        let end = min(currentIndex + 1, words.count)
+        return (0..<end).map { (index: $0, word: words[$0]) }
+    }
+
+    var body: some View {
+        // Use a Text concatenation approach for natural wrapping
+        visibleWords.reduce(Text("")) { result, item in
+            let isCurrent = item.index == currentIndex
+            let opacity = isCurrent ? 0.95 : max(0.3, 0.6 - Double(currentIndex - item.index) * 0.05)
+            let weight: Font.Weight = isCurrent ? .medium : .light
+
+            let wordText = Text(item.word)
+                .font(.system(size: isCurrent ? 16 : 14, weight: weight))
+                .foregroundColor(.white.opacity(opacity))
+
+            let space = Text(" ")
+                .font(.system(size: 14))
+                .foregroundColor(.clear)
+
+            return result + wordText + space
+        }
+        .lineSpacing(4)
+        .multilineTextAlignment(.leading)
+    }
+}
+
+struct MinimalWaveHUDNew: View {
+    let time: TimeInterval
+    let isPlaying: Bool
+    let audioLevel: Float
+
+    @State private var smoothedLevel: CGFloat = 0.2
+
+    var body: some View {
+        if isPlaying {
+            TimelineView(.animation(minimumInterval: 0.016)) { timeline in
+                Canvas { context, size in
+                    let currentTime = timeline.date.timeIntervalSinceReferenceDate
+                    let midY = size.height / 2
+
+                    let targetLevel = CGFloat(audioLevel)
+                    let level = max(0.2, smoothedLevel)
+
+                    // Draw 3 layered waves
+                    for waveIndex in 0..<3 {
+                        let waveOffset = Double(waveIndex) * 0.3
+
+                        var path = Path()
+                        path.move(to: CGPoint(x: 0, y: midY))
+
+                        let baseFrequency = 0.012
+                        let baseSpeed = 1.5
+
+                        // Amplitude expands with audio (baseline 15%, up to 40%)
+                        let baseAmplitude = size.height * 0.12
+                        let audioAmplitude = size.height * Double(level) * 0.28
+                        let totalAmplitude = baseAmplitude + audioAmplitude
+
+                        for x in stride(from: 0, through: size.width, by: 2) {
+                            let phase = currentTime * baseSpeed + waveOffset
+
+                            // Add subtle secondary wave for organic feel
+                            let primary = sin((x * baseFrequency) + phase) * totalAmplitude
+                            let secondary = sin((x * baseFrequency * 2.5) + phase * 1.3) * totalAmplitude * 0.15
+
+                            let y = midY + primary + secondary
+                            path.addLine(to: CGPoint(x: x, y: y))
+                        }
+
+                        let opacity = 0.4 - Double(waveIndex) * 0.1 + Double(level) * 0.4
+                        context.stroke(path, with: .color(Color.white.opacity(opacity)), lineWidth: 1.5)
+                    }
+
+                    // Update smoothed level
+                    DispatchQueue.main.async {
+                        smoothedLevel = smoothedLevel * 0.85 + targetLevel * 0.15
+                    }
+                }
+            }
+        } else {
+            ZStack {
+                Text("Show HUD Overlay to see visualization")
+                    .font(.system(size: 16, weight: .ultraLight))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+struct AudioReactiveSinePath: Shape {
+    var time: TimeInterval
+    var audioLevel: Float
+    var offset: Double
+
+    var animatableData: AnimatablePair<Double, Double> {
+        get { AnimatablePair(time, Double(audioLevel)) }
+        set {
+            time = newValue.first
+            audioLevel = Float(newValue.second)
+        }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.width
+        let height = rect.height
+        let midHeight = height / 2
+
+        path.move(to: CGPoint(x: 0, y: midHeight))
+
+        // Constant horizontal movement
+        let baseFrequency = 0.015
+        let baseSpeed = 1.5
+
+        // Vertical amplitude expands with audio (baseline 15%, up to 40%)
+        let baseAmplitude = height * 0.15
+        let audioAmplitude = height * Double(audioLevel) * 0.25
+        let totalAmplitude = baseAmplitude + audioAmplitude
+
+        for x in stride(from: 0, through: width, by: 1) {
+            let phase = time * baseSpeed + offset
+            let y = midHeight + sin((x * baseFrequency) + phase) * totalAmplitude
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+
+        return path
+    }
+}
+
+struct SpectrumHUDNew: View {
+    let time: TimeInterval
+    let isPlaying: Bool
+    let audioLevel: Float
+
+    @State private var smoothedLevel: CGFloat = 0.2
+
+    var body: some View {
+        if isPlaying {
+            TimelineView(.animation(minimumInterval: 0.016)) { timeline in
+                Canvas { context, size in
+                    let currentTime = timeline.date.timeIntervalSinceReferenceDate
+                    let centerY = size.height / 2
+
+                    let targetLevel = CGFloat(audioLevel)
+                    let level = max(0.2, smoothedLevel)
+
+                    let barCount = 40
+                    let gap: CGFloat = 4
+                    let totalGaps = CGFloat(barCount - 1) * gap
+                    let barWidth = (size.width - totalGaps - 60) / CGFloat(barCount)
+
+                    for i in 0..<barCount {
+                        let x = 30 + CGFloat(i) * (barWidth + gap)
+
+                        // Golden ratio seeding for unique per-bar character
+                        let seed = Double(i) * 1.618033988749
+                        let seedFrac = seed.truncatingRemainder(dividingBy: 1.0)
+
+                        // Each bar has its own dance: multiple layered waves
+                        // Primary rhythm - unique speed per bar
+                        let primarySpeed = 4.0 + seedFrac * 3.0
+                        let primaryPhase = seed * 0.7
+                        let primary = sin(currentTime * primarySpeed + primaryPhase)
+
+                        // Secondary rhythm - faster, subtle
+                        let secondarySpeed = 7.0 + (1.0 - seedFrac) * 4.0
+                        let secondaryPhase = seed * 1.3
+                        let secondary = sin(currentTime * secondarySpeed + secondaryPhase) * 0.4
+
+                        // Tertiary - very fast shimmer
+                        let tertiarySpeed = 12.0 + seedFrac * 6.0
+                        let tertiary = sin(currentTime * tertiarySpeed + seed * 2.1) * 0.2
+
+                        // Combine waves
+                        let combined = primary + secondary + tertiary
+                        let normalized = (combined / 1.6 + 1) / 2 // Normalize to 0-1
+
+                        // Baseline height that's always moving
+                        let minHeight: CGFloat = 6
+                        let baseRange: CGFloat = 20
+                        let baseHeight = minHeight + (normalized * baseRange)
+
+                        // Audio expands vertical amplitude per bar
+                        let audioBoost = level * 45 * CGFloat(normalized)
+                        let barHeight = baseHeight + audioBoost
+
+                        let barRect = CGRect(
+                            x: x,
+                            y: centerY - barHeight / 2,
+                            width: barWidth,
+                            height: barHeight
+                        )
+
+                        // Opacity pulses per bar
+                        let barOpacity = 0.5 + Double(level) * 0.35 + (normalized * 0.15)
+                        context.fill(
+                            RoundedRectangle(cornerRadius: 1.5).path(in: barRect),
+                            with: .color(Color.white.opacity(barOpacity))
+                        )
+                    }
+
+                    // Smooth audio level update
+                    DispatchQueue.main.async {
+                        smoothedLevel = smoothedLevel * 0.85 + targetLevel * 0.15
+                    }
+                }
+            }
+        } else {
+            ZStack {
+                Text("Show HUD Overlay to see visualization")
+                    .font(.system(size: 16, weight: .ultraLight))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+struct ParticleFieldHUDNew: View {
+    let time: TimeInterval
+    let isPlaying: Bool
+    let audioLevel: Float
+
+    @State private var smoothedLevel: CGFloat = 0.2
+
+    var body: some View {
+        if isPlaying {
+            TimelineView(.animation(minimumInterval: 0.016)) { timeline in
+                Canvas { context, size in
+                    let currentTime = timeline.date.timeIntervalSinceReferenceDate
+                    let centerY = size.height / 2
+
+                    // Smooth the audio level
+                    let targetLevel = CGFloat(audioLevel)
+                    let level = max(0.15, smoothedLevel)
+
+                    let particleCount = 40
+
+                    // CONSTANT horizontal speed - does NOT change with audio
+                    let baseSpeed: CGFloat = 0.08
+                    // CONSTANT wave speed - does NOT change with audio
+                    let waveSpeed: CGFloat = 1.8
+                    // Vertical amplitude EXPANDS with audio (the only audio-reactive parameter)
+                    let baseAmplitude: CGFloat = 8
+                    let audioAmplitude: CGFloat = level * 30  // expands up to 30px more
+                    let totalAmplitude = baseAmplitude + audioAmplitude
+
+                    for i in 0..<particleCount {
+                        // Golden ratio seeding for each particle's unique journey
+                        let seed = Double(i) * 1.618033988749
+                        let seedFrac = seed.truncatingRemainder(dividingBy: 1.0)
+
+                        // Horizontal flow - CONSTANT speed, unique per particle
+                        let speedVar = CGFloat(seedFrac) * 0.04  // slight variation per particle
+                        let speed = baseSpeed + speedVar  // but NO audio influence
+                        let xProgress = (currentTime * Double(speed) + seed).truncatingRemainder(dividingBy: 1.0)
+                        let x = CGFloat(xProgress) * size.width
+
+                        // Each particle has its own sine wave journey
+                        // Primary wave + secondary wave for organic feel
+                        let primaryPhase = seed * 4
+                        let secondaryPhase = seed * 7
+                        let primaryWave = sin(currentTime * Double(waveSpeed) + primaryPhase)
+                        let secondaryWave = sin(currentTime * Double(waveSpeed * 0.6) + secondaryPhase) * 0.3
+                        let combinedWave = primaryWave + secondaryWave
+
+                        // Vertical position: audio only affects AMPLITUDE, not speed
+                        let y = centerY + CGFloat(combinedWave) * totalAmplitude
+
+                        // Fixed particle size with seed variation
+                        let particleSize: CGFloat = 2.5 + CGFloat(seedFrac) * 1.5
+
+                        // Crisp white particles
+                        let opacity = 0.7 + sin(seed * 3) * 0.25
+
+                        let rect = CGRect(
+                            x: x - particleSize / 2,
+                            y: y - particleSize / 2,
+                            width: particleSize,
+                            height: particleSize
+                        )
+                        context.fill(Circle().path(in: rect), with: .color(Color.white.opacity(opacity)))
+                    }
+
+                    // Smooth level update
+                    DispatchQueue.main.async {
+                        smoothedLevel = smoothedLevel * 0.88 + targetLevel * 0.12
+                    }
+                }
+            }
+        } else {
+            ZStack {
+                Text("Show HUD Overlay to see visualization")
+                    .font(.system(size: 16, weight: .light))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+// MARK: - Combined Text + Waveform HUD
+
+struct CombinedTextWaveHUD: View {
+    let words: [String]
+    let currentIndex: Int
+    let time: TimeInterval
+    let isPlaying: Bool
+    let audioLevel: Float
+
+    @State private var smoothedLevel: CGFloat = 0.2
+    @ObservedObject private var config = ConfigManager.shared
+
+    var body: some View {
+        if isPlaying {
+            VStack(spacing: 0) {
+                // Text section at top (60% of height)
+                CombinedTextSection(
+                    words: words,
+                    currentIndex: currentIndex,
+                    font: config.hudTextFont,
+                    size: config.hudTextSize
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Waveform at bottom (40% of height)
+                CombinedWaveformSection(
+                    audioLevel: audioLevel,
+                    barCount: config.hudWaveformBarCount,
+                    amplitudeMultiplier: config.hudWaveformAmplitude,
+                    colorName: config.hudWaveformColor
+                )
+                .frame(height: 35)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+            }
+        } else {
+            VStack(spacing: 8) {
+                Text("Show HUD Overlay to see visualization")
+                    .font(.system(size: 14, weight: .ultraLight))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+struct CombinedTextSection: View {
+    let words: [String]
+    let currentIndex: Int
+    let font: String
+    let size: String
+
+    private var visibleWords: [(index: Int, word: String)] {
+        guard currentIndex >= 0 else { return [] }
+        let end = min(currentIndex + 1, words.count)
+        return (0..<end).map { (index: $0, word: words[$0]) }
+    }
+
+    private var fontSize: CGFloat {
+        switch size {
+        case "xs": return 10
+        case "sm": return 12
+        case "md": return 14
+        case "lg": return 16
+        case "xl": return 18
+        default: return 14
+        }
+    }
+
+    private var fontDesign: Font.Design {
+        switch font {
+        case "mono": return .monospaced
+        case "serif": return .serif
+        case "rounded": return .rounded
+        default: return .default
+        }
+    }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            visibleWords.reduce(Text("")) { result, item in
+                let isCurrent = item.index == currentIndex
+                let opacity = isCurrent ? 0.95 : max(0.3, 0.6 - Double(currentIndex - item.index) * 0.03)
+                let weight: Font.Weight = isCurrent ? .medium : .light
+                let currentSize = isCurrent ? fontSize + 2 : fontSize
+
+                let wordText = Text(item.word)
+                    .font(.system(size: currentSize, weight: weight, design: fontDesign))
+                    .foregroundColor(.white.opacity(opacity))
+
+                let space = Text(" ")
+                    .font(.system(size: fontSize, design: fontDesign))
+                    .foregroundColor(.clear)
+
+                return result + wordText + space
+            }
+            .lineSpacing(3)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .animation(.easeInOut(duration: 0.1), value: currentIndex)
+    }
+}
+
+struct CombinedWaveformSection: View {
+    let audioLevel: Float
+    let barCount: Int
+    let amplitudeMultiplier: Double
+    let colorName: String
+
+    @State private var smoothedLevel: CGFloat = 0.2
+
+    private var waveformColor: Color {
+        switch colorName.lowercased() {
+        case "blue": return .blue
+        case "purple": return .purple
+        case "green": return .green
+        case "orange": return .orange
+        case "cyan": return .cyan
+        case "pink": return .pink
+        default:
+            // Check for hex color
+            if colorName.hasPrefix("#") {
+                return Color(hex: colorName) ?? .white
+            }
+            return .white
+        }
+    }
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.016)) { timeline in
+            Canvas { context, size in
+                let currentTime = timeline.date.timeIntervalSinceReferenceDate
+                let centerY = size.height / 2
+
+                let targetLevel = CGFloat(audioLevel)
+                let level = max(0.2, smoothedLevel)
+
+                let effectiveBarCount = max(10, min(60, barCount))
+                let gap: CGFloat = 3
+                let totalGaps = CGFloat(effectiveBarCount - 1) * gap
+                let barWidth = (size.width - totalGaps) / CGFloat(effectiveBarCount)
+
+                for i in 0..<effectiveBarCount {
+                    let x = CGFloat(i) * (barWidth + gap)
+
+                    // Golden ratio seeding for unique per-bar character
+                    let seed = Double(i) * 1.618033988749
+                    let seedFrac = seed.truncatingRemainder(dividingBy: 1.0)
+
+                    // Each bar has its own dance
+                    let primarySpeed = 4.0 + seedFrac * 2.5
+                    let primaryPhase = seed * 0.7
+                    let primary = sin(currentTime * primarySpeed + primaryPhase)
+
+                    let secondarySpeed = 7.0 + (1.0 - seedFrac) * 3.0
+                    let secondary = sin(currentTime * secondarySpeed + seed * 1.3) * 0.3
+
+                    let combined = primary + secondary
+                    let normalized = (combined / 1.3 + 1) / 2
+
+                    // Base height + audio-reactive expansion
+                    let minHeight: CGFloat = 3
+                    let baseRange: CGFloat = 8 * amplitudeMultiplier
+                    let baseHeight = minHeight + (normalized * baseRange)
+                    let audioBoost = level * 20 * CGFloat(normalized) * amplitudeMultiplier
+                    let barHeight = baseHeight + audioBoost
+
+                    let barRect = CGRect(
+                        x: x,
+                        y: centerY - barHeight / 2,
+                        width: barWidth,
+                        height: barHeight
+                    )
+
+                    let barOpacity = 0.5 + Double(level) * 0.35 + (normalized * 0.15)
+                    context.fill(
+                        RoundedRectangle(cornerRadius: 1).path(in: barRect),
+                        with: .color(waveformColor.opacity(barOpacity))
+                    )
+                }
+
+                DispatchQueue.main.async {
+                    smoothedLevel = smoothedLevel * 0.85 + targetLevel * 0.15
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Color Hex Extension
+
+extension Color {
+    init?(hex: String) {
+        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
+
+        var rgb: UInt64 = 0
+        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
+
+        let r = Double((rgb & 0xFF0000) >> 16) / 255.0
+        let g = Double((rgb & 0x00FF00) >> 8) / 255.0
+        let b = Double(rgb & 0x0000FF) / 255.0
+
+        self.init(red: r, green: g, blue: b)
     }
 }
