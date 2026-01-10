@@ -15,9 +15,9 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>SpeakEasy Config</string>
+    <string>SpeakEasy</string>
     <key>CFBundleDisplayName</key>
-    <string>SpeakEasy Config</string>
+    <string>SpeakEasy</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

@@ -2,8 +2,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="SpeakEasy Config"
-BUNDLE_NAME="SpeakEasyConfig.app"
+APP_NAME="SpeakEasy"
+BUNDLE_NAME="SpeakEasy.app"
 BUILD_DIR="$SCRIPT_DIR/.build/release"
 APP_DIR="$SCRIPT_DIR/$BUNDLE_NAME"
 INSTALL=false
@@ -24,7 +24,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "Building SpeakEasy Config..."
+echo "Building SpeakEasy..."
 
 # Build release version
 swift build -c release
