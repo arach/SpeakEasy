@@ -13,6 +13,7 @@ import { ElevenLabsProvider } from './providers/elevenlabs';
 import { GroqProvider } from './providers/groq';
 import { GeminiProvider } from './providers/gemini';
 import { TTSCache } from './cache';
+import { notifyHUD } from './hud';
 
 const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
@@ -45,9 +46,11 @@ export class SpeakEasy {
   private cache?: TTSCache;
   private useCache = false;
   private debug = false;
+  private hudEnabled = false;
 
   constructor(config: SpeakEasyConfig) {
     const globalConfig = loadGlobalConfig();
+    this.hudEnabled = globalConfig.hud?.enabled ?? false;
     
 
     this.config = {
@@ -207,6 +210,7 @@ export class SpeakEasy {
                 if (this.debug) {
                   console.log(`📦 Using cached audio from: ${cachedEntry.audioFilePath}`);
                 }
+                this.sendHUDNotification(text, providerName, true);
                 if (!silent) {
                   await this.playCachedAudio(cachedEntry.audioFilePath);
                 }
@@ -226,6 +230,7 @@ export class SpeakEasy {
               if (this.debug) {
                 console.log(`🎙️  Using system voice: ${voice}`);
               }
+              this.sendHUDNotification(text, providerName, false);
               await provider.speak({
                 text,
                 rate,
@@ -278,6 +283,7 @@ export class SpeakEasy {
               
               console.log('cached');
 
+              this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 // Play the generated audio
                 // Detect format from provider (Gemini returns WAV, others return MP3)
@@ -292,6 +298,7 @@ export class SpeakEasy {
                 }
               }
             } else if (audioBuffer) {
+              this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 // Play directly if no caching
                 // Detect format from provider
@@ -460,6 +467,17 @@ export class SpeakEasy {
       case 'system': return 'macOS-system';
       default: return provider;
     }
+  }
+
+  private sendHUDNotification(text: string, provider: string, cached: boolean): void {
+    if (!this.hudEnabled) return;
+
+    notifyHUD({
+      text: text.substring(0, 200), // Limit to 200 chars for HUD display
+      provider,
+      cached,
+      timestamp: Date.now()
+    });
   }
 
   private stopSpeaking(): void {
