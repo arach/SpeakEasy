@@ -203,17 +203,18 @@ struct HUDOverlayView: View {
     private func getPosition(in size: CGSize) -> CGPoint {
         let padding: CGFloat = 20
         let menuBarHeight: CGFloat = 28 // Account for macOS menu bar at top
-        let hudSize = CGSize(width: 400, height: 100)
+        let hudWidth: CGFloat = 450
+        let hudHeight: CGFloat = 120
 
         switch position {
         case .topLeft:
-            return CGPoint(x: hudSize.width / 2 + padding, y: hudSize.height / 2 + padding + menuBarHeight)
+            return CGPoint(x: hudWidth / 2 + padding, y: hudHeight / 2 + padding + menuBarHeight)
         case .topRight:
-            return CGPoint(x: size.width - hudSize.width / 2 - padding, y: hudSize.height / 2 + padding + menuBarHeight)
+            return CGPoint(x: size.width - hudWidth / 2 - padding, y: hudHeight / 2 + padding + menuBarHeight)
         case .bottomLeft:
-            return CGPoint(x: hudSize.width / 2 + padding, y: size.height - hudSize.height / 2 - padding)
+            return CGPoint(x: hudWidth / 2 + padding, y: size.height - hudHeight / 2 - padding)
         case .bottomRight:
-            return CGPoint(x: size.width - hudSize.width / 2 - padding, y: size.height - hudSize.height / 2 - padding)
+            return CGPoint(x: size.width - hudWidth / 2 - padding, y: size.height - hudHeight / 2 - padding)
         }
     }
 }
@@ -225,15 +226,14 @@ enum HUDPosition: String, CaseIterable {
     case bottomRight = "bottom-right"
 }
 
+// MARK: - Combined Style HUD Content (matches preview)
+
 struct HUDContent: View {
     let message: HUDMessage
     let theme: Theme
-    @State private var wavePhase: Double = 0
-    @State private var scanlineOffset: CGFloat = 0
     @ObservedObject private var config = ConfigManager.shared
 
-    private var accentColor: Color {
-        // Use configured waveform color, or fall back to provider color
+    private var waveformColor: Color {
         switch config.hudWaveformColor.lowercased() {
         case "blue": return .blue
         case "purple": return .purple
@@ -241,12 +241,27 @@ struct HUDContent: View {
         case "orange": return .orange
         case "cyan": return .cyan
         case "pink": return .pink
-        case "white": return providerColor // Use provider color when white
-        default: return providerColor
+        default:
+            // Check for hex color
+            if config.hudWaveformColor.hasPrefix("#") {
+                return Color(hex: config.hudWaveformColor) ?? .white
+            }
+            return .white
         }
     }
 
-    private var textFontDesign: Font.Design {
+    private var fontSize: CGFloat {
+        switch config.hudTextSize {
+        case "xs": return 10
+        case "sm": return 12
+        case "md": return 14
+        case "lg": return 16
+        case "xl": return 18
+        default: return 14
+        }
+    }
+
+    private var fontDesign: Font.Design {
         switch config.hudTextFont {
         case "mono": return .monospaced
         case "serif": return .serif
@@ -255,78 +270,26 @@ struct HUDContent: View {
         }
     }
 
-    private var textFontSize: CGFloat {
-        switch config.hudTextSize {
-        case "xs": return 11
-        case "sm": return 13
-        case "md": return 15
-        case "lg": return 17
-        case "xl": return 19
-        default: return 15
-        }
-    }
-
     var body: some View {
-        ZStack {
-            // Animated background waves
-            WaveformBackground(phase: wavePhase, color: accentColor)
-                .opacity(0.1)
+        VStack(spacing: 0) {
+            // Text section at top
+            HUDTextSection(
+                text: message.text,
+                cached: message.cached,
+                fontSize: fontSize,
+                fontDesign: fontDesign
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Scanline effect
-            ScanlineOverlay(offset: scanlineOffset)
-                .opacity(0.05)
-
-            // Main content
-            HStack(spacing: 16) {
-                // Provider icon with glow
-                ZStack {
-                    Circle()
-                        .fill(providerColor.opacity(0.15))
-                        .frame(width: 50, height: 50)
-                        .blur(radius: 8)
-
-                    Image(systemName: providerIcon)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(providerColor)
-                        .shadow(color: providerColor.opacity(0.6), radius: 8)
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text(providerDisplayName.uppercased())
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(providerColor)
-                            .tracking(1.2)
-
-                        if message.cached {
-                            HStack(spacing: 3) {
-                                Image(systemName: "bolt.fill")
-                                    .font(.system(size: 8))
-                                Text("CACHED")
-                                    .font(.system(size: 7, weight: .bold, design: .monospaced))
-                            }
-                            .foregroundColor(Color.cyan)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.cyan.opacity(0.2))
-                            .cornerRadius(3)
-                        }
-                    }
-
-                    Text(message.text)
-                        .font(.system(size: textFontSize, weight: .medium, design: textFontDesign))
-                        .foregroundColor(.white.opacity(0.95))
-                        .lineLimit(2)
-                        .truncationMode(.tail)
-
-                    // Audio wave indicator
-                    AudioWaveIndicator(color: accentColor, phase: wavePhase, barCount: config.hudWaveformBarCount)
-                        .frame(height: 18)
-                }
-
-                Spacer()
-            }
-            .padding(16)
+            // Waveform at bottom
+            HUDWaveformSection(
+                barCount: config.hudWaveformBarCount,
+                amplitudeMultiplier: config.hudWaveformAmplitude,
+                color: waveformColor
+            )
+            .frame(height: 35)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
         .frame(width: 450, height: 120)
         .background(
@@ -340,157 +303,105 @@ struct HUDContent: View {
                     .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
             }
         )
-        .onAppear {
-            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                wavePhase = .pi * 2
-            }
-            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                scanlineOffset = 120
-            }
-        }
-    }
-
-    private var providerColor: Color {
-        switch message.provider {
-        case "system":
-            return .blue
-        case "openai":
-            return .green
-        case "elevenlabs":
-            return .purple
-        case "groq":
-            return .orange
-        case "gemini":
-            return .cyan
-        default:
-            return .white
-        }
-    }
-
-    private var providerIcon: String {
-        switch message.provider {
-        case "system":
-            return "speaker.wave.2.fill"
-        case "openai":
-            return "waveform.circle.fill"
-        case "elevenlabs":
-            return "waveform.badge.mic"
-        case "groq":
-            return "bolt.circle.fill"
-        case "gemini":
-            return "sparkles"
-        default:
-            return "speaker.fill"
-        }
-    }
-
-    private var providerDisplayName: String {
-        switch message.provider {
-        case "system":
-            return "System Voice"
-        case "openai":
-            return "OpenAI"
-        case "elevenlabs":
-            return "ElevenLabs"
-        case "groq":
-            return "Groq"
-        case "gemini":
-            return "Gemini"
-        default:
-            return message.provider.capitalized
-        }
     }
 }
 
-// MARK: - Animation Components
+// MARK: - Text Section
 
-struct WaveformBackground: View {
-    let phase: Double
+struct HUDTextSection: View {
+    let text: String
+    let cached: Bool
+    let fontSize: CGFloat
+    let fontDesign: Font.Design
+
+    var body: some View {
+        VStack(spacing: 4) {
+            // Cached indicator if applicable
+            if cached {
+                HStack(spacing: 3) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 8))
+                    Text("CACHED")
+                        .font(.system(size: 7, weight: .bold, design: .monospaced))
+                }
+                .foregroundColor(Color.cyan)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.cyan.opacity(0.2))
+                .cornerRadius(4)
+            }
+
+            // Main text
+            Text(text)
+                .font(.system(size: fontSize, weight: .light, design: fontDesign))
+                .foregroundColor(.white.opacity(0.9))
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .padding(.horizontal, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Waveform Section (TimelineView for smooth animation)
+
+struct HUDWaveformSection: View {
+    let barCount: Int
+    let amplitudeMultiplier: Double
     let color: Color
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                ForEach(0..<3, id: \.self) { index in
-                    WavePath(phase: phase, offset: Double(index) * 0.5)
-                        .stroke(
-                            color.opacity(0.3 - Double(index) * 0.1),
-                            lineWidth: 2
-                        )
+        TimelineView(.animation(minimumInterval: 0.016)) { timeline in
+            Canvas { context, size in
+                let currentTime = timeline.date.timeIntervalSinceReferenceDate
+                let centerY = size.height / 2
+
+                let effectiveBarCount = max(10, min(60, barCount))
+                let gap: CGFloat = 3
+                let totalGaps = CGFloat(effectiveBarCount - 1) * gap
+                let barWidth = (size.width - totalGaps) / CGFloat(effectiveBarCount)
+
+                for i in 0..<effectiveBarCount {
+                    let x = CGFloat(i) * (barWidth + gap)
+
+                    // Golden ratio seeding for unique per-bar character
+                    let seed = Double(i) * 1.618033988749
+                    let seedFrac = seed.truncatingRemainder(dividingBy: 1.0)
+
+                    // Each bar has its own dance
+                    let primarySpeed = 4.0 + seedFrac * 2.5
+                    let primaryPhase = seed * 0.7
+                    let primary = sin(currentTime * primarySpeed + primaryPhase)
+
+                    let secondarySpeed = 7.0 + (1.0 - seedFrac) * 3.0
+                    let secondary = sin(currentTime * secondarySpeed + seed * 1.3) * 0.3
+
+                    let combined = primary + secondary
+                    let normalized = (combined / 1.3 + 1) / 2
+
+                    // Base height + animation
+                    let minHeight: CGFloat = 3
+                    let baseRange: CGFloat = 8 * amplitudeMultiplier
+                    let baseHeight = minHeight + (normalized * baseRange)
+
+                    // Add simulated "audio" variation
+                    let audioBoost: CGFloat = 12 * amplitudeMultiplier
+                    let audioVariation = sin(currentTime * 3.0 + Double(i) * 0.3) * 0.5 + 0.5
+                    let totalHeight = baseHeight + (audioVariation * audioBoost)
+
+                    let rect = CGRect(
+                        x: x,
+                        y: centerY - totalHeight / 2,
+                        width: barWidth,
+                        height: totalHeight
+                    )
+
+                    let path = RoundedRectangle(cornerRadius: barWidth / 2)
+                        .path(in: rect)
+
+                    context.fill(path, with: .color(color.opacity(0.8)))
                 }
             }
         }
-    }
-}
-
-struct WavePath: Shape {
-    var phase: Double
-    let offset: Double
-
-    var animatableData: Double {
-        get { phase }
-        set { phase = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let width = rect.width
-        let height = rect.height
-        let midHeight = height / 2
-        let wavelength = width / 4
-        let amplitude = height / 8
-
-        path.move(to: CGPoint(x: 0, y: midHeight))
-
-        for x in stride(from: 0, through: width, by: 1) {
-            let relativeX = x / wavelength
-            let normalizedPhase = (phase + offset) / (.pi * 2)
-            let sine = sin((relativeX + normalizedPhase) * .pi * 2)
-            let y = midHeight + sine * amplitude
-            path.addLine(to: CGPoint(x: x, y: y))
-        }
-
-        return path
-    }
-}
-
-struct ScanlineOverlay: View {
-    let offset: CGFloat
-
-    var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 4) {
-                ForEach(0..<Int(geometry.size.height / 4), id: \.self) { _ in
-                    Rectangle()
-                        .fill(Color.white.opacity(0.05))
-                        .frame(height: 1)
-                }
-            }
-            .offset(y: offset.truncatingRemainder(dividingBy: geometry.size.height))
-        }
-    }
-}
-
-struct AudioWaveIndicator: View {
-    let color: Color
-    let phase: Double
-    var barCount: Int = 20
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<barCount, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(color.opacity(0.7))
-                    .frame(width: 3, height: barHeight(for: index))
-            }
-        }
-    }
-
-    private func barHeight(for index: Int) -> CGFloat {
-        let normalizedIndex = Double(index) / Double(barCount)
-        let offset = normalizedIndex * .pi * 2
-        let sine = sin(phase + offset)
-        let normalized = (sine + 1) / 2 // 0 to 1
-        return 3 + normalized * 12
     }
 }

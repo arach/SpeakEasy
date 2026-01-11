@@ -1289,6 +1289,30 @@ var TTSCache = class {
   }
 };
 
+// src/hud.ts
+var import_fs = require("fs");
+var import_fs2 = require("fs");
+var HUD_PIPE_PATH = "/tmp/speakeasy-hud.fifo";
+function notifyHUD(message) {
+  if (!(0, import_fs2.existsSync)(HUD_PIPE_PATH)) {
+    return;
+  }
+  try {
+    const stats = (0, import_fs2.statSync)(HUD_PIPE_PATH);
+    if (!stats.isFIFO()) {
+      return;
+    }
+    const fd = (0, import_fs.openSync)(HUD_PIPE_PATH, import_fs.constants.O_WRONLY | import_fs.constants.O_NONBLOCK);
+    try {
+      const jsonMessage = JSON.stringify(message) + "\n";
+      (0, import_fs.writeSync)(fd, jsonMessage);
+    } finally {
+      (0, import_fs.closeSync)(fd);
+    }
+  } catch (error) {
+  }
+}
+
 // src/index.ts
 var CONFIG_DIR = path6.join(require("os").homedir(), ".config", "speakeasy");
 var CONFIG_FILE = path6.join(CONFIG_DIR, "settings.json");
@@ -1314,8 +1338,10 @@ var SpeakEasy = class {
   cache;
   useCache = false;
   debug = false;
+  hudEnabled = false;
   constructor(config) {
     const globalConfig = loadGlobalConfig();
+    this.hudEnabled = globalConfig.hud?.enabled ?? false;
     this.config = {
       provider: config.provider || globalConfig.defaults?.provider || "system",
       systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || "Samantha",
@@ -1450,6 +1476,7 @@ var SpeakEasy = class {
                 if (this.debug) {
                   console.log(`\u{1F4E6} Using cached audio from: ${cachedEntry.audioFilePath}`);
                 }
+                this.sendHUDNotification(text, providerName, true);
                 if (!silent) {
                   await this.playCachedAudio(cachedEntry.audioFilePath);
                 }
@@ -1465,6 +1492,7 @@ var SpeakEasy = class {
               if (this.debug) {
                 console.log(`\u{1F399}\uFE0F  Using system voice: ${voice}`);
               }
+              this.sendHUDNotification(text, providerName, false);
               await provider.speak({
                 text,
                 rate,
@@ -1511,6 +1539,7 @@ var SpeakEasy = class {
                 success: true
               });
               console.log("cached");
+              this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 const fileExt = providerName === "gemini" ? "wav" : "mp3";
                 const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
@@ -1522,6 +1551,7 @@ var SpeakEasy = class {
                 }
               }
             } else if (audioBuffer) {
+              this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 const fileExt = providerName === "gemini" ? "wav" : "mp3";
                 const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
@@ -1684,6 +1714,17 @@ var SpeakEasy = class {
       default:
         return provider;
     }
+  }
+  sendHUDNotification(text, provider, cached) {
+    if (!this.hudEnabled)
+      return;
+    notifyHUD({
+      text: text.substring(0, 200),
+      // Limit to 200 chars for HUD display
+      provider,
+      cached,
+      timestamp: Date.now()
+    });
   }
   stopSpeaking() {
     try {

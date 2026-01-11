@@ -89,6 +89,11 @@ interface GlobalConfig {
         maxSize?: string | number;
         dir?: string;
     };
+    hud?: {
+        enabled?: boolean;
+        duration?: number;
+        opacity?: number;
+    };
 }
 
 declare class SystemProvider implements Provider {
@@ -264,6 +269,7 @@ declare class SpeakEasy {
     private cache?;
     private useCache;
     private debug;
+    private hudEnabled;
     constructor(config: SpeakEasyConfig);
     private initializeProviders;
     speak(text: string, options?: SpeakEasyOptions): Promise<void>;
@@ -274,6 +280,7 @@ declare class SpeakEasy {
     private getVoiceForProvider;
     private getApiKeyForProvider;
     private inferModel;
+    private sendHUDNotification;
     private stopSpeaking;
     getCacheStats(): Promise<{
         size: number;
@@ -286,4 +293,4 @@ declare const speak: (text: string, options?: SpeakEasyOptions & {
     volume?: number;
 }) => Promise<void>;
 
-export { CONFIG_FILE, ElevenLabsProvider, GeminiProvider, GlobalConfig, GroqProvider, OpenAIProvider, Provider, ProviderConfig, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSCache, say, speak };
+export { CONFIG_FILE, ElevenLabsProvider, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, type Provider, type ProviderConfig, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, TTSCache, say, speak };

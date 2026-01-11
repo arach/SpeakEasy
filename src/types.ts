@@ -93,4 +93,9 @@ export interface GlobalConfig {
     maxSize?: string | number; // '100mb', '1gb', 104857600, etc.
     dir?: string;
   };
+  hud?: {
+    enabled?: boolean;
+    duration?: number;
+    opacity?: number;
+  };
 }
