@@ -4,10 +4,15 @@ import Foundation
 // MARK: - HUD Message Model
 
 struct HUDMessage: Codable {
-    let text: String
-    let provider: String
-    let cached: Bool
-    let timestamp: TimeInterval
+    let text: String?          // nil for level-only updates
+    let provider: String?
+    let cached: Bool?
+    let timestamp: TimeInterval?
+    let audioLevel: Float?     // 0.0 to 1.0, for waveform amplitude
+
+    var isLevelUpdate: Bool {
+        text == nil && audioLevel != nil
+    }
 }
 
 // MARK: - HUD Window Manager (Singleton)
@@ -17,6 +22,7 @@ class HUDWindowManager: ObservableObject {
 
     @Published var currentMessage: HUDMessage?
     @Published var isVisible = false
+    @Published var audioLevel: Float = 0.0  // Current audio level for waveform
 
     private var hideTimer: Timer?
     private var hudDuration: TimeInterval = 3.0
@@ -31,7 +37,7 @@ class HUDWindowManager: ObservableObject {
         // Start the singleton pipe reader
         PipeReaderService.shared.start { [weak self] message in
             DispatchQueue.main.async {
-                self?.showMessage(message)
+                self?.handleMessage(message)
             }
         }
     }
@@ -42,8 +48,20 @@ class HUDWindowManager: ObservableObject {
         hideTimer = nil
     }
 
+    private func handleMessage(_ message: HUDMessage) {
+        if message.isLevelUpdate {
+            // Just update audio level, don't reset timer
+            audioLevel = message.audioLevel ?? 0.0
+        } else {
+            // New text message
+            showMessage(message)
+        }
+    }
+
     private func showMessage(_ message: HUDMessage) {
         currentMessage = message
+        audioLevel = message.audioLevel ?? 0.0
+
         withAnimation(.easeOut(duration: 0.3)) {
             isVisible = true
         }
@@ -59,6 +77,13 @@ class HUDWindowManager: ObservableObject {
         withAnimation(.easeIn(duration: 0.3)) {
             isVisible = false
         }
+        audioLevel = 0.0
+    }
+
+    func dismiss() {
+        hideTimer?.invalidate()
+        hideTimer = nil
+        hideMessage()
     }
 }
 
@@ -182,11 +207,11 @@ struct HUDOverlayView: View {
     var body: some View {
         GeometryReader { geometry in
             if manager.isVisible, let message = manager.currentMessage {
-                HUDContent(message: message, theme: theme)
+                HUDContent(message: message, theme: theme, audioLevel: manager.audioLevel)
                     .opacity(opacity)
                     .position(getPosition(in: geometry.size))
                     .transition(.asymmetric(
-                        insertion: .scale.combined(with: .opacity),
+                        insertion: .move(edge: entryEdge).combined(with: .opacity),
                         removal: .opacity
                     ))
             }
@@ -197,6 +222,15 @@ struct HUDOverlayView: View {
         }
         .onDisappear {
             // Don't stop - singleton keeps running
+        }
+    }
+
+    private var entryEdge: Edge {
+        switch position {
+        case .topLeft, .topRight:
+            return .top
+        case .bottomLeft, .bottomRight:
+            return .bottom
         }
     }
 
@@ -231,6 +265,7 @@ enum HUDPosition: String, CaseIterable {
 struct HUDContent: View {
     let message: HUDMessage
     let theme: Theme
+    let audioLevel: Float
     @ObservedObject private var config = ConfigManager.shared
 
     private var waveformColor: Color {
@@ -271,25 +306,42 @@ struct HUDContent: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Text section at top
-            HUDTextSection(
-                text: message.text,
-                cached: message.cached,
-                fontSize: fontSize,
-                fontDesign: fontDesign
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 0) {
+                // Text section at top
+                HUDTextSection(
+                    text: message.text ?? "",
+                    cached: message.cached ?? false,
+                    fontSize: fontSize,
+                    fontDesign: fontDesign
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Waveform at bottom
-            HUDWaveformSection(
-                barCount: config.hudWaveformBarCount,
-                amplitudeMultiplier: config.hudWaveformAmplitude,
-                color: waveformColor
-            )
-            .frame(height: 35)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+                // Waveform at bottom
+                HUDWaveformSection(
+                    barCount: config.hudWaveformBarCount,
+                    amplitudeMultiplier: config.hudWaveformAmplitude,
+                    color: waveformColor,
+                    audioLevel: audioLevel
+                )
+                .frame(height: 35)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+            }
+
+            // Dismiss button
+            Button(action: {
+                HUDWindowManager.shared.dismiss()
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+                    .frame(width: 20, height: 20)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(8)
         }
         .frame(width: 450, height: 120)
         .background(
@@ -306,13 +358,20 @@ struct HUDContent: View {
     }
 }
 
-// MARK: - Text Section
+// MARK: - Text Section (with word-by-word animation)
 
 struct HUDTextSection: View {
     let text: String
     let cached: Bool
     let fontSize: CGFloat
     let fontDesign: Font.Design
+
+    @State private var visibleWordCount: Int = 0
+    @State private var animationTimer: Timer?
+
+    private var words: [String] {
+        text.split(separator: " ").map(String.init)
+    }
 
     var body: some View {
         VStack(spacing: 4) {
@@ -331,77 +390,144 @@ struct HUDTextSection: View {
                 .cornerRadius(4)
             }
 
-            // Main text
-            Text(text)
-                .font(.system(size: fontSize, weight: .light, design: fontDesign))
-                .foregroundColor(.white.opacity(0.9))
-                .multilineTextAlignment(.center)
-                .lineLimit(3)
-                .padding(.horizontal, 16)
+            // Animated word-by-word text
+            FlowingText(
+                words: words,
+                visibleCount: visibleWordCount,
+                fontSize: fontSize,
+                fontDesign: fontDesign
+            )
+            .padding(.horizontal, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            startWordAnimation()
+        }
+        .onDisappear {
+            animationTimer?.invalidate()
+        }
+    }
+
+    private func startWordAnimation() {
+        visibleWordCount = 0
+        // Show words at roughly speech pace (150-200 WPM = ~3-4 words/sec)
+        let interval = 0.25 // 4 words per second
+        animationTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
+            withAnimation(.easeOut(duration: 0.15)) {
+                if visibleWordCount < words.count {
+                    visibleWordCount += 1
+                } else {
+                    animationTimer?.invalidate()
+                }
+            }
+        }
     }
 }
 
-// MARK: - Waveform Section (TimelineView for smooth animation)
+struct FlowingText: View {
+    let words: [String]
+    let visibleCount: Int
+    let fontSize: CGFloat
+    let fontDesign: Font.Design
+
+    var body: some View {
+        // Build attributed text with visible/hidden words
+        HStack(spacing: 4) {
+            ForEach(Array(words.enumerated()), id: \.offset) { index, word in
+                Text(word)
+                    .font(.system(size: fontSize, weight: index == visibleCount - 1 ? .medium : .light, design: fontDesign))
+                    .foregroundColor(index < visibleCount ? .white.opacity(index == visibleCount - 1 ? 0.95 : 0.7) : .clear)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .lineLimit(3)
+    }
+}
+
+// MARK: - Waveform Section (Audio-reactive)
 
 struct HUDWaveformSection: View {
     let barCount: Int
     let amplitudeMultiplier: Double
     let color: Color
+    let audioLevel: Float  // 0.0 to 1.0 from audio input
+
+    private var effectiveBarCount: Int {
+        max(10, min(60, barCount))
+    }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.016)) { timeline in
-            Canvas { context, size in
-                let currentTime = timeline.date.timeIntervalSinceReferenceDate
-                let centerY = size.height / 2
-
-                let effectiveBarCount = max(10, min(60, barCount))
-                let gap: CGFloat = 3
-                let totalGaps = CGFloat(effectiveBarCount - 1) * gap
-                let barWidth = (size.width - totalGaps) / CGFloat(effectiveBarCount)
-
-                for i in 0..<effectiveBarCount {
-                    let x = CGFloat(i) * (barWidth + gap)
-
-                    // Golden ratio seeding for unique per-bar character
-                    let seed = Double(i) * 1.618033988749
-                    let seedFrac = seed.truncatingRemainder(dividingBy: 1.0)
-
-                    // Each bar has its own dance
-                    let primarySpeed = 4.0 + seedFrac * 2.5
-                    let primaryPhase = seed * 0.7
-                    let primary = sin(currentTime * primarySpeed + primaryPhase)
-
-                    let secondarySpeed = 7.0 + (1.0 - seedFrac) * 3.0
-                    let secondary = sin(currentTime * secondarySpeed + seed * 1.3) * 0.3
-
-                    let combined = primary + secondary
-                    let normalized = (combined / 1.3 + 1) / 2
-
-                    // Base height + animation
-                    let minHeight: CGFloat = 3
-                    let baseRange: CGFloat = 8 * amplitudeMultiplier
-                    let baseHeight = minHeight + (normalized * baseRange)
-
-                    // Add simulated "audio" variation
-                    let audioBoost: CGFloat = 12 * amplitudeMultiplier
-                    let audioVariation = sin(currentTime * 3.0 + Double(i) * 0.3) * 0.5 + 0.5
-                    let totalHeight = baseHeight + (audioVariation * audioBoost)
-
-                    let rect = CGRect(
-                        x: x,
-                        y: centerY - totalHeight / 2,
-                        width: barWidth,
-                        height: totalHeight
+        GeometryReader { geometry in
+            HStack(spacing: 3) {
+                ForEach(0..<effectiveBarCount, id: \.self) { i in
+                    WaveformBar(
+                        index: i,
+                        totalBars: effectiveBarCount,
+                        width: barWidth(in: geometry.size),
+                        amplitudeMultiplier: amplitudeMultiplier,
+                        color: color,
+                        audioLevel: audioLevel
                     )
-
-                    let path = RoundedRectangle(cornerRadius: barWidth / 2)
-                        .path(in: rect)
-
-                    context.fill(path, with: .color(color.opacity(0.8)))
                 }
             }
+            .frame(maxHeight: .infinity)
         }
+    }
+
+    private func barWidth(in size: CGSize) -> CGFloat {
+        let gap: CGFloat = 3
+        let totalGaps = CGFloat(effectiveBarCount - 1) * gap
+        return (size.width - totalGaps) / CGFloat(effectiveBarCount)
+    }
+}
+
+// Individual bar - height driven by audio level
+struct WaveformBar: View {
+    let index: Int
+    let totalBars: Int
+    let width: CGFloat
+    let amplitudeMultiplier: Double
+    let color: Color
+    let audioLevel: Float
+
+    // Pre-computed constants for this bar
+    private let baseHeight: CGFloat
+    private let maxBoost: CGFloat
+    private let phaseOffset: Double
+
+    init(index: Int, totalBars: Int, width: CGFloat, amplitudeMultiplier: Double, color: Color, audioLevel: Float) {
+        self.index = index
+        self.totalBars = totalBars
+        self.width = width
+        self.amplitudeMultiplier = amplitudeMultiplier
+        self.color = color
+        self.audioLevel = audioLevel
+
+        // Golden ratio for varied distribution
+        let seed = Double(index) * 1.618033988749
+        let seedFrac = seed.truncatingRemainder(dividingBy: 1.0)
+
+        // Base height when no audio (small idle state)
+        self.baseHeight = (3 + seedFrac * 3) * amplitudeMultiplier
+
+        // Max additional height when audio is loud
+        self.maxBoost = (15 + seedFrac * 10) * amplitudeMultiplier
+
+        // Phase offset for wave effect across bars
+        self.phaseOffset = Double(index) / Double(max(1, totalBars))
+    }
+
+    private var height: CGFloat {
+        // Audio level drives amplitude, with slight per-bar variation
+        let levelVariation = sin(phaseOffset * .pi * 2) * 0.15 + 1.0
+        let effectiveLevel = CGFloat(audioLevel) * levelVariation
+        return baseHeight + (maxBoost * effectiveLevel)
+    }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(color.opacity(0.8))
+            .frame(width: width, height: height)
+            .animation(.easeOut(duration: 0.05), value: audioLevel)
     }
 }

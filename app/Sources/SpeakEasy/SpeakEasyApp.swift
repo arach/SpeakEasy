@@ -204,16 +204,15 @@ struct SpeakEasyApp: App {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    var timer: Timer?
     var hudWindow: NSWindow?
     private var hudWindowManager: HUDWindowManager?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Configure all windows immediately
+        // Configure all windows once at launch
         configureAllWindows()
 
-        // Set up continuous monitoring to remove vibrancy
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        // One more pass after a short delay to catch any late-arriving views
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.configureAllWindows()
         }
 
@@ -230,7 +229,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        timer?.invalidate()
         hudWindowManager?.stop()
     }
 
@@ -269,7 +267,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.ignoresMouseEvents = true
+        window.ignoresMouseEvents = true  // Let clicks through to windows below
         window.hasShadow = false
 
         let hostingView = NSHostingView(rootView:
@@ -403,16 +401,18 @@ struct SolidWindowBackground: NSViewRepresentable {
             }
 
             window.invalidateShadow()
-            window.display()
         }
 
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        // Only update if color scheme actually changed
         let backgroundColor = context.environment.colorScheme == .dark ?
             NSColor(deviceRed: 0, green: 0, blue: 0, alpha: 1.0) :
             NSColor(deviceRed: 1, green: 1, blue: 1, alpha: 1.0)
+
+        guard nsView.layer?.backgroundColor != backgroundColor.cgColor else { return }
 
         nsView.layer?.backgroundColor = backgroundColor.cgColor
         nsView.layer?.isOpaque = true
@@ -423,14 +423,11 @@ struct SolidWindowBackground: NSViewRepresentable {
             window.contentView?.layer?.backgroundColor = backgroundColor.cgColor
             window.contentView?.layer?.isOpaque = true
 
-            // Update appearance
             if context.environment.colorScheme == .dark {
                 window.appearance = NSAppearance(named: .darkAqua)
             } else {
                 window.appearance = NSAppearance(named: .aqua)
             }
-
-            window.display()
         }
     }
 }

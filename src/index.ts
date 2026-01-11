@@ -1,11 +1,11 @@
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { 
-  SpeakEasyConfig, 
-  SpeakEasyOptions, 
-  GlobalConfig, 
-  Provider 
+import {
+  SpeakEasyConfig,
+  SpeakEasyOptions,
+  GlobalConfig,
+  Provider
 } from './types';
 import { SystemProvider } from './providers/system';
 import { OpenAIProvider } from './providers/openai';
@@ -13,7 +13,57 @@ import { ElevenLabsProvider } from './providers/elevenlabs';
 import { GroqProvider } from './providers/groq';
 import { GeminiProvider } from './providers/gemini';
 import { TTSCache } from './cache';
-import { notifyHUD } from './hud';
+import { notifyHUD, updateAudioLevel, closePipe } from './hud';
+
+/**
+ * Play audio file with simulated level updates for HUD waveform.
+ * Uses spawn to run afplay while sending level updates in parallel.
+ */
+function playAudioWithLevels(audioFile: string, volume: number = 1.0): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const volumeArgs = volume !== 1.0 ? ['-v', volume.toString()] : [];
+    const afplay = spawn('afplay', [...volumeArgs, audioFile]);
+
+    // Simulate audio levels during playback
+    let levelInterval: NodeJS.Timeout | null = null;
+    let phase = 0;
+
+    const startLevelSimulation = () => {
+      levelInterval = setInterval(() => {
+        // Simulate speech-like levels with variation
+        const base = 0.4 + Math.sin(phase * 0.3) * 0.2;
+        const variation = Math.random() * 0.3;
+        const level = Math.min(1, Math.max(0, base + variation));
+        updateAudioLevel(level);
+        phase++;
+      }, 33); // ~30 Hz updates
+    };
+
+    const stopLevelSimulation = () => {
+      if (levelInterval) {
+        clearInterval(levelInterval);
+        levelInterval = null;
+      }
+      updateAudioLevel(0); // Reset to zero when done
+    };
+
+    startLevelSimulation();
+
+    afplay.on('close', (code) => {
+      stopLevelSimulation();
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`afplay exited with code ${code}`));
+      }
+    });
+
+    afplay.on('error', (err) => {
+      stopLevelSimulation();
+      reject(err);
+    });
+  });
+}
 
 const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
@@ -285,13 +335,11 @@ export class SpeakEasy {
 
               this.sendHUDNotification(text, providerName, false);
               if (!silent) {
-                // Play the generated audio
-                // Detect format from provider (Gemini returns WAV, others return MP3)
+                // Play the generated audio with level updates for HUD
                 const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
                 const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
                 fs.writeFileSync(tempFile, audioBuffer);
-                const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
-                execSync(`afplay${volumeFlag} "${tempFile}"`);
+                await playAudioWithLevels(tempFile, volume);
 
                 if (fs.existsSync(tempFile)) {
                   fs.unlinkSync(tempFile);
@@ -300,16 +348,14 @@ export class SpeakEasy {
             } else if (audioBuffer) {
               this.sendHUDNotification(text, providerName, false);
               if (!silent) {
-                // Play directly if no caching
-                // Detect format from provider
+                // Play directly with level updates for HUD
                 const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
                 const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
                 if (this.debug) {
                   console.log(`🎵 Playing generated audio: ${tempFile}`);
                 }
                 fs.writeFileSync(tempFile, audioBuffer);
-                const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
-                execSync(`afplay${volumeFlag} "${tempFile}"`);
+                await playAudioWithLevels(tempFile, volume);
 
                 if (fs.existsSync(tempFile)) {
                   fs.unlinkSync(tempFile);
@@ -430,11 +476,9 @@ export class SpeakEasy {
   }
 
   private async playCachedAudio(audioFilePath: string): Promise<void> {
-    // Play cached audio file using system audio player
-    const { execSync } = require('child_process');
+    // Play cached audio file with level updates for HUD
     const volume = this.config.volume !== undefined ? this.config.volume : 0.7;
-    const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
-    execSync(`afplay${volumeFlag} "${audioFilePath}"`, { stdio: 'inherit' });
+    await playAudioWithLevels(audioFilePath, volume);
   }
 
   private getVoiceForProvider(provider: string): string {

@@ -1293,27 +1293,90 @@ var TTSCache = class {
 var import_fs = require("fs");
 var import_fs2 = require("fs");
 var HUD_PIPE_PATH = "/tmp/speakeasy-hud.fifo";
-function notifyHUD(message) {
+var pipeFd = null;
+function ensurePipeOpen() {
+  if (pipeFd !== null) {
+    return pipeFd;
+  }
   if (!(0, import_fs2.existsSync)(HUD_PIPE_PATH)) {
-    return;
+    return null;
   }
   try {
     const stats = (0, import_fs2.statSync)(HUD_PIPE_PATH);
     if (!stats.isFIFO()) {
-      return;
+      return null;
     }
-    const fd = (0, import_fs.openSync)(HUD_PIPE_PATH, import_fs.constants.O_WRONLY | import_fs.constants.O_NONBLOCK);
-    try {
-      const jsonMessage = JSON.stringify(message) + "\n";
-      (0, import_fs.writeSync)(fd, jsonMessage);
-    } finally {
-      (0, import_fs.closeSync)(fd);
-    }
-  } catch (error) {
+    pipeFd = (0, import_fs.openSync)(HUD_PIPE_PATH, import_fs.constants.O_WRONLY | import_fs.constants.O_NONBLOCK);
+    return pipeFd;
+  } catch {
+    return null;
   }
+}
+function writeToPipe(message) {
+  const fd = ensurePipeOpen();
+  if (fd === null)
+    return;
+  try {
+    const jsonMessage = JSON.stringify(message) + "\n";
+    (0, import_fs.writeSync)(fd, jsonMessage);
+  } catch {
+    closePipe();
+  }
+}
+function closePipe() {
+  if (pipeFd !== null) {
+    try {
+      (0, import_fs.closeSync)(pipeFd);
+    } catch {
+    }
+    pipeFd = null;
+  }
+}
+function notifyHUD(message) {
+  writeToPipe(message);
+}
+function updateAudioLevel(level) {
+  writeToPipe({ audioLevel: Math.max(0, Math.min(1, level)) });
 }
 
 // src/index.ts
+function playAudioWithLevels(audioFile, volume = 1) {
+  return new Promise((resolve, reject) => {
+    const volumeArgs = volume !== 1 ? ["-v", volume.toString()] : [];
+    const afplay = (0, import_child_process6.spawn)("afplay", [...volumeArgs, audioFile]);
+    let levelInterval = null;
+    let phase = 0;
+    const startLevelSimulation = () => {
+      levelInterval = setInterval(() => {
+        const base = 0.4 + Math.sin(phase * 0.3) * 0.2;
+        const variation = Math.random() * 0.3;
+        const level = Math.min(1, Math.max(0, base + variation));
+        updateAudioLevel(level);
+        phase++;
+      }, 33);
+    };
+    const stopLevelSimulation = () => {
+      if (levelInterval) {
+        clearInterval(levelInterval);
+        levelInterval = null;
+      }
+      updateAudioLevel(0);
+    };
+    startLevelSimulation();
+    afplay.on("close", (code) => {
+      stopLevelSimulation();
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`afplay exited with code ${code}`));
+      }
+    });
+    afplay.on("error", (err) => {
+      stopLevelSimulation();
+      reject(err);
+    });
+  });
+}
 var CONFIG_DIR = path6.join(require("os").homedir(), ".config", "speakeasy");
 var CONFIG_FILE = path6.join(CONFIG_DIR, "settings.json");
 function loadGlobalConfig() {
@@ -1544,8 +1607,7 @@ var SpeakEasy = class {
                 const fileExt = providerName === "gemini" ? "wav" : "mp3";
                 const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
                 fs6.writeFileSync(tempFile, audioBuffer);
-                const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-                (0, import_child_process6.execSync)(`afplay${volumeFlag} "${tempFile}"`);
+                await playAudioWithLevels(tempFile, volume);
                 if (fs6.existsSync(tempFile)) {
                   fs6.unlinkSync(tempFile);
                 }
@@ -1559,8 +1621,7 @@ var SpeakEasy = class {
                   console.log(`\u{1F3B5} Playing generated audio: ${tempFile}`);
                 }
                 fs6.writeFileSync(tempFile, audioBuffer);
-                const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-                (0, import_child_process6.execSync)(`afplay${volumeFlag} "${tempFile}"`);
+                await playAudioWithLevels(tempFile, volume);
                 if (fs6.existsSync(tempFile)) {
                   fs6.unlinkSync(tempFile);
                 }
@@ -1664,10 +1725,8 @@ var SpeakEasy = class {
     console.log("");
   }
   async playCachedAudio(audioFilePath) {
-    const { execSync: execSync7 } = require("child_process");
     const volume = this.config.volume !== void 0 ? this.config.volume : 0.7;
-    const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-    execSync7(`afplay${volumeFlag} "${audioFilePath}"`, { stdio: "inherit" });
+    await playAudioWithLevels(audioFilePath, volume);
   }
   getVoiceForProvider(provider) {
     switch (provider) {
