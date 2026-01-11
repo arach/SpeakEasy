@@ -10,32 +10,34 @@ struct HUDMessage: Codable {
     let timestamp: TimeInterval
 }
 
-// MARK: - HUD Window Manager
+// MARK: - HUD Window Manager (Singleton)
 
 class HUDWindowManager: ObservableObject {
+    static let shared = HUDWindowManager()
+
     @Published var currentMessage: HUDMessage?
     @Published var isVisible = false
 
-    private var pipeReader: PipeReader?
     private var hideTimer: Timer?
-    private let hudDuration: TimeInterval
+    private var hudDuration: TimeInterval = 3.0
+    private var isStarted = false
 
-    init(duration: TimeInterval = 3.0) {
-        self.hudDuration = duration
-    }
+    private init() {}
 
     func start() {
-        pipeReader = PipeReader { [weak self] message in
+        guard !isStarted else { return }
+        isStarted = true
+
+        // Start the singleton pipe reader
+        PipeReaderService.shared.start { [weak self] message in
             DispatchQueue.main.async {
                 self?.showMessage(message)
             }
         }
-        pipeReader?.start()
     }
 
     func stop() {
-        pipeReader?.stop()
-        pipeReader = nil
+        // Don't actually stop - keep pipe reader running as singleton
         hideTimer?.invalidate()
         hideTimer = nil
     }
@@ -60,20 +62,25 @@ class HUDWindowManager: ObservableObject {
     }
 }
 
-// MARK: - Pipe Reader
+// MARK: - Pipe Reader Service (Singleton)
 
-class PipeReader {
+class PipeReaderService {
+    static let shared = PipeReaderService()
+
     private let pipePath = "/tmp/speakeasy-hud.fifo"
     private var isRunning = false
-    private var readQueue: DispatchQueue
-    private let onMessage: (HUDMessage) -> Void
+    private let readQueue = DispatchQueue(label: "com.speakeasy.hud.pipe", qos: .userInitiated)
+    private var onMessage: ((HUDMessage) -> Void)?
+    private let lock = NSLock()
 
-    init(onMessage: @escaping (HUDMessage) -> Void) {
+    private init() {}
+
+    func start(onMessage: @escaping (HUDMessage) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+
         self.onMessage = onMessage
-        self.readQueue = DispatchQueue(label: "com.speakeasy.hud.pipe", qos: .userInitiated)
-    }
 
-    func start() {
         guard !isRunning else { return }
         isRunning = true
 
@@ -87,56 +94,78 @@ class PipeReader {
     }
 
     func stop() {
+        lock.lock()
+        defer { lock.unlock() }
         isRunning = false
     }
 
     private func createPipe() {
         let fileManager = FileManager.default
 
-        // Remove old pipe if exists
-        if fileManager.fileExists(atPath: pipePath) {
-            try? fileManager.removeItem(atPath: pipePath)
-        }
-
-        // Create new FIFO
-        let result = mkfifo(pipePath, 0o666)
-        if result != 0 && errno != EEXIST {
-            print("Failed to create FIFO: \(String(cString: strerror(errno)))")
+        // Only create if doesn't exist (don't remove - might have writer waiting)
+        if !fileManager.fileExists(atPath: pipePath) {
+            let result = mkfifo(pipePath, 0o666)
+            if result != 0 && errno != EEXIST {
+                print("Failed to create FIFO: \(String(cString: strerror(errno)))")
+            }
         }
     }
 
     private func readLoop() {
-        guard let fileHandle = FileHandle(forReadingAtPath: pipePath) else {
-            print("Failed to open pipe for reading")
-            return
-        }
-
-        defer {
-            fileHandle.closeFile()
-        }
-
         while isRunning {
-            autoreleasepool {
-                let data = fileHandle.availableData
+            // Open pipe - this blocks until a writer connects
+            guard let fileHandle = FileHandle(forReadingAtPath: pipePath) else {
+                // Pipe doesn't exist, wait and retry
+                Thread.sleep(forTimeInterval: 0.5)
+                createPipe()
+                continue
+            }
 
-                if data.isEmpty {
-                    // Pipe was closed, reopen it
-                    return
-                }
+            // Read until pipe closes or we're stopped
+            var shouldReopen = false
+            while isRunning && !shouldReopen {
+                autoreleasepool {
+                    do {
+                        // Use the Swift-throwing API instead of availableData
+                        // which throws ObjC exceptions that Swift can't catch
+                        guard let data = try fileHandle.read(upToCount: 4096) else {
+                            // EOF or error
+                            shouldReopen = true
+                            return
+                        }
 
-                guard let jsonString = String(data: data, encoding: .utf8) else {
-                    return
-                }
+                        if data.isEmpty {
+                            // Pipe was closed by writer, break to reopen
+                            shouldReopen = true
+                            return
+                        }
 
-                // Split by newlines in case multiple messages arrived
-                let lines = jsonString.components(separatedBy: "\n").filter { !$0.isEmpty }
+                        guard let jsonString = String(data: data, encoding: .utf8) else {
+                            return
+                        }
 
-                for line in lines {
-                    if let jsonData = line.data(using: .utf8),
-                       let message = try? JSONDecoder().decode(HUDMessage.self, from: jsonData) {
-                        onMessage(message)
+                        // Split by newlines in case multiple messages arrived
+                        let lines = jsonString.components(separatedBy: "\n").filter { !$0.isEmpty }
+
+                        for line in lines {
+                            if let jsonData = line.data(using: .utf8),
+                               let message = try? JSONDecoder().decode(HUDMessage.self, from: jsonData) {
+                                onMessage?(message)
+                            }
+                        }
+                    } catch {
+                        // FileHandle became invalid or other read error
+                        // Close and reopen the pipe
+                        shouldReopen = true
                     }
                 }
+            }
+
+            // Safely close the file handle
+            do {
+                try fileHandle.close()
+            } catch {
+                // Ignore close errors
             }
         }
     }
@@ -145,7 +174,7 @@ class PipeReader {
 // MARK: - HUD View
 
 struct HUDOverlayView: View {
-    @StateObject private var manager = HUDWindowManager()
+    @ObservedObject private var manager = HUDWindowManager.shared
     @Environment(\.theme) var theme
     let position: HUDPosition
     let opacity: Double
@@ -167,7 +196,7 @@ struct HUDOverlayView: View {
             manager.start()
         }
         .onDisappear {
-            manager.stop()
+            // Don't stop - singleton keeps running
         }
     }
 

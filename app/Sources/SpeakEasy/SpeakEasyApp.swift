@@ -252,7 +252,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard hudWindow == nil else { return }
 
         let hudPosition = HUDPosition(rawValue: position) ?? .topRight
-        let manager = HUDWindowManager(duration: duration)
+        let manager = HUDWindowManager.shared
         manager.start()
         hudWindowManager = manager
 
@@ -274,10 +274,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let hostingView = NSHostingView(rootView:
             HUDOverlayView(position: hudPosition, opacity: opacity)
-                .environmentObject(manager)
         )
         hostingView.frame = window.contentView!.bounds
-        hostingView.autoresizingMask = [.width, .height]
+        hostingView.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
         window.contentView = hostingView
 
         window.orderFrontRegardless()
@@ -2476,15 +2475,19 @@ class PreviewWindowManager {
 
     private var previewWindow: NSWindow?
     private var controller: HUDPreviewController?
+    private var isClosing = false
 
     private init() {}
 
     func showPreview() {
-        // Reuse existing window if available
-        if let window = previewWindow {
+        // Reuse existing window if available and not closing
+        if let window = previewWindow, !isClosing {
             window.makeKeyAndOrderFront(nil)
             return
         }
+
+        // Wait if currently closing
+        if isClosing { return }
 
         let player = AudioPreviewPlayer()
         let ctrl = HUDPreviewController(player: player)
@@ -2497,7 +2500,7 @@ class PreviewWindowManager {
             defer: false
         )
         window.title = "HUD Preview"
-        window.animationBehavior = .none
+        window.animationBehavior = .none  // Disable animations
         window.isReleasedWhenClosed = false  // Keep window alive
         window.contentView = NSHostingView(rootView:
             HUDPreviewControlPanel(controller: ctrl)
@@ -2506,28 +2509,38 @@ class PreviewWindowManager {
         window.center()
         window.makeKeyAndOrderFront(nil)
 
-        // Watch for window close
+        // Watch for window close - use didEndSheet to ensure animations complete
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: window,
             queue: .main
-        ) { [weak self] _ in
-            self?.handleWindowClose()
+        ) { [weak self] notification in
+            guard let self = self,
+                  let closingWindow = notification.object as? NSWindow,
+                  closingWindow === self.previewWindow else { return }
+            self.handleWindowClose()
         }
 
         self.previewWindow = window
     }
 
     private func handleWindowClose() {
-        controller?.cleanup()
-        // Don't nil out previewWindow - let it stay for reuse
-        // But reset controller state
-        controller = nil
+        guard !isClosing else { return }
+        isClosing = true
 
-        // Delay cleanup to next run loop to avoid animation issues
-        DispatchQueue.main.async { [weak self] in
-            self?.previewWindow?.contentView = nil
-            self?.previewWindow = nil
+        // Cleanup audio first
+        controller?.cleanup()
+
+        // Clear references after a delay to let animations complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            // Remove observer
+            if let window = self.previewWindow {
+                NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: window)
+            }
+            self.controller = nil
+            self.previewWindow = nil
+            self.isClosing = false
         }
     }
 }
