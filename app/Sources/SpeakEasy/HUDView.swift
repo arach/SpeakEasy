@@ -431,13 +431,14 @@ struct FlowingText: View {
     let fontDesign: Font.Design
 
     var body: some View {
-        // Build attributed text with visible/hidden words
-        HStack(spacing: 4) {
-            ForEach(Array(words.enumerated()), id: \.offset) { index, word in
-                Text(word)
-                    .font(.system(size: fontSize, weight: index == visibleCount - 1 ? .medium : .light, design: fontDesign))
-                    .foregroundColor(index < visibleCount ? .white.opacity(index == visibleCount - 1 ? 0.95 : 0.7) : .clear)
-            }
+        // Use Text concatenation for proper line wrapping
+        words.enumerated().reduce(Text("")) { result, item in
+            let (index, word) = item
+            let separator = index == 0 ? "" : " "
+            let wordText = Text(separator + word)
+                .font(.system(size: fontSize, weight: index == visibleCount - 1 ? .medium : .light, design: fontDesign))
+                .foregroundColor(index < visibleCount ? .white.opacity(index == visibleCount - 1 ? 0.95 : 0.7) : .clear)
+            return result + wordText
         }
         .multilineTextAlignment(.center)
         .lineLimit(3)

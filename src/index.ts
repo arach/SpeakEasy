@@ -260,7 +260,7 @@ export class SpeakEasy {
                 if (this.debug) {
                   console.log(`📦 Using cached audio from: ${cachedEntry.audioFilePath}`);
                 }
-                this.sendHUDNotification(text, providerName, true);
+                await this.sendHUDNotification(text, providerName, true);
                 if (!silent) {
                   await this.playCachedAudio(cachedEntry.audioFilePath);
                 }
@@ -280,7 +280,7 @@ export class SpeakEasy {
               if (this.debug) {
                 console.log(`🎙️  Using system voice: ${voice}`);
               }
-              this.sendHUDNotification(text, providerName, false);
+              await this.sendHUDNotification(text, providerName, false);
               await provider.speak({
                 text,
                 rate,
@@ -333,7 +333,7 @@ export class SpeakEasy {
               
               console.log('cached');
 
-              this.sendHUDNotification(text, providerName, false);
+              await this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 // Play the generated audio with level updates for HUD
                 const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
@@ -346,7 +346,7 @@ export class SpeakEasy {
                 }
               }
             } else if (audioBuffer) {
-              this.sendHUDNotification(text, providerName, false);
+              await this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 // Play directly with level updates for HUD
                 const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
@@ -513,7 +513,7 @@ export class SpeakEasy {
     }
   }
 
-  private sendHUDNotification(text: string, provider: string, cached: boolean): void {
+  private async sendHUDNotification(text: string, provider: string, cached: boolean): Promise<void> {
     if (!this.hudEnabled) return;
 
     notifyHUD({
@@ -522,6 +522,9 @@ export class SpeakEasy {
       cached,
       timestamp: Date.now()
     });
+
+    // Small delay to let HUD appear before audio starts
+    await new Promise(resolve => setTimeout(resolve, 50));
   }
 
   private stopSpeaking(): void {

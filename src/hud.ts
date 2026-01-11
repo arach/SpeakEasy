@@ -11,53 +11,32 @@ export interface HUDMessage {
   audioLevel?: number;  // 0.0 to 1.0 for waveform amplitude
 }
 
-// Keep file descriptor open for level updates (avoids open/close overhead)
-let pipeFd: number | null = null;
-
-function ensurePipeOpen(): number | null {
-  if (pipeFd !== null) {
-    return pipeFd;
-  }
-
+function writeToPipe(message: HUDMessage): void {
   if (!existsSync(HUD_PIPE_PATH)) {
-    return null;
+    return;
   }
 
   try {
     const stats = statSync(HUD_PIPE_PATH);
     if (!stats.isFIFO()) {
-      return null;
+      return;
     }
 
-    pipeFd = openSync(HUD_PIPE_PATH, constants.O_WRONLY | constants.O_NONBLOCK);
-    return pipeFd;
+    // Open, write, close each time to ensure immediate delivery
+    const fd = openSync(HUD_PIPE_PATH, constants.O_WRONLY | constants.O_NONBLOCK);
+    try {
+      const jsonMessage = JSON.stringify(message) + '\n';
+      writeSync(fd, jsonMessage);
+    } finally {
+      closeSync(fd);
+    }
   } catch {
-    return null;
-  }
-}
-
-function writeToPipe(message: HUDMessage): void {
-  const fd = ensurePipeOpen();
-  if (fd === null) return;
-
-  try {
-    const jsonMessage = JSON.stringify(message) + '\n';
-    writeSync(fd, jsonMessage);
-  } catch {
-    // Pipe broken, close and retry next time
-    closePipe();
+    // Silently ignore - HUD might not be running
   }
 }
 
 export function closePipe(): void {
-  if (pipeFd !== null) {
-    try {
-      closeSync(pipeFd);
-    } catch {
-      // Ignore
-    }
-    pipeFd = null;
-  }
+  // No-op now, kept for API compatibility
 }
 
 /**

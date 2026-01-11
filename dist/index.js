@@ -1293,43 +1293,23 @@ var TTSCache = class {
 var import_fs = require("fs");
 var import_fs2 = require("fs");
 var HUD_PIPE_PATH = "/tmp/speakeasy-hud.fifo";
-var pipeFd = null;
-function ensurePipeOpen() {
-  if (pipeFd !== null) {
-    return pipeFd;
-  }
+function writeToPipe(message) {
   if (!(0, import_fs2.existsSync)(HUD_PIPE_PATH)) {
-    return null;
+    return;
   }
   try {
     const stats = (0, import_fs2.statSync)(HUD_PIPE_PATH);
     if (!stats.isFIFO()) {
-      return null;
+      return;
     }
-    pipeFd = (0, import_fs.openSync)(HUD_PIPE_PATH, import_fs.constants.O_WRONLY | import_fs.constants.O_NONBLOCK);
-    return pipeFd;
-  } catch {
-    return null;
-  }
-}
-function writeToPipe(message) {
-  const fd = ensurePipeOpen();
-  if (fd === null)
-    return;
-  try {
-    const jsonMessage = JSON.stringify(message) + "\n";
-    (0, import_fs.writeSync)(fd, jsonMessage);
-  } catch {
-    closePipe();
-  }
-}
-function closePipe() {
-  if (pipeFd !== null) {
+    const fd = (0, import_fs.openSync)(HUD_PIPE_PATH, import_fs.constants.O_WRONLY | import_fs.constants.O_NONBLOCK);
     try {
-      (0, import_fs.closeSync)(pipeFd);
-    } catch {
+      const jsonMessage = JSON.stringify(message) + "\n";
+      (0, import_fs.writeSync)(fd, jsonMessage);
+    } finally {
+      (0, import_fs.closeSync)(fd);
     }
-    pipeFd = null;
+  } catch {
   }
 }
 function notifyHUD(message) {
@@ -1539,7 +1519,7 @@ var SpeakEasy = class {
                 if (this.debug) {
                   console.log(`\u{1F4E6} Using cached audio from: ${cachedEntry.audioFilePath}`);
                 }
-                this.sendHUDNotification(text, providerName, true);
+                await this.sendHUDNotification(text, providerName, true);
                 if (!silent) {
                   await this.playCachedAudio(cachedEntry.audioFilePath);
                 }
@@ -1555,7 +1535,7 @@ var SpeakEasy = class {
               if (this.debug) {
                 console.log(`\u{1F399}\uFE0F  Using system voice: ${voice}`);
               }
-              this.sendHUDNotification(text, providerName, false);
+              await this.sendHUDNotification(text, providerName, false);
               await provider.speak({
                 text,
                 rate,
@@ -1602,7 +1582,7 @@ var SpeakEasy = class {
                 success: true
               });
               console.log("cached");
-              this.sendHUDNotification(text, providerName, false);
+              await this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 const fileExt = providerName === "gemini" ? "wav" : "mp3";
                 const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
@@ -1613,7 +1593,7 @@ var SpeakEasy = class {
                 }
               }
             } else if (audioBuffer) {
-              this.sendHUDNotification(text, providerName, false);
+              await this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 const fileExt = providerName === "gemini" ? "wav" : "mp3";
                 const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
@@ -1774,7 +1754,7 @@ var SpeakEasy = class {
         return provider;
     }
   }
-  sendHUDNotification(text, provider, cached) {
+  async sendHUDNotification(text, provider, cached) {
     if (!this.hudEnabled)
       return;
     notifyHUD({
@@ -1784,6 +1764,7 @@ var SpeakEasy = class {
       cached,
       timestamp: Date.now()
     });
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
   stopSpeaking() {
     try {
