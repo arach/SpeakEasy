@@ -506,7 +506,7 @@ struct ContentView: View {
 
                 // Tab selector
                 HStack(spacing: 4) {
-                    ForEach(Array(["Dashboard", "OpenAI", "ElevenLabs", "System", "Cache", "HUD"].enumerated()), id: \.offset) { index, title in
+                    ForEach(Array(["Dashboard", "OpenAI", "ElevenLabs", "System", "Cache", "HUD", "History"].enumerated()), id: \.offset) { index, title in
                         Button(action: {
                             withAnimation(.spring(duration: 0.25, bounce: 0.2)) {
                                 selectedTab = index
@@ -549,6 +549,7 @@ struct ContentView: View {
                         case 3: SystemSettingsView()
                         case 4: CacheManagementView()
                         case 5: HUDSettingsView()
+                        case 6: HistoryView()
                         default: DashboardView(selectedTab: $selectedTab)
                         }
                     }

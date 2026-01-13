@@ -14,6 +14,7 @@ import { GroqProvider } from './providers/groq';
 import { GeminiProvider } from './providers/gemini';
 import { TTSCache } from './cache';
 import { notifyHUD, updateAudioLevel, closePipe } from './hud';
+import { getHistory } from './history';
 
 /**
  * Play audio file with simulated level updates for HUD waveform.
@@ -514,13 +515,23 @@ export class SpeakEasy {
   }
 
   private async sendHUDNotification(text: string, provider: string, cached: boolean): Promise<void> {
+    const timestamp = Date.now();
+
+    // Always record to history
+    getHistory().add({
+      text,
+      provider,
+      timestamp,
+      cached
+    });
+
     if (!this.hudEnabled) return;
 
     notifyHUD({
       text: text.substring(0, 200), // Limit to 200 chars for HUD display
       provider,
       cached,
-      timestamp: Date.now()
+      timestamp
     });
 
     // Small delay to let HUD appear before audio starts

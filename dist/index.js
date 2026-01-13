@@ -43,8 +43,8 @@ __export(src_exports, {
 });
 module.exports = __toCommonJS(src_exports);
 var import_child_process6 = require("child_process");
-var fs6 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var fs7 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
 
 // src/providers/system.ts
 var import_child_process = require("child_process");
@@ -63,14 +63,14 @@ var SystemProvider = class {
         const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
         const playCommand = `afplay${volumeFlag} "${tempFile}"`;
         (0, import_child_process.execSync)(playCommand);
-        const fs7 = require("fs");
-        if (fs7.existsSync(tempFile)) {
-          fs7.unlinkSync(tempFile);
+        const fs8 = require("fs");
+        if (fs8.existsSync(tempFile)) {
+          fs8.unlinkSync(tempFile);
         }
       } catch (error) {
-        const fs7 = require("fs");
-        if (fs7.existsSync(tempFile)) {
-          fs7.unlinkSync(tempFile);
+        const fs8 = require("fs");
+        if (fs8.existsSync(tempFile)) {
+          fs8.unlinkSync(tempFile);
         }
         throw error;
       }
@@ -1319,6 +1319,117 @@ function updateAudioLevel(level) {
   writeToPipe({ audioLevel: Math.max(0, Math.min(1, level)) });
 }
 
+// src/history.ts
+var fs6 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
+var import_uuid2 = require("uuid");
+var CONFIG_DIR = path6.join(require("os").homedir(), ".config", "speakeasy");
+var HISTORY_DIR = path6.join(CONFIG_DIR, "history");
+function getWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 864e5 + 1) / 7);
+  return { year: d.getUTCFullYear(), week };
+}
+function getHistoryFile(date = /* @__PURE__ */ new Date()) {
+  const { year, week } = getWeekNumber(date);
+  const weekStr = week.toString().padStart(2, "0");
+  return path6.join(HISTORY_DIR, `history-${year}-W${weekStr}.json`);
+}
+var NotificationHistory = class {
+  entries = [];
+  currentFile;
+  constructor() {
+    this.currentFile = getHistoryFile();
+    this.ensureDir();
+    this.load();
+  }
+  ensureDir() {
+    if (!fs6.existsSync(HISTORY_DIR)) {
+      fs6.mkdirSync(HISTORY_DIR, { recursive: true });
+    }
+  }
+  load() {
+    try {
+      if (fs6.existsSync(this.currentFile)) {
+        const data = fs6.readFileSync(this.currentFile, "utf8");
+        this.entries = JSON.parse(data);
+      }
+    } catch (error) {
+      console.warn("Failed to load history:", error);
+      this.entries = [];
+    }
+  }
+  save() {
+    const newFile = getHistoryFile();
+    if (newFile !== this.currentFile) {
+      this.currentFile = newFile;
+      this.entries = [];
+    }
+    try {
+      this.ensureDir();
+      fs6.writeFileSync(this.currentFile, JSON.stringify(this.entries, null, 2));
+    } catch (error) {
+      console.warn("Failed to save history:", error);
+    }
+  }
+  add(entry) {
+    const id = (0, import_uuid2.v4)();
+    const fullEntry = { id, ...entry };
+    this.entries.unshift(fullEntry);
+    if (this.entries.length > this.maxEntries) {
+      this.entries = this.entries.slice(0, this.maxEntries);
+    }
+    this.save();
+    return id;
+  }
+  getAll() {
+    return [...this.entries];
+  }
+  getRecent(limit = 20) {
+    return this.entries.slice(0, limit);
+  }
+  clear() {
+    this.entries = [];
+    this.save();
+  }
+  getById(id) {
+    return this.entries.find((e) => e.id === id);
+  }
+  // Get all history across all week files (for UI display)
+  getAllHistory() {
+    const allEntries = [];
+    try {
+      if (!fs6.existsSync(HISTORY_DIR))
+        return allEntries;
+      const files = fs6.readdirSync(HISTORY_DIR).filter((f) => f.startsWith("history-") && f.endsWith(".json")).sort().reverse();
+      for (const file of files) {
+        try {
+          const data = fs6.readFileSync(path6.join(HISTORY_DIR, file), "utf8");
+          const entries = JSON.parse(data);
+          allEntries.push(...entries);
+        } catch {
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to read history files:", error);
+    }
+    return allEntries.sort((a, b) => b.timestamp - a.timestamp);
+  }
+  getHistoryDir() {
+    return HISTORY_DIR;
+  }
+};
+var historyInstance = null;
+function getHistory() {
+  if (!historyInstance) {
+    historyInstance = new NotificationHistory();
+  }
+  return historyInstance;
+}
+
 // src/index.ts
 function playAudioWithLevels(audioFile, volume = 1) {
   return new Promise((resolve, reject) => {
@@ -1357,12 +1468,12 @@ function playAudioWithLevels(audioFile, volume = 1) {
     });
   });
 }
-var CONFIG_DIR = path6.join(require("os").homedir(), ".config", "speakeasy");
-var CONFIG_FILE = path6.join(CONFIG_DIR, "settings.json");
+var CONFIG_DIR2 = path7.join(require("os").homedir(), ".config", "speakeasy");
+var CONFIG_FILE = path7.join(CONFIG_DIR2, "settings.json");
 function loadGlobalConfig() {
   try {
-    if (fs6.existsSync(CONFIG_FILE)) {
-      const configData = fs6.readFileSync(CONFIG_FILE, "utf8");
+    if (fs7.existsSync(CONFIG_FILE)) {
+      const configData = fs7.readFileSync(CONFIG_FILE, "utf8");
       return JSON.parse(configData);
     }
   } catch (error) {
@@ -1408,7 +1519,7 @@ var SpeakEasy = class {
     const cacheEnabled = cacheConfig?.enabled ?? (hasApiKeys && this.config.provider !== "system");
     this.useCache = cacheEnabled;
     if (this.useCache) {
-      const cacheDir = cacheConfig?.dir || path6.join(this.config.tempDir || "/tmp", "speakeasy-cache");
+      const cacheDir = cacheConfig?.dir || path7.join(this.config.tempDir || "/tmp", "speakeasy-cache");
       this.cache = new TTSCache(
         cacheDir,
         cacheConfig?.ttl || "7d",
@@ -1585,25 +1696,25 @@ var SpeakEasy = class {
               await this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 const fileExt = providerName === "gemini" ? "wav" : "mp3";
-                const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
-                fs6.writeFileSync(tempFile, audioBuffer);
+                const tempFile = path7.join(tempDir, `speech_${Date.now()}.${fileExt}`);
+                fs7.writeFileSync(tempFile, audioBuffer);
                 await playAudioWithLevels(tempFile, volume);
-                if (fs6.existsSync(tempFile)) {
-                  fs6.unlinkSync(tempFile);
+                if (fs7.existsSync(tempFile)) {
+                  fs7.unlinkSync(tempFile);
                 }
               }
             } else if (audioBuffer) {
               await this.sendHUDNotification(text, providerName, false);
               if (!silent) {
                 const fileExt = providerName === "gemini" ? "wav" : "mp3";
-                const tempFile = path6.join(tempDir, `speech_${Date.now()}.${fileExt}`);
+                const tempFile = path7.join(tempDir, `speech_${Date.now()}.${fileExt}`);
                 if (this.debug) {
                   console.log(`\u{1F3B5} Playing generated audio: ${tempFile}`);
                 }
-                fs6.writeFileSync(tempFile, audioBuffer);
+                fs7.writeFileSync(tempFile, audioBuffer);
                 await playAudioWithLevels(tempFile, volume);
-                if (fs6.existsSync(tempFile)) {
-                  fs6.unlinkSync(tempFile);
+                if (fs7.existsSync(tempFile)) {
+                  fs7.unlinkSync(tempFile);
                 }
               }
             }
@@ -1755,6 +1866,13 @@ var SpeakEasy = class {
     }
   }
   async sendHUDNotification(text, provider, cached) {
+    const timestamp = Date.now();
+    getHistory().add({
+      text,
+      provider,
+      timestamp,
+      cached
+    });
     if (!this.hudEnabled)
       return;
     notifyHUD({
@@ -1762,7 +1880,7 @@ var SpeakEasy = class {
       // Limit to 200 chars for HUD display
       provider,
       cached,
-      timestamp: Date.now()
+      timestamp
     });
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
