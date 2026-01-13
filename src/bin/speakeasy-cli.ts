@@ -5,6 +5,7 @@ import { showHelp as showHelpUI, showWelcome } from '../cli/ui';
 import { hasConfig as hasConfigFile, showConfig as showConfigCmd, diagnoseConfig as diagnoseConfigCmd, setApiKey as setApiKeyCmd, setDefaultProvider as setDefaultProviderCmd } from '../cli/config';
 import { runDoctor as runDoctorCmd } from '../cli/doctor';
 import { clearCache as clearCacheCmd, playCachedAudio as playCachedAudioCmd, listCacheEntries as listCacheEntriesCmd } from '../cli/cache';
+import { ensureAppInstalled, launchApp, updateApp, isAppInstalled } from '../app-manager';
 import { Command } from 'commander';
 import { getPackageVersion } from '../cli/constants';
 import { parseAndValidate } from '../cli/args';
@@ -36,6 +37,8 @@ interface CLIOptions {
   silent?: boolean;
   setKey?: string;
   setDefault?: string;
+  app?: boolean;
+  updateApp?: boolean;
 }
 
 async function run(): Promise<void> {
@@ -75,7 +78,9 @@ async function run(): Promise<void> {
     .option('--out <file>')
     .option('-s, --silent')
     .option('--set-key <provider>')
-    .option('--set-default <provider>');
+    .option('--set-default <provider>')
+    .option('--app', 'open settings app (downloads on first use)')
+    .option('--update-app', 'update the settings app');
 
   program.parse(process.argv);
   const parsed = program.opts();
@@ -130,6 +135,29 @@ async function run(): Promise<void> {
 
   if (options.setDefault) {
     setDefaultProviderCmd(options.setDefault);
+    return;
+  }
+
+  if (options.updateApp) {
+    await updateApp(console.log);
+    return;
+  }
+
+  if (options.app) {
+    if (process.platform !== 'darwin') {
+      console.error('❌ Settings app is only available on macOS');
+      process.exit(1);
+    }
+
+    if (!isAppInstalled()) {
+      const success = await ensureAppInstalled(console.log);
+      if (!success) {
+        process.exit(1);
+      }
+    }
+
+    console.log('🚀 Opening SpeakEasy settings...');
+    launchApp();
     return;
   }
 

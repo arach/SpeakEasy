@@ -36,6 +36,8 @@ export const cliSchema = z.object({
   silent: z.boolean().optional(),
   setKey: z.string().optional(),
   setDefault: z.string().optional(),
+  app: z.boolean().optional(),
+  updateApp: z.boolean().optional(),
 });
 
 export type CliOptions = z.infer<typeof cliSchema>;
