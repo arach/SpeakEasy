@@ -153,8 +153,12 @@ export async function downloadAndInstallApp(onProgress?: (msg: string) => void):
     return false;
   }
 
-  // Clean up zip
+  // Clean up zip and __MACOSX folder
   fs.unlinkSync(zipPath);
+  const macosxDir = path.join(APP_DIR, '__MACOSX');
+  if (fs.existsSync(macosxDir)) {
+    fs.rmSync(macosxDir, { recursive: true, force: true });
+  }
 
   // Remove quarantine attribute
   try {
