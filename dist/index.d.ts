@@ -17,6 +17,7 @@ interface SpeakEasyConfig {
     systemVoice?: string;
     openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
     elevenlabsVoiceId?: string;
+    groqVoice?: string;
     geminiModel?: string;
     rate?: number;
     volume?: number;

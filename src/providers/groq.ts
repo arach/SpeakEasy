@@ -8,7 +8,7 @@ export class GroqProvider implements Provider {
   private apiKey: string;
   private voice: string;
 
-  constructor(apiKey: string = '', voice: string = 'Celeste-PlayAI') {
+  constructor(apiKey: string = '', voice: string = 'tara') {
     this.apiKey = apiKey;
     this.voice = voice;
   }
@@ -42,20 +42,22 @@ export class GroqProvider implements Provider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'playai-tts',
+          model: 'canopylabs/orpheus-v1-english',
           voice: this.voice,
           input: config.text,
-          speed: config.rate / 200,
         }),
       });
 
       if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
         if (response.status === 401) {
           throw new Error('Groq API error: Invalid API key');
         } else if (response.status === 429) {
           throw new Error('Groq API error: Rate limit exceeded');
+        } else if (response.status === 400) {
+          throw new Error(`Groq API error: Bad request - ${errorBody || 'check voice name and parameters'}`);
         }
-        throw new Error(`Groq API error: ${response.status}`);
+        throw new Error(`Groq API error: ${response.status} - ${errorBody}`);
       }
 
       const audioBuffer = await response.arrayBuffer();

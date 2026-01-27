@@ -21,7 +21,7 @@ export const DEFAULT_VOICES: Record<ProviderKey, string> = {
   system: 'Samantha',
   openai: 'nova',
   elevenlabs: 'EXAVITQu4vr4xnSDxMaL',
-  groq: 'nova',
+  groq: 'tara',
   gemini: 'gemini-2.5-flash-preview-tts',
 };
 

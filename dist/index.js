@@ -270,6 +270,8 @@ var ElevenLabsProvider = class {
           throw new Error("ElevenLabs API error: Access forbidden - check your API key permissions");
         } else if (response.status === 422) {
           throw new Error("ElevenLabs API error: Invalid voice ID or parameters - check your configuration");
+        } else if (response.status === 404) {
+          throw new Error(`ElevenLabs API error: Voice ID "${this.voiceId}" not found. Use a valid voice ID (e.g., EXAVITQu4vr4xnSDxMaL) not a voice name`);
         }
         throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
       }
@@ -292,6 +294,9 @@ var ElevenLabsProvider = class {
     if (error.message.includes("Rate limit")) {
       return '\u23F0 ElevenLabs rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
+    if (error.message.includes("not found")) {
+      return '\u{1F50A} Invalid ElevenLabs voice ID. Use a voice ID like "EXAVITQu4vr4xnSDxMaL", not a name like "nova". Find voice IDs at: https://elevenlabs.io/app/voice-library';
+    }
     return `ElevenLabs TTS failed: ${error.message}`;
   }
 };
@@ -304,7 +309,7 @@ var import_node_fetch3 = __toESM(require("node-fetch"));
 var GroqProvider = class {
   apiKey;
   voice;
-  constructor(apiKey = "", voice = "Celeste-PlayAI") {
+  constructor(apiKey = "", voice = "tara") {
     this.apiKey = apiKey;
     this.voice = voice;
   }
@@ -333,19 +338,21 @@ var GroqProvider = class {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "playai-tts",
+          model: "canopylabs/orpheus-v1-english",
           voice: this.voice,
-          input: config.text,
-          speed: config.rate / 200
+          input: config.text
         })
       });
       if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
         if (response.status === 401) {
           throw new Error("Groq API error: Invalid API key");
         } else if (response.status === 429) {
           throw new Error("Groq API error: Rate limit exceeded");
+        } else if (response.status === 400) {
+          throw new Error(`Groq API error: Bad request - ${errorBody || "check voice name and parameters"}`);
         }
-        throw new Error(`Groq API error: ${response.status}`);
+        throw new Error(`Groq API error: ${response.status} - ${errorBody}`);
       }
       const audioBuffer = await response.arrayBuffer();
       return Buffer.from(audioBuffer);
@@ -1501,6 +1508,7 @@ var SpeakEasy = class {
       systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || "Samantha",
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || "nova",
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || "EXAVITQu4vr4xnSDxMaL",
+      groqVoice: config.groqVoice || globalConfig.providers?.groq?.voice || "tara",
       geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || "gemini-2.5-flash-preview-tts",
       rate: config.rate || globalConfig.defaults?.rate || 180,
       volume: config.volume !== void 0 ? config.volume : globalConfig.defaults?.volume !== void 0 ? globalConfig.defaults.volume : 0.7,
@@ -1537,7 +1545,7 @@ var SpeakEasy = class {
     this.providers.set("system", new SystemProvider(this.config.systemVoice || "Samantha"));
     this.providers.set("openai", new OpenAIProvider(this.config.apiKeys?.openai || "", this.config.openaiVoice || "nova", this.config.instructions));
     this.providers.set("elevenlabs", new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || "", this.config.elevenlabsVoiceId || "EXAVITQu4vr4xnSDxMaL"));
-    this.providers.set("groq", new GroqProvider(this.config.apiKeys?.groq || ""));
+    this.providers.set("groq", new GroqProvider(this.config.apiKeys?.groq || "", this.config.groqVoice || "tara"));
     this.providers.set("gemini", new GeminiProvider(this.config.apiKeys?.gemini || "", this.config.geminiModel || "gemini-2.5-flash-preview-tts"));
   }
   async speak(text, options = {}) {
@@ -1828,7 +1836,7 @@ var SpeakEasy = class {
       case "system":
         return this.config.systemVoice || "Samantha";
       case "groq":
-        return "Celeste-PlayAI";
+        return this.config.groqVoice || "tara";
       case "gemini":
         return this.config.geminiModel || "gemini-2.5-flash-preview-tts";
       default:

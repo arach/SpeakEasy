@@ -207,6 +207,9 @@ async function run(): Promise<void> {
         case 'elevenlabs':
           config.elevenlabsVoiceId = options.voice;
           break;
+        case 'groq':
+          config.groqVoice = options.voice;
+          break;
         case 'gemini':
           config.geminiModel = options.voice;
           break;

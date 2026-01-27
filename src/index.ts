@@ -109,6 +109,7 @@ export class SpeakEasy {
       systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || 'Samantha',
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || 'nova',
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || 'EXAVITQu4vr4xnSDxMaL',
+      groqVoice: config.groqVoice || globalConfig.providers?.groq?.voice || 'tara',
       geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || 'gemini-2.5-flash-preview-tts',
       rate: config.rate || globalConfig.defaults?.rate || 180,
       volume: config.volume !== undefined ? config.volume : (globalConfig.defaults?.volume !== undefined ? globalConfig.defaults.volume : 0.7),
@@ -151,7 +152,7 @@ export class SpeakEasy {
     this.providers.set('system', new SystemProvider(this.config.systemVoice || 'Samantha'));
     this.providers.set('openai', new OpenAIProvider(this.config.apiKeys?.openai || '', this.config.openaiVoice || 'nova', this.config.instructions));
     this.providers.set('elevenlabs', new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || '', this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL'));
-    this.providers.set('groq', new GroqProvider(this.config.apiKeys?.groq || ''));
+    this.providers.set('groq', new GroqProvider(this.config.apiKeys?.groq || '', this.config.groqVoice || 'tara'));
     this.providers.set('gemini', new GeminiProvider(this.config.apiKeys?.gemini || '', this.config.geminiModel || 'gemini-2.5-flash-preview-tts'));
   }
 
@@ -487,7 +488,7 @@ export class SpeakEasy {
       case 'openai': return this.config.openaiVoice || 'nova';
       case 'elevenlabs': return this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL';
       case 'system': return this.config.systemVoice || 'Samantha';
-      case 'groq': return 'Celeste-PlayAI';
+      case 'groq': return this.config.groqVoice || 'tara';
       case 'gemini': return this.config.geminiModel || 'gemini-2.5-flash-preview-tts';
       default: return this.config.systemVoice || 'Samantha';
     }

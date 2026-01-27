@@ -69,6 +69,8 @@ export class ElevenLabsProvider implements Provider {
           throw new Error('ElevenLabs API error: Access forbidden - check your API key permissions');
         } else if (response.status === 422) {
           throw new Error('ElevenLabs API error: Invalid voice ID or parameters - check your configuration');
+        } else if (response.status === 404) {
+          throw new Error(`ElevenLabs API error: Voice ID "${this.voiceId}" not found. Use a valid voice ID (e.g., EXAVITQu4vr4xnSDxMaL) not a voice name`);
         }
         throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
       }
@@ -93,6 +95,9 @@ export class ElevenLabsProvider implements Provider {
     }
     if (error.message.includes('Rate limit')) {
       return '⏰ ElevenLabs rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
+    }
+    if (error.message.includes('not found')) {
+      return '🔊 Invalid ElevenLabs voice ID. Use a voice ID like "EXAVITQu4vr4xnSDxMaL", not a name like "nova". Find voice IDs at: https://elevenlabs.io/app/voice-library';
     }
     return `ElevenLabs TTS failed: ${error.message}`;
   }
