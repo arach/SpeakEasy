@@ -216,7 +216,7 @@ const speaker = new SpeakEasy({
 speakeasy --list
 
 # Example output:
-📋 Cache Entries (3)
+Cache Entries (3)
 ═══════════════════════
 
 1. abc123-def456-789g-hij0-123456789abc
@@ -267,7 +267,7 @@ speakeasy --find "claude"
 speakeasy --id abc123-def456-789g-hij0-123456789abc
 
 # Example output:
-🔍 Cache Entry Details
+Cache Entry Details
 ═════════════════════
 ID: abc123-def456-789g-hij0-123456789abc
 Text: "Hello, world!"
@@ -283,7 +283,7 @@ Session: sess_abc123
 Directory: /Users/user/project
 User: username
 Duration: 756ms
-Success: ✅
+Success: Yes
 ```
 
 ### Play Cached Audio
@@ -293,7 +293,7 @@ Success: ✅
 speakeasy --play abc123-def456-789g-hij0-123456789abc
 
 # Output:
-🎵 Playing cached audio: "Hello, world!"
+Playing cached audio: "Hello, world!"
    Provider: openai, Voice: nova
 ```
 
@@ -304,7 +304,7 @@ speakeasy --play abc123-def456-789g-hij0-123456789abc
 speakeasy --stats
 
 # Example output:
-📊 Cache Statistics
+Cache Statistics
 ══════════════════
 Total Entries: 47
 Total Size: 15.63 MB
@@ -314,18 +314,18 @@ Hit Rate: 72.4%
 Avg File Size: 342.1 KB
 Date Range: 2025-07-28 - 2025-08-05
 
-📈 By Provider:
+By Provider:
   openai: 31
   elevenlabs: 12
   system: 0
   groq: 4
 
-📈 By Model:
+By Model:
   tts-1: 35
   tts-1-hd: 8
   eleven_monolingual_v1: 4
 
-📈 By Source:
+By Source:
   CLI: 28
   SDK: 19
 ```
@@ -337,7 +337,7 @@ Date Range: 2025-07-28 - 2025-08-05
 speakeasy --clear-cache
 
 # Output:
-🗑️  Cache cleared successfully
+Cache cleared successfully
 ```
 
 ## SDK Cache Operations
@@ -409,22 +409,22 @@ console.log(`Cache using ${(stats.totalSize / 1024 / 1024).toFixed(2)} MB`);
 
 **Use consistent text:**
 ```typescript
-// ✅ Good - consistent text gets cached
+// Good: Good - consistent text gets cached
 await speaker.speak('Build completed successfully');
 await speaker.speak('Build completed successfully'); // Cache hit!
 
-// ❌ Bad - variations don't hit cache
+// Bad: Bad - variations don't hit cache
 await speaker.speak('Build completed successfully');
 await speaker.speak('build completed successfully'); // Cache miss (lowercase)
 ```
 
 **Use consistent parameters:**
 ```typescript
-// ✅ Good - same provider/voice/rate hits cache
+// Good: Good - same provider/voice/rate hits cache
 await speaker.speak('Hello', { provider: 'openai', voice: 'nova', rate: 180 });
 await speaker.speak('Hello', { provider: 'openai', voice: 'nova', rate: 180 }); // Hit!
 
-// ❌ Bad - different rate misses cache
+// Bad: Bad - different rate misses cache
 await speaker.speak('Hello', { provider: 'openai', voice: 'nova', rate: 180 });
 await speaker.speak('Hello', { provider: 'openai', voice: 'nova', rate: 200 }); // Miss
 ```
@@ -545,9 +545,9 @@ const speaker = new SpeakEasy({
 
 await speaker.speak('Debug cache');
 // Debug output shows cache operations:
-// 🔍 SpeakEasy Debug: Cache key generated: abc123...
-// 📦 SpeakEasy Debug: Cache miss - generating audio
-// 💾 SpeakEasy Debug: Audio cached successfully
+// SpeakEasy Debug: Cache key generated: abc123...
+// SpeakEasy Debug: Cache miss - generating audio
+// SpeakEasy Debug: Audio cached successfully
 ```
 
 For configuration details, see [Configuration Guide](configuration.md).

@@ -13,11 +13,11 @@ SpeakEasy supports five TTS providers, each with unique characteristics:
 
 | Provider | Type | API Key Required | Voices | Quality | Speed |
 |----------|------|------------------|---------|---------|-------|
-| **System** | Built-in | ❌ No | macOS voices | Good | Fast |
-| **OpenAI** | API | ✅ Yes | 6 voices | High | Medium |
-| **ElevenLabs** | API | ✅ Yes | Custom | Very High | Medium |
-| **Groq** | API | ✅ Yes | 6 voices | High | Very Fast |
-| **Gemini** | API | ✅ Yes | Multiple | High | Fast |
+| **System** | Built-in | No | macOS voices | Good | Fast |
+| **OpenAI** | API | Yes | 6 voices | High | Medium |
+| **ElevenLabs** | API | Yes | Custom | Very High | Medium |
+| **Groq** | API | Yes | 6 voices | High | Very Fast |
+| **Gemini** | API | Yes | Multiple | High | Fast |
 
 ## System Voice (macOS)
 
@@ -88,16 +88,16 @@ speakeasy "Fast speech" --provider system --rate 250
 ```
 
 ### Advantages
-- ✅ **No API key** required
-- ✅ **Fast response** (no network calls)
-- ✅ **Reliable** (always available on macOS)
-- ✅ **Good quality** built-in voices
-- ✅ **No caching needed** (already fast)
+- **No API key** required
+- **Fast response** (no network calls)
+- **Reliable** (always available on macOS)
+- **Good quality** built-in voices
+- **No caching needed** (already fast)
 
 ### Limitations
-- ❌ **macOS only** (requires `say` command)
-- ❌ **Limited voices** compared to API providers
-- ❌ **No custom voices**
+- **macOS only** (requires `say` command)
+- **Limited voices** compared to API providers
+- **No custom voices**
 
 ## OpenAI TTS
 
@@ -193,17 +193,17 @@ speed = rate / 200
 ```
 
 ### Advantages
-- ✅ **High quality** neural voices
-- ✅ **Diverse voices** with distinct characteristics
-- ✅ **Reliable API** with good uptime
-- ✅ **Automatic caching** for repeated text
-- ✅ **Wide platform support**
+- **High quality** neural voices
+- **Diverse voices** with distinct characteristics
+- **Reliable API** with good uptime
+- **Automatic caching** for repeated text
+- **Wide platform support**
 
 ### Limitations
-- ❌ **API key required** (paid service)
-- ❌ **Network dependent** (can fail offline)
-- ❌ **Rate limits** (API quotas)
-- ❌ **No custom voices** (fixed set of 6)
+- **API key required** (paid service)
+- **Network dependent** (can fail offline)
+- **Rate limits** (API quotas)
+- **No custom voices** (fixed set of 6)
 
 ### Error Handling
 
@@ -302,17 +302,17 @@ ElevenLabs doesn't have a direct rate parameter. Rate control is simulated throu
 - `eleven_multilingual_v2` - Latest multilingual
 
 ### Advantages
-- ✅ **Highest quality** voices available
-- ✅ **Custom voice cloning** capability
-- ✅ **Emotional expression** controls
-- ✅ **Professional results** for production use
-- ✅ **Multiple languages** support
+- **Highest quality** voices available
+- **Custom voice cloning** capability
+- **Emotional expression** controls
+- **Professional results** for production use
+- **Multiple languages** support
 
 ### Limitations
-- ❌ **Most expensive** provider
-- ❌ **Custom voice ID required** (not human-readable names)
-- ❌ **Limited rate control** (no native speed parameter)
-- ❌ **Higher latency** due to processing complexity
+- **Most expensive** provider
+- **Custom voice ID required** (not human-readable names)
+- **Limited rate control** (no native speed parameter)
+- **Higher latency** due to processing complexity
 
 ### Finding Voice IDs
 
@@ -397,17 +397,17 @@ speakeasy "Male voice" --provider groq --voice leo
 - **Output format**: Audio streamed as response
 
 ### Advantages
-- ✅ **Very fast** inference on Groq LPU hardware
-- ✅ **Cost effective** ($22/1M characters)
-- ✅ **Expressive voices** with natural prosody
-- ✅ **Good quality** output
-- ✅ **8 distinct voices** to choose from
+- **Very fast** inference on Groq LPU hardware
+- **Cost effective** ($22/1M characters)
+- **Expressive voices** with natural prosody
+- **Good quality** output
+- **8 distinct voices** to choose from
 
 ### Limitations
-- ❌ **API key required**
-- ❌ **Terms acceptance required** before first use
-- ❌ **200 character limit** per request
-- ❌ **English only** (Arabic available via separate model)
+- **API key required**
+- **Terms acceptance required** before first use
+- **200 character limit** per request
+- **English only** (Arabic available via separate model)
 
 ## Gemini TTS
 
@@ -483,17 +483,17 @@ Gemini returns audio in WAV format (L16 PCM), which is automatically handled by 
 Gemini uses the standard WPM rate control through text preprocessing and speech configuration.
 
 ### Advantages
-- ✅ **Google's technology** - Backed by Google's AI infrastructure
-- ✅ **Good quality** voices
-- ✅ **Multiple voice options**
-- ✅ **Fast generation** with Flash model
-- ✅ **Automatic caching** for repeated text
+- **Google's technology** - Backed by Google's AI infrastructure
+- **Good quality** voices
+- **Multiple voice options**
+- **Fast generation** with Flash model
+- **Automatic caching** for repeated text
 
 ### Limitations
-- ❌ **API key required** (Google Cloud/AI Studio)
-- ❌ **Rate limits** apply, especially for Pro model
-- ❌ **Network dependent**
-- ❌ **WAV format** (larger than MP3, but handled automatically)
+- **API key required** (Google Cloud/AI Studio)
+- **Rate limits** apply, especially for Pro model
+- **Network dependent**
+- **WAV format** (larger than MP3, but handled automatically)
 
 ### Error Handling
 
@@ -574,34 +574,34 @@ async function reliableSpeech(text: string) {
 ## Provider Selection Guide
 
 ### Choose **System** when:
-- ✅ macOS environment
-- ✅ No API costs desired
-- ✅ Fast, reliable speech needed
-- ✅ Basic quality sufficient
+- macOS environment
+- No API costs desired
+- Fast, reliable speech needed
+- Basic quality sufficient
 
 ### Choose **OpenAI** when:
-- ✅ High quality needed
-- ✅ Diverse voice options wanted
-- ✅ Established API preferred
-- ✅ Good documentation required
+- High quality needed
+- Diverse voice options wanted
+- Established API preferred
+- Good documentation required
 
 ### Choose **ElevenLabs** when:
-- ✅ Highest quality required
-- ✅ Custom voices needed
-- ✅ Professional production use
-- ✅ Budget allows premium pricing
+- Highest quality required
+- Custom voices needed
+- Professional production use
+- Budget allows premium pricing
 
 ### Choose **Groq** when:
-- ✅ Speed is critical
-- ✅ Cost effectiveness important
-- ✅ Good quality sufficient
-- ✅ Fast iteration needed
+- Speed is critical
+- Cost effectiveness important
+- Good quality sufficient
+- Fast iteration needed
 
 ### Choose **Gemini** when:
-- ✅ Google ecosystem preferred
-- ✅ High quality needed
-- ✅ Multiple voice options wanted
-- ✅ Fast generation with Flash model
+- Google ecosystem preferred
+- High quality needed
+- Multiple voice options wanted
+- Fast generation with Flash model
 
 ## Troubleshooting Providers
 

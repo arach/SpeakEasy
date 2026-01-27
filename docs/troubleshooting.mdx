@@ -34,13 +34,13 @@ speakeasy "test message" --debug
 
 **Solutions:**
 ```bash
-# ❌ Incorrect - missing text
+# [BAD] Incorrect - missing text
 speakeasy --provider openai
 
-# ✅ Correct - positional text
+# [OK] Correct - positional text
 speakeasy "Hello world" --provider openai
 
-# ✅ Correct - explicit text flag
+# [OK] Correct - explicit text flag
 speakeasy --text "Hello world" --provider openai
 ```
 
@@ -125,10 +125,10 @@ echo $GROQ_API_KEY | head -c 4  # Should show "gsk_"
 
 **Solutions:**
 ```bash
-# ❌ Incorrect - using voice name
+# [BAD] Incorrect - using voice name
 speakeasy "Hello" --provider elevenlabs --voice nova
 
-# ✅ Correct - using voice ID
+# [OK] Correct - using voice ID
 speakeasy "Hello" --provider elevenlabs --voice EXAVITQu4vr4xnSDxMaL
 ```
 
@@ -443,12 +443,12 @@ speakeasy "debug test" --debug --provider openai
 
 **Example debug output:**
 ```
-🔍 SpeakEasy Debug: Using provider 'openai'
-🔍 SpeakEasy Debug: Voice 'nova', Rate 180 WPM, Volume 70%
-🔍 SpeakEasy Debug: Cache key: abc123-def456
-📦 SpeakEasy Debug: Cache miss - generating audio
-🔊 SpeakEasy Debug: Playing generated audio
-🔍 SpeakEasy Debug: Cleanup: removing temp file
+SpeakEasy Debug: Using provider 'openai'
+SpeakEasy Debug: Voice 'nova', Rate 180 WPM, Volume 70%
+SpeakEasy Debug: Cache key: abc123-def456
+SpeakEasy Debug: Cache miss - generating audio
+SpeakEasy Debug: Playing generated audio
+SpeakEasy Debug: Cleanup: removing temp file
 ```
 
 ### Health Check Deep Dive
@@ -458,11 +458,11 @@ speakeasy --doctor
 ```
 
 **Checks performed:**
-- ✅ System compatibility (macOS detection, required commands)
-- ✅ Configuration file validation (JSON syntax, permissions)
-- ✅ API key detection (config file and environment variables)
-- ✅ Voice configuration validation
-- ✅ Cache system health (directory permissions, TTL settings)
+- System compatibility (macOS detection, required commands)
+- Configuration file validation (JSON syntax, permissions)
+- API key detection (config file and environment variables)
+- Voice configuration validation
+- Cache system health (directory permissions, TTL settings)
 
 ### Configuration Diagnostics
 
