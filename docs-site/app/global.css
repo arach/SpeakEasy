@@ -30,6 +30,10 @@
   --docs-muted: #566168;
   --docs-accent: #1f7a65;
   --docs-border: rgba(16, 21, 24, 0.12);
+
+  /* Fumadocs layout variables */
+  --fd-layout-width: 1200px;
+  --fd-sidebar-width: 240px;
 }
 
 .dark {
@@ -66,87 +70,174 @@
 
 body {
   font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--docs-paper);
 }
 
-/* Narrower sidebar - ARK style */
-:root {
-  --fd-sidebar-width: 230px;
-  --fd-toc-width: 210px;
+/* ==========================================
+   SIDEBAR NAVIGATION STYLING
+   ========================================== */
+
+/* Sidebar container */
+aside[data-sidebar] {
+  background: transparent !important;
+  border-right: none !important;
 }
 
-/* Constrain overall layout width */
-.fd-layout {
-  max-width: 1200px;
-  margin: 0 auto;
+/* Sidebar inner content */
+aside[data-sidebar] > div {
+  padding: 16px 12px;
 }
 
-/* Sidebar styling */
-.fd-sidebar {
-  width: var(--fd-sidebar-width) !important;
-  min-width: var(--fd-sidebar-width) !important;
-  max-width: var(--fd-sidebar-width) !important;
-}
-
-/* Navigation links */
-.fd-sidebar a {
-  border-radius: 10px;
+/* Navigation items in sidebar */
+aside[data-sidebar] a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 2px 0;
+  border-radius: 8px;
   font-size: 14px;
+  font-weight: 400;
+  color: var(--docs-muted);
+  transition: all 150ms ease;
+  text-decoration: none;
 }
 
-.fd-sidebar a[data-active="true"] {
-  background: rgba(31, 122, 101, 0.12);
-  border: 1px solid rgba(31, 122, 101, 0.22);
-  color: var(--docs-accent);
+aside[data-sidebar] a:hover {
+  background: rgba(31, 122, 101, 0.06);
+  color: var(--docs-ink);
 }
 
-.dark .fd-sidebar a[data-active="true"] {
-  background: rgba(52, 211, 153, 0.12);
-  border: 1px solid rgba(52, 211, 153, 0.22);
-  color: var(--docs-accent);
+/* Active navigation item */
+aside[data-sidebar] a[data-active="true"] {
+  background: rgba(31, 122, 101, 0.12) !important;
+  color: var(--docs-accent) !important;
+  font-weight: 500;
 }
 
-/* Section headings in sidebar */
-.fd-sidebar [data-separator] {
+.dark aside[data-sidebar] a[data-active="true"] {
+  background: rgba(52, 211, 153, 0.12) !important;
+  color: var(--docs-accent) !important;
+}
+
+/* Section group titles in sidebar */
+aside[data-sidebar] [role="group"] > span,
+aside[data-sidebar] p {
   font-size: 11px;
-  letter-spacing: 0.15em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--docs-muted);
-  margin-top: 20px;
-  padding: 8px 12px;
+  padding: 16px 12px 8px;
+  margin-top: 8px;
 }
 
-/* Main content area - card style like ARK */
-.fd-page {
+/* Folder items in sidebar */
+aside[data-sidebar] button {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--docs-muted);
+}
+
+/* ==========================================
+   TABLE OF CONTENTS STYLING
+   ========================================== */
+
+/* TOC container */
+aside[data-toc] {
+  background: transparent !important;
+  border-left: none !important;
+  width: 200px;
+  max-width: 200px;
+}
+
+aside[data-toc] a {
+  font-size: 12px;
+  color: var(--docs-muted);
+  padding: 4px 0;
+  line-height: 1.4;
+}
+
+aside[data-toc] a:hover {
+  color: var(--docs-ink);
+}
+
+aside[data-toc] a[data-active="true"] {
+  color: var(--docs-accent);
+  font-weight: 500;
+}
+
+/* TOC heading */
+aside[data-toc] > div > p {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--docs-muted);
+  margin-bottom: 12px;
+}
+
+/* ==========================================
+   MAIN CONTENT AREA
+   ========================================== */
+
+/* Page content wrapper */
+article {
   background: hsl(var(--card));
   border: 1px solid var(--docs-border);
-  border-radius: 20px;
+  border-radius: 16px;
+  padding: 32px 40px;
   margin: 24px 0;
-  padding: 32px;
+  box-shadow: 0 8px 24px rgba(16, 23, 32, 0.06);
 }
 
-.dark .fd-page {
+.dark article {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
-:root .fd-page {
-  box-shadow: 0 16px 32px rgba(16, 23, 32, 0.08);
+/* Page title */
+article h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
 }
 
-/* TOC styling */
-.fd-toc {
-  width: var(--fd-toc-width) !important;
-  min-width: var(--fd-toc-width) !important;
-}
-
-.fd-toc a {
-  font-size: 13px;
+/* Page description */
+article > p:first-of-type {
   color: var(--docs-muted);
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+/* Section headings */
+article h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--docs-border);
+}
+
+article h2:first-of-type {
+  margin-top: 2rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+article h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
 /* Code blocks */
 pre {
-  border-radius: 14px !important;
+  border-radius: 12px !important;
   border: 1px solid var(--docs-border) !important;
+  font-size: 13px;
 }
 
 .dark pre {
@@ -154,50 +245,90 @@ pre {
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Headings */
-h1, h2, h3, h4 {
-  font-weight: 600;
-  letter-spacing: -0.02em;
+/* Inline code */
+code:not(pre code) {
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.dark code:not(pre code) {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* Tables */
 table {
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
+  font-size: 14px;
 }
 
 th {
   font-size: 11px;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--docs-muted);
+  background: rgba(0, 0, 0, 0.02);
 }
 
-/* Links */
-.fd-page a:not([class]) {
+.dark th {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Links in content */
+article a:not([class]) {
   color: var(--docs-accent);
   text-decoration: none;
+  font-weight: 500;
 }
 
-.fd-page a:not([class]):hover {
+article a:not([class]):hover {
   text-decoration: underline;
 }
 
-/* Hide TOC on smaller screens */
+/* Lists */
+article ul, article ol {
+  padding-left: 1.25rem;
+}
+
+article li {
+  margin: 0.4rem 0;
+}
+
+article li::marker {
+  color: var(--docs-accent);
+}
+
+/* ==========================================
+   NAVBAR STYLING
+   ========================================== */
+
+nav[data-navbar] {
+  background: rgba(247, 244, 238, 0.9) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--docs-border) !important;
+}
+
+.dark nav[data-navbar] {
+  background: rgba(15, 20, 24, 0.9) !important;
+}
+
+/* ==========================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================== */
+
 @media (max-width: 1100px) {
-  .fd-toc {
+  aside[data-toc] {
     display: none;
   }
 }
 
 @media (max-width: 900px) {
-  .fd-sidebar {
-    display: none;
-  }
-
-  .fd-page {
-    margin: 16px;
+  article {
+    margin: 12px;
     padding: 24px;
-    border-radius: 16px;
+    border-radius: 12px;
   }
 }
