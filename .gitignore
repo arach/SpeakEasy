@@ -41,6 +41,36 @@ config.local.json
 .settings.json
 .settings.local.json
 
+# Agent skill symlinks (created by dewey/skills installers)
+.agent/
+.agents/
+.cline/
+.codebuddy/
+.codex/
+.commandcode/
+.continue/
+.crush/
+.cursor/
+.factory/
+.gemini/
+.github/skills/
+.goose/
+.kilocode/
+.kiro/
+.mcpjam/
+.mux/
+.neovate/
+.opencode/
+.openhands/
+.pi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+.zencoder/
+skills/
+
 # Test files
 test-*.js
 test-*.json

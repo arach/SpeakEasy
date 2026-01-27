@@ -1,0 +1,36 @@
+# speakeasy
+
+> Unified text-to-speech library with multi-provider support
+
+## Documentation
+
+- Overview: /docs/overview
+- Quickstart: /docs/quickstart
+- Providers: /docs/providers
+- Configuration: /docs/configuration
+- Cli: /docs/cli
+- Sdk: /docs/sdk
+
+## Overview
+
+Welcome to **speakeasy**.
+
+## Quickstart
+
+Get up and running with **speakeasy** in under 5 minutes.
+
+## Providers
+
+Comprehensive documentation for all SpeakEasy TTS providers, including setup, configuration, and provider-specific features.
+
+## Configuration
+
+Complete configuration documentation for SpeakEasy, covering all available options for CLI, SDK, and global settings.
+
+## Cli
+
+Complete command-line interface documentation for SpeakEasy.
+
+## Sdk
+
+Complete TypeScript SDK documentation for SpeakEasy.
