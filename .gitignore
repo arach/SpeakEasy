@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+docs-site/node_modules/
+docs-site/.next/
+docs-site/.source/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

@@ -13,7 +13,9 @@
     "dev": "tsc --watch",
     "test": "node dist/test.js",
     "example": "npm run build && node examples/basic-usage.js",
-    "cli": "npm run build && node dist/bin/speakeasy-cli.js"
+    "cli": "npm run build && node dist/bin/speakeasy-cli.js",
+    "docs": "cd docs-site && pnpm dev",
+    "docs:build": "cd docs-site && pnpm build"
   },
   "bin": {
     "speakeasy": "dist/bin/speakeasy-cli.js"
