@@ -245,6 +245,8 @@ export ELEVENLABS_API_KEY="..."
 
 ### Voice Configuration
 
+> **Important**: ElevenLabs requires **voice IDs**, not voice names. Using a name like `nova` will result in a 404 error. You must use the actual voice ID (e.g., `EXAVITQu4vr4xnSDxMaL`).
+
 **Default voice ID:**
 ```json
 {
@@ -258,7 +260,7 @@ export ELEVENLABS_API_KEY="..."
 
 **Custom voice ID:**
 ```bash
-speakeasy "Hello" --provider elevenlabs --voice "your-custom-voice-id"
+speakeasy "Hello" --provider elevenlabs --voice "EXAVITQu4vr4xnSDxMaL"
 ```
 
 ### Usage Examples
@@ -322,10 +324,10 @@ EXAVITQu4vr4xnSDxMaL  // Example format
 ## Groq
 
 ### Overview
-- **Fast inference**: Optimized for speed
-- **OpenAI compatible**: Same voice names and API
-- **Cost effective**: Competitive pricing
-- **High performance**: Excellent speed/quality balance
+- **Fast inference**: Optimized for speed using Groq's LPU hardware
+- **Orpheus TTS**: Uses Canopy Labs' Orpheus model for expressive speech
+- **Cost effective**: Competitive pricing ($22/1M characters)
+- **High performance**: Up to 100 characters/second generation
 
 ### Setup
 
@@ -334,14 +336,15 @@ EXAVITQu4vr4xnSDxMaL  // Example format
 export GROQ_API_KEY="gsk_..."
 ```
 
+> **Note**: You must accept the model terms at https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english before first use.
+
 **Global config:**
 ```json
 {
   "providers": {
     "groq": {
       "enabled": true,
-      "voice": "nova",
-      "model": "tts-1",
+      "voice": "tara",
       "apiKey": "gsk_..."
     }
   }
@@ -350,8 +353,18 @@ export GROQ_API_KEY="gsk_..."
 
 ### Available Voices
 
-Uses OpenAI-compatible voice names:
-- `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`
+Groq uses Canopy Labs' Orpheus model with 8 English voices:
+
+| Voice | Description |
+|-------|-------------|
+| `tara` | Default female voice (recommended) |
+| `leah` | Female voice |
+| `jess` | Female voice |
+| `mia` | Female voice |
+| `zoe` | Female voice |
+| `leo` | Male voice |
+| `dan` | Male voice |
+| `zac` | Male voice |
 
 ### Usage Examples
 
@@ -359,7 +372,7 @@ Uses OpenAI-compatible voice names:
 ```typescript
 const speaker = new SpeakEasy({
   provider: 'groq',
-  rate: 220, // Groq handles fast generation well
+  groqVoice: 'tara',
   apiKeys: {
     groq: process.env.GROQ_API_KEY
   }
@@ -368,27 +381,28 @@ const speaker = new SpeakEasy({
 
 **CLI:**
 ```bash
-speakeasy "Fast generation" --provider groq --voice nova
+speakeasy "Fast generation" --provider groq --voice tara
+speakeasy "Male voice" --provider groq --voice leo
 ```
 
-### Rate Control
+### Model Details
 
-Similar to OpenAI:
-```
-speed = rate / 200
-```
+- **Model**: `canopylabs/orpheus-v1-english`
+- **Character limit**: 200 characters per request
+- **Output format**: Audio streamed as response
 
 ### Advantages
-- ✅ **Very fast** inference and generation
-- ✅ **Cost effective** compared to other APIs
-- ✅ **OpenAI compatible** voice names
+- ✅ **Very fast** inference on Groq LPU hardware
+- ✅ **Cost effective** ($22/1M characters)
+- ✅ **Expressive voices** with natural prosody
 - ✅ **Good quality** output
-- ✅ **Reliable performance**
+- ✅ **8 distinct voices** to choose from
 
 ### Limitations
-- ❌ **Newer provider** (less established)
 - ❌ **API key required**
-- ❌ **Limited voice selection** (6 voices)
+- ❌ **Terms acceptance required** before first use
+- ❌ **200 character limit** per request
+- ❌ **English only** (Arabic available via separate model)
 
 ## Gemini TTS
 

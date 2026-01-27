@@ -98,12 +98,39 @@ echo '{
 
 **Solutions:**
 ```bash
-# Set environment variable  
+# Set environment variable
 export GROQ_API_KEY="gsk_your-groq-key"
 
 # Groq keys start with "gsk_"
 echo $GROQ_API_KEY | head -c 4  # Should show "gsk_"
 ```
+
+#### "Groq API error: model_terms_required"
+
+**Cause:** You need to accept the Orpheus model terms before first use
+
+**Solutions:**
+1. Visit https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english
+2. Accept the model terms
+3. Retry your command
+
+#### "ElevenLabs API error: Voice ID not found" / 404 Error
+
+**Cause:** Using a voice name (like "nova") instead of a voice ID
+
+**Solutions:**
+```bash
+# ❌ Incorrect - using voice name
+speakeasy "Hello" --provider elevenlabs --voice nova
+
+# ✅ Correct - using voice ID
+speakeasy "Hello" --provider elevenlabs --voice EXAVITQu4vr4xnSDxMaL
+```
+
+**Finding voice IDs:**
+1. Go to https://elevenlabs.io/app/voice-library
+2. Select a voice
+3. Copy the voice ID from the URL or voice settings
 
 ### 3. System Voice Issues
 

@@ -37,7 +37,8 @@ speakeasy --text "text" [options]
 - `--voice, -v <voice>` - Select voice (provider-dependent)
 - System voices: `Samantha`, `Alex`, `Victoria`, etc.
 - OpenAI voices: `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`
-- ElevenLabs: Custom voice IDs (e.g., `EXAVITQu4vr4xnSDxMaL`)
+- ElevenLabs: Custom voice IDs (e.g., `EXAVITQu4vr4xnSDxMaL`) - not voice names!
+- Groq voices: `tara`, `leah`, `jess`, `mia`, `zoe`, `leo`, `dan`, `zac`
 - Example: `speakeasy "Hello" --provider openai --voice nova`
 
 ### Speech Control
@@ -154,7 +155,7 @@ speakeasy "OpenAI speech" --provider openai --voice nova --cache
 speakeasy "ElevenLabs speech" --provider elevenlabs --voice EXAVITQu4vr4xnSDxMaL
 
 # Groq with high priority
-speakeasy "Groq speech" --provider groq --voice onyx --interrupt
+speakeasy "Groq speech" --provider groq --voice tara --interrupt
 ```
 
 ### Cache Management Workflow

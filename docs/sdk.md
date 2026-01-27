@@ -61,6 +61,7 @@ interface SpeakEasyConfig {
   systemVoice?: string;
   openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
   elevenlabsVoiceId?: string;
+  groqVoice?: string; // tara, leah, jess, mia, zoe, leo, dan, zac
   rate?: number;
   volume?: number;
   apiKeys?: {
@@ -190,13 +191,13 @@ await elevenlabsSpeaker.speak('Using ElevenLabs voice synthesis');
 ```typescript
 const groqSpeaker = new SpeakEasy({
   provider: 'groq',
-  rate: 220,
+  groqVoice: 'tara', // Options: tara, leah, jess, mia, zoe, leo, dan, zac
   apiKeys: {
     groq: process.env.GROQ_API_KEY
   }
 });
 
-await groqSpeaker.speak('Using Groq fast inference');
+await groqSpeaker.speak('Using Groq Orpheus TTS');
 ```
 
 ## Queue Management
@@ -421,6 +422,7 @@ interface SpeakEasyConfig {
   systemVoice?: string;
   openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
   elevenlabsVoiceId?: string;
+  groqVoice?: string; // tara, leah, jess, mia, zoe, leo, dan, zac
   rate?: number;
   volume?: number;
   apiKeys?: {

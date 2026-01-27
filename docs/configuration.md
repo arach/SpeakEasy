@@ -41,8 +41,7 @@ SpeakEasy uses a hierarchical configuration system with the following precedence
     },
     "groq": {
       "enabled": true,
-      "voice": "nova",
-      "model": "tts-1",
+      "voice": "tara",
       "apiKey": "gsk_..."
     }
   },
@@ -145,8 +144,7 @@ SpeakEasy uses a hierarchical configuration system with the following precedence
   "providers": {
     "groq": {
       "enabled": true,
-      "voice": "nova",
-      "model": "tts-1",
+      "voice": "tara",
       "apiKey": "gsk_..."
     }
   }
@@ -154,9 +152,10 @@ SpeakEasy uses a hierarchical configuration system with the following precedence
 ```
 
 **Configuration options:**
-- `voice`: Compatible with OpenAI voice names
-- `model`: TTS model selection
+- `voice`: Orpheus voice name (`tara`, `leah`, `jess`, `mia`, `zoe`, `leo`, `dan`, `zac`)
 - `apiKey`: Groq API key (or use `GROQ_API_KEY` env var)
+
+> **Note**: You must accept the model terms at Groq console before first use.
 
 ## Default Settings
 

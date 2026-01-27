@@ -154,9 +154,8 @@ await say('Hello!', 'gemini');                // Gemini TTS
     },
     "groq": {
       "enabled": true,
-      "voice": "onyx",
-      "model": "tts-1-hd",
-      "apiKey": "gsk-..."
+      "voice": "tara",
+      "apiKey": "gsk_..."
     },
     "gemini": {
       "enabled": true,
@@ -449,7 +448,7 @@ $ speakeasy --doctor
    system: Samantha
    openai: nova
    elevenlabs: EXAVITQu4vr4xnSDxMaL
-   groq: nova
+   groq: tara
    gemini: Puck
 
 📦 Cache Configuration:
