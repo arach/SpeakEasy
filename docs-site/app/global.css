@@ -125,12 +125,19 @@ nav a[href="/docs"] {
 #nd-sidebar {
   background: color-mix(in srgb, var(--dw-background) 95%, transparent) !important;
   border-right: 1px solid var(--dw-border) !important;
-  padding: 8px !important;
+  padding: 8px 8px 8px 0 !important;
 }
 
 /* Reset excessive padding from Fumadocs */
 #nd-sidebar > div {
   padding: 0 !important;
+}
+
+#nd-sidebar nav,
+#nd-sidebar ul,
+#nd-sidebar li {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
 }
 
 /* Sidebar navigation links */
@@ -139,6 +146,7 @@ nav a[href="/docs"] {
   font-size: 14px;
   padding: 6px 10px !important;
   margin: 1px 0 !important;
+  margin-left: 0 !important;
   color: var(--dw-muted);
   transition: all 150ms ease;
 }
@@ -164,8 +172,8 @@ nav a[href="/docs"] {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--dw-muted) !important;
-  padding: 12px 10px 4px !important;
-  margin-top: 4px;
+  padding: 12px 0 4px 0 !important;
+  margin: 4px 0 0 0 !important;
 }
 
 /* Sidebar folder buttons */
@@ -175,11 +183,22 @@ nav a[href="/docs"] {
   border-radius: 6px;
   padding: 6px 10px !important;
   margin: 1px 0 !important;
+  margin-left: 0 !important;
 }
 
 #nd-sidebar button:hover {
   background: rgba(31, 122, 101, 0.06);
   color: var(--dw-foreground);
+}
+
+/* Remove all nested padding */
+#nd-sidebar * {
+  padding-left: revert;
+}
+
+#nd-sidebar div[class*="flex"],
+#nd-sidebar div[class*="pl-"] {
+  padding-left: 0 !important;
 }
 
 /* ============================================
