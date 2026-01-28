@@ -125,14 +125,20 @@ nav a[href="/docs"] {
 #nd-sidebar {
   background: color-mix(in srgb, var(--dw-background) 95%, transparent) !important;
   border-right: 1px solid var(--dw-border) !important;
+  padding: 8px !important;
+}
+
+/* Reset excessive padding from Fumadocs */
+#nd-sidebar > div {
+  padding: 0 !important;
 }
 
 /* Sidebar navigation links */
 #nd-sidebar a {
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 14px;
-  padding: 8px 12px;
-  margin: 2px 4px;
+  padding: 6px 10px !important;
+  margin: 1px 0 !important;
   color: var(--dw-muted);
   transition: all 150ms ease;
 }
@@ -153,22 +159,22 @@ nav a[href="/docs"] {
 #nd-sidebar p,
 #nd-sidebar [data-separator],
 #nd-sidebar span[class*="text-fd-muted"] {
-  font-size: 11px !important;
+  font-size: 10px !important;
   font-weight: 600 !important;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--dw-muted) !important;
-  padding: 16px 16px 8px !important;
-  margin-top: 8px;
+  padding: 12px 10px 4px !important;
+  margin-top: 4px;
 }
 
 /* Sidebar folder buttons */
 #nd-sidebar button {
   font-size: 14px;
   color: var(--dw-muted);
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin: 2px 4px;
+  border-radius: 6px;
+  padding: 6px 10px !important;
+  margin: 1px 0 !important;
 }
 
 #nd-sidebar button:hover {
@@ -184,17 +190,19 @@ nav a[href="/docs"] {
 aside[class*="toc"],
 div[class*="toc"] {
   font-size: 13px;
+  padding-left: 16px !important;
 }
 
 /* TOC title */
 aside[class*="toc"] p:first-child,
 div[class*="toc"] p:first-child {
-  font-size: 11px !important;
+  font-size: 10px !important;
   font-weight: 600 !important;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--dw-muted) !important;
   margin-bottom: 12px;
+  padding-left: 0 !important;
 }
 
 /* TOC links */
@@ -202,9 +210,12 @@ aside[class*="toc"] a,
 div[class*="toc"] a {
   font-size: 12px;
   color: var(--dw-muted);
-  padding: 4px 0;
-  line-height: 1.5;
+  padding: 3px 0 3px 12px !important;
+  margin-left: 0 !important;
+  line-height: 1.4;
   transition: color 150ms ease;
+  display: block;
+  border-left: 2px solid transparent;
 }
 
 aside[class*="toc"] a:hover,
@@ -216,6 +227,7 @@ aside[class*="toc"] a[data-active="true"],
 div[class*="toc"] a[data-active="true"] {
   color: var(--dw-primary) !important;
   font-weight: 500;
+  border-left-color: var(--dw-primary) !important;
 }
 
 /* ============================================
