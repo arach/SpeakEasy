@@ -38,6 +38,8 @@ __export(src_exports, {
   SpeakEasy: () => SpeakEasy,
   SystemProvider: () => SystemProvider,
   TTSCache: () => TTSCache,
+  getAvailableVoices: () => getAvailableVoices,
+  getBestVoice: () => getBestVoice,
   say: () => say,
   speak: () => speak
 });
@@ -48,17 +50,63 @@ var path7 = __toESM(require("path"));
 
 // src/providers/system.ts
 var import_child_process = require("child_process");
+var PREFERRED_VOICES = [
+  "Ava (Premium)",
+  // Best quality US English
+  "Evan (Enhanced)",
+  // High quality US English
+  "Zoe (Premium)",
+  // Premium US English
+  "Samantha (Enhanced)",
+  // Enhanced Samantha
+  "Samantha"
+  // Standard fallback
+];
+var cachedVoices = null;
+function getAvailableVoices() {
+  if (cachedVoices)
+    return cachedVoices;
+  try {
+    const output = (0, import_child_process.execSync)('say -v "?"', { encoding: "utf-8" });
+    cachedVoices = output.split("\n").filter((line) => line.trim()).map((line) => {
+      const match = line.match(/^(.+?)\s+[a-z]{2}[_-][A-Z]{2}/i);
+      return match ? match[1].trim() : line.split(/\s+/)[0];
+    });
+    return cachedVoices;
+  } catch {
+    return ["Samantha"];
+  }
+}
+function getBestVoice(language = "en_US") {
+  const available = getAvailableVoices();
+  for (const voice of PREFERRED_VOICES) {
+    if (available.includes(voice)) {
+      return voice;
+    }
+  }
+  const englishPremium = available.find(
+    (v) => v.includes("(Premium)") && (v.includes("en_") || !v.includes("_"))
+  );
+  if (englishPremium)
+    return englishPremium;
+  const englishEnhanced = available.find(
+    (v) => v.includes("(Enhanced)") && (v.includes("en_") || !v.includes("_"))
+  );
+  if (englishEnhanced)
+    return englishEnhanced;
+  return "Samantha";
+}
 var SystemProvider = class {
   voice;
-  constructor(voice = "Samantha") {
-    this.voice = voice;
+  constructor(voice) {
+    this.voice = voice || getBestVoice();
   }
   async speak(config) {
     try {
       const volume = config.volume !== void 0 ? config.volume : 0.7;
       const tempFile = `${config.tempDir}/system_speech_${Date.now()}.aiff`;
       try {
-        const sayCommand = `say -v ${this.voice} -r ${config.rate} -o "${tempFile}" "${config.text.replace(/"/g, '\\"')}"`;
+        const sayCommand = `say -v "${this.voice}" -r ${config.rate} -o "${tempFile}" "${config.text.replace(/"/g, '\\"')}"`;
         (0, import_child_process.execSync)(sayCommand);
         const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
         const playCommand = `afplay${volumeFlag} "${tempFile}"`;
@@ -1505,7 +1553,7 @@ var SpeakEasy = class {
     this.hudEnabled = globalConfig.hud?.enabled ?? false;
     this.config = {
       provider: config.provider || globalConfig.defaults?.provider || "system",
-      systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || "Samantha",
+      systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || getBestVoice(),
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || "nova",
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || "EXAVITQu4vr4xnSDxMaL",
       groqVoice: config.groqVoice || globalConfig.providers?.groq?.voice || "tara",
@@ -1930,6 +1978,8 @@ var speak = (text, options) => {
   SpeakEasy,
   SystemProvider,
   TTSCache,
+  getAvailableVoices,
+  getBestVoice,
   say,
   speak
 });

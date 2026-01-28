@@ -7,7 +7,7 @@ import {
   GlobalConfig,
   Provider
 } from './types';
-import { SystemProvider } from './providers/system';
+import { SystemProvider, getBestVoice } from './providers/system';
 import { OpenAIProvider } from './providers/openai';
 import { ElevenLabsProvider } from './providers/elevenlabs';
 import { GroqProvider } from './providers/groq';
@@ -106,7 +106,7 @@ export class SpeakEasy {
 
     this.config = {
       provider: config.provider || globalConfig.defaults?.provider || 'system',
-      systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || 'Samantha',
+      systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || getBestVoice(),
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || 'nova',
       elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || 'EXAVITQu4vr4xnSDxMaL',
       groqVoice: config.groqVoice || globalConfig.providers?.groq?.voice || 'tara',
@@ -573,7 +573,7 @@ export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 's
 };
 
 export * from './types';
-export { SystemProvider } from './providers/system';
+export { SystemProvider, getAvailableVoices, getBestVoice } from './providers/system';
 export { OpenAIProvider } from './providers/openai';
 export { ElevenLabsProvider } from './providers/elevenlabs';
 export { GroqProvider } from './providers/groq';

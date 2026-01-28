@@ -97,6 +97,14 @@ interface GlobalConfig {
     };
 }
 
+/**
+ * Get all available system voices on macOS
+ */
+declare function getAvailableVoices(): string[];
+/**
+ * Get the best available voice for the given language
+ */
+declare function getBestVoice(language?: string): string;
 declare class SystemProvider implements Provider {
     private voice;
     constructor(voice?: string);
@@ -294,4 +302,4 @@ declare const speak: (text: string, options?: SpeakEasyOptions & {
     volume?: number;
 }) => Promise<void>;
 
-export { CONFIG_FILE, ElevenLabsProvider, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, type Provider, type ProviderConfig, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, TTSCache, say, speak };
+export { CONFIG_FILE, ElevenLabsProvider, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, type Provider, type ProviderConfig, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, TTSCache, getAvailableVoices, getBestVoice, say, speak };

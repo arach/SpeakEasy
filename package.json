@@ -37,7 +37,7 @@
     "@anthropic-ai/claude-code": "^1.0.72",
     "@google/generative-ai": "^0.24.1",
     "@types/uuid": "^10.0.0",
-    "better-sqlite3": "^12.2.0",
+    "better-sqlite3": "^12.6.2",
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
     "fluent-ffmpeg": "^2.1.3",
