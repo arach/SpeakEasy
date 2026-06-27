@@ -1,11 +1,11 @@
 {
   "name": "@arach/speakeasy",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "SpeakEasy - Unified text-to-speech service with provider abstraction",
   "homepage": "https://speakeasy.arach.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/arach/SpeakEasy.git"
+    "url": "https://github.com/arach/SpeakEasy.git"
   },
   "bugs": {
     "url": "https://github.com/arach/SpeakEasy/issues"
