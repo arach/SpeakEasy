@@ -12,7 +12,7 @@ import { OpenAIProvider } from './providers/openai';
 import { ElevenLabsProvider } from './providers/elevenlabs';
 import { GroqProvider } from './providers/groq';
 import { GeminiProvider } from './providers/gemini';
-import { TTSCache } from './cache';
+import { TTSCache, CacheMetadata, CacheStats } from './cache';
 import { notifyHUD, updateAudioLevel, closePipe } from './hud';
 import { getHistory } from './history';
 
@@ -330,7 +330,8 @@ export class SpeakEasy {
               }, audioBuffer, {
                 model: this.inferModel(providerName),
                 durationMs: Date.now() - startTime,
-                success: true
+                success: true,
+                extension: providerName === 'gemini' ? 'wav' : undefined,
               });
               
               console.log('cached');
@@ -547,11 +548,46 @@ export class SpeakEasy {
     }
   }
 
-  getCacheStats(): Promise<{ size: number, dir?: string }> {
-    return Promise.resolve({
-      size: 0, // Keyv doesn't provide easy way to get size
-      dir: this.cache?.getCacheDir()
-    });
+  private requireCache(): TTSCache {
+    if (!this.cache) {
+      throw new Error('Cache is not enabled. Configure cache.enabled or use an API provider with keys present.');
+    }
+    return this.cache;
+  }
+
+  async getCacheStats(): Promise<CacheStats & { dir?: string }> {
+    if (!this.cache) {
+      return {
+        totalEntries: 0,
+        totalSize: 0,
+        cacheHits: 0,
+        cacheMisses: 0,
+        providers: {},
+        models: {},
+        sources: {},
+        dateRange: null,
+        avgFileSize: 0,
+        hitRate: 0,
+      };
+    }
+
+    const stats = await this.cache.getStats();
+    return {
+      ...stats,
+      dir: this.cache.getCacheDir(),
+    };
+  }
+
+  async getCacheMetadata(): Promise<CacheMetadata[]> {
+    return this.requireCache().getCacheMetadata();
+  }
+
+  async findByText(text: string): Promise<CacheMetadata[]> {
+    return this.requireCache().findByText(text);
+  }
+
+  async findByProvider(provider: string): Promise<CacheMetadata[]> {
+    return this.requireCache().findByProvider(provider);
   }
 }
 
@@ -578,4 +614,4 @@ export { OpenAIProvider } from './providers/openai';
 export { ElevenLabsProvider } from './providers/elevenlabs';
 export { GroqProvider } from './providers/groq';
 export { GeminiProvider } from './providers/gemini';
-export { TTSCache } from './cache';
+export { TTSCache, CacheMetadata, CacheStats } from './cache';

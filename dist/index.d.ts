@@ -97,6 +97,141 @@ interface GlobalConfig {
     };
 }
 
+interface CacheLogger {
+    debug: (message: string, ...args: any[]) => void;
+    info: (message: string, ...args: any[]) => void;
+    warn: (message: string, ...args: any[]) => void;
+    error: (message: string, ...args: any[]) => void;
+}
+interface CacheEntry {
+    audioFilePath: string;
+    provider: string;
+    voice: string;
+    rate: number;
+    timestamp: number;
+    text: string;
+}
+interface CacheMetadata {
+    cacheKey: string;
+    originalText: string;
+    provider: string;
+    voice: string;
+    rate: number;
+    timestamp: number;
+    fileSize: number;
+    filePath: string;
+    model?: string;
+    source?: string;
+    sessionId?: string;
+    processId?: string;
+    hostname?: string;
+    user?: string;
+    workingDirectory?: string;
+    commandLine?: string;
+    durationMs?: number;
+    success?: boolean;
+    errorMessage?: string;
+}
+interface CacheStats {
+    totalEntries: number;
+    totalSize: number;
+    cacheHits: number;
+    cacheMisses: number;
+    providers: Record<string, number>;
+    models: Record<string, number>;
+    sources: Record<string, number>;
+    dateRange: {
+        earliest: Date;
+        latest: Date;
+    } | null;
+    avgFileSize: number;
+    hitRate: number;
+}
+type SqliteBackend = 'node' | 'bun';
+declare class TTSCache {
+    private cacheDir;
+    private dbPath;
+    private metadataFile;
+    private statsFile;
+    private ttlMs;
+    private maxSize?;
+    private logger;
+    private db;
+    private sqliteBackend;
+    private jsonEntries;
+    private useJsonFallback;
+    private metadataLoaded;
+    private cacheHits;
+    private cacheMisses;
+    constructor(cacheDir: string, ttl?: string | number, maxSize?: string | number, logger?: CacheLogger);
+    private createDefaultLogger;
+    private initializeStorage;
+    private migrateJsonMetadataIfNeeded;
+    private migrateLegacySqliteIfNeeded;
+    private importStoredEntry;
+    private importLegacyMetadataDb;
+    private importLegacyKeyvDb;
+    private ensureMetadataLoaded;
+    private loadJsonMetadata;
+    private saveJsonMetadata;
+    private loadStats;
+    private saveStats;
+    private rowToStoredEntry;
+    private rowToMetadata;
+    private toMetadata;
+    private isExpired;
+    private isValidEntry;
+    private inferModel;
+    private getSource;
+    private getSessionId;
+    private upsertSqliteEntry;
+    private getSqliteEntry;
+    private deleteSqliteEntry;
+    private deleteEntry;
+    private enforceMaxSize;
+    private buildSearchQuery;
+    private filterJsonMetadata;
+    private calculateStats;
+    get(key: string): Promise<CacheEntry | undefined>;
+    set(key: string, entry: Omit<CacheEntry, 'timestamp' | 'audioFilePath'>, audioBuffer: Buffer, options?: {
+        model?: string;
+        source?: string;
+        durationMs?: number;
+        success?: boolean;
+        errorMessage?: string;
+        extension?: 'mp3' | 'wav';
+    }): Promise<boolean>;
+    getCacheMetadata(): Promise<CacheMetadata[]>;
+    findByText(text: string): Promise<CacheMetadata[]>;
+    findByProvider(provider: string): Promise<CacheMetadata[]>;
+    search(options?: {
+        text?: string;
+        provider?: string;
+        model?: string;
+        source?: string;
+        fromDate?: Date;
+        toDate?: Date;
+        minSize?: number;
+        maxSize?: number;
+        success?: boolean;
+        workingDirectory?: string;
+        user?: string;
+        sessionId?: string;
+        limit?: number;
+        offset?: number;
+    }): Promise<CacheMetadata[]>;
+    getStats(): Promise<CacheStats>;
+    getRecent(limit?: number): Promise<CacheMetadata[]>;
+    delete(key: string): Promise<boolean>;
+    clear(): Promise<void>;
+    cleanup(maxAge?: number): Promise<void>;
+    generateCacheKey(text: string, provider: string, voice: string, rate: number): string;
+    getCacheDir(): string;
+    getEntryCount(): number;
+    usesSqlite(): boolean;
+    getSqliteBackend(): SqliteBackend | 'json';
+}
+
 /**
  * Get all available system voices on macOS
  */
@@ -159,116 +294,6 @@ declare class GeminiProvider implements Provider {
     getErrorMessage(error: any): string;
 }
 
-interface CacheLogger {
-    debug: (message: string, ...args: any[]) => void;
-    info: (message: string, ...args: any[]) => void;
-    warn: (message: string, ...args: any[]) => void;
-    error: (message: string, ...args: any[]) => void;
-}
-interface CacheEntry {
-    audioFilePath: string;
-    provider: string;
-    voice: string;
-    rate: number;
-    timestamp: number;
-    text: string;
-}
-interface CacheMetadata {
-    cacheKey: string;
-    originalText: string;
-    provider: string;
-    voice: string;
-    rate: number;
-    timestamp: number;
-    fileSize: number;
-    filePath: string;
-    model?: string;
-    source?: string;
-    sessionId?: string;
-    processId?: string;
-    hostname?: string;
-    user?: string;
-    workingDirectory?: string;
-    commandLine?: string;
-    durationMs?: number;
-    success?: boolean;
-    errorMessage?: string;
-}
-interface CacheStats {
-    totalEntries: number;
-    totalSize: number;
-    cacheHits: number;
-    cacheMisses: number;
-    providers: Record<string, number>;
-    models: Record<string, number>;
-    sources: Record<string, number>;
-    dateRange: {
-        earliest: Date;
-        latest: Date;
-    } | null;
-    avgFileSize: number;
-    hitRate: number;
-}
-declare class TTSCache {
-    private cache;
-    private cacheDir;
-    private maxSize?;
-    private logger;
-    private metadataDb;
-    private statsFile;
-    private cacheHits;
-    private cacheMisses;
-    constructor(cacheDir: string, ttl?: string | number, maxSize?: string | number, logger?: CacheLogger);
-    private initializeMetadataDb;
-    private createDefaultLogger;
-    get(key: string): Promise<CacheEntry | undefined>;
-    private loadStats;
-    private saveStats;
-    set(key: string, entry: Omit<CacheEntry, 'timestamp' | 'audioFilePath'>, audioBuffer: Buffer, options?: {
-        model?: string;
-        source?: string;
-        durationMs?: number;
-        success?: boolean;
-        errorMessage?: string;
-    }): Promise<boolean>;
-    private inferModel;
-    private getSource;
-    private getSessionId;
-    private addMetadata;
-    private getMetadataFromDb;
-    private deleteMetadata;
-    private loadMetadataIndex;
-    getCacheMetadata(): Promise<CacheMetadata[]>;
-    findByText(text: string): Promise<CacheMetadata[]>;
-    findByProvider(provider: string): Promise<CacheMetadata[]>;
-    search(options?: {
-        text?: string;
-        provider?: string;
-        model?: string;
-        source?: string;
-        fromDate?: Date;
-        toDate?: Date;
-        minSize?: number;
-        maxSize?: number;
-        success?: boolean;
-        workingDirectory?: string;
-        user?: string;
-        sessionId?: string;
-        limit?: number;
-        offset?: number;
-    }): Promise<CacheMetadata[]>;
-    getStats(): Promise<CacheStats>;
-    private calculateStatsFromMetadata;
-    getRecent(limit?: number): Promise<CacheMetadata[]>;
-    delete(key: string): Promise<boolean>;
-    clear(): Promise<void>;
-    cleanup(maxAge?: number): Promise<void>;
-    private cleanupFileBased;
-    private isValidEntry;
-    generateCacheKey(text: string, provider: string, voice: string, rate: number): string;
-    getCacheDir(): string;
-}
-
 declare const CONFIG_FILE: string;
 declare class SpeakEasy {
     private config;
@@ -291,10 +316,13 @@ declare class SpeakEasy {
     private inferModel;
     private sendHUDNotification;
     private stopSpeaking;
-    getCacheStats(): Promise<{
-        size: number;
+    private requireCache;
+    getCacheStats(): Promise<CacheStats & {
         dir?: string;
     }>;
+    getCacheMetadata(): Promise<CacheMetadata[]>;
+    findByText(text: string): Promise<CacheMetadata[]>;
+    findByProvider(provider: string): Promise<CacheMetadata[]>;
 }
 declare const say: (text: string, provider?: "system" | "openai" | "elevenlabs" | "groq" | "gemini") => Promise<void>;
 declare const speak: (text: string, options?: SpeakEasyOptions & {
@@ -302,4 +330,4 @@ declare const speak: (text: string, options?: SpeakEasyOptions & {
     volume?: number;
 }) => Promise<void>;
 
-export { CONFIG_FILE, ElevenLabsProvider, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, type Provider, type ProviderConfig, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, TTSCache, getAvailableVoices, getBestVoice, say, speak };
+export { CONFIG_FILE, type CacheMetadata, type CacheStats, ElevenLabsProvider, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, type Provider, type ProviderConfig, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, TTSCache, getAvailableVoices, getBestVoice, say, speak };

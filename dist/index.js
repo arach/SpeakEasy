@@ -138,7 +138,6 @@ var SystemProvider = class {
 var import_child_process2 = require("child_process");
 var fs = __toESM(require("fs"));
 var path = __toESM(require("path"));
-var import_node_fetch = __toESM(require("node-fetch"));
 var OpenAIProvider = class {
   apiKey;
   voice;
@@ -170,7 +169,7 @@ var OpenAIProvider = class {
       return this.generateAudioWithInstructions(config, instructions);
     }
     try {
-      const response = await (0, import_node_fetch.default)("https://api.openai.com/v1/audio/speech", {
+      const response = await fetch("https://api.openai.com/v1/audio/speech", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${this.apiKey}`,
@@ -199,7 +198,7 @@ var OpenAIProvider = class {
   }
   async generateAudioWithInstructions(config, instructions) {
     try {
-      const response = await (0, import_node_fetch.default)("https://api.openai.com/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${this.apiKey}`,
@@ -261,7 +260,6 @@ var OpenAIProvider = class {
 var import_child_process3 = require("child_process");
 var fs2 = __toESM(require("fs"));
 var path2 = __toESM(require("path"));
-var import_node_fetch2 = __toESM(require("node-fetch"));
 var ElevenLabsProvider = class {
   apiKey;
   voiceId;
@@ -289,7 +287,7 @@ var ElevenLabsProvider = class {
     const BALANCED = 0.5;
     const NATURAL = 0.5;
     try {
-      const response = await (0, import_node_fetch2.default)(`https://api.elevenlabs.io/v1/text-to-speech/${this.voiceId}`, {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${this.voiceId}`, {
         method: "POST",
         headers: {
           "Accept": "audio/mpeg",
@@ -353,7 +351,6 @@ var ElevenLabsProvider = class {
 var import_child_process4 = require("child_process");
 var fs3 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
-var import_node_fetch3 = __toESM(require("node-fetch"));
 var GroqProvider = class {
   apiKey;
   voice;
@@ -379,7 +376,7 @@ var GroqProvider = class {
       throw new Error("Groq API key is required");
     }
     try {
-      const response = await (0, import_node_fetch3.default)("https://api.groq.com/openai/v1/audio/speech", {
+      const response = await fetch("https://api.groq.com/openai/v1/audio/speech", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${this.apiKey}`,
@@ -426,7 +423,6 @@ var GroqProvider = class {
 var import_child_process5 = require("child_process");
 var fs4 = __toESM(require("fs"));
 var path4 = __toESM(require("path"));
-var import_node_fetch4 = __toESM(require("node-fetch"));
 var GeminiProvider = class {
   apiKey;
   model;
@@ -454,7 +450,7 @@ var GeminiProvider = class {
       throw new Error("Gemini API key is required");
     }
     try {
-      const response = await (0, import_node_fetch4.default)(
+      const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
         {
           method: "POST",
@@ -593,7 +589,6 @@ var GeminiProvider = class {
 };
 
 // src/cache.ts
-var import_keyv = __toESM(require("keyv"));
 var path5 = __toESM(require("path"));
 var fs5 = __toESM(require("fs"));
 var import_uuid = require("uuid");
@@ -647,146 +642,297 @@ function parseSize(size) {
 }
 
 // src/cache.ts
+var CREATE_ENTRIES_TABLE = `
+  CREATE TABLE IF NOT EXISTS entries (
+    cache_key TEXT PRIMARY KEY,
+    original_text TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    voice TEXT NOT NULL,
+    rate INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    file_size INTEGER NOT NULL,
+    file_path TEXT NOT NULL,
+    expires_at INTEGER,
+    model TEXT,
+    source TEXT,
+    session_id TEXT,
+    process_id TEXT,
+    hostname TEXT,
+    user TEXT,
+    working_directory TEXT,
+    command_line TEXT,
+    duration_ms INTEGER,
+    success INTEGER DEFAULT 1,
+    error_message TEXT
+  )
+`;
+var CREATE_INDEXES = `
+  CREATE INDEX IF NOT EXISTS idx_provider ON entries(provider);
+  CREATE INDEX IF NOT EXISTS idx_timestamp ON entries(timestamp);
+  CREATE INDEX IF NOT EXISTS idx_source ON entries(source);
+  CREATE INDEX IF NOT EXISTS idx_user ON entries(user);
+  CREATE INDEX IF NOT EXISTS idx_model ON entries(model);
+  CREATE INDEX IF NOT EXISTS idx_success ON entries(success);
+`;
+function wrapNodeDatabase(db) {
+  return db;
+}
+function wrapBunDatabase(db) {
+  return {
+    exec: (sql) => {
+      db.run(sql);
+    },
+    prepare: (sql) => {
+      const statement = db.query(sql);
+      return {
+        run: (...args) => {
+          statement.run(...args);
+        },
+        get: (...args) => statement.get(...args),
+        all: (...args) => statement.all(...args)
+      };
+    }
+  };
+}
+function detectAudioExtension(buffer) {
+  if (buffer.length >= 4 && buffer.toString("ascii", 0, 4) === "RIFF") {
+    return "wav";
+  }
+  if (buffer.length >= 3 && buffer[0] === 73 && buffer[1] === 68 && buffer[2] === 51) {
+    return "mp3";
+  }
+  if (buffer.length >= 2 && buffer[0] === 255 && (buffer[1] & 224) === 224) {
+    return "mp3";
+  }
+  return "mp3";
+}
+function openBuiltinSqlite(dbPath) {
+  try {
+    const specifier = ["node", "sqlite"].join(":");
+    const { DatabaseSync } = require(specifier);
+    return { db: wrapNodeDatabase(new DatabaseSync(dbPath)), backend: "node" };
+  } catch {
+  }
+  try {
+    const specifier = ["bun", "sqlite"].join(":");
+    const { Database } = require(specifier);
+    return { db: wrapBunDatabase(new Database(dbPath, { create: true })), backend: "bun" };
+  } catch {
+    return null;
+  }
+}
 var TTSCache = class {
-  cache;
   cacheDir;
+  dbPath;
+  metadataFile;
+  statsFile;
+  ttlMs;
   maxSize;
   logger;
-  metadataDb;
-  statsFile;
+  db = null;
+  sqliteBackend = null;
+  jsonEntries = {};
+  useJsonFallback = false;
+  metadataLoaded = false;
   cacheHits = 0;
   cacheMisses = 0;
   constructor(cacheDir, ttl = "7d", maxSize, logger) {
     this.cacheDir = cacheDir || path5.join("/tmp", "speakeasy-cache");
-    this.logger = logger || this.createDefaultLogger();
+    this.dbPath = path5.join(this.cacheDir, "cache.sqlite");
+    this.metadataFile = path5.join(this.cacheDir, "metadata.json");
     this.statsFile = path5.join(this.cacheDir, "stats.json");
+    this.ttlMs = parseTTL(ttl);
+    this.maxSize = maxSize ? parseSize(maxSize) : void 0;
+    this.logger = logger || this.createDefaultLogger();
     this.loadStats();
     this.logger.debug("Initializing TTSCache with dir:", this.cacheDir, "ttl:", ttl, "maxSize:", maxSize);
     if (!fs5.existsSync(this.cacheDir)) {
       this.logger.debug("Creating cache directory:", this.cacheDir);
       fs5.mkdirSync(this.cacheDir, { recursive: true });
     }
-    const dbPath = path5.join(this.cacheDir, "tts-cache.sqlite");
-    const metadataDbPath = path5.join(this.cacheDir, "metadata.sqlite");
-    this.logger.debug("Database path:", dbPath);
-    this.logger.debug("Metadata DB path:", metadataDbPath);
-    try {
-      const Database = require("better-sqlite3");
-      const db = new Database(dbPath);
-      const store = {
-        get: async (key) => {
-          const row = db.prepare("SELECT value FROM keyv WHERE key = ?").get(key);
-          if (row) {
-            const data = JSON.parse(row.value);
-            if (data.expires && Date.now() > data.expires) {
-              db.prepare("DELETE FROM keyv WHERE key = ?").run(key);
-              return void 0;
-            }
-            return data.value;
-          }
-          return void 0;
-        },
-        set: async (key, value) => {
-          const expires = parseTTL(ttl) ? Date.now() + parseTTL(ttl) : null;
-          const data = JSON.stringify({ value, expires });
-          db.prepare("INSERT OR REPLACE INTO keyv (key, value) VALUES (?, ?)").run(key, data);
-        },
-        delete: async (key) => {
-          db.prepare("DELETE FROM keyv WHERE key = ?").run(key);
-          return true;
-        },
-        clear: async () => {
-          db.prepare("DELETE FROM keyv").run();
-        }
-      };
-      db.prepare("CREATE TABLE IF NOT EXISTS keyv (key TEXT PRIMARY KEY, value TEXT)").run();
-      this.cache = new import_keyv.default({ store });
-      this.metadataDb = this.initializeMetadataDb(metadataDbPath);
-      this.cache.opts.ttl = parseTTL(ttl);
-      this.maxSize = maxSize ? parseSize(maxSize) : void 0;
-    } catch (error) {
-      this.logger.warn("SQLite not available, using in-memory cache:", error);
-      this.cache = new import_keyv.default();
-      this.metadataDb = null;
-    }
-  }
-  initializeMetadataDb(dbPath) {
-    try {
-      const sqlite3 = require("better-sqlite3");
-      const db = sqlite3(dbPath);
-      const createTableSQL = `
-        CREATE TABLE IF NOT EXISTS metadata (
-          cache_key TEXT PRIMARY KEY,
-          original_text TEXT NOT NULL,
-          provider TEXT NOT NULL,
-          voice TEXT NOT NULL,
-          rate INTEGER NOT NULL,
-          timestamp INTEGER NOT NULL,
-          file_size INTEGER NOT NULL,
-          file_path TEXT NOT NULL,
-          model TEXT,
-          source TEXT,
-          session_id TEXT,
-          process_id TEXT,
-          hostname TEXT,
-          user TEXT,
-          working_directory TEXT,
-          command_line TEXT,
-          duration_ms INTEGER,
-          success BOOLEAN DEFAULT TRUE,
-          error_message TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `;
-      db.exec(createTableSQL);
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_provider ON metadata(provider)`);
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_timestamp ON metadata(timestamp)`);
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_source ON metadata(source)`);
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_user ON metadata(user)`);
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_model ON metadata(model)`);
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_success ON metadata(success)`);
-      this.logger.debug("Metadata database initialized successfully");
-      return db;
-    } catch (error) {
-      this.logger.warn("Failed to initialize metadata database:", error);
-      return null;
-    }
+    this.initializeStorage();
   }
   createDefaultLogger() {
     return {
       debug: () => {
       },
-      // No logging by default
       info: console.log,
       warn: console.warn,
       error: console.error
     };
   }
-  async get(key) {
+  initializeStorage() {
+    const sqlite = openBuiltinSqlite(this.dbPath);
+    if (sqlite) {
+      try {
+        this.db = sqlite.db;
+        this.sqliteBackend = sqlite.backend;
+        this.db.exec(CREATE_ENTRIES_TABLE);
+        this.db.exec(CREATE_INDEXES);
+        this.db.exec("PRAGMA journal_mode = WAL;");
+        this.migrateJsonMetadataIfNeeded();
+        this.migrateLegacySqliteIfNeeded();
+        this.logger.debug(`Using ${sqlite.backend} SQLite cache at:`, this.dbPath);
+        return;
+      } catch (error) {
+        this.logger.warn("Built-in SQLite unavailable, using JSON fallback:", error);
+        this.db = null;
+        this.sqliteBackend = null;
+      }
+    } else {
+      this.logger.warn("No built-in SQLite available (Node 22.5+ or Bun), using JSON fallback");
+    }
+    this.useJsonFallback = true;
+    this.loadJsonMetadata();
+  }
+  migrateJsonMetadataIfNeeded() {
+    if (!this.db || !fs5.existsSync(this.metadataFile))
+      return;
     try {
-      const entry = await this.cache.get(key);
-      if (entry && this.isValidEntry(entry)) {
-        if (fs5.existsSync(entry.audioFilePath)) {
-          this.cacheHits++;
-          this.saveStats();
-          return entry;
-        } else {
-          await this.delete(key);
+      const data = JSON.parse(fs5.readFileSync(this.metadataFile, "utf8"));
+      const entries = Object.entries(data.entries || {});
+      if (entries.length === 0)
+        return;
+      let imported = 0;
+      for (const [cacheKey, entry] of entries) {
+        if (this.importStoredEntry(cacheKey, entry)) {
+          imported++;
         }
       }
+      if (imported > 0) {
+        const backupPath = `${this.metadataFile}.migrated`;
+        fs5.renameSync(this.metadataFile, backupPath);
+        this.logger.debug(`Migrated ${imported} JSON cache entries to SQLite`);
+      }
     } catch (error) {
-      console.warn("Cache retrieval error:", error);
+      this.logger.warn("Failed to migrate JSON metadata to SQLite:", error);
     }
-    this.cacheMisses++;
-    this.saveStats();
-    return void 0;
+  }
+  migrateLegacySqliteIfNeeded() {
+    if (!this.db)
+      return;
+    const legacyMetadataPath = path5.join(this.cacheDir, "metadata.sqlite");
+    const legacyKeyvPath = path5.join(this.cacheDir, "tts-cache.sqlite");
+    this.importLegacyMetadataDb(legacyMetadataPath);
+    this.importLegacyKeyvDb(legacyKeyvPath);
+  }
+  importStoredEntry(cacheKey, entry) {
+    if (!this.db || this.getSqliteEntry(cacheKey))
+      return false;
+    if (!entry.audioFilePath || !fs5.existsSync(entry.audioFilePath))
+      return false;
+    this.upsertSqliteEntry(cacheKey, entry);
+    return true;
+  }
+  importLegacyMetadataDb(legacyPath) {
+    if (!this.db || !fs5.existsSync(legacyPath))
+      return;
+    try {
+      const legacy = openBuiltinSqlite(legacyPath);
+      if (!legacy)
+        return;
+      const rows = legacy.db.prepare("SELECT * FROM metadata").all();
+      let imported = 0;
+      for (const row of rows) {
+        const cacheKey = row.cache_key;
+        const storedEntry = {
+          audioFilePath: row.file_path,
+          provider: row.provider,
+          voice: row.voice,
+          rate: row.rate,
+          timestamp: row.timestamp,
+          text: row.original_text,
+          fileSize: row.file_size,
+          model: row.model,
+          source: row.source,
+          sessionId: row.session_id,
+          processId: row.process_id,
+          hostname: row.hostname,
+          user: row.user,
+          workingDirectory: row.working_directory,
+          commandLine: row.command_line,
+          durationMs: row.duration_ms,
+          success: row.success === 1,
+          errorMessage: row.error_message
+        };
+        if (this.importStoredEntry(cacheKey, storedEntry)) {
+          imported++;
+        }
+      }
+      if (imported > 0) {
+        fs5.renameSync(legacyPath, `${legacyPath}.migrated`);
+        this.logger.debug(`Migrated ${imported} entries from legacy metadata.sqlite`);
+      }
+    } catch (error) {
+      this.logger.warn("Legacy metadata.sqlite migration failed:", error);
+    }
+  }
+  importLegacyKeyvDb(legacyPath) {
+    if (!this.db || !fs5.existsSync(legacyPath))
+      return;
+    try {
+      const legacy = openBuiltinSqlite(legacyPath);
+      if (!legacy)
+        return;
+      const rows = legacy.db.prepare("SELECT key, value FROM keyv").all();
+      let imported = 0;
+      for (const row of rows) {
+        const cacheKey = row.key;
+        if (this.getSqliteEntry(cacheKey))
+          continue;
+        const parsed = JSON.parse(row.value);
+        const entry = parsed.value;
+        if (!entry || !this.isValidEntry(entry))
+          continue;
+        if (parsed.expires && Date.now() > parsed.expires)
+          continue;
+        if (!fs5.existsSync(entry.audioFilePath))
+          continue;
+        const storedEntry = {
+          ...entry,
+          fileSize: fs5.statSync(entry.audioFilePath).size
+        };
+        if (this.importStoredEntry(cacheKey, storedEntry)) {
+          imported++;
+        }
+      }
+      if (imported > 0) {
+        fs5.renameSync(legacyPath, `${legacyPath}.migrated`);
+        this.logger.debug(`Migrated ${imported} entries from legacy tts-cache.sqlite`);
+      }
+    } catch (error) {
+      this.logger.warn("Legacy tts-cache.sqlite migration failed:", error);
+    }
+  }
+  ensureMetadataLoaded() {
+    if (!this.metadataLoaded && this.useJsonFallback) {
+      this.loadJsonMetadata();
+    }
+  }
+  loadJsonMetadata() {
+    try {
+      if (fs5.existsSync(this.metadataFile)) {
+        const data = JSON.parse(fs5.readFileSync(this.metadataFile, "utf8"));
+        this.jsonEntries = data.entries || {};
+      } else {
+        this.jsonEntries = {};
+      }
+    } catch (error) {
+      this.logger.warn("Error loading JSON metadata, starting fresh:", error);
+      this.jsonEntries = {};
+    }
+    this.metadataLoaded = true;
+  }
+  saveJsonMetadata() {
+    const data = { version: 1, entries: this.jsonEntries };
+    const tempFile = `${this.metadataFile}.tmp`;
+    fs5.writeFileSync(tempFile, JSON.stringify(data, null, 2));
+    fs5.renameSync(tempFile, this.metadataFile);
   }
   loadStats() {
     try {
       if (fs5.existsSync(this.statsFile)) {
-        const data = fs5.readFileSync(this.statsFile, "utf8");
-        const stats = JSON.parse(data);
+        const stats = JSON.parse(fs5.readFileSync(this.statsFile, "utf8"));
         this.cacheHits = stats.cacheHits || 0;
         this.cacheMisses = stats.cacheMisses || 0;
       }
@@ -796,56 +942,89 @@ var TTSCache = class {
   }
   saveStats() {
     try {
-      const stats = {
+      fs5.writeFileSync(this.statsFile, JSON.stringify({
         cacheHits: this.cacheHits,
         cacheMisses: this.cacheMisses,
         timestamp: Date.now()
-      };
-      fs5.writeFileSync(this.statsFile, JSON.stringify(stats, null, 2));
+      }, null, 2));
     } catch (error) {
       this.logger.warn("Error saving stats:", error);
     }
   }
-  async set(key, entry, audioBuffer, options) {
-    try {
-      const audioFilePath = path5.join(this.cacheDir, `${key}.mp3`);
-      fs5.writeFileSync(audioFilePath, audioBuffer);
-      const timestamp = Date.now();
-      const cacheEntry = {
-        ...entry,
-        audioFilePath,
-        timestamp
-      };
-      const cacheResult = await this.cache.set(key, cacheEntry);
-      const metadata = {
-        cacheKey: key,
-        originalText: entry.text,
-        provider: entry.provider,
-        voice: entry.voice,
-        rate: entry.rate,
-        timestamp,
-        fileSize: audioBuffer.length,
-        filePath: audioFilePath,
-        // Enhanced metadata
-        model: options?.model || this.inferModel(entry.provider, entry.voice),
-        source: options?.source || this.getSource(),
-        sessionId: this.getSessionId(),
-        processId: process.pid.toString(),
-        hostname: require("os").hostname(),
-        user: require("os").userInfo().username,
-        workingDirectory: process.cwd(),
-        commandLine: process.argv.join(" "),
-        durationMs: options?.durationMs,
-        success: options?.success ?? true,
-        errorMessage: options?.errorMessage
-      };
-      await this.addMetadata(metadata);
-      this.logger.debug("Cache entry stored:", metadata);
-      return cacheResult;
-    } catch (error) {
-      this.logger.warn("Cache storage error:", error);
-      return false;
-    }
+  rowToStoredEntry(row) {
+    return {
+      audioFilePath: row.file_path,
+      provider: row.provider,
+      voice: row.voice,
+      rate: row.rate,
+      timestamp: row.timestamp,
+      text: row.original_text,
+      fileSize: row.file_size,
+      expiresAt: row.expires_at == null ? void 0 : row.expires_at,
+      model: row.model,
+      source: row.source,
+      sessionId: row.session_id,
+      processId: row.process_id,
+      hostname: row.hostname,
+      user: row.user,
+      workingDirectory: row.working_directory,
+      commandLine: row.command_line,
+      durationMs: row.duration_ms,
+      success: row.success === 1,
+      errorMessage: row.error_message
+    };
+  }
+  rowToMetadata(row) {
+    return {
+      cacheKey: row.cache_key,
+      originalText: row.original_text,
+      provider: row.provider,
+      voice: row.voice,
+      rate: row.rate,
+      timestamp: row.timestamp,
+      fileSize: row.file_size,
+      filePath: row.file_path,
+      model: row.model,
+      source: row.source,
+      sessionId: row.session_id,
+      processId: row.process_id,
+      hostname: row.hostname,
+      user: row.user,
+      workingDirectory: row.working_directory,
+      commandLine: row.command_line,
+      durationMs: row.duration_ms,
+      success: row.success === 1,
+      errorMessage: row.error_message
+    };
+  }
+  toMetadata(cacheKey, entry) {
+    return {
+      cacheKey,
+      originalText: entry.text,
+      provider: entry.provider,
+      voice: entry.voice,
+      rate: entry.rate,
+      timestamp: entry.timestamp,
+      fileSize: entry.fileSize,
+      filePath: entry.audioFilePath,
+      model: entry.model,
+      source: entry.source,
+      sessionId: entry.sessionId,
+      processId: entry.processId,
+      hostname: entry.hostname,
+      user: entry.user,
+      workingDirectory: entry.workingDirectory,
+      commandLine: entry.commandLine,
+      durationMs: entry.durationMs,
+      success: entry.success,
+      errorMessage: entry.errorMessage
+    };
+  }
+  isExpired(entry) {
+    return entry.expiresAt !== void 0 && Date.now() > entry.expiresAt;
+  }
+  isValidEntry(entry) {
+    return !!entry && typeof entry.audioFilePath === "string" && typeof entry.provider === "string" && typeof entry.voice === "string" && typeof entry.rate === "number" && typeof entry.timestamp === "number" && typeof entry.text === "string";
   }
   inferModel(provider, voice) {
     switch (provider) {
@@ -871,300 +1050,187 @@ var TTSCache = class {
   getSessionId() {
     return `${Date.now()}-${process.pid}`;
   }
-  async addMetadata(metadata) {
-    if (!this.metadataDb) {
-      this.logger.warn("Metadata database not available");
+  upsertSqliteEntry(cacheKey, entry) {
+    if (!this.db)
       return;
-    }
-    try {
-      const insertSQL = `
-        INSERT OR REPLACE INTO metadata (
-          cache_key, original_text, provider, voice, rate, timestamp,
-          file_size, file_path, model, source, session_id, process_id,
-          hostname, user, working_directory, command_line, duration_ms,
-          success, error_message
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-      const stmt = this.metadataDb.prepare(insertSQL);
-      stmt.run(
-        metadata.cacheKey,
-        metadata.originalText,
-        metadata.provider,
-        metadata.voice,
-        metadata.rate,
-        metadata.timestamp,
-        metadata.fileSize,
-        metadata.filePath,
-        metadata.model,
-        metadata.source,
-        metadata.sessionId,
-        metadata.processId,
-        metadata.hostname,
-        metadata.user,
-        metadata.workingDirectory,
-        metadata.commandLine,
-        metadata.durationMs,
-        metadata.success ? 1 : 0,
-        metadata.errorMessage
-      );
-      this.logger.debug("Metadata stored in SQLite:", metadata.cacheKey);
-    } catch (error) {
-      this.logger.warn("Metadata storage error:", error);
-      throw error;
-    }
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO entries (
+        cache_key, original_text, provider, voice, rate, timestamp,
+        file_size, file_path, expires_at, model, source, session_id,
+        process_id, hostname, user, working_directory, command_line,
+        duration_ms, success, error_message
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(
+      cacheKey,
+      entry.text,
+      entry.provider,
+      entry.voice,
+      entry.rate,
+      entry.timestamp,
+      entry.fileSize,
+      entry.audioFilePath,
+      entry.expiresAt ?? null,
+      entry.model ?? null,
+      entry.source ?? null,
+      entry.sessionId ?? null,
+      entry.processId ?? null,
+      entry.hostname ?? null,
+      entry.user ?? null,
+      entry.workingDirectory ?? null,
+      entry.commandLine ?? null,
+      entry.durationMs ?? null,
+      entry.success === false ? 0 : 1,
+      entry.errorMessage ?? null
+    );
   }
-  async getMetadataFromDb(cacheKey) {
-    if (!this.metadataDb)
-      return null;
-    try {
-      const selectSQL = `
-        SELECT * FROM metadata WHERE cache_key = ?
-      `;
-      const stmt = this.metadataDb.prepare(selectSQL);
-      const row = stmt.get(cacheKey);
-      if (!row)
-        return null;
-      return {
-        cacheKey: row.cache_key,
-        originalText: row.original_text,
-        provider: row.provider,
-        voice: row.voice,
-        rate: row.rate,
-        timestamp: row.timestamp,
-        fileSize: row.file_size,
-        filePath: row.file_path,
-        model: row.model,
-        source: row.source,
-        sessionId: row.session_id,
-        processId: row.process_id,
-        hostname: row.hostname,
-        user: row.user,
-        workingDirectory: row.working_directory,
-        commandLine: row.command_line,
-        durationMs: row.duration_ms,
-        success: row.success === 1,
-        errorMessage: row.error_message
-      };
-    } catch (error) {
-      this.logger.warn("Metadata retrieval error:", error);
-      return null;
-    }
+  getSqliteEntry(cacheKey) {
+    if (!this.db)
+      return void 0;
+    const row = this.db.prepare("SELECT * FROM entries WHERE cache_key = ?").get(cacheKey);
+    return row ? this.rowToStoredEntry(row) : void 0;
   }
-  async deleteMetadata(cacheKey) {
-    if (!this.metadataDb)
+  deleteSqliteEntry(cacheKey) {
+    if (!this.db)
       return;
-    try {
-      const deleteSQL = `DELETE FROM metadata WHERE cache_key = ?`;
-      const stmt = this.metadataDb.prepare(deleteSQL);
-      stmt.run(cacheKey);
-      this.logger.debug("Metadata deleted from SQLite:", cacheKey);
-    } catch (error) {
-      this.logger.warn("Metadata deletion error:", error);
-      throw error;
+    this.db.prepare("DELETE FROM entries WHERE cache_key = ?").run(cacheKey);
+  }
+  deleteEntry(cacheKey, entry) {
+    const resolved = entry || (this.useJsonFallback ? this.jsonEntries[cacheKey] : this.getSqliteEntry(cacheKey));
+    if (resolved?.audioFilePath && fs5.existsSync(resolved.audioFilePath)) {
+      fs5.unlinkSync(resolved.audioFilePath);
+    }
+    if (this.useJsonFallback) {
+      delete this.jsonEntries[cacheKey];
+      this.saveJsonMetadata();
+    } else {
+      this.deleteSqliteEntry(cacheKey);
     }
   }
-  loadMetadataIndex() {
-    if (!this.metadataDb)
-      return [];
-    try {
-      const selectSQL = `SELECT * FROM metadata ORDER BY timestamp DESC`;
-      const stmt = this.metadataDb.prepare(selectSQL);
-      const rows = stmt.all();
-      return rows.map((row) => ({
-        cacheKey: row.cache_key,
-        originalText: row.original_text,
-        provider: row.provider,
-        voice: row.voice,
-        rate: row.rate,
-        timestamp: row.timestamp,
-        fileSize: row.file_size,
-        filePath: row.file_path,
-        model: row.model,
-        source: row.source,
-        sessionId: row.session_id,
-        processId: row.process_id,
-        hostname: row.hostname,
-        user: row.user,
-        workingDirectory: row.working_directory,
-        commandLine: row.command_line,
-        durationMs: row.duration_ms,
-        success: row.success === 1,
-        errorMessage: row.error_message
-      }));
-    } catch (error) {
-      this.logger.warn("Error loading metadata index:", error);
-      return [];
+  enforceMaxSize() {
+    if (!this.maxSize)
+      return;
+    const entries = this.useJsonFallback ? Object.entries(this.jsonEntries).map(([cacheKey, entry]) => ({ cacheKey, entry })) : (this.db?.prepare("SELECT cache_key, file_size, timestamp FROM entries ORDER BY timestamp ASC").all() || []).map((row) => ({
+      cacheKey: row.cache_key,
+      entry: { fileSize: row.file_size }
+    }));
+    let totalSize = entries.reduce((sum, item) => sum + (item.entry.fileSize || 0), 0);
+    if (totalSize <= this.maxSize)
+      return;
+    for (const item of entries) {
+      if (totalSize <= this.maxSize)
+        break;
+      const entry = this.useJsonFallback ? this.jsonEntries[item.cacheKey] : this.getSqliteEntry(item.cacheKey);
+      if (!entry)
+        continue;
+      totalSize -= entry.fileSize;
+      this.deleteEntry(item.cacheKey, entry);
     }
   }
-  async getCacheMetadata() {
-    return this.search({});
-  }
-  async findByText(text) {
-    return this.search({ text });
-  }
-  async findByProvider(provider) {
-    return this.search({ provider });
-  }
-  async search(options = {}) {
-    if (!this.metadataDb) {
-      return this.loadMetadataIndex();
+  buildSearchQuery(options) {
+    const where = [];
+    const params = [];
+    if (options.text) {
+      where.push("original_text LIKE ?");
+      params.push(`%${options.text}%`);
     }
-    try {
-      let whereConditions = [];
-      let params = [];
-      if (options.text) {
-        whereConditions.push("original_text LIKE ?");
-        params.push(`%${options.text}%`);
-      }
-      if (options.provider) {
-        whereConditions.push("provider = ?");
-        params.push(options.provider);
-      }
-      if (options.model) {
-        whereConditions.push("model = ?");
-        params.push(options.model);
-      }
-      if (options.source) {
-        whereConditions.push("source = ?");
-        params.push(options.source);
-      }
-      if (options.fromDate) {
-        whereConditions.push("timestamp >= ?");
-        params.push(options.fromDate.getTime());
-      }
-      if (options.toDate) {
-        whereConditions.push("timestamp <= ?");
-        params.push(options.toDate.getTime());
-      }
-      if (options.minSize !== void 0) {
-        whereConditions.push("file_size >= ?");
-        params.push(options.minSize);
-      }
-      if (options.maxSize !== void 0) {
-        whereConditions.push("file_size <= ?");
-        params.push(options.maxSize);
-      }
-      if (options.success !== void 0) {
-        whereConditions.push("success = ?");
-        params.push(options.success ? 1 : 0);
-      }
-      if (options.workingDirectory) {
-        whereConditions.push("working_directory LIKE ?");
-        params.push(`%${options.workingDirectory}%`);
-      }
-      if (options.user) {
-        whereConditions.push("user = ?");
-        params.push(options.user);
-      }
-      if (options.sessionId) {
-        whereConditions.push("session_id = ?");
-        params.push(options.sessionId);
-      }
-      let sql = "SELECT * FROM metadata";
-      if (whereConditions.length > 0) {
-        sql += " WHERE " + whereConditions.join(" AND ");
-      }
-      sql += " ORDER BY timestamp DESC";
-      if (options.limit) {
-        sql += " LIMIT ?";
-        params.push(options.limit);
-        if (options.offset) {
-          sql += " OFFSET ?";
-          params.push(options.offset);
-        }
-      }
-      const stmt = this.metadataDb.prepare(sql);
-      const rows = stmt.all(...params);
-      return rows.map((row) => ({
-        cacheKey: row.cache_key,
-        originalText: row.original_text,
-        provider: row.provider,
-        voice: row.voice,
-        rate: row.rate,
-        timestamp: row.timestamp,
-        fileSize: row.file_size,
-        filePath: row.file_path,
-        model: row.model,
-        source: row.source,
-        sessionId: row.session_id,
-        processId: row.process_id,
-        hostname: row.hostname,
-        user: row.user,
-        workingDirectory: row.working_directory,
-        commandLine: row.command_line,
-        durationMs: row.duration_ms,
-        success: row.success === 1,
-        errorMessage: row.error_message
-      }));
-    } catch (error) {
-      this.logger.warn("Search error:", error);
-      throw error;
+    if (options.provider) {
+      where.push("provider = ?");
+      params.push(options.provider);
     }
+    if (options.model) {
+      where.push("model = ?");
+      params.push(options.model);
+    }
+    if (options.source) {
+      where.push("source = ?");
+      params.push(options.source);
+    }
+    if (options.fromDate) {
+      where.push("timestamp >= ?");
+      params.push(options.fromDate.getTime());
+    }
+    if (options.toDate) {
+      where.push("timestamp <= ?");
+      params.push(options.toDate.getTime());
+    }
+    if (options.minSize !== void 0) {
+      where.push("file_size >= ?");
+      params.push(options.minSize);
+    }
+    if (options.maxSize !== void 0) {
+      where.push("file_size <= ?");
+      params.push(options.maxSize);
+    }
+    if (options.success !== void 0) {
+      where.push("success = ?");
+      params.push(options.success ? 1 : 0);
+    }
+    if (options.workingDirectory) {
+      where.push("working_directory LIKE ?");
+      params.push(`%${options.workingDirectory}%`);
+    }
+    if (options.user) {
+      where.push("user = ?");
+      params.push(options.user);
+    }
+    if (options.sessionId) {
+      where.push("session_id = ?");
+      params.push(options.sessionId);
+    }
+    let sql = "SELECT * FROM entries";
+    if (where.length > 0) {
+      sql += ` WHERE ${where.join(" AND ")}`;
+    }
+    sql += " ORDER BY timestamp DESC";
+    if (options.limit !== void 0) {
+      sql += " LIMIT ?";
+      params.push(options.limit);
+      if (options.offset !== void 0) {
+        sql += " OFFSET ?";
+        params.push(options.offset);
+      }
+    }
+    return { sql, params };
   }
-  async getStats() {
-    if (!this.metadataDb) {
-      const metadata = this.loadMetadataIndex();
-      return this.calculateStatsFromMetadata(metadata);
+  filterJsonMetadata(options = {}) {
+    this.ensureMetadataLoaded();
+    let results = Object.entries(this.jsonEntries).map(([cacheKey, entry]) => this.toMetadata(cacheKey, entry)).sort((a, b) => b.timestamp - a.timestamp);
+    if (options.text) {
+      const needle = options.text.toLowerCase();
+      results = results.filter((entry) => entry.originalText.toLowerCase().includes(needle));
     }
-    try {
-      const countStmt = this.metadataDb.prepare("SELECT COUNT(*) as count, SUM(file_size) as total_size FROM metadata");
-      const countResult = countStmt.get();
-      if (!countResult || countResult.count === 0) {
-        return {
-          totalEntries: 0,
-          totalSize: 0,
-          cacheHits: this.cacheHits,
-          cacheMisses: this.cacheMisses,
-          providers: {},
-          models: {},
-          sources: {},
-          dateRange: null,
-          avgFileSize: 0,
-          hitRate: this.cacheHits + this.cacheMisses > 0 ? this.cacheHits / (this.cacheHits + this.cacheMisses) : 0
-        };
-      }
-      const dateStmt = this.metadataDb.prepare("SELECT MIN(timestamp) as earliest, MAX(timestamp) as latest FROM metadata");
-      const dateResult = dateStmt.get();
-      const providerStmt = this.metadataDb.prepare("SELECT provider, COUNT(*) as count FROM metadata GROUP BY provider");
-      const providerRows = providerStmt.all();
-      const providers = {};
-      providerRows.forEach((row) => {
-        providers[row.provider] = row.count;
-      });
-      const modelStmt = this.metadataDb.prepare("SELECT model, COUNT(*) as count FROM metadata GROUP BY model");
-      const modelRows = modelStmt.all();
-      const models = {};
-      modelRows.forEach((row) => {
-        models[row.model || "unknown"] = row.count;
-      });
-      const sourceStmt = this.metadataDb.prepare("SELECT source, COUNT(*) as count FROM metadata GROUP BY source");
-      const sourceRows = sourceStmt.all();
-      const sources = {};
-      sourceRows.forEach((row) => {
-        sources[row.source || "unknown"] = row.count;
-      });
-      return {
-        totalEntries: countResult.count,
-        totalSize: countResult.total_size || 0,
-        cacheHits: this.cacheHits,
-        cacheMisses: this.cacheMisses,
-        providers,
-        models,
-        sources,
-        dateRange: {
-          earliest: new Date(dateResult.earliest),
-          latest: new Date(dateResult.latest)
-        },
-        avgFileSize: (countResult.total_size || 0) / countResult.count,
-        hitRate: this.cacheHits + this.cacheMisses > 0 ? this.cacheHits / (this.cacheHits + this.cacheMisses) : 0
-      };
-    } catch (error) {
-      this.logger.warn("Stats error:", error);
-      const metadata = this.loadMetadataIndex();
-      return this.calculateStatsFromMetadata(metadata);
+    if (options.provider)
+      results = results.filter((entry) => entry.provider === options.provider);
+    if (options.model)
+      results = results.filter((entry) => entry.model === options.model);
+    if (options.source)
+      results = results.filter((entry) => entry.source === options.source);
+    if (options.fromDate)
+      results = results.filter((entry) => entry.timestamp >= options.fromDate.getTime());
+    if (options.toDate)
+      results = results.filter((entry) => entry.timestamp <= options.toDate.getTime());
+    if (options.minSize !== void 0)
+      results = results.filter((entry) => entry.fileSize >= options.minSize);
+    if (options.maxSize !== void 0)
+      results = results.filter((entry) => entry.fileSize <= options.maxSize);
+    if (options.success !== void 0)
+      results = results.filter((entry) => entry.success === options.success);
+    if (options.workingDirectory) {
+      const needle = options.workingDirectory.toLowerCase();
+      results = results.filter((entry) => entry.workingDirectory?.toLowerCase().includes(needle));
     }
+    if (options.user)
+      results = results.filter((entry) => entry.user === options.user);
+    if (options.sessionId)
+      results = results.filter((entry) => entry.sessionId === options.sessionId);
+    if (options.offset)
+      results = results.slice(options.offset);
+    if (options.limit)
+      results = results.slice(0, options.limit);
+    return results;
   }
-  calculateStatsFromMetadata(metadata) {
+  calculateStats(metadata) {
     if (metadata.length === 0) {
       return {
         totalEntries: 0,
@@ -1188,8 +1254,8 @@ var TTSCache = class {
       models: {},
       sources: {},
       dateRange: {
-        earliest: new Date(Math.min(...metadata.map((e) => e.timestamp))),
-        latest: new Date(Math.max(...metadata.map((e) => e.timestamp)))
+        earliest: new Date(Math.min(...metadata.map((entry) => entry.timestamp))),
+        latest: new Date(Math.max(...metadata.map((entry) => entry.timestamp)))
       },
       avgFileSize: metadata.reduce((sum, entry) => sum + entry.fileSize, 0) / metadata.length,
       hitRate: this.cacheHits + this.cacheMisses > 0 ? this.cacheHits / (this.cacheHits + this.cacheMisses) : 0
@@ -1201,60 +1267,133 @@ var TTSCache = class {
     });
     return stats;
   }
-  async getRecent(limit = 10) {
-    if (!this.metadataDb) {
-      const metadata = this.loadMetadataIndex();
-      return metadata.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
-    }
+  async get(key) {
     try {
-      const sql = `SELECT * FROM metadata ORDER BY timestamp DESC LIMIT ?`;
-      const stmt = this.metadataDb.prepare(sql);
-      const rows = stmt.all(limit);
-      return rows.map((row) => ({
-        cacheKey: row.cache_key,
-        originalText: row.original_text,
-        provider: row.provider,
-        voice: row.voice,
-        rate: row.rate,
-        timestamp: row.timestamp,
-        fileSize: row.file_size,
-        filePath: row.file_path,
-        model: row.model,
-        source: row.source,
-        sessionId: row.session_id,
-        processId: row.process_id,
-        hostname: row.hostname,
-        user: row.user,
-        workingDirectory: row.working_directory,
-        commandLine: row.command_line,
-        durationMs: row.duration_ms,
-        success: row.success === 1,
-        errorMessage: row.error_message
-      }));
+      const entry = this.useJsonFallback ? (this.ensureMetadataLoaded(), this.jsonEntries[key]) : this.getSqliteEntry(key);
+      if (entry && this.isValidEntry(entry)) {
+        if (this.isExpired(entry)) {
+          this.deleteEntry(key, entry);
+        } else if (fs5.existsSync(entry.audioFilePath)) {
+          this.cacheHits++;
+          this.saveStats();
+          return entry;
+        } else {
+          this.deleteEntry(key, entry);
+        }
+      }
     } catch (error) {
-      this.logger.warn("Recent error:", error);
-      throw error;
+      console.warn("Cache retrieval error:", error);
     }
+    this.cacheMisses++;
+    this.saveStats();
+    return void 0;
+  }
+  async set(key, entry, audioBuffer, options) {
+    try {
+      const extension = options?.extension || detectAudioExtension(audioBuffer);
+      const audioFilePath = path5.join(this.cacheDir, `${key}.${extension}`);
+      fs5.writeFileSync(audioFilePath, audioBuffer);
+      const timestamp = Date.now();
+      const storedEntry = {
+        ...entry,
+        audioFilePath,
+        timestamp,
+        fileSize: audioBuffer.length,
+        expiresAt: this.ttlMs ? timestamp + this.ttlMs : void 0,
+        model: options?.model || this.inferModel(entry.provider, entry.voice),
+        source: options?.source || this.getSource(),
+        sessionId: this.getSessionId(),
+        processId: process.pid.toString(),
+        hostname: require("os").hostname(),
+        user: require("os").userInfo().username,
+        workingDirectory: process.cwd(),
+        commandLine: process.argv.join(" "),
+        durationMs: options?.durationMs,
+        success: options?.success ?? true,
+        errorMessage: options?.errorMessage
+      };
+      if (this.useJsonFallback) {
+        this.ensureMetadataLoaded();
+        this.jsonEntries[key] = storedEntry;
+        this.saveJsonMetadata();
+      } else {
+        this.upsertSqliteEntry(key, storedEntry);
+      }
+      this.enforceMaxSize();
+      this.logger.debug("Cache entry stored:", this.toMetadata(key, storedEntry));
+      return true;
+    } catch (error) {
+      this.logger.warn("Cache storage error:", error);
+      return false;
+    }
+  }
+  async getCacheMetadata() {
+    return this.search();
+  }
+  async findByText(text) {
+    return this.search({ text });
+  }
+  async findByProvider(provider) {
+    return this.search({ provider });
+  }
+  async search(options = {}) {
+    if (this.useJsonFallback) {
+      return this.filterJsonMetadata(options);
+    }
+    if (!this.db)
+      return [];
+    const { sql, params } = this.buildSearchQuery(options);
+    return this.db.prepare(sql).all(...params).map((row) => this.rowToMetadata(row));
+  }
+  async getStats() {
+    if (this.useJsonFallback) {
+      return this.calculateStats(this.filterJsonMetadata());
+    }
+    if (!this.db) {
+      return this.calculateStats([]);
+    }
+    const countRow = this.db.prepare("SELECT COUNT(*) AS count, SUM(file_size) AS total_size FROM entries").get();
+    const count = countRow?.count || 0;
+    if (count === 0) {
+      return this.calculateStats([]);
+    }
+    const dateRow = this.db.prepare("SELECT MIN(timestamp) AS earliest, MAX(timestamp) AS latest FROM entries").get();
+    const providers = {};
+    const models = {};
+    const sources = {};
+    this.db.prepare("SELECT provider, COUNT(*) AS count FROM entries GROUP BY provider").all().forEach((row) => {
+      providers[row.provider] = row.count;
+    });
+    this.db.prepare("SELECT model, COUNT(*) AS count FROM entries GROUP BY model").all().forEach((row) => {
+      models[row.model || "unknown"] = row.count;
+    });
+    this.db.prepare("SELECT source, COUNT(*) AS count FROM entries GROUP BY source").all().forEach((row) => {
+      sources[row.source || "unknown"] = row.count;
+    });
+    const totalSize = countRow?.total_size || 0;
+    return {
+      totalEntries: count,
+      totalSize,
+      cacheHits: this.cacheHits,
+      cacheMisses: this.cacheMisses,
+      providers,
+      models,
+      sources,
+      dateRange: {
+        earliest: new Date(dateRow?.earliest),
+        latest: new Date(dateRow?.latest)
+      },
+      avgFileSize: totalSize / count,
+      hitRate: this.cacheHits + this.cacheMisses > 0 ? this.cacheHits / (this.cacheHits + this.cacheMisses) : 0
+    };
+  }
+  async getRecent(limit = 10) {
+    return this.search({ limit });
   }
   async delete(key) {
     try {
-      const entry = await this.cache.get(key);
-      if (entry && entry.audioFilePath) {
-        if (fs5.existsSync(entry.audioFilePath)) {
-          fs5.unlinkSync(entry.audioFilePath);
-        }
-      }
-      if (this.metadataDb) {
-        try {
-          const deleteSQL = `DELETE FROM metadata WHERE cache_key = ?`;
-          const stmt = this.metadataDb.prepare(deleteSQL);
-          stmt.run(key);
-          this.logger.debug("Metadata deleted from SQLite:", key);
-        } catch (error) {
-          this.logger.warn("Metadata deletion error:", error);
-        }
-      }
-      return await this.cache.delete(key);
+      this.deleteEntry(key);
+      return true;
     } catch (error) {
       console.warn("Cache deletion error:", error);
       return false;
@@ -1262,24 +1401,20 @@ var TTSCache = class {
   }
   async clear() {
     try {
-      const files = fs5.readdirSync(this.cacheDir);
-      for (const file of files) {
-        if (file.endsWith(".mp3")) {
+      for (const file of fs5.readdirSync(this.cacheDir)) {
+        if (file.endsWith(".mp3") || file.endsWith(".wav")) {
           fs5.unlinkSync(path5.join(this.cacheDir, file));
         }
       }
-      if (this.metadataDb) {
-        try {
-          this.metadataDb.exec("DELETE FROM metadata");
-          this.logger.debug("Metadata table cleared");
-        } catch (error) {
-          this.logger.warn("Error clearing metadata table:", error);
-        }
+      if (this.useJsonFallback) {
+        this.jsonEntries = {};
+        this.saveJsonMetadata();
+      } else if (this.db) {
+        this.db.exec("DELETE FROM entries");
       }
       this.cacheHits = 0;
       this.cacheMisses = 0;
       this.saveStats();
-      await this.cache.clear();
     } catch (error) {
       console.warn("Cache clear error:", error);
     }
@@ -1287,52 +1422,29 @@ var TTSCache = class {
   async cleanup(maxAge) {
     try {
       const cutoff = Date.now() - (maxAge || 7 * 24 * 60 * 60 * 1e3);
-      if (this.metadataDb) {
-        try {
-          const selectStmt = this.metadataDb.prepare("SELECT cache_key, file_path FROM metadata WHERE timestamp < ?");
-          const oldEntries = selectStmt.all(cutoff);
-          for (const entry of oldEntries) {
-            if (fs5.existsSync(entry.file_path)) {
-              fs5.unlinkSync(entry.file_path);
-            }
+      if (this.useJsonFallback) {
+        this.ensureMetadataLoaded();
+        for (const [key, entry] of Object.entries(this.jsonEntries)) {
+          if (entry.timestamp < cutoff) {
+            this.deleteEntry(key, entry);
           }
-          const deleteStmt = this.metadataDb.prepare("DELETE FROM metadata WHERE timestamp < ?");
-          deleteStmt.run(cutoff);
-          for (const entry of oldEntries) {
-            await this.cache.delete(entry.cache_key);
-          }
-          this.logger.debug(`Cleaned up ${oldEntries.length} old cache entries`);
-        } catch (error) {
-          this.logger.warn("SQLite cleanup error:", error);
-          await this.cleanupFileBased(cutoff);
         }
-      } else {
-        await this.cleanupFileBased(cutoff);
+        return;
+      }
+      if (!this.db)
+        return;
+      const oldEntries = this.db.prepare("SELECT cache_key, file_path FROM entries WHERE timestamp < ?").all(cutoff);
+      for (const row of oldEntries) {
+        const cacheKey = row.cache_key;
+        const filePath = row.file_path;
+        if (fs5.existsSync(filePath)) {
+          fs5.unlinkSync(filePath);
+        }
+        this.deleteSqliteEntry(cacheKey);
       }
     } catch (error) {
       console.warn("Cache cleanup error:", error);
     }
-  }
-  async cleanupFileBased(cutoff) {
-    try {
-      const files = fs5.readdirSync(this.cacheDir);
-      for (const file of files) {
-        if (file.endsWith(".mp3")) {
-          const filePath = path5.join(this.cacheDir, file);
-          const stats = fs5.statSync(filePath);
-          if (stats.mtime.getTime() < cutoff) {
-            fs5.unlinkSync(filePath);
-            const key = file.replace(".mp3", "");
-            await this.cache.delete(key);
-          }
-        }
-      }
-    } catch (error) {
-      console.warn("File-based cleanup error:", error);
-    }
-  }
-  isValidEntry(entry) {
-    return entry && typeof entry.audioFilePath === "string" && typeof entry.provider === "string" && typeof entry.voice === "string" && typeof entry.rate === "number" && typeof entry.timestamp === "number" && typeof entry.text === "string";
   }
   generateCacheKey(text, provider, voice, rate) {
     const normalizedText = text.trim().toLowerCase();
@@ -1341,6 +1453,22 @@ var TTSCache = class {
   }
   getCacheDir() {
     return this.cacheDir;
+  }
+  getEntryCount() {
+    if (this.useJsonFallback) {
+      this.ensureMetadataLoaded();
+      return Object.keys(this.jsonEntries).length;
+    }
+    const row = this.db?.prepare("SELECT COUNT(*) AS count FROM entries").get();
+    return row?.count || 0;
+  }
+  usesSqlite() {
+    return !this.useJsonFallback && this.db !== null;
+  }
+  getSqliteBackend() {
+    if (this.useJsonFallback)
+      return "json";
+    return this.sqliteBackend || "json";
   }
 };
 
@@ -1746,7 +1874,8 @@ var SpeakEasy = class {
               }, audioBuffer, {
                 model: this.inferModel(providerName),
                 durationMs: Date.now() - startTime,
-                success: true
+                success: true,
+                extension: providerName === "gemini" ? "wav" : void 0
               });
               console.log("cached");
               await this.sendHUDNotification(text, providerName, false);
@@ -1946,12 +2075,41 @@ var SpeakEasy = class {
     } catch (error) {
     }
   }
-  getCacheStats() {
-    return Promise.resolve({
-      size: 0,
-      // Keyv doesn't provide easy way to get size
-      dir: this.cache?.getCacheDir()
-    });
+  requireCache() {
+    if (!this.cache) {
+      throw new Error("Cache is not enabled. Configure cache.enabled or use an API provider with keys present.");
+    }
+    return this.cache;
+  }
+  async getCacheStats() {
+    if (!this.cache) {
+      return {
+        totalEntries: 0,
+        totalSize: 0,
+        cacheHits: 0,
+        cacheMisses: 0,
+        providers: {},
+        models: {},
+        sources: {},
+        dateRange: null,
+        avgFileSize: 0,
+        hitRate: 0
+      };
+    }
+    const stats = await this.cache.getStats();
+    return {
+      ...stats,
+      dir: this.cache.getCacheDir()
+    };
+  }
+  async getCacheMetadata() {
+    return this.requireCache().getCacheMetadata();
+  }
+  async findByText(text) {
+    return this.requireCache().findByText(text);
+  }
+  async findByProvider(provider) {
+    return this.requireCache().findByProvider(provider);
   }
 };
 var say = (text, provider) => {

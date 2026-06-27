@@ -8,7 +8,7 @@ A unified speech library for all your projects with support for multiple TTS pro
 ## Key Features
 
 ### Intelligent Caching System
-- **16x faster** repeated playback with SQLite-based cache
+- **16x faster** repeated playback with SQLite cache
 - Automatic cache management with TTL and size limits
 - Content-aware deduplication prevents redundant API calls
 - Comprehensive analytics and cache inspection tools
@@ -88,7 +88,7 @@ await say('Hello!', 'groq');                  // Groq TTS
 
 ### Core Features
 - **Multi-Provider Support** - System, OpenAI, ElevenLabs, Groq
-- **Smart Caching** - SQLite-based cache with metadata
+- **Smart Caching** - SQLite cache with metadata (no extra deps)
 - **Queue Management** - Priority-based speech queue
 - **Rate Control** - Customizable speech rate (WPM)
 - **Volume Control** - Precise volume without affecting system

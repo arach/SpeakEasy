@@ -16,7 +16,7 @@ speakeasy/
 ├── src/
 │   ├── index.ts              # Main SpeakEasy class, exports
 │   ├── types.ts              # TypeScript interfaces
-│   ├── cache.ts              # SQLite-based audio cache (TTSCache)
+│   ├── cache.ts              # SQLite audio cache via node:sqlite (TTSCache)
 │   ├── providers/            # TTS provider implementations
 │   │   ├── system.ts         # macOS `say` command
 │   │   ├── openai.ts         # OpenAI TTS API
@@ -123,7 +123,7 @@ User Request
 ## Caching System
 
 The `TTSCache` class provides:
-- SQLite-based metadata storage
+- Built-in SQLite metadata storage (`node:sqlite`)
 - File-based audio storage in `/tmp/speakeasy-cache/`
 - UUID v5 keys based on text + provider + voice + rate
 - Configurable TTL and max size

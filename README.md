@@ -74,7 +74,7 @@ Built with ❤️ by Arach • https://arach.dev
 ## ✨ Key Features
 
 ### 🚀 **Intelligent Caching System**
-- **16x faster** repeated playback with SQLite-based cache
+- **16x faster** repeated playback with built-in SQLite cache
 - Automatic cache management with TTL and size limits
 - Content-aware deduplication prevents redundant API calls
 - Comprehensive analytics and cache inspection tools

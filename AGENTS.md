@@ -11,6 +11,7 @@
 - Groq uses Orpheus model (canopylabs/orpheus-v1-english) with voices: tara, leah, jess, mia, zoe, leo, dan, zac
 - Groq requires accepting model terms at console.groq.com before first use
 - Cache is auto-enabled for API providers when keys are present
+- Cache uses built-in SQLite (`node:sqlite` / `bun:sqlite`) — no native addons
 - Use pnpm for package management
 
 ## Project Structure
@@ -67,7 +68,7 @@ Get up and running with **speakeasy** in under 5 minutes.
 
 List any requirements:
 
-- Node.js >= 18
+- Node.js >= 22.5 (built-in SQLite) or Bun >= 1.0
 - pnpm (recommended)
 
 ## Installation

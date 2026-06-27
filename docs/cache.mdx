@@ -11,7 +11,7 @@ Comprehensive documentation for SpeakEasy's intelligent caching system, includin
 
 SpeakEasy includes a sophisticated caching system that:
 - **Stores generated audio** for faster repeated playback
-- **Uses SQLite** for robust metadata management
+- **Uses built-in SQLite** (`node:sqlite`) — no extra dependencies
 - **Provides analytics** on cache usage and performance
 - **Automatically manages** TTL expiration and size limits
 - **Supports CLI tools** for inspection and management
@@ -22,11 +22,20 @@ SpeakEasy includes a sophisticated caching system that:
 
 ```
 /tmp/speakeasy-cache/
-├── cache.db                    # SQLite metadata database
+├── cache.sqlite               # SQLite metadata database (node:sqlite or bun:sqlite)
+├── stats.json                 # Hit/miss counters
 ├── abc123-def456.mp3          # Audio files (UUID names)
 ├── def789-ghi012.mp3
 └── ...
 ```
+
+### Runtime Requirements
+
+- **Node.js 22.5+** uses built-in `node:sqlite`
+- **Bun 1.0+** uses built-in `bun:sqlite`
+- Older Node versions fall back to `metadata.json` (no SQLite)
+
+Legacy `metadata.sqlite` and `tts-cache.sqlite` files from the old `better-sqlite3` cache are automatically migrated on first run.
 
 ### Cache Key Generation
 
@@ -195,8 +204,8 @@ const permSpeaker = new SpeakEasy({
 ### Automatic Cleanup
 
 When size limit is exceeded:
-1. **Sorts by last access time** (LRU - Least Recently Used)
-2. **Deletes oldest entries** first
+1. **Sorts by creation time** (oldest first)
+2. **Deletes oldest entries** until under the limit
 3. **Removes both audio file and metadata**
 4. **Continues until under limit**
 

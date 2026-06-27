@@ -1,7 +1,6 @@
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import fetch from 'node-fetch';
 import { Provider, ProviderConfig } from '../types';
 
 export class GroqProvider implements Provider {

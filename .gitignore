@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+bun.lock
+package-lock.json
 docs-site/node_modules/
 docs-site/.next/
 docs-site/.source/

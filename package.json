@@ -9,11 +9,12 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/bin/speakeasy-cli.ts --dts --format cjs",
+    "build": "tsup src/index.ts src/bin/speakeasy-cli.ts --dts --format cjs --external node:sqlite --external bun:sqlite",
     "dev": "tsc --watch",
     "test": "node dist/test.js",
-    "example": "npm run build && node examples/basic-usage.js",
-    "cli": "npm run build && node dist/bin/speakeasy-cli.js",
+    "test:cache": "pnpm run build && node scripts/cache-test.js",
+    "example": "pnpm run build && node examples/basic-usage.js",
+    "cli": "pnpm run build && node dist/bin/speakeasy-cli.js",
     "docs": "cd docs-site && pnpm dev",
     "docs:build": "cd docs-site && pnpm build"
   },
@@ -33,23 +34,20 @@
   ],
   "author": "arach",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.5.0",
+    "bun": ">=1.0.0"
+  },
   "dependencies": {
-    "@anthropic-ai/claude-code": "^1.0.72",
-    "@google/generative-ai": "^0.24.1",
-    "@types/uuid": "^10.0.0",
-    "better-sqlite3": "^12.6.2",
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
-    "fluent-ffmpeg": "^2.1.3",
-    "keyv": "^5.3.4",
-    "node-fetch": "^3.3.2",
     "uuid": "^11.1.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@arach/dewey": "^0.2.0",
-    "@types/node": "^20.0.0",
-    "playwright": "^1.54.2",
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
     "tsup": "^7.0.0",
     "typescript": "^5.0.0"
   }
