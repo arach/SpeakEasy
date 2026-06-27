@@ -17,7 +17,18 @@ Welcome to **speakeasy**.
 
 ## Quickstart
 
-Get up and running with **speakeasy** in under 5 minutes.
+Get up and running with **@arach/speakeasy** in under 5 minutes.
+
+Requirements: Node.js >= 22.5 or Bun >= 1.0, macOS for system voice.
+
+```bash
+npm install @arach/speakeasy
+```
+
+```typescript
+import { say } from '@arach/speakeasy';
+await say('Hello, world!');
+```
 
 ## Providers
 

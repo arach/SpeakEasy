@@ -13,6 +13,8 @@ export default {
       'Groq uses Orpheus model (canopylabs/orpheus-v1-english) with voices: tara, leah, jess, mia, zoe, leo, dan, zac',
       'Groq requires accepting model terms at console.groq.com before first use',
       'Cache is auto-enabled for API providers when keys are present',
+      'Cache uses built-in SQLite (node:sqlite / bun:sqlite) — no native addons',
+      'Requires Node.js >= 22.5 or Bun >= 1.0 for SQLite cache',
       'Use pnpm for package management',
     ],
 

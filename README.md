@@ -97,16 +97,24 @@ Listen to SpeakEasy in action: [welcome-demo.mp3](examples/welcome-demo.mp3)
 
 *Generated with: `speakeasy "Welcome to SpeakEasy! This unified text-to-speech service makes it easy to add voice to your applications" --provider openai --voice nova --rate 185 --out welcome-demo.mp3`*
 
+## Requirements
+
+- **Node.js >= 22.5** or **Bun >= 1.0** (built-in SQLite cache)
+- **macOS** for system voice and audio playback
+
 ## Installation
 
 ```bash
-npm install speakeasy
+npm install @arach/speakeasy
+
+# or global CLI
+npm install -g @arach/speakeasy
 ```
 
 ## Quick Start
 
 ```typescript
-import { say } from 'speakeasy';
+import { say } from '@arach/speakeasy';
 
 await say('Hello world!');                    // system voice
 await say('Hello!', 'openai');                // OpenAI TTS

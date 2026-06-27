@@ -54,7 +54,11 @@ class SpeakEasy {
   getQueueLength(): number
   
   // Cache operations
-  async getCacheStats(): Promise<CacheStats>
+  async getCacheStats(): Promise<CacheStats & { dir?: string }>
+  async getCacheMetadata(): Promise<CacheMetadata[]>
+  async findByText(text: string): Promise<CacheMetadata[]>
+  async findByProvider(provider: string): Promise<CacheMetadata[]>
+  async clearCache(): Promise<void>
 }
 ```
 
@@ -277,10 +281,18 @@ const speaker = new SpeakEasy({
 const stats = await speaker.getCacheStats();
 console.log(`Cache has ${stats.totalEntries} entries`);
 console.log(`Total size: ${stats.totalSize} bytes`);
-console.log(`Hit rate: ${stats.hitRate * 100}%`);
+console.log(`Hit rate: ${(stats.hitRate * 100).toFixed(1)}%`);
 
-// Cache is automatically managed - no manual operations needed
+// Search and inspect entries
+const all = await speaker.getCacheMetadata();
+const matches = await speaker.findByText('build completed');
+const openai = await speaker.findByProvider('openai');
+
+// Clear cache
+await speaker.clearCache();
 ```
+
+Cache uses built-in SQLite on Node.js 22.5+ (`node:sqlite`) or Bun (`bun:sqlite`), with JSON fallback on older Node versions.
 
 ## Error Handling
 

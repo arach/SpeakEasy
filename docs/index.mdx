@@ -5,10 +5,15 @@ description: Unified text-to-speech library with multi-provider support
 
 A unified speech library for all your projects with support for multiple TTS providers and clean configuration structure.
 
+## Requirements
+
+- **Node.js >= 22.5** or **Bun >= 1.0** (built-in SQLite cache)
+- **macOS** for system voice and audio playback
+
 ## Key Features
 
 ### Intelligent Caching System
-- **16x faster** repeated playback with SQLite cache
+- **16x faster** repeated playback with built-in SQLite (`node:sqlite` / `bun:sqlite`)
 - Automatic cache management with TTL and size limits
 - Content-aware deduplication prevents redundant API calls
 - Comprehensive analytics and cache inspection tools

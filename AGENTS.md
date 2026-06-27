@@ -12,6 +12,7 @@
 - Groq requires accepting model terms at console.groq.com before first use
 - Cache is auto-enabled for API providers when keys are present
 - Cache uses built-in SQLite (`node:sqlite` / `bun:sqlite`) — no native addons
+- Requires Node.js >= 22.5 or Bun >= 1.0 for SQLite cache
 - Use pnpm for package management
 
 ## Project Structure
@@ -66,35 +67,66 @@ Get up and running with **speakeasy** in under 5 minutes.
 
 ## Prerequisites
 
-List any requirements:
-
-- Node.js >= 22.5 (built-in SQLite) or Bun >= 1.0
-- pnpm (recommended)
+- **Node.js >= 22.5** (built-in `node:sqlite` for cache) or **Bun >= 1.0** (`bun:sqlite`)
+- **macOS** for system voice playback (`say` / `afplay`)
+- API keys for cloud providers (optional — system voice works without keys)
 
 ## Installation
 
 ```bash
-# Install via pnpm
-pnpm add speakeasy
+# npm
+npm install @arach/speakeasy
 
-# Or npm
-npm install speakeasy
+# pnpm
+pnpm add @arach/speakeasy
+
+# global CLI
+npm install -g @arach/speakeasy
 ```
 
 ## Basic Usage
 
-```typescript
-// Example code
-import { something } from 'speakeasy'
+### SDK
 
-// Use it
-something()
+```typescript
+import { say, SpeakEasy } from '@arach/speakeasy';
+
+// One-liner — uses system voice on macOS
+await say('Hello, world!');
+
+// With a cloud provider (requires API key)
+await say('Hello from OpenAI', 'openai');
+
+// Full configuration with caching
+const speaker = new SpeakEasy({
+  provider: 'openai',
+  openaiVoice: 'nova',
+  rate: 180,
+  cache: { enabled: true },
+  apiKeys: { openai: process.env.OPENAI_API_KEY },
+});
+
+await speaker.speak('Hello, world!');
+```
+
+### CLI
+
+```bash
+# System voice (no API key)
+speakeasy "Hello, world!" --provider system
+
+# OpenAI with caching
+speakeasy "Build completed" --provider openai --voice nova --cache
+
+# Health check
+speakeasy --doctor
 ```
 
 ## Next Steps
 
 - Read the [Configuration](./configuration.md) guide
-- Explore the [API Reference](./api.md)
+- Explore [Providers](./providers.md) for voice options
+- See the [SDK Guide](./sdk.md) and [API Reference](./api.md)
 
 ## Providers
 
