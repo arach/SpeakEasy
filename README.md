@@ -1,5 +1,7 @@
 # SpeakEasy 🎤
 
+**Website:** [speakeasy.arach.dev](https://speakeasy.arach.dev) · **npm:** [@arach/speakeasy](https://www.npmjs.com/package/@arach/speakeasy) · **GitHub:** [arach/SpeakEasy](https://github.com/arach/SpeakEasy)
+
 A unified speech library for all your projects with support for multiple TTS providers and clean configuration structure.
 
 ## 🎉 Welcome Experience
