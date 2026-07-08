@@ -1447,259 +1447,210 @@ struct CacheManagementView: View {
 
 struct HUDSettingsView: View {
     @EnvironmentObject var config: ConfigManager
-    @Environment(\.theme) var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            GlassSection(title: "HUD Settings", icon: "square.stack.3d.up.fill", color: .purple) {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Enable/Disable HUD
-                    Toggle(isOn: $config.hudEnabled) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Enable HUD")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("Show a floating notification when audio plays")
-                                .font(.caption)
-                                .foregroundColor(theme.textSecondary)
-                        }
-                    }
-                    .toggleStyle(.switch)
+        VStack(alignment: .leading, spacing: HudSpacing.lg) {
+            HudCard {
+                VStack(alignment: .leading, spacing: HudSpacing.lg) {
+                    Toggle("Enable HUD", isOn: $config.hudEnabled)
+                        .toggleStyle(.switch)
 
                     if config.hudEnabled {
-                        Divider()
-                            .background(theme.border)
+                        HudDivider()
 
-                        // Position
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Position")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
-
-                            Picker("Position", selection: $config.hudPosition) {
-                                Text("Top Left").tag("top-left")
-                                Text("Top Right").tag("top-right")
-                                Text("Bottom Left").tag("bottom-left")
-                                Text("Bottom Right").tag("bottom-right")
+                        hudStrip {
+                            inlineMenu("Position", width: 108) {
+                                Picker("", selection: $config.hudPosition) {
+                                    Text("Top Left").tag("top-left")
+                                    Text("Top Right").tag("top-right")
+                                    Text("Bottom Left").tag("bottom-left")
+                                    Text("Bottom Right").tag("bottom-right")
+                                }
+                                .labelsHidden()
                             }
-                            .pickerStyle(.segmented)
-                        }
 
-                        // Duration
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Display Duration")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
+                            Spacer(minLength: HudSpacing.md)
 
-                            HStack {
-                                Slider(value: Binding(
+                            inlineSlider(
+                                "Duration",
+                                value: Binding(
                                     get: { Double(config.hudDuration) },
                                     set: { config.hudDuration = Int($0) }
-                                ), in: 1000...10000, step: 500)
+                                ),
+                                range: 1000...10000,
+                                step: 500,
+                                valueLabel: "\(config.hudDuration / 1000)s",
+                                sliderWidth: 88
+                            )
 
-                                Text("\(config.hudDuration / 1000)s")
-                                    .font(.caption)
-                                    .foregroundColor(theme.textSecondary)
-                                    .frame(width: 40)
-                            }
+                            inlineSlider(
+                                "Opacity",
+                                value: $config.hudOpacity,
+                                range: 0.5...1.0,
+                                step: 0.05,
+                                valueLabel: "\(Int(config.hudOpacity * 100))%",
+                                sliderWidth: 88
+                            )
                         }
 
-                        // Opacity
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Opacity")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
-
-                            HStack {
-                                Slider(value: $config.hudOpacity, in: 0.5...1.0, step: 0.05)
-
-                                Text("\(Int(config.hudOpacity * 100))%")
-                                    .font(.caption)
-                                    .foregroundColor(theme.textSecondary)
-                                    .frame(width: 40)
-                            }
+                        hudStrip {
+                            HudButton("Preview", icon: "eye", style: .ghost, action: openPreviewWindow)
+                            HudButton("Test", icon: "play.fill", style: .ghost, action: testHUD)
+                            Spacer(minLength: 0)
                         }
 
-                        Divider()
-                            .background(theme.border)
+                        HudSectionLabel("Appearance")
 
-                        // Preview and Test buttons
-                        HStack(spacing: 12) {
-                            Button(action: openPreviewWindow) {
-                                Label("Preview Styles", systemImage: "eye.circle")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.glassCompat)
-
-                            Button(action: testHUD) {
-                                Label("Test HUD", systemImage: "play.circle")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.glassCompat)
-                        }
-                    }
-                }
-            }
-
-            // Appearance settings (only show when HUD is enabled)
-            if config.hudEnabled {
-                GlassSection(title: "Appearance", icon: "paintbrush.fill", color: .pink) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Style selector
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Style")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
-
-                            Picker("Style", selection: $config.hudStyle) {
-                                Text("Combined").tag("combined")
-                                Text("Waveform").tag("waveform")
-                                Text("Spectrum").tag("spectrum")
-                                Text("Particles").tag("particles")
-                                Text("Text").tag("text")
-                            }
-                            .pickerStyle(.segmented)
-                        }
-
-                        Divider().background(theme.border)
-
-                        // Waveform Settings
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Waveform")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
-
-                            // Bar count
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Bar Count")
-                                        .font(.caption2)
-                                        .foregroundColor(theme.textSecondary)
-                                    Spacer()
-                                    Text("\(config.hudWaveformBarCount)")
-                                        .font(.caption2.monospacedDigit())
-                                        .foregroundColor(theme.textSecondary)
+                        hudStrip {
+                            inlineMenu("Style", width: 96) {
+                                Picker("", selection: $config.hudStyle) {
+                                    Text("Combined").tag("combined")
+                                    Text("Waveform").tag("waveform")
+                                    Text("Spectrum").tag("spectrum")
+                                    Text("Particles").tag("particles")
+                                    Text("Text").tag("text")
                                 }
-                                Slider(value: Binding(
-                                    get: { Double(config.hudWaveformBarCount) },
-                                    set: { config.hudWaveformBarCount = Int($0) }
-                                ), in: 20...60, step: 5)
+                                .labelsHidden()
                             }
 
-                            // Amplitude
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Amplitude")
-                                        .font(.caption2)
-                                        .foregroundColor(theme.textSecondary)
-                                    Spacer()
-                                    Text(String(format: "%.1fx", config.hudWaveformAmplitude))
-                                        .font(.caption2.monospacedDigit())
-                                        .foregroundColor(theme.textSecondary)
+                            if showsWaveformSettings {
+                                inlineMenu("Color", width: 84) {
+                                    Picker("", selection: $config.hudWaveformColor) {
+                                        Text("White").tag("white")
+                                        Text("Blue").tag("blue")
+                                        Text("Purple").tag("purple")
+                                        Text("Green").tag("green")
+                                        Text("Orange").tag("orange")
+                                        Text("Cyan").tag("cyan")
+                                        Text("Pink").tag("pink")
+                                    }
+                                    .labelsHidden()
                                 }
-                                Slider(value: $config.hudWaveformAmplitude, in: 0.5...2.0, step: 0.1)
                             }
 
-                            // Color
-                            HStack {
-                                Text("Color")
-                                    .font(.caption2)
-                                    .foregroundColor(theme.textSecondary)
-                                Spacer()
-                                Picker("", selection: $config.hudWaveformColor) {
-                                    Label("White", systemImage: "circle.fill").tag("white")
-                                        .foregroundColor(.white)
-                                    Label("Blue", systemImage: "circle.fill").tag("blue")
-                                        .foregroundColor(.blue)
-                                    Label("Purple", systemImage: "circle.fill").tag("purple")
-                                        .foregroundColor(.purple)
-                                    Label("Green", systemImage: "circle.fill").tag("green")
-                                        .foregroundColor(.green)
-                                    Label("Orange", systemImage: "circle.fill").tag("orange")
-                                        .foregroundColor(.orange)
-                                    Label("Cyan", systemImage: "circle.fill").tag("cyan")
-                                        .foregroundColor(.cyan)
-                                    Label("Pink", systemImage: "circle.fill").tag("pink")
-                                        .foregroundColor(.pink)
+                            if showsTextSettings {
+                                inlineMenu("Font", width: 84) {
+                                    Picker("", selection: $config.hudTextFont) {
+                                        Text("System").tag("system")
+                                        Text("Mono").tag("mono")
+                                        Text("Serif").tag("serif")
+                                        Text("Rounded").tag("rounded")
+                                    }
+                                    .labelsHidden()
                                 }
-                                .pickerStyle(.menu)
-                                .frame(width: 120)
+
+                                inlineMenu("Size", width: 68) {
+                                    Picker("", selection: $config.hudTextSize) {
+                                        Text("XS").tag("xs")
+                                        Text("SM").tag("sm")
+                                        Text("MD").tag("md")
+                                        Text("LG").tag("lg")
+                                        Text("XL").tag("xl")
+                                    }
+                                    .labelsHidden()
+                                }
                             }
+
+                            Spacer(minLength: 0)
                         }
 
-                        Divider().background(theme.border)
+                        if showsWaveformSettings {
+                            HudSectionLabel("Waveform")
 
-                        // Text Settings
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Text")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
+                            hudStrip {
+                                inlineSlider(
+                                    "Bars",
+                                    value: Binding(
+                                        get: { Double(config.hudWaveformBarCount) },
+                                        set: { config.hudWaveformBarCount = Int($0) }
+                                    ),
+                                    range: 20...60,
+                                    step: 5,
+                                    valueLabel: "\(config.hudWaveformBarCount)",
+                                    sliderWidth: 96
+                                )
 
-                            // Font
-                            HStack {
-                                Text("Font")
-                                    .font(.caption2)
-                                    .foregroundColor(theme.textSecondary)
-                                Spacer()
-                                Picker("", selection: $config.hudTextFont) {
-                                    Text("System").tag("system")
-                                    Text("Monospace").tag("mono")
-                                    Text("Serif").tag("serif")
-                                    Text("Rounded").tag("rounded")
-                                }
-                                .pickerStyle(.menu)
-                                .frame(width: 120)
-                            }
+                                inlineSlider(
+                                    "Amp",
+                                    value: $config.hudWaveformAmplitude,
+                                    range: 0.5...2.0,
+                                    step: 0.1,
+                                    valueLabel: String(format: "%.1fx", config.hudWaveformAmplitude),
+                                    sliderWidth: 96
+                                )
 
-                            // Size
-                            HStack {
-                                Text("Size")
-                                    .font(.caption2)
-                                    .foregroundColor(theme.textSecondary)
-                                Spacer()
-                                Picker("", selection: $config.hudTextSize) {
-                                    Text("Extra Small").tag("xs")
-                                    Text("Small").tag("sm")
-                                    Text("Medium").tag("md")
-                                    Text("Large").tag("lg")
-                                    Text("Extra Large").tag("xl")
-                                }
-                                .pickerStyle(.menu)
-                                .frame(width: 120)
+                                Spacer(minLength: 0)
                             }
                         }
                     }
                 }
             }
 
-            // Info section
-            GlassSection(title: "How It Works", icon: "info.circle.fill", color: .blue) {
-                VStack(alignment: .leading, spacing: 12) {
-                    InfoRow(
-                        icon: "terminal",
-                        title: "CLI Integration",
-                        description: "When SpeakEasy CLI plays audio, it sends a notification to the HUD"
-                    )
+            Text("CLI pushes playback events to /tmp/speakeasy-hud.fifo.")
+                .font(HudFont.ui(11))
+                .foregroundStyle(HudPalette.dim)
+        }
+    }
 
-                    InfoRow(
-                        icon: "pipe.and.drop.fill",
-                        title: "Named Pipe",
-                        description: "Uses a Unix named pipe at /tmp/speakeasy-hud.fifo for IPC"
-                    )
+    private var showsWaveformSettings: Bool {
+        config.hudStyle != "text"
+    }
 
-                    InfoRow(
-                        icon: "sparkles",
-                        title: "Non-Blocking",
-                        description: "CLI continues immediately if HUD isn't running - no delays"
-                    )
-                }
-            }
+    private var showsTextSettings: Bool {
+        config.hudStyle == "combined" || config.hudStyle == "text"
+    }
+
+    @ViewBuilder
+    private func hudStrip<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .center, spacing: HudSpacing.md) {
+            content()
+        }
+        .padding(.horizontal, HudSpacing.md)
+        .padding(.vertical, HudSpacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: HudRadius.standard, style: .continuous)
+                .fill(HudPalette.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: HudRadius.standard, style: .continuous)
+                .stroke(HudPalette.border, lineWidth: HudStrokeWidth.thin)
+        )
+    }
+
+    @ViewBuilder
+    private func inlineMenu<Content: View>(_ label: String, width: CGFloat, @ViewBuilder menu: () -> Content) -> some View {
+        HStack(spacing: HudSpacing.xs) {
+            Text(label)
+                .font(HudFont.ui(11))
+                .foregroundStyle(HudPalette.muted)
+            menu()
+                .frame(width: width)
+        }
+    }
+
+    private func inlineSlider(
+        _ label: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        step: Double,
+        valueLabel: String,
+        sliderWidth: CGFloat
+    ) -> some View {
+        HStack(spacing: HudSpacing.xs) {
+            Text(label)
+                .font(HudFont.ui(11))
+                .foregroundStyle(HudPalette.muted)
+                .frame(width: 52, alignment: .leading)
+
+            Slider(value: value, in: range, step: step)
+                .frame(width: sliderWidth)
+
+            Text(valueLabel)
+                .font(HudFont.mono(10))
+                .foregroundStyle(HudPalette.muted)
+                .monospacedDigit()
+                .frame(width: 34, alignment: .trailing)
         }
     }
 
@@ -1708,47 +1659,17 @@ struct HUDSettingsView: View {
     }
 
     private func testHUD() {
-        // Write a test message to the pipe
         let testMessage = """
         {"text":"This is a test of the HUD overlay system!","provider":"system","cached":false,"timestamp":\(Date().timeIntervalSince1970)}
         """
 
         DispatchQueue.global(qos: .userInitiated).async {
             let pipePath = "/tmp/speakeasy-hud.fifo"
-
-            // Try to write to pipe (non-blocking)
             guard let data = (testMessage + "\n").data(using: .utf8) else { return }
 
             if let fileHandle = FileHandle(forWritingAtPath: pipePath) {
                 fileHandle.write(data)
                 fileHandle.closeFile()
-            }
-        }
-    }
-}
-
-struct InfoRow: View {
-    @Environment(\.theme) var theme
-    let icon: String
-    let title: String
-    let description: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(theme.text.opacity(0.6))
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(theme.text)
-
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(theme.textSecondary)
             }
         }
     }
