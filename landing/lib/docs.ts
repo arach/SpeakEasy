@@ -34,6 +34,12 @@ export function resolveSlug(slug: string): string {
   return SLUG_ALIASES[slug] ?? slug
 }
 
+/** Path for static export (trailingSlash + GitHub Pages folder indexes). */
+export function docHref(slug: string): string {
+  const resolved = resolveSlug(slug)
+  return resolved === "index" ? "/docs/" : `/docs/${resolved}/`
+}
+
 export async function loadDocsMeta(): Promise<{ title: string; pages: string[] }> {
   const raw = await readFile(join(DOCS_DIR, "meta.json"), "utf8")
   return JSON.parse(raw)

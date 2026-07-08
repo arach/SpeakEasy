@@ -21,7 +21,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col items-center gap-4">
             <div className="flex items-center gap-6 text-sm">
-              <a href="/docs/quickstart" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
+              <a href="/docs/quickstart/" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
                 Documentation
               </a>
               <a href="https://github.com/arach/SpeakEasy" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">

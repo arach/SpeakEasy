@@ -1,3 +1,4 @@
+import { docHref } from "@/lib/docs"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeSlug from "rehype-slug"
@@ -7,9 +8,12 @@ function resolveDocHref(href?: string) {
   if (!href || href.startsWith("http") || href.startsWith("#")) return href
 
   const withoutExt = href.replace(/\.(mdx?|md)$/, "")
-  if (withoutExt.startsWith("/docs/")) return withoutExt
-  if (withoutExt.startsWith("/")) return `/docs${withoutExt}`
-  return `/docs/${withoutExt}`
+  if (withoutExt.startsWith("/docs/")) {
+    const slug = withoutExt.slice("/docs/".length).replace(/\/$/, "")
+    return slug ? docHref(slug) : "/docs/"
+  }
+  if (withoutExt.startsWith("/")) return docHref(withoutExt.slice(1))
+  return docHref(withoutExt)
 }
 
 export default function DocsMarkdown({ content }: { content: string }) {

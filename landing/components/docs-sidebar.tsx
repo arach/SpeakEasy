@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ExternalLink } from "lucide-react"
-import type { DocNavItem } from "@/lib/docs"
+import { docHref, type DocNavItem } from "@/lib/docs"
 
 export default function DocsSidebar({
   items,
@@ -33,7 +33,7 @@ export default function DocsSidebar({
             return (
               <Link
                 key={item.slug}
-                href={`/docs/${item.slug}`}
+                href={docHref(item.slug)}
                 className={`block px-2 py-1.5 rounded-lg text-xs transition-colors ${
                   isActive
                     ? "bg-blue-100 text-blue-900 font-medium"

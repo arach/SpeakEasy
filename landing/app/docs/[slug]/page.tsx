@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import DocsMarkdown from "@/components/docs-markdown"
 import DocsSidebar from "@/components/docs-sidebar"
 import {
+  docHref,
   getAllDocSlugs,
   getDocNavTree,
   getDocNavigation,
@@ -97,7 +98,7 @@ export default async function DocPage({ params }: DocPageProps) {
                   <div className="flex justify-between items-center">
                     <div className="flex-1">
                       {prev ? (
-                        <Link href={`/docs/${prev.slug}`}>
+                        <Link href={docHref(prev.slug)}>
                           <Button variant="outline" size="sm" className="group">
                             <ChevronLeft className="w-3 h-3 mr-1 group-hover:-translate-x-1 transition-transform" />
                             <div className="text-left">
@@ -110,7 +111,7 @@ export default async function DocPage({ params }: DocPageProps) {
                     </div>
                     <div className="flex-1 text-right">
                       {next ? (
-                        <Link href={`/docs/${next.slug}`}>
+                        <Link href={docHref(next.slug)}>
                           <Button variant="outline" size="sm" className="group">
                             <div className="text-right">
                               <div className="text-xs text-slate-500">Next</div>

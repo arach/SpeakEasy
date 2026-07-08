@@ -25,7 +25,7 @@ export default function FeaturesSection() {
       description: "Automatic caching for API providers. Same text + voice = no API call, lower bills.",
       demo: ["Save Money"],
       isKeyboard: false,
-      href: "/docs/cache",
+      href: "/docs/cache/",
     },
     {
       icon: Settings,
@@ -33,7 +33,7 @@ export default function FeaturesSection() {
       description: "Set defaults once in ~/.config/speakeasy/settings.json. Override per-call when needed.",
       demo: ["JSON Config"],
       isKeyboard: false,
-      href: "/docs/configuration",
+      href: "/docs/configuration/",
     },
     {
       icon: Zap,
@@ -41,7 +41,7 @@ export default function FeaturesSection() {
       description: "Full type safety, IntelliSense, and modern async/await patterns. Built for developer experience.",
       demo: ["100% Typed"],
       isKeyboard: false,
-      href: "/docs/sdk#advanced-usage",
+      href: "/docs/sdk/#advanced-usage",
     },
     {
       icon: Volume2Icon,
@@ -50,7 +50,7 @@ export default function FeaturesSection() {
         "Precise volume control (0.0-1.0) without affecting your system. Isolated playback for every provider.",
       demo: ["0.5 Volume"],
       isKeyboard: false,
-      href: "/docs/sdk",
+      href: "/docs/sdk/",
     },
     {
       icon: Cloud,
@@ -58,7 +58,7 @@ export default function FeaturesSection() {
       description: `${SPEAKEASY_PROVIDER_SUMMARY}. Smart fallbacks ensure your speech always works.`,
       demo: [`${SPEAKEASY_PROVIDER_COUNT} Providers`],
       isKeyboard: false,
-      href: "/docs/providers",
+      href: "/docs/providers/",
     },
     {
       icon: Shield,
@@ -67,7 +67,7 @@ export default function FeaturesSection() {
         "Minimal footprint with smart fallbacks. Works offline with system voices, online with API providers.",
       demo: ["Lightweight"],
       isKeyboard: true,
-      href: "/docs/troubleshooting",
+      href: "/docs/troubleshooting/",
     },
   ]
 

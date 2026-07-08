@@ -3,7 +3,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ExternalLink, ArrowRight } from "lucide-react"
-import { getDocNavTree, groupDocNavPages } from "@/lib/docs"
+import { docHref, getDocNavTree, groupDocNavPages } from "@/lib/docs"
 import { getPackageVersion } from "@/lib/package-version"
 
 export const metadata: Metadata = {
@@ -72,7 +72,7 @@ export default async function DocsPage() {
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {section.pages.map((doc) => (
-                  <Link key={doc.slug} href={`/docs/${doc.slug}`}>
+                  <Link key={doc.slug} href={docHref(doc.slug)}>
                     <Card className="h-full hover:shadow-md transition-shadow cursor-pointer group">
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
@@ -128,7 +128,7 @@ export default async function DocsPage() {
         <div className="mt-16 pt-8 border-t border-slate-200 text-center">
           <p className="text-sm text-slate-600">
             Need help? Start with the{" "}
-            <Link href="/docs/troubleshooting" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link href="/docs/troubleshooting/" className="text-blue-600 hover:text-blue-700 font-medium">
               Troubleshooting Guide
             </Link>{" "}
             or run{" "}
