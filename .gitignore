@@ -39,6 +39,7 @@ Thumbs.db
 # Config files with secrets
 config.json
 config.local.json
+.npmrc
 
 # Claude files
 .claude/
