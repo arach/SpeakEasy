@@ -3,6 +3,10 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Layers, Zap, Cloud, Settings, Shield } from "lucide-react"
+import {
+  SPEAKEASY_PROVIDER_COUNT,
+  SPEAKEASY_PROVIDER_SUMMARY,
+} from "@/lib/site"
 
 // Custom Volume2 icon to avoid hydration issues
 const Volume2Icon = ({ className }: { className?: string }) => (
@@ -51,8 +55,8 @@ export default function FeaturesSection() {
     {
       icon: Cloud,
       title: "Multiple Providers",
-      description: "System voices, OpenAI, ElevenLabs, and Groq. Smart fallbacks ensure your speech always works.",
-      demo: ["4 Providers"],
+      description: `${SPEAKEASY_PROVIDER_SUMMARY}. Smart fallbacks ensure your speech always works.`,
+      demo: [`${SPEAKEASY_PROVIDER_COUNT} Providers`],
       isKeyboard: false,
       href: "/docs/providers",
     },

@@ -3,12 +3,15 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Copy, Check } from "lucide-react"
+import { getSpeakeasyVersion } from "@/lib/site"
+
+const version = getSpeakeasyVersion()
 
 const steps = [
   {
     number: "1",
     command: "npm install -g @arach/speakeasy",
-    output: "+ @arach/speakeasy@0.2.6\nAdded 1 package in 2.3s",
+    output: `+ @arach/speakeasy@${version}\nAdded 1 package in 2.3s`,
   },
   {
     number: "2",
@@ -115,7 +118,7 @@ export default function QuickStartSection() {
             Groq
           </a>
           <a
-            href="https://makersuite.google.com/app/apikey"
+            href="https://aistudio.google.com/apikey"
             target="_blank"
             rel="noopener noreferrer"
             className="text-orange-600 hover:text-orange-700 hover:underline"
