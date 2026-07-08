@@ -1,0 +1,306 @@
+---
+title: Custom Providers
+description: Add bespoke TTS backends using the TTSAdapter interface
+---
+
+# Custom TTS Providers
+
+SpeakEasy routes all synthesis through a normalized **adapter** interface. Built-in providers (system, OpenAI, ElevenLabs, Groq, Gemini) are thin implementations of that contract. You can add your own backend in two ways:
+
+1. **Standalone adapter** — use `TTSAdapter` directly in your app (no fork, no CLI changes)
+2. **First-class provider** — wire the adapter into SpeakEasy's registry, config, and CLI (for contributions or forks)
+
+## Adapter contract
+
+Every provider implements `TTSAdapter` from `@arach/speakeasy`:
+
+```typescript
+interface TTSAdapter {
+  readonly id: TTSProviderId;
+  readonly capabilities: TTSAdapterCapabilities;
+  validate(): boolean;
+  synthesize(request: TTSRequest): Promise<TTSResult>;
+  formatError(error: unknown): string;
+}
+```
+
+### Request and result
+
+**Input** — normalized across all providers:
+
+```typescript
+interface TTSRequest {
+  text: string;
+  voice: string;       // provider-specific voice id or name
+  rate: number;        // words per minute (80–400 typical)
+  volume: number;      // 0.0–1.0 (playback only; synthesis ignores this)
+  tempDir: string;     // scratch directory for intermediate files
+  apiKey?: string;     // optional per-request key override
+  instructions?: string; // steering prompt (OpenAI-style providers only)
+}
+```
+
+**Output** — always a buffer plus format metadata:
+
+```typescript
+interface TTSResult {
+  audio: Buffer;
+  format: 'mp3' | 'wav' | 'aiff';
+  model?: string;      // used in cache metadata and debug output
+}
+```
+
+Adapters **only synthesize audio**. Playback, queueing, HUD notifications, and caching are handled by SpeakEasy (or your own orchestration layer).
+
+### Capabilities
+
+Declare what your adapter supports:
+
+```typescript
+interface TTSAdapterCapabilities {
+  cacheable: boolean;      // audio can be stored in TTSCache
+  instructions: boolean;   // honors request.instructions
+  silent: boolean;         // supports synthesize-without-playback workflows
+}
+```
+
+SpeakEasy's orchestrator currently gates behavior on `cacheable` (whether to read/write the shared cache). Set the flags accurately so future capability checks behave correctly.
+
+## Minimal example
+
+Below is a minimal adapter that calls a fictional local HTTP TTS service. Use it as a template for any REST, gRPC, or subprocess-based backend.
+
+```typescript
+import type { TTSAdapter, TTSRequest, TTSResult } from '@arach/speakeasy';
+import { playTTSResult } from '@arach/speakeasy';
+
+class LocalHttpTTS implements TTSAdapter {
+  readonly id = 'local-http' as any; // use a real id after extending TTSProviderId
+  readonly capabilities = {
+    cacheable: true,
+    instructions: false,
+    silent: true,
+  };
+
+  constructor(
+    private baseUrl: string,
+    private defaultVoice: string,
+    private apiKey?: string
+  ) {}
+
+  validate(): boolean {
+    return this.baseUrl.length > 0;
+  }
+
+  async synthesize(request: TTSRequest): Promise<TTSResult> {
+    const response = await fetch(`${this.baseUrl}/v1/speech`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        text: request.text,
+        voice: request.voice || this.defaultVoice,
+        rate: request.rate,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Local TTS error: HTTP ${response.status}`);
+    }
+
+    const audio = Buffer.from(await response.arrayBuffer());
+    return { audio, format: 'mp3', model: 'local-http-v1' };
+  }
+
+  formatError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    return `Local TTS failed: ${message}. Is the server running at ${this.baseUrl}?`;
+  }
+}
+
+// Standalone usage — no SpeakEasy class required
+async function speak(text: string) {
+  const adapter = new LocalHttpTTS('http://127.0.0.1:8765', 'default');
+  if (!adapter.validate()) throw new Error('Adapter not configured');
+
+  const result = await adapter.synthesize({
+    text,
+    voice: 'default',
+    rate: 180,
+    volume: 0.7,
+    tempDir: '/tmp',
+    apiKey: process.env.LOCAL_TTS_KEY,
+  });
+
+  await playTTSResult(result, 0.7, '/tmp');
+}
+```
+
+### Implementation checklist
+
+When writing `synthesize()`:
+
+- **Honor `request.voice`** — use `request.voice || <constructor default>` so per-request overrides work
+- **Throw on failure** — let SpeakEasy (or your caller) handle fallback; use `formatError()` for user-facing messages
+- **Return the correct `format`** — `mp3`, `wav`, or `aiff`. macOS `afplay` handles all three
+- **Set `model`** when the backend has distinct models — improves cache inspection and debug output
+- **Avoid shell string interpolation** for subprocess calls — pass argv arrays to `spawn()` (see `SystemProvider` in `src/providers/system.ts`)
+
+When writing `validate()`:
+
+- Return `false` when required credentials or environment are missing
+- Keep checks cheap (key length, env var presence) — no network calls
+
+When writing `formatError()`:
+
+- Map common failures (401, 429, missing key) to actionable messages
+- Include links or env var names where helpful
+
+## Standalone adapter with caching
+
+If you want SpeakEasy's SQLite cache without the full `SpeakEasy` class:
+
+```typescript
+import { TTSCache, playTTSResult } from '@arach/speakeasy';
+
+const cache = new TTSCache('/tmp/my-app-tts-cache', '7d');
+const adapter = new LocalHttpTTS('http://127.0.0.1:8765', 'default', process.env.LOCAL_TTS_KEY);
+
+async function speakCached(text: string, voice: string, rate = 180) {
+  const key = cache.generateCacheKey(text, adapter.id, voice, rate);
+  const hit = await cache.get(key);
+
+  if (hit) {
+    const { playAudioFile } = await import('@arach/speakeasy');
+    await playAudioFile(hit.audioFilePath, 0.7);
+    return;
+  }
+
+  const result = await adapter.synthesize({
+    text,
+    voice,
+    rate,
+    volume: 0.7,
+    tempDir: '/tmp',
+  });
+
+  await cache.set(key, { provider: adapter.id, voice, rate, text }, result.audio, {
+    model: result.model,
+    extension: result.format,
+  });
+
+  await playTTSResult(result, 0.7, '/tmp');
+}
+```
+
+If your provider supports steering instructions (like OpenAI), pass them as the fifth argument to `generateCacheKey()` so cache entries do not collide across different instruction prompts.
+
+## Wiring a first-class provider
+
+To make a bespoke adapter selectable via `SpeakEasy`, the CLI, and global config, extend these touchpoints:
+
+| File | Change |
+|------|--------|
+| `src/adapters/types.ts` | Add your id to `TTSProviderId` |
+| `src/providers/<name>.ts` | Implement `TTSAdapter` |
+| `src/adapters/registry.ts` | Register in `createAdapterRegistry()` |
+| `src/adapters/registry.ts` | Append to `PROVIDER_ORDER` (controls fallback sequence) |
+| `src/types.ts` | Add config fields (`apiKeys`, voice, model, etc.) |
+| `src/index.ts` | Extend `buildRequest()`, `getVoiceForProvider()`, `getApiKeyForProvider()` |
+| `src/cli/constants.ts` | Add to `PROVIDERS` and `DEFAULT_VOICES` |
+| `docs/providers.mdx` | Document setup and voices |
+
+### Registry registration
+
+```typescript
+// src/adapters/registry.ts
+import { LocalHttpProvider } from '../providers/local-http';
+
+export const PROVIDER_ORDER: TTSProviderId[] = [
+  'system',
+  'openai',
+  // ...
+  'local-http',
+];
+
+export function createAdapterRegistry(config: SpeakEasyConfig) {
+  const registry = new Map<TTSProviderId, TTSAdapter>();
+  // ...existing providers...
+  registry.set(
+    'local-http',
+    new LocalHttpProvider(
+      config.localHttpUrl || 'http://127.0.0.1:8765',
+      config.localHttpVoice || 'default',
+      config.apiKeys?.localHttp || process.env.LOCAL_TTS_KEY || ''
+    )
+  );
+  return registry;
+}
+```
+
+### Backward-compatible exports
+
+Built-in providers also implement the legacy `Provider` interface (`speak()`, `generateAudio()`, `validateConfig()`, `getErrorMessage()`). Add these shims if external code may call them directly:
+
+```typescript
+import { toTTSRequest } from '../adapters/request';
+import { playTTSResult } from '../adapters/audio';
+
+async generateAudio(config: ProviderConfig): Promise<Buffer | null> {
+  const result = await this.synthesize(toTTSRequest(config, this.defaultVoice));
+  return result.audio;
+}
+
+async speak(config: ProviderConfig): Promise<void> {
+  const result = await this.synthesize(toTTSRequest(config, this.defaultVoice));
+  await playTTSResult(result, config.volume ?? 0.7, config.tempDir);
+}
+```
+
+## Orchestration flow
+
+When wired into `SpeakEasy`, every request follows the same path:
+
+```
+speak(text)
+  → buildRequest() → TTSRequest
+  → cache lookup (if capabilities.cacheable)
+  → adapter.synthesize(request) → TTSResult
+  → cache write (if cacheable)
+  → playTTSResult() via afplay
+```
+
+On failure, SpeakEasy walks `PROVIDER_ORDER` starting at the requested provider, then falls through to the next valid adapter.
+
+## Reference implementations
+
+Study these built-in adapters (simplest to most complex):
+
+| Provider | File | Notes |
+|----------|------|-------|
+| Groq | `src/providers/groq.ts` | Small REST adapter, returns MP3 |
+| System | `src/providers/system.ts` | Subprocess (`spawn`), returns AIFF |
+| OpenAI | `src/providers/openai.ts` | Instructions path + standard TTS |
+| Gemini | `src/providers/gemini.ts` | Base64 inline audio, WAV conversion |
+
+Shared utilities:
+
+| Module | Purpose |
+|--------|---------|
+| `src/adapters/types.ts` | `TTSAdapter`, `TTSRequest`, `TTSResult` |
+| `src/adapters/audio.ts` | `playTTSResult`, `playAudioFile`, `stopPlayback` |
+| `src/adapters/request.ts` | `toTTSRequest()` for legacy `ProviderConfig` |
+| `src/adapters/registry.ts` | `createAdapterRegistry()`, `PROVIDER_ORDER` |
+
+## Contributing upstream
+
+If your provider is generally useful (stable public API, clear credential story), open a PR against [arach/SpeakEasy](https://github.com/arach/SpeakEasy) with:
+
+- Adapter implementation in `src/providers/`
+- Registry and type wiring
+- Docs in `docs/providers.mdx` (usage) — this page covers the how-to
+- No secrets or provider-specific test keys in the repo
+
+For private or experimental backends, the **standalone adapter** path keeps your code in your application while still using SpeakEasy's playback and cache utilities.

@@ -17,6 +17,11 @@ speakeasy/
 │   ├── index.ts              # Main SpeakEasy class, exports
 │   ├── types.ts              # TypeScript interfaces
 │   ├── cache.ts              # SQLite audio cache via node:sqlite (TTSCache)
+│   ├── adapters/             # Normalized TTS adapter layer
+│   │   ├── types.ts          # TTSAdapter, TTSRequest, TTSResult
+│   │   ├── registry.ts       # createAdapterRegistry(), PROVIDER_ORDER
+│   │   ├── audio.ts          # Shared afplay playback
+│   │   └── request.ts        # ProviderConfig → TTSRequest helper
 │   ├── providers/            # TTS provider implementations
 │   │   ├── system.ts         # macOS `say` command
 │   │   ├── openai.ts         # OpenAI TTS API
@@ -51,7 +56,7 @@ The main orchestrator that:
 │                      SpeakEasy                          │
 ├─────────────────────────────────────────────────────────┤
 │  config: SpeakEasyConfig                                │
-│  providers: Map<string, Provider>                       │
+│  adapters: Map<TTSProviderId, TTSAdapter>               │
 │  cache: TTSCache                                        │
 │  queue: Array<{text, options}>                          │
 ├─────────────────────────────────────────────────────────┤
@@ -61,19 +66,23 @@ The main orchestrator that:
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Provider Interface (`src/types.ts`)
+### TTSAdapter interface (`src/adapters/types.ts`)
 
-All providers implement:
+All providers implement the normalized adapter contract:
 
 ```typescript
-interface Provider {
-  speak(config: ProviderConfig): Promise<void>;
-  validateConfig(): boolean;
-  getErrorMessage(error: any): string;
+interface TTSAdapter {
+  readonly id: TTSProviderId;
+  readonly capabilities: TTSAdapterCapabilities;
+  validate(): boolean;
+  synthesize(request: TTSRequest): Promise<TTSResult>;
+  formatError(error: unknown): string;
 }
 ```
 
-### Provider Flow
+Legacy `Provider` methods (`speak()`, `generateAudio()`) remain on built-in classes for backward compatibility but delegate to `synthesize()`.
+
+### Provider flow
 
 ```
 User Request
@@ -92,9 +101,8 @@ User Request
        │ No
        ▼
 ┌─────────────┐
-│  Provider   │
-│ .speak() or │
-│ .generate() │
+│ TTSAdapter  │
+│.synthesize()│
 └──────┬──────┘
        │
        ▼
@@ -105,10 +113,12 @@ User Request
        │
        ▼
 ┌─────────────┐
-│   afplay    │
-│  (playback) │
+│ playTTSResult│
+│  (afplay)   │
 └─────────────┘
 ```
+
+To add a bespoke backend, see [Custom Providers](custom-providers.md).
 
 ## Provider Implementations
 
@@ -125,12 +135,12 @@ User Request
 The `TTSCache` class provides:
 - Built-in SQLite metadata storage (`node:sqlite`)
 - File-based audio storage in `/tmp/speakeasy-cache/`
-- UUID v5 keys based on text + provider + voice + rate
+- UUID v5 keys based on text + provider + voice + rate + instructions (when applicable)
 - Configurable TTL and max size
 - Automatic cleanup of expired entries
 
 ```
-Cache Key = UUID5(text|provider|voice|rate)
+Cache Key = UUID5(text|provider|voice|rate|instructions)
 ```
 
 ## Configuration Hierarchy
@@ -178,7 +188,7 @@ speakeasy "text" [options]
 
 ## Key Design Decisions
 
-1. **Provider abstraction**: All providers share the same interface, making it easy to add new ones
+1. **Adapter abstraction**: All providers implement `TTSAdapter.synthesize()`, making it easy to add new backends
 2. **Fallback chain**: If a provider fails, automatically try the next in the fallback order
 3. **Cache by default**: API providers cache automatically to reduce costs and latency
 4. **macOS native**: Uses `afplay` for audio playback, ensuring consistent volume control

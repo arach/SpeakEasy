@@ -563,4 +563,22 @@ SpeakEasy Debug: Cache hit - using cached audio
 SpeakEasy Debug: Playing audio from cache
 ```
 
+## Custom adapters
+
+The SDK exports the adapter primitives for bespoke TTS backends:
+
+```typescript
+import {
+  TTSAdapter,
+  TTSRequest,
+  TTSResult,
+  playTTSResult,
+  playAudioFile,
+  createAdapterRegistry,
+  TTSCache,
+} from '@arach/speakeasy';
+```
+
+Use adapters standalone (synthesize + play) or wire them into SpeakEasy's registry for first-class CLI support. See [Custom Providers](custom-providers.md).
+
 For more advanced configuration options, see [Configuration Guide](configuration.md).

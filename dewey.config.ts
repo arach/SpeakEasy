@@ -27,12 +27,13 @@ export default {
     },
 
     rules: [
-      { pattern: 'src/providers/*', instruction: 'Each provider implements the Provider interface from types.ts' },
+      { pattern: 'src/providers/*', instruction: 'Each provider implements TTSAdapter from adapters/types.ts (synthesize, validate, formatError)' },
+      { pattern: 'src/adapters/*', instruction: 'Adapter layer: types, registry, shared audio playback, request helpers' },
       { pattern: 'src/bin/*', instruction: 'CLI entry point using commander.js' },
       { pattern: '*.test.ts', instruction: 'Tests use manual testing - run npm test' },
     ],
 
-    sections: ['overview', 'quickstart', 'providers', 'configuration', 'cli', 'sdk'],
+    sections: ['overview', 'quickstart', 'providers', 'custom-providers', 'configuration', 'cli', 'sdk'],
   },
 
   docs: {
