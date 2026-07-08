@@ -98,7 +98,7 @@ struct HistoryView: View {
             // Header
             GlassSection(title: "Notification History", icon: "clock.arrow.circlepath", color: .blue) {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
+                    HStack(spacing: 10) {
                         VStack(alignment: .leading) {
                             Text("Total Notifications")
                                 .font(.caption)
@@ -108,13 +108,12 @@ struct HistoryView: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(theme.text)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                         .glassBackground(cornerRadius: 10, intensity: .subtle)
 
-                        Spacer()
-
                         if let latest = historyService.entries.first {
-                            VStack(alignment: .trailing) {
+                            VStack(alignment: .leading) {
                                 Text("Latest")
                                     .font(.caption)
                                     .foregroundColor(theme.textSecondary)
@@ -123,6 +122,7 @@ struct HistoryView: View {
                                     .fontWeight(.semibold)
                                     .foregroundColor(theme.text)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .glassBackground(cornerRadius: 10, intensity: .subtle)
                         }
