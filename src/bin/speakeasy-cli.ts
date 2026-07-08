@@ -131,7 +131,19 @@ async function run(): Promise<void> {
   }
 
   // Show welcome screen if no config exists or --welcome flag is used
-  if (((!hasConfigFile() && !options.config && !options.help && !options.diagnose && !options.doctor) || options.welcome) && !options.help) {
+  if (
+    (
+      (!hasConfigFile()
+        && !options.config
+        && !options.help
+        && !options.diagnose
+        && !options.doctor
+        && !options.app
+        && !options.updateApp)
+      || options.welcome
+    )
+    && !options.help
+  ) {
     showWelcome();
     return;
   }
