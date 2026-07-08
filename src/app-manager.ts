@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { mkdtempSync } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync, spawn } from 'child_process';
@@ -8,9 +9,8 @@ const APP_DIR = path.join(os.homedir(), '.speakeasy');
 const APP_PATH = path.join(APP_DIR, 'SpeakEasy.app');
 const VERSION_FILE = path.join(APP_DIR, '.app-version');
 
-// GitHub release info - update these when publishing
-const GITHUB_REPO = 'arach/speakeasy';
-const APP_VERSION = '1.0.0';
+const GITHUB_REPO = 'arach/SpeakEasy';
+const RELEASE_APP_ASSET_NAMES = ['SpeakEasy.dmg'];
 
 interface ReleaseAsset {
   name: string;
@@ -53,7 +53,7 @@ async function fetchJson<T>(url: string): Promise<T> {
       res.on('end', () => {
         try {
           resolve(JSON.parse(data));
-        } catch (e) {
+        } catch {
           reject(new Error(`Failed to parse JSON: ${data.substring(0, 200)}`));
         }
       });
@@ -95,11 +95,78 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
   });
 }
 
+function findAppAsset(assets: ReleaseAsset[]): ReleaseAsset | undefined {
+  return assets.find((asset) =>
+    RELEASE_APP_ASSET_NAMES.includes(asset.name)
+    || (asset.name.endsWith('.dmg') && asset.name.startsWith('SpeakEasy'))
+  );
+}
+
+function installBundleFromDmg(dmgPath: string): void {
+  const mountPoint = mkdtempSync(path.join(os.tmpdir(), 'speakeasy-mount-'));
+  try {
+    execSync(`hdiutil attach -nobrowse -readonly -mountpoint '${mountPoint}' '${dmgPath}'`, { stdio: 'pipe' });
+    const mountedBundle = path.join(mountPoint, 'SpeakEasy.app');
+    if (!fs.existsSync(mountedBundle)) {
+      throw new Error('SpeakEasy.app not found in mounted disk image');
+    }
+    if (fs.existsSync(APP_PATH)) {
+      fs.rmSync(APP_PATH, { recursive: true, force: true });
+    }
+    execSync(`cp -R '${mountedBundle}' '${APP_PATH}'`);
+  } finally {
+    try {
+      execSync(`hdiutil detach '${mountPoint}' -quiet`, { stdio: 'pipe' });
+    } catch {
+      // Ignore detach failures after a successful copy.
+    }
+    fs.rmSync(mountPoint, { recursive: true, force: true });
+  }
+}
+
+async function installFromZip(asset: ReleaseAsset, onProgress?: (msg: string) => void): Promise<boolean> {
+  const zipPath = path.join(APP_DIR, asset.name);
+
+  try {
+    await downloadFile(asset.browser_download_url, zipPath);
+  } catch (error) {
+    onProgress?.(`❌ Download failed: ${(error as Error).message}`);
+    return false;
+  }
+
+  if (fs.existsSync(APP_PATH)) {
+    fs.rmSync(APP_PATH, { recursive: true, force: true });
+  }
+
+  try {
+    execSync(`unzip -q -o "${zipPath}" -d "${APP_DIR}"`, { stdio: 'pipe' });
+  } catch {
+    onProgress?.('❌ Failed to unzip app');
+    return false;
+  }
+
+  fs.unlinkSync(zipPath);
+  const macosxDir = path.join(APP_DIR, '__MACOSX');
+  if (fs.existsSync(macosxDir)) {
+    fs.rmSync(macosxDir, { recursive: true, force: true });
+  }
+
+  return true;
+}
+
+function clearQuarantine(): void {
+  try {
+    execSync(`xattr -rd com.apple.quarantine "${APP_PATH}"`, { stdio: 'pipe' });
+  } catch {
+    // Ignore if xattr fails.
+  }
+}
+
 export async function getLatestRelease(): Promise<GitHubRelease | null> {
   try {
     const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
     return await fetchJson<GitHubRelease>(url);
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -120,54 +187,41 @@ export async function downloadAndInstallApp(onProgress?: (msg: string) => void):
     return false;
   }
 
-  const appAsset = release.assets.find(a => a.name === 'SpeakEasy.app.zip' || a.name === 'SpeakEasy-macos.zip');
-  if (!appAsset) {
+  const dmgAsset = findAppAsset(release.assets);
+  const zipAsset = release.assets.find((asset) =>
+    asset.name === 'SpeakEasy.app.zip' || asset.name === 'SpeakEasy-macos.zip'
+  );
+
+  if (!dmgAsset && !zipAsset) {
     onProgress?.('❌ No macOS app found in latest release');
-    onProgress?.('   Available assets: ' + release.assets.map(a => a.name).join(', '));
+    onProgress?.('   Available assets: ' + release.assets.map((asset) => asset.name).join(', '));
     return false;
   }
 
-  const zipPath = path.join(APP_DIR, 'SpeakEasy.app.zip');
-
-  onProgress?.(`📥 Downloading ${appAsset.name}...`);
+  onProgress?.(`📥 Downloading ${(dmgAsset ?? zipAsset)!.name}...`);
 
   try {
-    await downloadFile(appAsset.browser_download_url, zipPath);
+    if (dmgAsset) {
+      const tempDir = mkdtempSync(path.join(os.tmpdir(), 'speakeasy-download-'));
+      const dmgPath = path.join(tempDir, dmgAsset.name);
+      try {
+        await downloadFile(dmgAsset.browser_download_url, dmgPath);
+        onProgress?.('📦 Installing from disk image...');
+        installBundleFromDmg(dmgPath);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    } else if (zipAsset) {
+      onProgress?.('📦 Installing from zip...');
+      const installed = await installFromZip(zipAsset, onProgress);
+      if (!installed) return false;
+    }
   } catch (error) {
-    onProgress?.(`❌ Download failed: ${(error as Error).message}`);
+    onProgress?.(`❌ Install failed: ${(error as Error).message}`);
     return false;
   }
 
-  onProgress?.('📦 Installing...');
-
-  // Remove old app if exists
-  if (fs.existsSync(APP_PATH)) {
-    fs.rmSync(APP_PATH, { recursive: true, force: true });
-  }
-
-  // Unzip
-  try {
-    execSync(`unzip -q -o "${zipPath}" -d "${APP_DIR}"`, { stdio: 'pipe' });
-  } catch (error) {
-    onProgress?.('❌ Failed to unzip app');
-    return false;
-  }
-
-  // Clean up zip and __MACOSX folder
-  fs.unlinkSync(zipPath);
-  const macosxDir = path.join(APP_DIR, '__MACOSX');
-  if (fs.existsSync(macosxDir)) {
-    fs.rmSync(macosxDir, { recursive: true, force: true });
-  }
-
-  // Remove quarantine attribute
-  try {
-    execSync(`xattr -rd com.apple.quarantine "${APP_PATH}"`, { stdio: 'pipe' });
-  } catch {
-    // Ignore if xattr fails
-  }
-
-  // Save version
+  clearQuarantine();
   fs.writeFileSync(VERSION_FILE, release.tag_name);
 
   onProgress?.(`✅ Installed SpeakEasy.app (${release.tag_name})`);

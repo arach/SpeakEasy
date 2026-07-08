@@ -44,14 +44,14 @@ On macOS, SpeakEasy ships a native companion app that lives in the menu bar:
 
 - **Settings UI** — providers, cache, HUD, and speech history
 - **Floating HUD** — shows the current phrase and waveform while the CLI speaks
-- **Auto-install** — `speakeasy --app` downloads `SpeakEasy.app` on first use to `~/.speakeasy/`
+- **Auto-install** — `speakeasy --app` pulls the signed, notarized `SpeakEasy.dmg` from GitHub Releases into `~/.speakeasy/`
 
 ```bash
 speakeasy --app          # install (if needed) and open
 speakeasy --update-app   # pull the latest release build
 ```
 
-Build from source: `cd app && ./build-app.sh`
+Build from source: `cd app && ./build-app.sh` · release DMG: `cd app && ./Scripts/build.sh`
 
 The CLI pushes HUD updates over `/tmp/speakeasy-hud.fifo` while audio plays. Keep the app running in the background for live feedback during agent workflows.
 
