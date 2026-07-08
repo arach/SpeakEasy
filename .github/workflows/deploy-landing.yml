@@ -5,11 +5,13 @@ on:
     branches: [ master ]
     paths:
       - 'landing/**'
+      - 'docs/**'
       - '.github/workflows/deploy-landing.yml'
   pull_request:
     branches: [ master ]
     paths:
       - 'landing/**'
+      - 'docs/**'
       - '.github/workflows/deploy-landing.yml'
   workflow_dispatch:
 
