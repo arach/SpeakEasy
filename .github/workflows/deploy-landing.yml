@@ -3,59 +3,61 @@ name: Deploy Landing Page
 on:
   push:
     branches: [ master ]
-    paths: 
+    paths:
       - 'landing/**'
+      - '.github/workflows/deploy-landing.yml'
   pull_request:
     branches: [ master ]
     paths:
       - 'landing/**'
+      - '.github/workflows/deploy-landing.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
+    name: Build landing page
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
-    - name: Cache npm dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.npm
-        key: ${{ runner.os }}-node-${{ hashFiles('landing/package.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-        
-    - name: Install dependencies
-      working-directory: ./landing
-      run: npm install --legacy-peer-deps
-      
-    - name: Build and export landing page
-      working-directory: ./landing
-      run: npm run export
-      
-    - name: Setup Pages
-      if: github.ref == 'refs/heads/master'
-      uses: actions/configure-pages@v4
-      
-    - name: Upload artifact
-      if: github.ref == 'refs/heads/master'
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: ./landing/out
-        
-    - name: Deploy to GitHub Pages
-      if: github.ref == 'refs/heads/master'
-      id: deployment
-      uses: actions/deploy-pages@v4
 
-# Made with ❤️ and 🤖 by Arach
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        working-directory: ./landing
+        run: bun install --frozen-lockfile
+
+      - name: Build and export landing page
+        working-directory: ./landing
+        run: bun run build
+        env:
+          NODE_ENV: production
+
+      - name: Upload artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./landing/out
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: github-pages
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -15,16 +15,16 @@ A clean, simple landing page for the SpeakEasy text-to-speech library.
 
 ```bash
 # Install dependencies
-npm install --legacy-peer-deps
+bun install
 
 # Start development server
-npm run dev
+bun run dev
 
 # Build for production
-npm run build
+bun run build
 
 # Start production server
-npm start
+bun start
 ```
 
 ## Structure
@@ -49,7 +49,7 @@ The landing page can be deployed to any static hosting platform:
 
 For static export:
 ```bash
-npm run build
+bun run build
 ```
 
 ## Customization
