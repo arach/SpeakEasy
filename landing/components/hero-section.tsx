@@ -239,7 +239,7 @@ export default function HeroSection() {
               <span className="font-silkscreen text-slate-900 text-lg">SpeakEasy</span>
             </div>
             <div className="flex items-center gap-3">
-              <Link href="/docs/overview">
+              <Link href="/docs/quickstart">
                 <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900 text-xs">
                   <BookOpen className="w-3 h-3 mr-1" />
                   Docs
