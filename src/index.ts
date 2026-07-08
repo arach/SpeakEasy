@@ -1,70 +1,17 @@
-import { execSync, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
   SpeakEasyConfig,
   SpeakEasyOptions,
   GlobalConfig,
-  Provider
 } from './types';
-import { SystemProvider, getBestVoice } from './providers/system';
-import { OpenAIProvider } from './providers/openai';
-import { ElevenLabsProvider } from './providers/elevenlabs';
-import { GroqProvider } from './providers/groq';
-import { GeminiProvider } from './providers/gemini';
+import { getBestVoice } from './providers/system';
 import { TTSCache, CacheMetadata, CacheStats } from './cache';
-import { notifyHUD, updateAudioLevel, closePipe } from './hud';
+import { notifyHUD, closePipe } from './hud';
 import { getHistory } from './history';
-
-/**
- * Play audio file with simulated level updates for HUD waveform.
- * Uses spawn to run afplay while sending level updates in parallel.
- */
-function playAudioWithLevels(audioFile: string, volume: number = 1.0): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const volumeArgs = volume !== 1.0 ? ['-v', volume.toString()] : [];
-    const afplay = spawn('afplay', [...volumeArgs, audioFile]);
-
-    // Simulate audio levels during playback
-    let levelInterval: NodeJS.Timeout | null = null;
-    let phase = 0;
-
-    const startLevelSimulation = () => {
-      levelInterval = setInterval(() => {
-        // Simulate speech-like levels with variation
-        const base = 0.4 + Math.sin(phase * 0.3) * 0.2;
-        const variation = Math.random() * 0.3;
-        const level = Math.min(1, Math.max(0, base + variation));
-        updateAudioLevel(level);
-        phase++;
-      }, 33); // ~30 Hz updates
-    };
-
-    const stopLevelSimulation = () => {
-      if (levelInterval) {
-        clearInterval(levelInterval);
-        levelInterval = null;
-      }
-      updateAudioLevel(0); // Reset to zero when done
-    };
-
-    startLevelSimulation();
-
-    afplay.on('close', (code) => {
-      stopLevelSimulation();
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`afplay exited with code ${code}`));
-      }
-    });
-
-    afplay.on('error', (err) => {
-      stopLevelSimulation();
-      reject(err);
-    });
-  });
-}
+import { TTSAdapter, TTSProviderId, TTSRequest } from './adapters/types';
+import { createAdapterRegistry, PROVIDER_ORDER } from './adapters/registry';
+import { playAudioFile, playTTSResult, stopPlayback } from './adapters/audio';
 
 const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
@@ -89,9 +36,23 @@ function cleanTextForSpeech(text: string): string {
     .trim();
 }
 
+const API_KEY_HELP: Partial<Record<TTSProviderId, string>> = {
+  openai: 'export OPENAI_API_KEY=your_key_here',
+  elevenlabs: 'export ELEVENLABS_API_KEY=your_key_here',
+  groq: 'export GROQ_API_KEY=your_key_here',
+  gemini: 'export GEMINI_API_KEY=your_key_here',
+};
+
+const API_KEY_URLS: Partial<Record<TTSProviderId, string>> = {
+  openai: 'https://platform.openai.com/api-keys',
+  elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
+  groq: 'https://console.groq.com/keys',
+  gemini: 'https://makersuite.google.com/app/apikey',
+};
+
 export class SpeakEasy {
   private config: SpeakEasyConfig;
-  private providers: Map<string, Provider>;
+  private adapters: Map<TTSProviderId, TTSAdapter>;
   private isPlaying = false;
   private queue: Array<{ text: string; options: SpeakEasyOptions }> = [];
   private cache?: TTSCache;
@@ -102,63 +63,80 @@ export class SpeakEasy {
   constructor(config: SpeakEasyConfig) {
     const globalConfig = loadGlobalConfig();
     this.hudEnabled = globalConfig.hud?.enabled ?? false;
-    
 
     this.config = {
       provider: config.provider || globalConfig.defaults?.provider || 'system',
       systemVoice: config.systemVoice || globalConfig.providers?.system?.voice || getBestVoice(),
       openaiVoice: config.openaiVoice || globalConfig.providers?.openai?.voice || 'nova',
-      elevenlabsVoiceId: config.elevenlabsVoiceId || globalConfig.providers?.elevenlabs?.voiceId || 'EXAVITQu4vr4xnSDxMaL',
+      elevenlabsVoiceId:
+        config.elevenlabsVoiceId ||
+        globalConfig.providers?.elevenlabs?.voiceId ||
+        'EXAVITQu4vr4xnSDxMaL',
       groqVoice: config.groqVoice || globalConfig.providers?.groq?.voice || 'tara',
-      geminiModel: config.geminiModel || globalConfig.providers?.gemini?.model || 'gemini-2.5-flash-preview-tts',
+      geminiModel:
+        config.geminiModel ||
+        globalConfig.providers?.gemini?.model ||
+        'gemini-2.5-flash-preview-tts',
       rate: config.rate || globalConfig.defaults?.rate || 180,
-      volume: config.volume !== undefined ? config.volume : (globalConfig.defaults?.volume !== undefined ? globalConfig.defaults.volume : 0.7),
+      volume:
+        config.volume !== undefined
+          ? config.volume
+          : globalConfig.defaults?.volume !== undefined
+            ? globalConfig.defaults.volume
+            : 0.7,
       instructions: config.instructions || globalConfig.providers?.openai?.instructions,
       debug: config.debug || false,
       apiKeys: {
-        openai: config.apiKeys?.openai || globalConfig.providers?.openai?.apiKey || process.env.OPENAI_API_KEY || '',
-        elevenlabs: config.apiKeys?.elevenlabs || globalConfig.providers?.elevenlabs?.apiKey || process.env.ELEVENLABS_API_KEY || '',
-        groq: config.apiKeys?.groq || globalConfig.providers?.groq?.apiKey || process.env.GROQ_API_KEY || '',
-        gemini: config.apiKeys?.gemini || globalConfig.providers?.gemini?.apiKey || process.env.GEMINI_API_KEY || '',
+        openai:
+          config.apiKeys?.openai ||
+          globalConfig.providers?.openai?.apiKey ||
+          process.env.OPENAI_API_KEY ||
+          '',
+        elevenlabs:
+          config.apiKeys?.elevenlabs ||
+          globalConfig.providers?.elevenlabs?.apiKey ||
+          process.env.ELEVENLABS_API_KEY ||
+          '',
+        groq:
+          config.apiKeys?.groq ||
+          globalConfig.providers?.groq?.apiKey ||
+          process.env.GROQ_API_KEY ||
+          '',
+        gemini:
+          config.apiKeys?.gemini ||
+          globalConfig.providers?.gemini?.apiKey ||
+          process.env.GEMINI_API_KEY ||
+          '',
       },
       tempDir: config.tempDir || globalConfig.global?.tempDir || '/tmp',
     };
 
     const cacheConfig = config.cache || globalConfig.cache;
-    
-    // Enable cache by default when API keys are present (for API-based providers)
-    const hasApiKeys = !!(this.config.apiKeys?.openai || this.config.apiKeys?.elevenlabs || this.config.apiKeys?.groq || this.config.apiKeys?.gemini);
+    const hasApiKeys = !!(
+      this.config.apiKeys?.openai ||
+      this.config.apiKeys?.elevenlabs ||
+      this.config.apiKeys?.groq ||
+      this.config.apiKeys?.gemini
+    );
     const cacheEnabled = cacheConfig?.enabled ?? (hasApiKeys && this.config.provider !== 'system');
-    
+
     this.useCache = cacheEnabled;
     if (this.useCache) {
       const cacheDir = cacheConfig?.dir || path.join(this.config.tempDir || '/tmp', 'speakeasy-cache');
-      this.cache = new TTSCache(
-        cacheDir,
-        cacheConfig?.ttl || '7d',
-        cacheConfig?.maxSize
-      );
+      this.cache = new TTSCache(cacheDir, cacheConfig?.ttl || '7d', cacheConfig?.maxSize);
     }
-    this.providers = new Map();
-    this.initializeProviders();
-    
+
+    this.adapters = createAdapterRegistry(this.config);
     this.debug = this.config.debug || false;
+
     if (this.debug) {
       this.printConfigDiagnostics();
     }
   }
 
-  private initializeProviders(): void {
-    this.providers.set('system', new SystemProvider(this.config.systemVoice || 'Samantha'));
-    this.providers.set('openai', new OpenAIProvider(this.config.apiKeys?.openai || '', this.config.openaiVoice || 'nova', this.config.instructions));
-    this.providers.set('elevenlabs', new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || '', this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL'));
-    this.providers.set('groq', new GroqProvider(this.config.apiKeys?.groq || '', this.config.groqVoice || 'tara'));
-    this.providers.set('gemini', new GeminiProvider(this.config.apiKeys?.gemini || '', this.config.geminiModel || 'gemini-2.5-flash-preview-tts'));
-  }
-
   async speak(text: string, options: SpeakEasyOptions = {}): Promise<void> {
     const cleanText = cleanTextForSpeech(text);
-    
+
     if (options.interrupt && this.isPlaying) {
       this.stopSpeaking();
     }
@@ -185,8 +163,6 @@ export class SpeakEasy {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('❌ Speech error:', errorMsg);
-      
-      // Re-throw to let CLI handle with better formatting
       throw error;
     } finally {
       this.isPlaying = false;
@@ -197,243 +173,139 @@ export class SpeakEasy {
   }
 
   private async speakText(text: string, options: SpeakEasyOptions = {}): Promise<void> {
-    const requestedProvider = this.config.provider || 'system';
+    const requestedId = (this.config.provider || 'system') as TTSProviderId;
     const silent = options.silent || false;
 
     if (this.debug) {
-      console.log(`🔍 Requested provider: ${requestedProvider}`);
+      console.log(`🔍 Requested provider: ${requestedId}`);
       console.log(`🔍 Text: "${text}"`);
       if (silent) console.log(`🔇 Silent mode: audio will not be played`);
     }
-    
-    // First, validate the requested provider
-    const requestedProviderInstance = this.providers.get(requestedProvider);
-    if (requestedProvider !== 'system' && requestedProviderInstance) {
-      if (!requestedProviderInstance.validateConfig()) {
-        const providerName = requestedProvider.charAt(0).toUpperCase() + requestedProvider.slice(1);
-        let envVarHelp = '';
-        switch (requestedProvider) {
-          case 'openai':
-            envVarHelp = 'export OPENAI_API_KEY=your_key_here';
-            break;
-          case 'elevenlabs':
-            envVarHelp = 'export ELEVENLABS_API_KEY=your_key_here';
-            break;
-          case 'groq':
-            envVarHelp = 'export GROQ_API_KEY=your_key_here';
-            break;
-          case 'gemini':
-            envVarHelp = 'export GEMINI_API_KEY=your_key_here';
-            break;
-        }
-        throw new Error(
-          `${providerName} API key is required. ${envVarHelp ? `Run: ${envVarHelp}` : ''}`
-        );
-      }
+
+    const requestedAdapter = this.adapters.get(requestedId);
+    if (requestedId !== 'system' && requestedAdapter && !requestedAdapter.validate()) {
+      const providerName = requestedId.charAt(0).toUpperCase() + requestedId.slice(1);
+      const envVarHelp = API_KEY_HELP[requestedId];
+      throw new Error(
+        `${providerName} API key is required.${envVarHelp ? ` Run: ${envVarHelp}` : ''}`
+      );
     }
 
-    const providers = ['system', 'openai', 'elevenlabs', 'groq', 'gemini'];
     let lastError: Error | null = null;
 
-    for (const providerName of providers) {
-      if (providerName === requestedProvider || lastError) {
-        try {
-          const provider = this.providers.get(providerName);
-          if (provider && provider.validateConfig()) {
-            const voice = this.getVoiceForProvider(providerName);
-            const rate = this.config.rate || 180;
-            const volume = this.config.volume !== undefined ? this.config.volume : 0.7;
-            const tempDir = this.config.tempDir || '/tmp';
-            
+    for (const providerId of PROVIDER_ORDER) {
+      if (providerId !== requestedId && !lastError) continue;
+
+      const adapter = this.adapters.get(providerId);
+      if (!adapter?.validate()) continue;
+
+      try {
+        const request = this.buildRequest(text, providerId);
+
+        if (this.debug) {
+          console.log(`✅ Using provider: ${providerId}`);
+          console.log(`🎙️  Voice/model: ${request.voice}`);
+          console.log(`⚡ Rate: ${request.rate} WPM`);
+          console.log(`🔊 Volume: ${(request.volume * 100).toFixed(0)}%`);
+        }
+
+        if (this.useCache && adapter.capabilities.cacheable && this.cache) {
+          const cacheKey = this.cache.generateCacheKey(
+            text,
+            providerId,
+            request.voice,
+            request.rate,
+            adapter.capabilities.instructions ? request.instructions : undefined
+          );
+          const cachedEntry = await this.cache.get(cacheKey);
+
+          if (cachedEntry) {
+            console.log('(already cached)');
             if (this.debug) {
-              console.log(`✅ Using provider: ${providerName}`);
-              console.log(`🎙️  Voice/model: ${voice}`);
-              console.log(`⚡ Rate: ${rate} WPM`);
-              console.log(`🔊 Volume: ${(volume * 100).toFixed(0)}%`);
+              console.log(`📦 Using cached audio from: ${cachedEntry.audioFilePath}`);
             }
-            
-            // Check cache first if caching is enabled
-            if (this.useCache && providerName !== 'system' && this.cache) {
-              const cacheKey = this.cache!.generateCacheKey(text, providerName, voice, rate);
-              const cachedEntry = await this.cache!.get(cacheKey);
-              
-              if (cachedEntry) {
-                console.log(`(already cached)`);
-                if (this.debug) {
-                  console.log(`📦 Using cached audio from: ${cachedEntry.audioFilePath}`);
-                }
-                await this.sendHUDNotification(text, providerName, true);
-                if (!silent) {
-                  await this.playCachedAudio(cachedEntry.audioFilePath);
-                }
-                return;
-              }
+            await this.sendHUDNotification(text, providerId, true);
+            if (!silent) {
+              await playAudioFile(cachedEntry.audioFilePath, request.volume);
             }
-
-            // Generate new audio
-            let audioBuffer: Buffer | null = null;
-            
-            if (providerName === 'system') {
-              // System provider doesn't support caching, use speak directly
-              if (silent) {
-                console.log('⚠️  Silent mode not supported with system provider (no audio file generated)');
-                return;
-              }
-              if (this.debug) {
-                console.log(`🎙️  Using system voice: ${voice}`);
-              }
-              await this.sendHUDNotification(text, providerName, false);
-              await provider.speak({
-                text,
-                rate,
-                tempDir,
-                voice,
-                volume,
-                apiKey: this.getApiKeyForProvider(providerName) || ''
-              });
-              return;
-            } else {
-              // Use generateAudio for cacheable providers
-              const generateMethod = (provider as any).generateAudio;
-              if (generateMethod) {
-                audioBuffer = await generateMethod.call(provider, {
-                  text,
-                  rate,
-                  tempDir,
-                  voice,
-                  volume,
-                  apiKey: this.getApiKeyForProvider(providerName) || ''
-                });
-              } else {
-                // Fallback for providers without generateAudio
-                await provider.speak({
-                  text,
-                  rate,
-                  tempDir,
-                  voice,
-                  volume,
-                  apiKey: this.getApiKeyForProvider(providerName) || ''
-                });
-                return;
-              }
-            }
-
-            // Cache the audio if enabled and buffer was returned
-            if (this.useCache && providerName !== 'system' && this.cache && audioBuffer) {
-              const cacheKey = this.cache!.generateCacheKey(text, providerName, voice, rate);
-              const startTime = Date.now();
-              await this.cache!.set(cacheKey, {
-                provider: providerName,
-                voice,
-                rate,
-                text
-              }, audioBuffer, {
-                model: this.inferModel(providerName),
-                durationMs: Date.now() - startTime,
-                success: true,
-                extension: providerName === 'gemini' ? 'wav' : undefined,
-              });
-              
-              console.log('cached');
-
-              await this.sendHUDNotification(text, providerName, false);
-              if (!silent) {
-                // Play the generated audio with level updates for HUD
-                const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
-                const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
-                fs.writeFileSync(tempFile, audioBuffer);
-                await playAudioWithLevels(tempFile, volume);
-
-                if (fs.existsSync(tempFile)) {
-                  fs.unlinkSync(tempFile);
-                }
-              }
-            } else if (audioBuffer) {
-              await this.sendHUDNotification(text, providerName, false);
-              if (!silent) {
-                // Play directly with level updates for HUD
-                const fileExt = providerName === 'gemini' ? 'wav' : 'mp3';
-                const tempFile = path.join(tempDir, `speech_${Date.now()}.${fileExt}`);
-                if (this.debug) {
-                  console.log(`🎵 Playing generated audio: ${tempFile}`);
-                }
-                fs.writeFileSync(tempFile, audioBuffer);
-                await playAudioWithLevels(tempFile, volume);
-
-                if (fs.existsSync(tempFile)) {
-                  fs.unlinkSync(tempFile);
-                }
-              }
-            }
-
             return;
           }
-        } catch (error) {
-          console.warn(`${providerName} provider failed:`, error);
-          lastError = error as Error;
-          continue;
         }
+
+        const startTime = Date.now();
+        const result = await adapter.synthesize(request);
+
+        if (this.useCache && adapter.capabilities.cacheable && this.cache) {
+          const cacheKey = this.cache.generateCacheKey(
+            text,
+            providerId,
+            request.voice,
+            request.rate,
+            adapter.capabilities.instructions ? request.instructions : undefined
+          );
+          await this.cache.set(
+            cacheKey,
+            {
+              provider: providerId,
+              voice: request.voice,
+              rate: request.rate,
+              text,
+            },
+            result.audio,
+            {
+              model: result.model ?? providerId,
+              durationMs: Date.now() - startTime,
+              success: true,
+              extension: result.format,
+            }
+          );
+          console.log('cached');
+        }
+
+        await this.sendHUDNotification(text, providerId, false);
+        if (!silent) {
+          await playTTSResult(result, request.volume, request.tempDir);
+        }
+        return;
+      } catch (error) {
+        console.warn(`${providerId} provider failed:`, error);
+        lastError = error as Error;
       }
     }
 
     if (lastError) {
-      // If we tried a specific provider and it failed, provide better guidance
-      if (requestedProvider !== 'system') {
-        const providerName = requestedProvider.charAt(0).toUpperCase() + requestedProvider.slice(1);
-        let helpText = '';
-        
-        if (lastError.message.includes('API key')) {
-          switch (requestedProvider) {
-            case 'openai':
-              helpText = 'Get your API key: https://platform.openai.com/api-keys';
-              break;
-            case 'elevenlabs':
-              helpText = 'Get your API key: https://elevenlabs.io/app/settings/api-keys';
-              break;
-            case 'groq':
-              helpText = 'Get your API key: https://console.groq.com/keys';
-              break;
-            case 'gemini':
-              helpText = 'Get your API key: https://makersuite.google.com/app/apikey';
-              break;
-          }
-        }
-        
+      if (requestedId !== 'system') {
+        const providerName = requestedId.charAt(0).toUpperCase() + requestedId.slice(1);
+        const helpUrl = lastError.message.includes('API key')
+          ? API_KEY_URLS[requestedId]
+          : undefined;
+
         throw new Error(
-          `${providerName} failed: ${lastError.message}${helpText ? `\n💡 ${helpText}` : ''}\n🗣️  Try: speakeasy --text "hello world" --provider system`
+          `${providerName} failed: ${lastError.message}${
+            helpUrl ? `\n💡 Get your API key: ${helpUrl}` : ''
+          }\n🗣️  Try: speakeasy --text "hello world" --provider system`
         );
       }
       throw new Error(`All providers failed. Last error: ${lastError.message}`);
     }
 
-    // Fallback to system voice (never cached)
-    if (silent) {
-      console.log('⚠️  Silent mode not supported with system provider (no audio file generated)');
-      return;
-    }
-    const systemProvider = this.providers.get('system');
-    if (systemProvider) {
-      try {
-        if (this.debug) {
-          console.log(`🗣️  Falling back to system voice: ${this.config.systemVoice || 'Samantha'}`);
-        }
-        await systemProvider.speak({
-          text,
-          rate: this.config.rate || 180,
-          tempDir: this.config.tempDir || '/tmp',
-          voice: this.config.systemVoice || 'Samantha',
-          volume: this.config.volume !== undefined ? this.config.volume : 0.7
-        });
-      } catch (error) {
-        throw new Error(`System voice failed: ${error}. Ensure you're on macOS.`);
-      }
-    }
+    throw new Error(`No available TTS provider. Ensure you're on macOS for system voice.`);
+  }
+
+  private buildRequest(text: string, providerId: TTSProviderId): TTSRequest {
+    return {
+      text,
+      voice: this.getVoiceForProvider(providerId),
+      rate: this.config.rate || 180,
+      volume: this.config.volume !== undefined ? this.config.volume : 0.7,
+      tempDir: this.config.tempDir || '/tmp',
+      apiKey: this.getApiKeyForProvider(providerId) || undefined,
+      instructions: providerId === 'openai' ? this.config.instructions : undefined,
+    };
   }
 
   private printConfigDiagnostics(): void {
     console.log('🔍 Debug mode enabled');
-
-    // Configuration summary
     console.log('📊 Current Configuration:');
     console.log(`   Provider: ${this.config.provider}`);
     console.log(`   Rate: ${this.config.rate} WPM`);
@@ -443,22 +315,23 @@ export class SpeakEasy {
     console.log(`   ElevenLabs Voice: ${this.config.elevenlabsVoiceId}`);
     console.log(`   Gemini Model: ${this.config.geminiModel}`);
     if (this.config.instructions) {
-      console.log(`   Instructions: "${this.config.instructions.substring(0, 50)}${this.config.instructions.length > 50 ? '...' : ''}"`);
+      console.log(
+        `   Instructions: "${this.config.instructions.substring(0, 50)}${this.config.instructions.length > 50 ? '...' : ''}"`
+      );
     }
-    
-    // API Key status
+
     console.log('🔑 API Key Status:');
     const providers = [
       { name: 'OpenAI', key: 'openai', env: 'OPENAI_API_KEY' },
       { name: 'ElevenLabs', key: 'elevenlabs', env: 'ELEVENLABS_API_KEY' },
       { name: 'Groq', key: 'groq', env: 'GROQ_API_KEY' },
-      { name: 'Gemini', key: 'gemini', env: 'GEMINI_API_KEY' }
+      { name: 'Gemini', key: 'gemini', env: 'GEMINI_API_KEY' },
     ];
-    
+
     providers.forEach(({ name, key, env }) => {
       const fromConfig = this.config.apiKeys?.[key as keyof typeof this.config.apiKeys];
       const fromEnv = process.env[env];
-      
+
       if (fromConfig && fromConfig.length > 10) {
         console.log(`   ✅ ${name}: Available from config (${fromConfig.substring(0, 8)}...)`);
       } else if (fromEnv && fromEnv.length > 10) {
@@ -467,90 +340,82 @@ export class SpeakEasy {
         console.log(`   ❌ ${name}: Not available`);
       }
     });
-    
-    // Cache status
+
     console.log('📦 Cache Status:');
     console.log(`   Enabled: ${this.useCache}`);
     if (this.cache) {
       console.log(`   Directory: ${(this.cache as any).dir || 'default'}`);
     }
-    
     console.log('');
   }
 
-  private async playCachedAudio(audioFilePath: string): Promise<void> {
-    // Play cached audio file with level updates for HUD
-    const volume = this.config.volume !== undefined ? this.config.volume : 0.7;
-    await playAudioWithLevels(audioFilePath, volume);
-  }
-
-  private getVoiceForProvider(provider: string): string {
+  private getVoiceForProvider(provider: TTSProviderId): string {
     switch (provider) {
-      case 'openai': return this.config.openaiVoice || 'nova';
-      case 'elevenlabs': return this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL';
-      case 'system': return this.config.systemVoice || 'Samantha';
-      case 'groq': return this.config.groqVoice || 'tara';
-      case 'gemini': return this.config.geminiModel || 'gemini-2.5-flash-preview-tts';
-      default: return this.config.systemVoice || 'Samantha';
+      case 'openai':
+        return this.config.openaiVoice || 'nova';
+      case 'elevenlabs':
+        return this.config.elevenlabsVoiceId || 'EXAVITQu4vr4xnSDxMaL';
+      case 'system':
+        return this.config.systemVoice || 'Samantha';
+      case 'groq':
+        return this.config.groqVoice || 'tara';
+      case 'gemini':
+        return this.config.geminiModel || 'gemini-2.5-flash-preview-tts';
+      default:
+        return this.config.systemVoice || 'Samantha';
     }
   }
 
-  private getApiKeyForProvider(provider: string): string {
+  private getApiKeyForProvider(provider: TTSProviderId): string {
     switch (provider) {
-      case 'openai': return this.config.apiKeys?.openai || '';
-      case 'elevenlabs': return this.config.apiKeys?.elevenlabs || '';
-      case 'groq': return this.config.apiKeys?.groq || '';
-      case 'gemini': return this.config.apiKeys?.gemini || '';
-      default: return '';
+      case 'openai':
+        return this.config.apiKeys?.openai || '';
+      case 'elevenlabs':
+        return this.config.apiKeys?.elevenlabs || '';
+      case 'groq':
+        return this.config.apiKeys?.groq || '';
+      case 'gemini':
+        return this.config.apiKeys?.gemini || '';
+      default:
+        return '';
     }
   }
 
-  private inferModel(provider: string): string {
-    switch (provider) {
-      case 'openai': return 'tts-1';
-      case 'elevenlabs': return 'eleven_multilingual_v2';
-      case 'groq': return 'tts-1-hd';
-      case 'gemini': return this.config.geminiModel || 'gemini-2.5-flash-preview-tts';
-      case 'system': return 'macOS-system';
-      default: return provider;
-    }
-  }
-
-  private async sendHUDNotification(text: string, provider: string, cached: boolean): Promise<void> {
+  private async sendHUDNotification(
+    text: string,
+    provider: string,
+    cached: boolean
+  ): Promise<void> {
     const timestamp = Date.now();
 
-    // Always record to history
     getHistory().add({
       text,
       provider,
       timestamp,
-      cached
+      cached,
     });
 
     if (!this.hudEnabled) return;
 
     notifyHUD({
-      text: text.substring(0, 200), // Limit to 200 chars for HUD display
+      text: text.substring(0, 200),
       provider,
       cached,
-      timestamp
+      timestamp,
     });
 
-    // Small delay to let HUD appear before audio starts
     await new Promise(resolve => setTimeout(resolve, 50));
   }
 
   private stopSpeaking(): void {
-    try {
-      execSync('pkill -f "say|afplay"', { stdio: 'ignore' });
-    } catch (error) {
-      // Ignore errors when killing processes
-    }
+    stopPlayback();
   }
 
   private requireCache(): TTSCache {
     if (!this.cache) {
-      throw new Error('Cache is not enabled. Configure cache.enabled or use an API provider with keys present.');
+      throw new Error(
+        'Cache is not enabled. Configure cache.enabled or use an API provider with keys present.'
+      );
     }
     return this.cache;
   }
@@ -591,15 +456,23 @@ export class SpeakEasy {
   }
 }
 
-// Convenience functions
-export const say = (text: string, provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini') => {
+export const say = (
+  text: string,
+  provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini'
+) => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Text argument is required for say()');
   }
   return new SpeakEasy(provider ? { provider } : {}).speak(text);
 };
 
-export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini', volume?: number }) => {
+export const speak = (
+  text: string,
+  options?: SpeakEasyOptions & {
+    provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
+    volume?: number;
+  }
+) => {
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Text argument is required for speak()');
   }
@@ -609,6 +482,9 @@ export const speak = (text: string, options?: SpeakEasyOptions & { provider?: 's
 };
 
 export * from './types';
+export * from './adapters/types';
+export { createAdapterRegistry, PROVIDER_ORDER } from './adapters/registry';
+export { playAudioFile, playTTSResult, stopPlayback } from './adapters/audio';
 export { SystemProvider, getAvailableVoices, getBestVoice } from './providers/system';
 export { OpenAIProvider } from './providers/openai';
 export { ElevenLabsProvider } from './providers/elevenlabs';

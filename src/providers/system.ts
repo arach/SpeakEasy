@@ -1,21 +1,21 @@
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Provider, ProviderConfig } from '../types';
+import { TTSAdapter, TTSRequest, TTSResult } from '../adapters/types';
+import { toTTSRequest } from '../adapters/request';
+import { playTTSResult } from '../adapters/audio';
 
-// Preferred voices in order of quality (Premium > Enhanced > Standard)
 const PREFERRED_VOICES = [
-  'Ava (Premium)',      // Best quality US English
-  'Evan (Enhanced)',    // High quality US English
-  'Zoe (Premium)',      // Premium US English
-  'Samantha (Enhanced)', // Enhanced Samantha
-  'Samantha',           // Standard fallback
+  'Ava (Premium)',
+  'Evan (Enhanced)',
+  'Zoe (Premium)',
+  'Samantha (Enhanced)',
+  'Samantha',
 ];
 
-// Cache for available voices
 let cachedVoices: string[] | null = null;
 
-/**
- * Get all available system voices on macOS
- */
 export function getAvailableVoices(): string[] {
   if (cachedVoices) return cachedVoices;
 
@@ -25,30 +25,24 @@ export function getAvailableVoices(): string[] {
       .split('\n')
       .filter(line => line.trim())
       .map(line => {
-        // Extract voice name (everything before the locale code)
         const match = line.match(/^(.+?)\s+[a-z]{2}[_-][A-Z]{2}/i);
         return match ? match[1].trim() : line.split(/\s+/)[0];
       });
     return cachedVoices;
   } catch {
-    return ['Samantha']; // Fallback
+    return ['Samantha'];
   }
 }
 
-/**
- * Get the best available voice for the given language
- */
 export function getBestVoice(language: string = 'en_US'): string {
   const available = getAvailableVoices();
 
-  // Check preferred voices in order
   for (const voice of PREFERRED_VOICES) {
     if (available.includes(voice)) {
       return voice;
     }
   }
 
-  // Fallback: find any English premium/enhanced voice
   const englishPremium = available.find(v =>
     v.includes('(Premium)') && (v.includes('en_') || !v.includes('_'))
   );
@@ -62,53 +56,73 @@ export function getBestVoice(language: string = 'en_US'): string {
   return 'Samantha';
 }
 
-export class SystemProvider implements Provider {
+export class SystemProvider implements TTSAdapter, Provider {
+  readonly id = 'system' as const;
+  readonly capabilities = {
+    cacheable: true,
+    instructions: false,
+    silent: true,
+  };
+
   private voice: string;
 
   constructor(voice?: string) {
     this.voice = voice || getBestVoice();
   }
 
-  async speak(config: ProviderConfig): Promise<void> {
+  async synthesize(request: TTSRequest): Promise<TTSResult> {
+    const voice = request.voice || this.voice;
+    const tempFile = path.join(request.tempDir, `system_speech_${Date.now()}.aiff`);
+
     try {
-      const volume = config.volume !== undefined ? config.volume : 0.7;
-      
-      // Generate audio file using say command, then play with volume control
-      const tempFile = `${config.tempDir}/system_speech_${Date.now()}.aiff`;
-      
-      try {
-        // Generate audio file with say command (quote voice name for names with special chars)
-        const sayCommand = `say -v "${this.voice}" -r ${config.rate} -o "${tempFile}" "${config.text.replace(/"/g, '\\"')}"`;
-        execSync(sayCommand);
-        
-        // Play with volume control using afplay
-        const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
-        const playCommand = `afplay${volumeFlag} "${tempFile}"`;
-        execSync(playCommand);
-        
-        // Clean up temp file
-        const fs = require('fs');
-        if (fs.existsSync(tempFile)) {
-          fs.unlinkSync(tempFile);
-        }
-      } catch (error) {
-        // Clean up temp file even if there's an error
-        const fs = require('fs');
-        if (fs.existsSync(tempFile)) {
-          fs.unlinkSync(tempFile);
-        }
-        throw error;
+      await runSay(['-v', voice, '-r', String(request.rate), '-o', tempFile, request.text]);
+      const audio = fs.readFileSync(tempFile);
+      return { audio, format: 'aiff', model: 'macOS-system' };
+    } finally {
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
       }
-    } catch (error) {
-      throw new Error(`System TTS failed: ${error}`);
     }
   }
 
-  validateConfig(): boolean {
-    return true; // System voice always works on macOS
+  validate(): boolean {
+    return true;
   }
 
-  getErrorMessage(error: any): string {
-    return `System voice failed: ${error.message}. Ensure 'say' command is available.`;
+  formatError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    return `System voice failed: ${message}. Ensure 'say' command is available.`;
   }
+
+  validateConfig(): boolean {
+    return this.validate();
+  }
+
+  getErrorMessage(error: unknown): string {
+    return this.formatError(error);
+  }
+
+  async generateAudio(config: ProviderConfig): Promise<Buffer | null> {
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    return result.audio;
+  }
+
+  async speak(config: ProviderConfig): Promise<void> {
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    await playTTSResult(result, config.volume ?? 0.7, config.tempDir);
+  }
+}
+
+function runSay(args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('say', args);
+    proc.on('error', reject);
+    proc.on('close', code => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`say exited with code ${code}`));
+      }
+    });
+  });
 }

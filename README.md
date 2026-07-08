@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@arach/speakeasy.svg)](https://www.npmjs.com/package/@arach/speakeasy)
 [![license](https://img.shields.io/npm/l/@arach/speakeasy.svg)](https://github.com/arach/SpeakEasy/blob/master/package.json)
 
-Unified text-to-speech for Node and Bun — one SDK, one CLI, five providers, SQLite caching, and an optional macOS HUD companion.
+Convenient TTS CLI for Mac — centralized credentials + configurable caching so all your apps and agents can speak.
 
 **[speakeasy.arach.dev](https://speakeasy.arach.dev)** · **npm:** [@arach/speakeasy](https://www.npmjs.com/package/@arach/speakeasy) · **docs:** [quickstart](https://speakeasy.arach.dev/docs/quickstart)
 

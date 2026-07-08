@@ -8,10 +8,11 @@ export interface ProviderConfig {
   instructions?: string; // OpenAI-only: steering instructions for voice style, accent, tone
 }
 
+/** @deprecated Use TTSAdapter from adapters/types instead. */
 export interface Provider {
   speak(config: ProviderConfig): Promise<void>;
   validateConfig(): boolean;
-  getErrorMessage(error: any): string;
+  getErrorMessage(error: unknown): string;
 }
 
 export interface SpeakEasyConfig {

@@ -151,7 +151,10 @@ function wrapBunDatabase(db: {
   };
 }
 
-function detectAudioExtension(buffer: Buffer): 'mp3' | 'wav' {
+function detectAudioExtension(buffer: Buffer): 'mp3' | 'wav' | 'aiff' {
+  if (buffer.length >= 4 && buffer.toString('ascii', 0, 4) === 'FORM') {
+    return 'aiff';
+  }
   if (buffer.length >= 4 && buffer.toString('ascii', 0, 4) === 'RIFF') {
     return 'wav';
   }
@@ -844,7 +847,7 @@ export class TTSCache {
       durationMs?: number;
       success?: boolean;
       errorMessage?: string;
-      extension?: 'mp3' | 'wav';
+      extension?: 'mp3' | 'wav' | 'aiff';
     }
   ): Promise<boolean> {
     try {
@@ -1043,9 +1046,16 @@ export class TTSCache {
     }
   }
 
-  generateCacheKey(text: string, provider: string, voice: string, rate: number): string {
+  generateCacheKey(
+    text: string,
+    provider: string,
+    voice: string,
+    rate: number,
+    instructions?: string
+  ): string {
     const normalizedText = text.trim().toLowerCase();
-    const keyData = `${normalizedText}|${provider}|${voice}|${rate}`;
+    const normalizedInstructions = instructions?.trim() || '';
+    const keyData = `${normalizedText}|${provider}|${voice}|${rate}|${normalizedInstructions}`;
     return uuidv5(keyData, '6ba7b810-9dad-11d1-80b4-00c04fd430c8');
   }
 

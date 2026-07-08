@@ -35,39 +35,152 @@ __export(src_exports, {
   GeminiProvider: () => GeminiProvider,
   GroqProvider: () => GroqProvider,
   OpenAIProvider: () => OpenAIProvider,
+  PROVIDER_ORDER: () => PROVIDER_ORDER,
   SpeakEasy: () => SpeakEasy,
   SystemProvider: () => SystemProvider,
   TTSCache: () => TTSCache,
+  createAdapterRegistry: () => createAdapterRegistry,
   getAvailableVoices: () => getAvailableVoices,
   getBestVoice: () => getBestVoice,
+  playAudioFile: () => playAudioFile,
+  playTTSResult: () => playTTSResult,
   say: () => say,
-  speak: () => speak
+  speak: () => speak,
+  stopPlayback: () => stopPlayback
 });
 module.exports = __toCommonJS(src_exports);
-var import_child_process6 = require("child_process");
-var fs7 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
+var fs5 = __toESM(require("fs"));
+var path5 = __toESM(require("path"));
 
 // src/providers/system.ts
+var import_child_process2 = require("child_process");
+var fs2 = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
+
+// src/adapters/request.ts
+function toTTSRequest(config, defaultVoice) {
+  return {
+    text: config.text,
+    voice: config.voice ?? defaultVoice,
+    rate: config.rate,
+    volume: config.volume ?? 0.7,
+    tempDir: config.tempDir,
+    apiKey: config.apiKey,
+    instructions: config.instructions
+  };
+}
+
+// src/adapters/audio.ts
 var import_child_process = require("child_process");
+var fs = __toESM(require("fs"));
+var path = __toESM(require("path"));
+
+// src/hud.ts
+var import_fs = require("fs");
+var import_fs2 = require("fs");
+var HUD_PIPE_PATH = "/tmp/speakeasy-hud.fifo";
+function writeToPipe(message) {
+  if (!(0, import_fs2.existsSync)(HUD_PIPE_PATH)) {
+    return;
+  }
+  try {
+    const stats = (0, import_fs2.statSync)(HUD_PIPE_PATH);
+    if (!stats.isFIFO()) {
+      return;
+    }
+    const fd = (0, import_fs.openSync)(HUD_PIPE_PATH, import_fs.constants.O_WRONLY | import_fs.constants.O_NONBLOCK);
+    try {
+      const jsonMessage = JSON.stringify(message) + "\n";
+      (0, import_fs.writeSync)(fd, jsonMessage);
+    } finally {
+      (0, import_fs.closeSync)(fd);
+    }
+  } catch {
+  }
+}
+function notifyHUD(message) {
+  writeToPipe(message);
+}
+function updateAudioLevel(level) {
+  writeToPipe({ audioLevel: Math.max(0, Math.min(1, level)) });
+}
+
+// src/adapters/audio.ts
+function extensionForFormat(format) {
+  return format;
+}
+function playAudioFile(filePath, volume = 1) {
+  return new Promise((resolve, reject) => {
+    const volumeArgs = volume !== 1 ? ["-v", volume.toString()] : [];
+    const afplay = (0, import_child_process.spawn)("afplay", [...volumeArgs, filePath]);
+    let levelInterval = null;
+    let phase = 0;
+    const startLevelSimulation = () => {
+      levelInterval = setInterval(() => {
+        const base = 0.4 + Math.sin(phase * 0.3) * 0.2;
+        const variation = Math.random() * 0.3;
+        const level = Math.min(1, Math.max(0, base + variation));
+        updateAudioLevel(level);
+        phase++;
+      }, 33);
+    };
+    const stopLevelSimulation = () => {
+      if (levelInterval) {
+        clearInterval(levelInterval);
+        levelInterval = null;
+      }
+      updateAudioLevel(0);
+    };
+    startLevelSimulation();
+    afplay.on("close", (code) => {
+      stopLevelSimulation();
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`afplay exited with code ${code}`));
+      }
+    });
+    afplay.on("error", (err) => {
+      stopLevelSimulation();
+      reject(err);
+    });
+  });
+}
+async function playTTSResult(result, volume, tempDir) {
+  const tempFile = path.join(
+    tempDir,
+    `speech_${Date.now()}.${extensionForFormat(result.format)}`
+  );
+  fs.writeFileSync(tempFile, result.audio);
+  try {
+    await playAudioFile(tempFile, volume);
+  } finally {
+    if (fs.existsSync(tempFile)) {
+      fs.unlinkSync(tempFile);
+    }
+  }
+}
+function stopPlayback() {
+  try {
+    (0, import_child_process.execSync)('pkill -f "say|afplay"', { stdio: "ignore" });
+  } catch {
+  }
+}
+
+// src/providers/system.ts
 var PREFERRED_VOICES = [
   "Ava (Premium)",
-  // Best quality US English
   "Evan (Enhanced)",
-  // High quality US English
   "Zoe (Premium)",
-  // Premium US English
   "Samantha (Enhanced)",
-  // Enhanced Samantha
   "Samantha"
-  // Standard fallback
 ];
 var cachedVoices = null;
 function getAvailableVoices() {
   if (cachedVoices)
     return cachedVoices;
   try {
-    const output = (0, import_child_process.execSync)('say -v "?"', { encoding: "utf-8" });
+    const output = (0, import_child_process2.execSync)('say -v "?"', { encoding: "utf-8" });
     cachedVoices = output.split("\n").filter((line) => line.trim()).map((line) => {
       const match = line.match(/^(.+?)\s+[a-z]{2}[_-][A-Z]{2}/i);
       return match ? match[1].trim() : line.split(/\s+/)[0];
@@ -97,500 +210,68 @@ function getBestVoice(language = "en_US") {
   return "Samantha";
 }
 var SystemProvider = class {
+  id = "system";
+  capabilities = {
+    cacheable: true,
+    instructions: false,
+    silent: true
+  };
   voice;
   constructor(voice) {
     this.voice = voice || getBestVoice();
   }
-  async speak(config) {
+  async synthesize(request) {
+    const voice = request.voice || this.voice;
+    const tempFile = path2.join(request.tempDir, `system_speech_${Date.now()}.aiff`);
     try {
-      const volume = config.volume !== void 0 ? config.volume : 0.7;
-      const tempFile = `${config.tempDir}/system_speech_${Date.now()}.aiff`;
-      try {
-        const sayCommand = `say -v "${this.voice}" -r ${config.rate} -o "${tempFile}" "${config.text.replace(/"/g, '\\"')}"`;
-        (0, import_child_process.execSync)(sayCommand);
-        const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-        const playCommand = `afplay${volumeFlag} "${tempFile}"`;
-        (0, import_child_process.execSync)(playCommand);
-        const fs8 = require("fs");
-        if (fs8.existsSync(tempFile)) {
-          fs8.unlinkSync(tempFile);
-        }
-      } catch (error) {
-        const fs8 = require("fs");
-        if (fs8.existsSync(tempFile)) {
-          fs8.unlinkSync(tempFile);
-        }
-        throw error;
-      }
-    } catch (error) {
-      throw new Error(`System TTS failed: ${error}`);
-    }
-  }
-  validateConfig() {
-    return true;
-  }
-  getErrorMessage(error) {
-    return `System voice failed: ${error.message}. Ensure 'say' command is available.`;
-  }
-};
-
-// src/providers/openai.ts
-var import_child_process2 = require("child_process");
-var fs = __toESM(require("fs"));
-var path = __toESM(require("path"));
-var OpenAIProvider = class {
-  apiKey;
-  voice;
-  instructions;
-  constructor(apiKey = "", voice = "nova", instructions) {
-    this.apiKey = apiKey;
-    this.voice = voice;
-    this.instructions = instructions;
-  }
-  async speak(config) {
-    const audioBuffer = await this.generateAudio(config);
-    if (audioBuffer) {
-      const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
-      fs.writeFileSync(tempFile, audioBuffer);
-      const volume = config.volume !== void 0 ? config.volume : 0.7;
-      const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-      (0, import_child_process2.execSync)(`afplay${volumeFlag} "${tempFile}"`);
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
-    }
-  }
-  async generateAudio(config) {
-    if (!this.apiKey) {
-      throw new Error("OpenAI API key is required");
-    }
-    const instructions = config.instructions || this.instructions;
-    if (instructions) {
-      return this.generateAudioWithInstructions(config, instructions);
-    }
-    try {
-      const response = await fetch("https://api.openai.com/v1/audio/speech", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "tts-1",
-          voice: this.voice,
-          input: config.text,
-          speed: config.rate / 200
-        })
-      });
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error(`OpenAI API error: Invalid API key. Check your OPENAI_API_KEY environment variable.`);
-        } else if (response.status === 429) {
-          throw new Error(`OpenAI API error: Rate limit exceeded. Try again later or reduce request frequency.`);
-        }
-        throw new Error(`OpenAI API error: ${response.status}. Check your API key and rate limits.`);
-      }
-      const audioBuffer = await response.arrayBuffer();
-      return Buffer.from(audioBuffer);
-    } catch (error) {
-      throw new Error(`OpenAI TTS failed: ${error}`);
-    }
-  }
-  async generateAudioWithInstructions(config, instructions) {
-    try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-audio-preview",
-          modalities: ["text", "audio"],
-          audio: {
-            voice: this.voice,
-            format: "mp3"
-          },
-          messages: [
-            {
-              role: "system",
-              content: instructions
-            },
-            {
-              role: "user",
-              content: config.text
-            }
-          ]
-        })
-      });
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error(`OpenAI API error: Invalid API key. Check your OPENAI_API_KEY environment variable.`);
-        } else if (response.status === 429) {
-          throw new Error(`OpenAI API error: Rate limit exceeded. Try again later or reduce request frequency.`);
-        }
-        const errorBody = await response.text();
-        throw new Error(`OpenAI API error: ${response.status}. ${errorBody}`);
-      }
-      const data = await response.json();
-      const audioData = data.choices?.[0]?.message?.audio?.data;
-      if (!audioData) {
-        throw new Error("No audio data in OpenAI response");
-      }
-      return Buffer.from(audioData, "base64");
-    } catch (error) {
-      throw new Error(`OpenAI TTS with instructions failed: ${error}`);
-    }
-  }
-  validateConfig() {
-    return !!(this.apiKey && this.apiKey.length > 10);
-  }
-  getErrorMessage(error) {
-    if (error.message.includes("Invalid API key")) {
-      return "\u{1F511} Invalid OpenAI API key. Get yours at: https://platform.openai.com/api-keys";
-    }
-    if (error.message.includes("Rate limit")) {
-      return '\u23F0 OpenAI rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
-    }
-    return `OpenAI TTS failed: ${error.message}`;
-  }
-};
-
-// src/providers/elevenlabs.ts
-var import_child_process3 = require("child_process");
-var fs2 = __toESM(require("fs"));
-var path2 = __toESM(require("path"));
-var ElevenLabsProvider = class {
-  apiKey;
-  voiceId;
-  constructor(apiKey = "", voiceId = "EXAVITQu4vr4xnSDxMaL") {
-    this.apiKey = apiKey;
-    this.voiceId = voiceId;
-  }
-  async speak(config) {
-    const audioBuffer = await this.generateAudio(config);
-    if (audioBuffer) {
-      const tempFile = path2.join(config.tempDir, `speech_${Date.now()}.mp3`);
-      fs2.writeFileSync(tempFile, audioBuffer);
-      const volume = config.volume !== void 0 ? config.volume : 0.7;
-      const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-      (0, import_child_process3.execSync)(`afplay${volumeFlag} "${tempFile}"`);
+      await runSay(["-v", voice, "-r", String(request.rate), "-o", tempFile, request.text]);
+      const audio = fs2.readFileSync(tempFile);
+      return { audio, format: "aiff", model: "macOS-system" };
+    } finally {
       if (fs2.existsSync(tempFile)) {
         fs2.unlinkSync(tempFile);
       }
     }
   }
-  async generateAudio(config) {
-    if (!this.apiKey) {
-      throw new Error("ElevenLabs API key is required");
-    }
-    const BALANCED = 0.5;
-    const NATURAL = 0.5;
-    try {
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${this.voiceId}`, {
-        method: "POST",
-        headers: {
-          "Accept": "audio/mpeg",
-          "Content-Type": "application/json",
-          "xi-api-key": this.apiKey
-        },
-        body: JSON.stringify({
-          text: config.text,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: {
-            stability: BALANCED,
-            similarity_boost: NATURAL
-          }
-        })
-      });
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => "");
-        if (response.status === 401) {
-          if (errorBody.includes("model_deprecated")) {
-            throw new Error("ElevenLabs API error: Model deprecated - updating to newer model");
-          }
-          throw new Error("ElevenLabs API error: Invalid API key");
-        } else if (response.status === 429) {
-          throw new Error("ElevenLabs API error: Rate limit exceeded");
-        } else if (response.status === 403) {
-          throw new Error("ElevenLabs API error: Access forbidden - check your API key permissions");
-        } else if (response.status === 422) {
-          throw new Error("ElevenLabs API error: Invalid voice ID or parameters - check your configuration");
-        } else if (response.status === 404) {
-          throw new Error(`ElevenLabs API error: Voice ID "${this.voiceId}" not found. Use a valid voice ID (e.g., EXAVITQu4vr4xnSDxMaL) not a voice name`);
-        }
-        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
-      }
-      const audioBuffer = await response.arrayBuffer();
-      return Buffer.from(audioBuffer);
-    } catch (error) {
-      throw new Error(`ElevenLabs TTS failed: ${error}`);
-    }
+  validate() {
+    return true;
+  }
+  formatError(error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `System voice failed: ${message}. Ensure 'say' command is available.`;
   }
   validateConfig() {
-    return !!(this.apiKey && this.apiKey.length > 10);
+    return this.validate();
   }
   getErrorMessage(error) {
-    if (error.message.includes("Invalid API key")) {
-      return "\u{1F511} Invalid ElevenLabs API key. Get yours at: https://elevenlabs.io/app/settings/api-keys";
-    }
-    if (error.message.includes("Access forbidden")) {
-      return "\u{1F512} ElevenLabs access forbidden. Ensure your API key has TTS permissions";
-    }
-    if (error.message.includes("Rate limit")) {
-      return '\u23F0 ElevenLabs rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
-    }
-    if (error.message.includes("not found")) {
-      return '\u{1F50A} Invalid ElevenLabs voice ID. Use a voice ID like "EXAVITQu4vr4xnSDxMaL", not a name like "nova". Find voice IDs at: https://elevenlabs.io/app/voice-library';
-    }
-    return `ElevenLabs TTS failed: ${error.message}`;
+    return this.formatError(error);
   }
-};
-
-// src/providers/groq.ts
-var import_child_process4 = require("child_process");
-var fs3 = __toESM(require("fs"));
-var path3 = __toESM(require("path"));
-var GroqProvider = class {
-  apiKey;
-  voice;
-  constructor(apiKey = "", voice = "tara") {
-    this.apiKey = apiKey;
-    this.voice = voice;
+  async generateAudio(config) {
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    return result.audio;
   }
   async speak(config) {
-    const audioBuffer = await this.generateAudio(config);
-    if (audioBuffer) {
-      const tempFile = path3.join(config.tempDir, `speech_${Date.now()}.mp3`);
-      fs3.writeFileSync(tempFile, audioBuffer);
-      const volume = config.volume !== void 0 ? config.volume : 0.7;
-      const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-      (0, import_child_process4.execSync)(`afplay${volumeFlag} "${tempFile}"`);
-      if (fs3.existsSync(tempFile)) {
-        fs3.unlinkSync(tempFile);
-      }
-    }
-  }
-  async generateAudio(config) {
-    if (!this.apiKey) {
-      throw new Error("Groq API key is required");
-    }
-    try {
-      const response = await fetch("https://api.groq.com/openai/v1/audio/speech", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "canopylabs/orpheus-v1-english",
-          voice: this.voice,
-          input: config.text
-        })
-      });
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => "");
-        if (response.status === 401) {
-          throw new Error("Groq API error: Invalid API key");
-        } else if (response.status === 429) {
-          throw new Error("Groq API error: Rate limit exceeded");
-        } else if (response.status === 400) {
-          throw new Error(`Groq API error: Bad request - ${errorBody || "check voice name and parameters"}`);
-        }
-        throw new Error(`Groq API error: ${response.status} - ${errorBody}`);
-      }
-      const audioBuffer = await response.arrayBuffer();
-      return Buffer.from(audioBuffer);
-    } catch (error) {
-      throw new Error(`Groq TTS failed: ${error}`);
-    }
-  }
-  validateConfig() {
-    return !!(this.apiKey && this.apiKey.length > 10);
-  }
-  getErrorMessage(error) {
-    if (error.message.includes("Invalid API key")) {
-      return "\u{1F511} Invalid Groq API key. Get yours at: https://console.groq.com/keys";
-    }
-    if (error.message.includes("Rate limit")) {
-      return '\u23F0 Groq rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
-    }
-    return `Groq TTS failed: ${error.message}`;
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    await playTTSResult(result, config.volume ?? 0.7, config.tempDir);
   }
 };
-
-// src/providers/gemini.ts
-var import_child_process5 = require("child_process");
-var fs4 = __toESM(require("fs"));
-var path4 = __toESM(require("path"));
-var GeminiProvider = class {
-  apiKey;
-  model;
-  voiceName;
-  constructor(apiKey = "", model = "gemini-2.5-flash-preview-tts", voiceName = "Puck") {
-    this.apiKey = apiKey;
-    this.model = model;
-    this.voiceName = voiceName;
-  }
-  async speak(config) {
-    const audioBuffer = await this.generateAudio(config);
-    if (audioBuffer) {
-      const tempFile = path4.join(config.tempDir, `speech_${Date.now()}.wav`);
-      fs4.writeFileSync(tempFile, audioBuffer);
-      const volume = config.volume !== void 0 ? config.volume : 0.7;
-      const volumeFlag = volume !== 1 ? ` -v ${volume}` : "";
-      (0, import_child_process5.execSync)(`afplay${volumeFlag} "${tempFile}"`);
-      if (fs4.existsSync(tempFile)) {
-        fs4.unlinkSync(tempFile);
+function runSay(args) {
+  return new Promise((resolve, reject) => {
+    const proc = (0, import_child_process2.spawn)("say", args);
+    proc.on("error", reject);
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`say exited with code ${code}`));
       }
-    }
-  }
-  async generateAudio(config) {
-    if (!this.apiKey) {
-      throw new Error("Gemini API key is required");
-    }
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: [{
-                text: config.text
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.7,
-              responseModalities: ["AUDIO"],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: this.voiceName
-                  }
-                }
-              }
-            }
-          })
-        }
-      );
-      if (!response.ok) {
-        const errorData = await response.text();
-        let errorMessage = `HTTP ${response.status}`;
-        try {
-          const error = JSON.parse(errorData);
-          errorMessage = error.error?.message || errorMessage;
-        } catch {
-        }
-        if (response.status === 429) {
-          throw new Error("Rate limit exceeded");
-        } else if (response.status === 401 || response.status === 403) {
-          throw new Error("Invalid API key");
-        } else {
-          throw new Error(errorMessage);
-        }
-      }
-      const data = await response.json();
-      if (data.candidates && data.candidates[0]?.content?.parts?.[0]) {
-        const part = data.candidates[0].content.parts[0];
-        if ("inlineData" in part && part.inlineData) {
-          const audioData = part.inlineData.data;
-          const mimeType = part.inlineData.mimeType || "audio/wav";
-          const buffer = Buffer.from(audioData, "base64");
-          if (mimeType.includes("wav")) {
-            return buffer;
-          }
-          return this.convertToWav(buffer, mimeType);
-        }
-      }
-      throw new Error("No audio content received from Gemini API");
-    } catch (error) {
-      if (error.message?.includes("API key") || error.message?.includes("Invalid API key")) {
-        throw new Error(`Gemini API error: Invalid API key. Check your GEMINI_API_KEY environment variable.`);
-      } else if (error.message?.includes("quota") || error.message?.includes("rate") || error.message?.includes("Rate limit")) {
-        throw new Error(`Gemini API error: Rate limit exceeded. Try again later or reduce request frequency.`);
-      } else if (error.message?.includes("model")) {
-        throw new Error(`Gemini API error: Model '${this.model}' may not support audio generation. Try 'gemini-2.5-flash-preview-tts' or check available models.`);
-      }
-      throw new Error(`Gemini TTS failed: ${error.message || error}`);
-    }
-  }
-  convertToWav(rawData, mimeType) {
-    const options = this.parseMimeType(mimeType);
-    const wavHeader = this.createWavHeader(rawData.length, options);
-    return Buffer.concat([wavHeader, rawData]);
-  }
-  parseMimeType(mimeType) {
-    const [fileType, ...params] = mimeType.split(";").map((s) => s.trim());
-    const [, format] = fileType.split("/");
-    const options = {
-      numChannels: 1,
-      sampleRate: 24e3,
-      // Default sample rate
-      bitsPerSample: 16
-      // Default bits per sample
-    };
-    if (format && format.startsWith("L")) {
-      const bits = parseInt(format.slice(1), 10);
-      if (!isNaN(bits)) {
-        options.bitsPerSample = bits;
-      }
-    }
-    for (const param of params) {
-      const [key, value] = param.split("=").map((s) => s.trim());
-      if (key === "rate") {
-        const rate = parseInt(value, 10);
-        if (!isNaN(rate)) {
-          options.sampleRate = rate;
-        }
-      }
-    }
-    return options;
-  }
-  createWavHeader(dataLength, options) {
-    const { numChannels, sampleRate, bitsPerSample } = options;
-    const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-    const blockAlign = numChannels * bitsPerSample / 8;
-    const buffer = Buffer.alloc(44);
-    buffer.write("RIFF", 0);
-    buffer.writeUInt32LE(36 + dataLength, 4);
-    buffer.write("WAVE", 8);
-    buffer.write("fmt ", 12);
-    buffer.writeUInt32LE(16, 16);
-    buffer.writeUInt16LE(1, 20);
-    buffer.writeUInt16LE(numChannels, 22);
-    buffer.writeUInt32LE(sampleRate, 24);
-    buffer.writeUInt32LE(byteRate, 28);
-    buffer.writeUInt16LE(blockAlign, 32);
-    buffer.writeUInt16LE(bitsPerSample, 34);
-    buffer.write("data", 36);
-    buffer.writeUInt32LE(dataLength, 40);
-    return buffer;
-  }
-  validateConfig() {
-    return !!(this.apiKey && this.apiKey.length > 10);
-  }
-  getErrorMessage(error) {
-    if (error.message.includes("Invalid API key")) {
-      return "\u{1F511} Invalid Gemini API key. Get yours at: https://aistudio.google.com/apikey";
-    }
-    if (error.message.includes("Rate limit") || error.message.includes("quota")) {
-      return '\u23F0 Gemini rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
-    }
-    if (error.message.includes("model")) {
-      return "\u274C Model not supported for audio. Try using gemini-2.5-flash-preview-tts or check available models.";
-    }
-    return `Gemini TTS failed: ${error.message}`;
-  }
-};
+    });
+  });
+}
 
 // src/cache.ts
-var path5 = __toESM(require("path"));
-var fs5 = __toESM(require("fs"));
+var path3 = __toESM(require("path"));
+var fs3 = __toESM(require("fs"));
 var import_uuid = require("uuid");
 
 // src/cache-config.ts
@@ -695,6 +376,9 @@ function wrapBunDatabase(db) {
   };
 }
 function detectAudioExtension(buffer) {
+  if (buffer.length >= 4 && buffer.toString("ascii", 0, 4) === "FORM") {
+    return "aiff";
+  }
   if (buffer.length >= 4 && buffer.toString("ascii", 0, 4) === "RIFF") {
     return "wav";
   }
@@ -737,18 +421,18 @@ var TTSCache = class {
   cacheHits = 0;
   cacheMisses = 0;
   constructor(cacheDir, ttl = "7d", maxSize, logger) {
-    this.cacheDir = cacheDir || path5.join("/tmp", "speakeasy-cache");
-    this.dbPath = path5.join(this.cacheDir, "cache.sqlite");
-    this.metadataFile = path5.join(this.cacheDir, "metadata.json");
-    this.statsFile = path5.join(this.cacheDir, "stats.json");
+    this.cacheDir = cacheDir || path3.join("/tmp", "speakeasy-cache");
+    this.dbPath = path3.join(this.cacheDir, "cache.sqlite");
+    this.metadataFile = path3.join(this.cacheDir, "metadata.json");
+    this.statsFile = path3.join(this.cacheDir, "stats.json");
     this.ttlMs = parseTTL(ttl);
     this.maxSize = maxSize ? parseSize(maxSize) : void 0;
     this.logger = logger || this.createDefaultLogger();
     this.loadStats();
     this.logger.debug("Initializing TTSCache with dir:", this.cacheDir, "ttl:", ttl, "maxSize:", maxSize);
-    if (!fs5.existsSync(this.cacheDir)) {
+    if (!fs3.existsSync(this.cacheDir)) {
       this.logger.debug("Creating cache directory:", this.cacheDir);
-      fs5.mkdirSync(this.cacheDir, { recursive: true });
+      fs3.mkdirSync(this.cacheDir, { recursive: true });
     }
     this.initializeStorage();
   }
@@ -786,10 +470,10 @@ var TTSCache = class {
     this.loadJsonMetadata();
   }
   migrateJsonMetadataIfNeeded() {
-    if (!this.db || !fs5.existsSync(this.metadataFile))
+    if (!this.db || !fs3.existsSync(this.metadataFile))
       return;
     try {
-      const data = JSON.parse(fs5.readFileSync(this.metadataFile, "utf8"));
+      const data = JSON.parse(fs3.readFileSync(this.metadataFile, "utf8"));
       const entries = Object.entries(data.entries || {});
       if (entries.length === 0)
         return;
@@ -801,7 +485,7 @@ var TTSCache = class {
       }
       if (imported > 0) {
         const backupPath = `${this.metadataFile}.migrated`;
-        fs5.renameSync(this.metadataFile, backupPath);
+        fs3.renameSync(this.metadataFile, backupPath);
         this.logger.debug(`Migrated ${imported} JSON cache entries to SQLite`);
       }
     } catch (error) {
@@ -811,21 +495,21 @@ var TTSCache = class {
   migrateLegacySqliteIfNeeded() {
     if (!this.db)
       return;
-    const legacyMetadataPath = path5.join(this.cacheDir, "metadata.sqlite");
-    const legacyKeyvPath = path5.join(this.cacheDir, "tts-cache.sqlite");
+    const legacyMetadataPath = path3.join(this.cacheDir, "metadata.sqlite");
+    const legacyKeyvPath = path3.join(this.cacheDir, "tts-cache.sqlite");
     this.importLegacyMetadataDb(legacyMetadataPath);
     this.importLegacyKeyvDb(legacyKeyvPath);
   }
   importStoredEntry(cacheKey, entry) {
     if (!this.db || this.getSqliteEntry(cacheKey))
       return false;
-    if (!entry.audioFilePath || !fs5.existsSync(entry.audioFilePath))
+    if (!entry.audioFilePath || !fs3.existsSync(entry.audioFilePath))
       return false;
     this.upsertSqliteEntry(cacheKey, entry);
     return true;
   }
   importLegacyMetadataDb(legacyPath) {
-    if (!this.db || !fs5.existsSync(legacyPath))
+    if (!this.db || !fs3.existsSync(legacyPath))
       return;
     try {
       const legacy = openBuiltinSqlite(legacyPath);
@@ -860,7 +544,7 @@ var TTSCache = class {
         }
       }
       if (imported > 0) {
-        fs5.renameSync(legacyPath, `${legacyPath}.migrated`);
+        fs3.renameSync(legacyPath, `${legacyPath}.migrated`);
         this.logger.debug(`Migrated ${imported} entries from legacy metadata.sqlite`);
       }
     } catch (error) {
@@ -868,7 +552,7 @@ var TTSCache = class {
     }
   }
   importLegacyKeyvDb(legacyPath) {
-    if (!this.db || !fs5.existsSync(legacyPath))
+    if (!this.db || !fs3.existsSync(legacyPath))
       return;
     try {
       const legacy = openBuiltinSqlite(legacyPath);
@@ -886,18 +570,18 @@ var TTSCache = class {
           continue;
         if (parsed.expires && Date.now() > parsed.expires)
           continue;
-        if (!fs5.existsSync(entry.audioFilePath))
+        if (!fs3.existsSync(entry.audioFilePath))
           continue;
         const storedEntry = {
           ...entry,
-          fileSize: fs5.statSync(entry.audioFilePath).size
+          fileSize: fs3.statSync(entry.audioFilePath).size
         };
         if (this.importStoredEntry(cacheKey, storedEntry)) {
           imported++;
         }
       }
       if (imported > 0) {
-        fs5.renameSync(legacyPath, `${legacyPath}.migrated`);
+        fs3.renameSync(legacyPath, `${legacyPath}.migrated`);
         this.logger.debug(`Migrated ${imported} entries from legacy tts-cache.sqlite`);
       }
     } catch (error) {
@@ -911,8 +595,8 @@ var TTSCache = class {
   }
   loadJsonMetadata() {
     try {
-      if (fs5.existsSync(this.metadataFile)) {
-        const data = JSON.parse(fs5.readFileSync(this.metadataFile, "utf8"));
+      if (fs3.existsSync(this.metadataFile)) {
+        const data = JSON.parse(fs3.readFileSync(this.metadataFile, "utf8"));
         this.jsonEntries = data.entries || {};
       } else {
         this.jsonEntries = {};
@@ -926,13 +610,13 @@ var TTSCache = class {
   saveJsonMetadata() {
     const data = { version: 1, entries: this.jsonEntries };
     const tempFile = `${this.metadataFile}.tmp`;
-    fs5.writeFileSync(tempFile, JSON.stringify(data, null, 2));
-    fs5.renameSync(tempFile, this.metadataFile);
+    fs3.writeFileSync(tempFile, JSON.stringify(data, null, 2));
+    fs3.renameSync(tempFile, this.metadataFile);
   }
   loadStats() {
     try {
-      if (fs5.existsSync(this.statsFile)) {
-        const stats = JSON.parse(fs5.readFileSync(this.statsFile, "utf8"));
+      if (fs3.existsSync(this.statsFile)) {
+        const stats = JSON.parse(fs3.readFileSync(this.statsFile, "utf8"));
         this.cacheHits = stats.cacheHits || 0;
         this.cacheMisses = stats.cacheMisses || 0;
       }
@@ -942,7 +626,7 @@ var TTSCache = class {
   }
   saveStats() {
     try {
-      fs5.writeFileSync(this.statsFile, JSON.stringify({
+      fs3.writeFileSync(this.statsFile, JSON.stringify({
         cacheHits: this.cacheHits,
         cacheMisses: this.cacheMisses,
         timestamp: Date.now()
@@ -1097,8 +781,8 @@ var TTSCache = class {
   }
   deleteEntry(cacheKey, entry) {
     const resolved = entry || (this.useJsonFallback ? this.jsonEntries[cacheKey] : this.getSqliteEntry(cacheKey));
-    if (resolved?.audioFilePath && fs5.existsSync(resolved.audioFilePath)) {
-      fs5.unlinkSync(resolved.audioFilePath);
+    if (resolved?.audioFilePath && fs3.existsSync(resolved.audioFilePath)) {
+      fs3.unlinkSync(resolved.audioFilePath);
     }
     if (this.useJsonFallback) {
       delete this.jsonEntries[cacheKey];
@@ -1273,7 +957,7 @@ var TTSCache = class {
       if (entry && this.isValidEntry(entry)) {
         if (this.isExpired(entry)) {
           this.deleteEntry(key, entry);
-        } else if (fs5.existsSync(entry.audioFilePath)) {
+        } else if (fs3.existsSync(entry.audioFilePath)) {
           this.cacheHits++;
           this.saveStats();
           return entry;
@@ -1291,8 +975,8 @@ var TTSCache = class {
   async set(key, entry, audioBuffer, options) {
     try {
       const extension = options?.extension || detectAudioExtension(audioBuffer);
-      const audioFilePath = path5.join(this.cacheDir, `${key}.${extension}`);
-      fs5.writeFileSync(audioFilePath, audioBuffer);
+      const audioFilePath = path3.join(this.cacheDir, `${key}.${extension}`);
+      fs3.writeFileSync(audioFilePath, audioBuffer);
       const timestamp = Date.now();
       const storedEntry = {
         ...entry,
@@ -1401,9 +1085,9 @@ var TTSCache = class {
   }
   async clear() {
     try {
-      for (const file of fs5.readdirSync(this.cacheDir)) {
+      for (const file of fs3.readdirSync(this.cacheDir)) {
         if (file.endsWith(".mp3") || file.endsWith(".wav")) {
-          fs5.unlinkSync(path5.join(this.cacheDir, file));
+          fs3.unlinkSync(path3.join(this.cacheDir, file));
         }
       }
       if (this.useJsonFallback) {
@@ -1437,8 +1121,8 @@ var TTSCache = class {
       for (const row of oldEntries) {
         const cacheKey = row.cache_key;
         const filePath = row.file_path;
-        if (fs5.existsSync(filePath)) {
-          fs5.unlinkSync(filePath);
+        if (fs3.existsSync(filePath)) {
+          fs3.unlinkSync(filePath);
         }
         this.deleteSqliteEntry(cacheKey);
       }
@@ -1446,9 +1130,10 @@ var TTSCache = class {
       console.warn("Cache cleanup error:", error);
     }
   }
-  generateCacheKey(text, provider, voice, rate) {
+  generateCacheKey(text, provider, voice, rate, instructions) {
     const normalizedText = text.trim().toLowerCase();
-    const keyData = `${normalizedText}|${provider}|${voice}|${rate}`;
+    const normalizedInstructions = instructions?.trim() || "";
+    const keyData = `${normalizedText}|${provider}|${voice}|${rate}|${normalizedInstructions}`;
     return (0, import_uuid.v5)(keyData, "6ba7b810-9dad-11d1-80b4-00c04fd430c8");
   }
   getCacheDir() {
@@ -1472,42 +1157,12 @@ var TTSCache = class {
   }
 };
 
-// src/hud.ts
-var import_fs = require("fs");
-var import_fs2 = require("fs");
-var HUD_PIPE_PATH = "/tmp/speakeasy-hud.fifo";
-function writeToPipe(message) {
-  if (!(0, import_fs2.existsSync)(HUD_PIPE_PATH)) {
-    return;
-  }
-  try {
-    const stats = (0, import_fs2.statSync)(HUD_PIPE_PATH);
-    if (!stats.isFIFO()) {
-      return;
-    }
-    const fd = (0, import_fs.openSync)(HUD_PIPE_PATH, import_fs.constants.O_WRONLY | import_fs.constants.O_NONBLOCK);
-    try {
-      const jsonMessage = JSON.stringify(message) + "\n";
-      (0, import_fs.writeSync)(fd, jsonMessage);
-    } finally {
-      (0, import_fs.closeSync)(fd);
-    }
-  } catch {
-  }
-}
-function notifyHUD(message) {
-  writeToPipe(message);
-}
-function updateAudioLevel(level) {
-  writeToPipe({ audioLevel: Math.max(0, Math.min(1, level)) });
-}
-
 // src/history.ts
-var fs6 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var fs4 = __toESM(require("fs"));
+var path4 = __toESM(require("path"));
 var import_uuid2 = require("uuid");
-var CONFIG_DIR = path6.join(require("os").homedir(), ".config", "speakeasy");
-var HISTORY_DIR = path6.join(CONFIG_DIR, "history");
+var CONFIG_DIR = path4.join(require("os").homedir(), ".config", "speakeasy");
+var HISTORY_DIR = path4.join(CONFIG_DIR, "history");
 function getWeekNumber(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -1519,7 +1174,7 @@ function getWeekNumber(date) {
 function getHistoryFile(date = /* @__PURE__ */ new Date()) {
   const { year, week } = getWeekNumber(date);
   const weekStr = week.toString().padStart(2, "0");
-  return path6.join(HISTORY_DIR, `history-${year}-W${weekStr}.json`);
+  return path4.join(HISTORY_DIR, `history-${year}-W${weekStr}.json`);
 }
 var NotificationHistory = class {
   entries = [];
@@ -1530,14 +1185,14 @@ var NotificationHistory = class {
     this.load();
   }
   ensureDir() {
-    if (!fs6.existsSync(HISTORY_DIR)) {
-      fs6.mkdirSync(HISTORY_DIR, { recursive: true });
+    if (!fs4.existsSync(HISTORY_DIR)) {
+      fs4.mkdirSync(HISTORY_DIR, { recursive: true });
     }
   }
   load() {
     try {
-      if (fs6.existsSync(this.currentFile)) {
-        const data = fs6.readFileSync(this.currentFile, "utf8");
+      if (fs4.existsSync(this.currentFile)) {
+        const data = fs4.readFileSync(this.currentFile, "utf8");
         this.entries = JSON.parse(data);
       }
     } catch (error) {
@@ -1553,7 +1208,7 @@ var NotificationHistory = class {
     }
     try {
       this.ensureDir();
-      fs6.writeFileSync(this.currentFile, JSON.stringify(this.entries, null, 2));
+      fs4.writeFileSync(this.currentFile, JSON.stringify(this.entries, null, 2));
     } catch (error) {
       console.warn("Failed to save history:", error);
     }
@@ -1585,12 +1240,12 @@ var NotificationHistory = class {
   getAllHistory() {
     const allEntries = [];
     try {
-      if (!fs6.existsSync(HISTORY_DIR))
+      if (!fs4.existsSync(HISTORY_DIR))
         return allEntries;
-      const files = fs6.readdirSync(HISTORY_DIR).filter((f) => f.startsWith("history-") && f.endsWith(".json")).sort().reverse();
+      const files = fs4.readdirSync(HISTORY_DIR).filter((f) => f.startsWith("history-") && f.endsWith(".json")).sort().reverse();
       for (const file of files) {
         try {
-          const data = fs6.readFileSync(path6.join(HISTORY_DIR, file), "utf8");
+          const data = fs4.readFileSync(path4.join(HISTORY_DIR, file), "utf8");
           const entries = JSON.parse(data);
           allEntries.push(...entries);
         } catch {
@@ -1613,50 +1268,577 @@ function getHistory() {
   return historyInstance;
 }
 
-// src/index.ts
-function playAudioWithLevels(audioFile, volume = 1) {
-  return new Promise((resolve, reject) => {
-    const volumeArgs = volume !== 1 ? ["-v", volume.toString()] : [];
-    const afplay = (0, import_child_process6.spawn)("afplay", [...volumeArgs, audioFile]);
-    let levelInterval = null;
-    let phase = 0;
-    const startLevelSimulation = () => {
-      levelInterval = setInterval(() => {
-        const base = 0.4 + Math.sin(phase * 0.3) * 0.2;
-        const variation = Math.random() * 0.3;
-        const level = Math.min(1, Math.max(0, base + variation));
-        updateAudioLevel(level);
-        phase++;
-      }, 33);
-    };
-    const stopLevelSimulation = () => {
-      if (levelInterval) {
-        clearInterval(levelInterval);
-        levelInterval = null;
+// src/providers/openai.ts
+var OpenAIProvider = class {
+  id = "openai";
+  capabilities = {
+    cacheable: true,
+    instructions: true,
+    silent: true
+  };
+  apiKey;
+  voice;
+  instructions;
+  constructor(apiKey = "", voice = "nova", instructions) {
+    this.apiKey = apiKey;
+    this.voice = voice;
+    this.instructions = instructions;
+  }
+  async synthesize(request) {
+    if (!this.apiKey) {
+      throw new Error("OpenAI API key is required");
+    }
+    const instructions = request.instructions || this.instructions;
+    if (instructions) {
+      return this.synthesizeWithInstructions(request, instructions);
+    }
+    try {
+      const response = await fetch("https://api.openai.com/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "tts-1",
+          voice: request.voice || this.voice,
+          input: request.text,
+          speed: request.rate / 200
+        })
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error(
+            "OpenAI API error: Invalid API key. Check your OPENAI_API_KEY environment variable."
+          );
+        }
+        if (response.status === 429) {
+          throw new Error(
+            "OpenAI API error: Rate limit exceeded. Try again later or reduce request frequency."
+          );
+        }
+        throw new Error(
+          `OpenAI API error: ${response.status}. Check your API key and rate limits.`
+        );
       }
-      updateAudioLevel(0);
-    };
-    startLevelSimulation();
-    afplay.on("close", (code) => {
-      stopLevelSimulation();
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`afplay exited with code ${code}`));
+      const audioBuffer = await response.arrayBuffer();
+      return {
+        audio: Buffer.from(audioBuffer),
+        format: "mp3",
+        model: "tts-1"
+      };
+    } catch (error) {
+      throw new Error(`OpenAI TTS failed: ${error}`);
+    }
+  }
+  async synthesizeWithInstructions(request, instructions) {
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-audio-preview",
+          modalities: ["text", "audio"],
+          audio: {
+            voice: request.voice || this.voice,
+            format: "mp3"
+          },
+          messages: [
+            { role: "system", content: instructions },
+            { role: "user", content: request.text }
+          ]
+        })
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error(
+            "OpenAI API error: Invalid API key. Check your OPENAI_API_KEY environment variable."
+          );
+        }
+        if (response.status === 429) {
+          throw new Error(
+            "OpenAI API error: Rate limit exceeded. Try again later or reduce request frequency."
+          );
+        }
+        const errorBody = await response.text();
+        throw new Error(`OpenAI API error: ${response.status}. ${errorBody}`);
       }
-    });
-    afplay.on("error", (err) => {
-      stopLevelSimulation();
-      reject(err);
-    });
-  });
+      const data = await response.json();
+      const audioData = data.choices?.[0]?.message?.audio?.data;
+      if (!audioData) {
+        throw new Error("No audio data in OpenAI response");
+      }
+      return {
+        audio: Buffer.from(audioData, "base64"),
+        format: "mp3",
+        model: "gpt-4o-audio-preview"
+      };
+    } catch (error) {
+      throw new Error(`OpenAI TTS with instructions failed: ${error}`);
+    }
+  }
+  validate() {
+    return !!(this.apiKey && this.apiKey.length > 10);
+  }
+  formatError(error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Invalid API key")) {
+      return "\u{1F511} Invalid OpenAI API key. Get yours at: https://platform.openai.com/api-keys";
+    }
+    if (message.includes("Rate limit")) {
+      return '\u23F0 OpenAI rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
+    }
+    return `OpenAI TTS failed: ${message}`;
+  }
+  validateConfig() {
+    return this.validate();
+  }
+  getErrorMessage(error) {
+    return this.formatError(error);
+  }
+  async generateAudio(config) {
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    return result.audio;
+  }
+  async speak(config) {
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    await playTTSResult(result, config.volume ?? 0.7, config.tempDir);
+  }
+};
+
+// src/providers/elevenlabs.ts
+var ElevenLabsProvider = class {
+  id = "elevenlabs";
+  capabilities = {
+    cacheable: true,
+    instructions: false,
+    silent: true
+  };
+  apiKey;
+  voiceId;
+  constructor(apiKey = "", voiceId = "EXAVITQu4vr4xnSDxMaL") {
+    this.apiKey = apiKey;
+    this.voiceId = voiceId;
+  }
+  async synthesize(request) {
+    if (!this.apiKey) {
+      throw new Error("ElevenLabs API key is required");
+    }
+    const BALANCED = 0.5;
+    const NATURAL = 0.5;
+    try {
+      const voiceId = request.voice || this.voiceId;
+      const response = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": this.apiKey
+          },
+          body: JSON.stringify({
+            text: request.text,
+            model_id: "eleven_multilingual_v2",
+            voice_settings: {
+              stability: BALANCED,
+              similarity_boost: NATURAL
+            }
+          })
+        }
+      );
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        if (response.status === 401) {
+          if (errorBody.includes("model_deprecated")) {
+            throw new Error("ElevenLabs API error: Model deprecated - updating to newer model");
+          }
+          throw new Error("ElevenLabs API error: Invalid API key");
+        }
+        if (response.status === 429) {
+          throw new Error("ElevenLabs API error: Rate limit exceeded");
+        }
+        if (response.status === 403) {
+          throw new Error(
+            "ElevenLabs API error: Access forbidden - check your API key permissions"
+          );
+        }
+        if (response.status === 422) {
+          throw new Error(
+            "ElevenLabs API error: Invalid voice ID or parameters - check your configuration"
+          );
+        }
+        if (response.status === 404) {
+          throw new Error(
+            `ElevenLabs API error: Voice ID "${voiceId}" not found. Use a valid voice ID (e.g., EXAVITQu4vr4xnSDxMaL) not a voice name`
+          );
+        }
+        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+      }
+      const audioBuffer = await response.arrayBuffer();
+      return {
+        audio: Buffer.from(audioBuffer),
+        format: "mp3",
+        model: "eleven_multilingual_v2"
+      };
+    } catch (error) {
+      throw new Error(`ElevenLabs TTS failed: ${error}`);
+    }
+  }
+  validate() {
+    return !!(this.apiKey && this.apiKey.length > 10);
+  }
+  formatError(error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Invalid API key")) {
+      return "\u{1F511} Invalid ElevenLabs API key. Get yours at: https://elevenlabs.io/app/settings/api-keys";
+    }
+    if (message.includes("Access forbidden")) {
+      return "\u{1F512} ElevenLabs access forbidden. Ensure your API key has TTS permissions";
+    }
+    if (message.includes("Rate limit")) {
+      return '\u23F0 ElevenLabs rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
+    }
+    if (message.includes("not found")) {
+      return '\u{1F50A} Invalid ElevenLabs voice ID. Use a voice ID like "EXAVITQu4vr4xnSDxMaL", not a name like "nova". Find voice IDs at: https://elevenlabs.io/app/voice-library';
+    }
+    return `ElevenLabs TTS failed: ${message}`;
+  }
+  validateConfig() {
+    return this.validate();
+  }
+  getErrorMessage(error) {
+    return this.formatError(error);
+  }
+  async generateAudio(config) {
+    const result = await this.synthesize(toTTSRequest(config, this.voiceId));
+    return result.audio;
+  }
+  async speak(config) {
+    const result = await this.synthesize(toTTSRequest(config, this.voiceId));
+    await playTTSResult(result, config.volume ?? 0.7, config.tempDir);
+  }
+};
+
+// src/providers/groq.ts
+var GroqProvider = class {
+  id = "groq";
+  capabilities = {
+    cacheable: true,
+    instructions: false,
+    silent: true
+  };
+  apiKey;
+  voice;
+  constructor(apiKey = "", voice = "tara") {
+    this.apiKey = apiKey;
+    this.voice = voice;
+  }
+  async synthesize(request) {
+    if (!this.apiKey) {
+      throw new Error("Groq API key is required");
+    }
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "canopylabs/orpheus-v1-english",
+          voice: request.voice || this.voice,
+          input: request.text
+        })
+      });
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        if (response.status === 401) {
+          throw new Error("Groq API error: Invalid API key");
+        }
+        if (response.status === 429) {
+          throw new Error("Groq API error: Rate limit exceeded");
+        }
+        if (response.status === 400) {
+          throw new Error(
+            `Groq API error: Bad request - ${errorBody || "check voice name and parameters"}`
+          );
+        }
+        throw new Error(`Groq API error: ${response.status} - ${errorBody}`);
+      }
+      const audioBuffer = await response.arrayBuffer();
+      return {
+        audio: Buffer.from(audioBuffer),
+        format: "mp3",
+        model: "canopylabs/orpheus-v1-english"
+      };
+    } catch (error) {
+      throw new Error(`Groq TTS failed: ${error}`);
+    }
+  }
+  validate() {
+    return !!(this.apiKey && this.apiKey.length > 10);
+  }
+  formatError(error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Invalid API key")) {
+      return "\u{1F511} Invalid Groq API key. Get yours at: https://console.groq.com/keys";
+    }
+    if (message.includes("Rate limit")) {
+      return '\u23F0 Groq rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
+    }
+    return `Groq TTS failed: ${message}`;
+  }
+  validateConfig() {
+    return this.validate();
+  }
+  getErrorMessage(error) {
+    return this.formatError(error);
+  }
+  async generateAudio(config) {
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    return result.audio;
+  }
+  async speak(config) {
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    await playTTSResult(result, config.volume ?? 0.7, config.tempDir);
+  }
+};
+
+// src/providers/gemini.ts
+var GeminiProvider = class {
+  id = "gemini";
+  capabilities = {
+    cacheable: true,
+    instructions: false,
+    silent: true
+  };
+  apiKey;
+  model;
+  voiceName;
+  constructor(apiKey = "", model = "gemini-2.5-flash-preview-tts", voiceName = "Puck") {
+    this.apiKey = apiKey;
+    this.model = model;
+    this.voiceName = voiceName;
+  }
+  async synthesize(request) {
+    if (!this.apiKey) {
+      throw new Error("Gemini API key is required");
+    }
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: request.text }]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: request.voice || this.voiceName
+                  }
+                }
+              }
+            }
+          })
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.text();
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const error = JSON.parse(errorData);
+          errorMessage = error.error?.message || errorMessage;
+        } catch {
+        }
+        if (response.status === 429) {
+          throw new Error("Rate limit exceeded");
+        }
+        if (response.status === 401 || response.status === 403) {
+          throw new Error("Invalid API key");
+        }
+        throw new Error(errorMessage);
+      }
+      const data = await response.json();
+      if (data.candidates && data.candidates[0]?.content?.parts?.[0]) {
+        const part = data.candidates[0].content.parts[0];
+        if ("inlineData" in part && part.inlineData) {
+          const audioData = part.inlineData.data;
+          const mimeType = part.inlineData.mimeType || "audio/wav";
+          const buffer = Buffer.from(audioData, "base64");
+          if (mimeType.includes("wav")) {
+            return { audio: buffer, format: "wav", model: this.model };
+          }
+          return {
+            audio: this.convertToWav(buffer, mimeType),
+            format: "wav",
+            model: this.model
+          };
+        }
+      }
+      throw new Error("No audio content received from Gemini API");
+    } catch (error) {
+      if (error.message?.includes("API key") || error.message?.includes("Invalid API key")) {
+        throw new Error(
+          "Gemini API error: Invalid API key. Check your GEMINI_API_KEY environment variable."
+        );
+      }
+      if (error.message?.includes("quota") || error.message?.includes("rate") || error.message?.includes("Rate limit")) {
+        throw new Error(
+          "Gemini API error: Rate limit exceeded. Try again later or reduce request frequency."
+        );
+      }
+      if (error.message?.includes("model")) {
+        throw new Error(
+          `Gemini API error: Model '${this.model}' may not support audio generation. Try 'gemini-2.5-flash-preview-tts' or check available models.`
+        );
+      }
+      throw new Error(`Gemini TTS failed: ${error.message || error}`);
+    }
+  }
+  convertToWav(rawData, mimeType) {
+    const options = this.parseMimeType(mimeType);
+    const wavHeader = this.createWavHeader(rawData.length, options);
+    return Buffer.concat([wavHeader, rawData]);
+  }
+  parseMimeType(mimeType) {
+    const [fileType, ...params] = mimeType.split(";").map((s) => s.trim());
+    const [, format] = fileType.split("/");
+    const options = {
+      numChannels: 1,
+      sampleRate: 24e3,
+      bitsPerSample: 16
+    };
+    if (format && format.startsWith("L")) {
+      const bits = parseInt(format.slice(1), 10);
+      if (!isNaN(bits)) {
+        options.bitsPerSample = bits;
+      }
+    }
+    for (const param of params) {
+      const [key, value] = param.split("=").map((s) => s.trim());
+      if (key === "rate") {
+        const rate = parseInt(value, 10);
+        if (!isNaN(rate)) {
+          options.sampleRate = rate;
+        }
+      }
+    }
+    return options;
+  }
+  createWavHeader(dataLength, options) {
+    const { numChannels, sampleRate, bitsPerSample } = options;
+    const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+    const blockAlign = numChannels * bitsPerSample / 8;
+    const buffer = Buffer.alloc(44);
+    buffer.write("RIFF", 0);
+    buffer.writeUInt32LE(36 + dataLength, 4);
+    buffer.write("WAVE", 8);
+    buffer.write("fmt ", 12);
+    buffer.writeUInt32LE(16, 16);
+    buffer.writeUInt16LE(1, 20);
+    buffer.writeUInt16LE(numChannels, 22);
+    buffer.writeUInt32LE(sampleRate, 24);
+    buffer.writeUInt32LE(byteRate, 28);
+    buffer.writeUInt16LE(blockAlign, 32);
+    buffer.writeUInt16LE(bitsPerSample, 34);
+    buffer.write("data", 36);
+    buffer.writeUInt32LE(dataLength, 40);
+    return buffer;
+  }
+  validate() {
+    return !!(this.apiKey && this.apiKey.length > 10);
+  }
+  formatError(error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Invalid API key")) {
+      return "\u{1F511} Invalid Gemini API key. Get yours at: https://aistudio.google.com/apikey";
+    }
+    if (message.includes("Rate limit") || message.includes("quota")) {
+      return '\u23F0 Gemini rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
+    }
+    if (message.includes("model")) {
+      return "\u274C Model not supported for audio. Try using gemini-2.5-flash-preview-tts or check available models.";
+    }
+    return `Gemini TTS failed: ${message}`;
+  }
+  validateConfig() {
+    return this.validate();
+  }
+  getErrorMessage(error) {
+    return this.formatError(error);
+  }
+  async generateAudio(config) {
+    const result = await this.synthesize(toTTSRequest(config, this.model));
+    return result.audio;
+  }
+  async speak(config) {
+    const result = await this.synthesize(toTTSRequest(config, this.model));
+    await playTTSResult(result, config.volume ?? 0.7, config.tempDir);
+  }
+};
+
+// src/adapters/registry.ts
+var PROVIDER_ORDER = [
+  "system",
+  "openai",
+  "elevenlabs",
+  "groq",
+  "gemini"
+];
+function createAdapterRegistry(config) {
+  const registry = /* @__PURE__ */ new Map();
+  registry.set("system", new SystemProvider(config.systemVoice || getBestVoice()));
+  registry.set(
+    "openai",
+    new OpenAIProvider(
+      config.apiKeys?.openai || "",
+      config.openaiVoice || "nova",
+      config.instructions
+    )
+  );
+  registry.set(
+    "elevenlabs",
+    new ElevenLabsProvider(
+      config.apiKeys?.elevenlabs || "",
+      config.elevenlabsVoiceId || "EXAVITQu4vr4xnSDxMaL"
+    )
+  );
+  registry.set(
+    "groq",
+    new GroqProvider(config.apiKeys?.groq || "", config.groqVoice || "tara")
+  );
+  registry.set(
+    "gemini",
+    new GeminiProvider(
+      config.apiKeys?.gemini || "",
+      config.geminiModel || "gemini-2.5-flash-preview-tts"
+    )
+  );
+  return registry;
 }
-var CONFIG_DIR2 = path7.join(require("os").homedir(), ".config", "speakeasy");
-var CONFIG_FILE = path7.join(CONFIG_DIR2, "settings.json");
+
+// src/index.ts
+var CONFIG_DIR2 = path5.join(require("os").homedir(), ".config", "speakeasy");
+var CONFIG_FILE = path5.join(CONFIG_DIR2, "settings.json");
 function loadGlobalConfig() {
   try {
-    if (fs7.existsSync(CONFIG_FILE)) {
-      const configData = fs7.readFileSync(CONFIG_FILE, "utf8");
+    if (fs5.existsSync(CONFIG_FILE)) {
+      const configData = fs5.readFileSync(CONFIG_FILE, "utf8");
       return JSON.parse(configData);
     }
   } catch (error) {
@@ -1667,9 +1849,21 @@ function loadGlobalConfig() {
 function cleanTextForSpeech(text) {
   return text.replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, "").replace(/[^\w\s.,!?'-]/g, " ").replace(/\s+/g, " ").trim();
 }
+var API_KEY_HELP = {
+  openai: "export OPENAI_API_KEY=your_key_here",
+  elevenlabs: "export ELEVENLABS_API_KEY=your_key_here",
+  groq: "export GROQ_API_KEY=your_key_here",
+  gemini: "export GEMINI_API_KEY=your_key_here"
+};
+var API_KEY_URLS = {
+  openai: "https://platform.openai.com/api-keys",
+  elevenlabs: "https://elevenlabs.io/app/settings/api-keys",
+  groq: "https://console.groq.com/keys",
+  gemini: "https://makersuite.google.com/app/apikey"
+};
 var SpeakEasy = class {
   config;
-  providers;
+  adapters;
   isPlaying = false;
   queue = [];
   cache;
@@ -1703,26 +1897,14 @@ var SpeakEasy = class {
     const cacheEnabled = cacheConfig?.enabled ?? (hasApiKeys && this.config.provider !== "system");
     this.useCache = cacheEnabled;
     if (this.useCache) {
-      const cacheDir = cacheConfig?.dir || path7.join(this.config.tempDir || "/tmp", "speakeasy-cache");
-      this.cache = new TTSCache(
-        cacheDir,
-        cacheConfig?.ttl || "7d",
-        cacheConfig?.maxSize
-      );
+      const cacheDir = cacheConfig?.dir || path5.join(this.config.tempDir || "/tmp", "speakeasy-cache");
+      this.cache = new TTSCache(cacheDir, cacheConfig?.ttl || "7d", cacheConfig?.maxSize);
     }
-    this.providers = /* @__PURE__ */ new Map();
-    this.initializeProviders();
+    this.adapters = createAdapterRegistry(this.config);
     this.debug = this.config.debug || false;
     if (this.debug) {
       this.printConfigDiagnostics();
     }
-  }
-  initializeProviders() {
-    this.providers.set("system", new SystemProvider(this.config.systemVoice || "Samantha"));
-    this.providers.set("openai", new OpenAIProvider(this.config.apiKeys?.openai || "", this.config.openaiVoice || "nova", this.config.instructions));
-    this.providers.set("elevenlabs", new ElevenLabsProvider(this.config.apiKeys?.elevenlabs || "", this.config.elevenlabsVoiceId || "EXAVITQu4vr4xnSDxMaL"));
-    this.providers.set("groq", new GroqProvider(this.config.apiKeys?.groq || "", this.config.groqVoice || "tara"));
-    this.providers.set("gemini", new GeminiProvider(this.config.apiKeys?.gemini || "", this.config.geminiModel || "gemini-2.5-flash-preview-tts"));
   }
   async speak(text, options = {}) {
     const cleanText = cleanTextForSpeech(text);
@@ -1757,210 +1939,120 @@ var SpeakEasy = class {
     }
   }
   async speakText(text, options = {}) {
-    const requestedProvider = this.config.provider || "system";
+    const requestedId = this.config.provider || "system";
     const silent = options.silent || false;
     if (this.debug) {
-      console.log(`\u{1F50D} Requested provider: ${requestedProvider}`);
+      console.log(`\u{1F50D} Requested provider: ${requestedId}`);
       console.log(`\u{1F50D} Text: "${text}"`);
       if (silent)
         console.log(`\u{1F507} Silent mode: audio will not be played`);
     }
-    const requestedProviderInstance = this.providers.get(requestedProvider);
-    if (requestedProvider !== "system" && requestedProviderInstance) {
-      if (!requestedProviderInstance.validateConfig()) {
-        const providerName = requestedProvider.charAt(0).toUpperCase() + requestedProvider.slice(1);
-        let envVarHelp = "";
-        switch (requestedProvider) {
-          case "openai":
-            envVarHelp = "export OPENAI_API_KEY=your_key_here";
-            break;
-          case "elevenlabs":
-            envVarHelp = "export ELEVENLABS_API_KEY=your_key_here";
-            break;
-          case "groq":
-            envVarHelp = "export GROQ_API_KEY=your_key_here";
-            break;
-          case "gemini":
-            envVarHelp = "export GEMINI_API_KEY=your_key_here";
-            break;
-        }
-        throw new Error(
-          `${providerName} API key is required. ${envVarHelp ? `Run: ${envVarHelp}` : ""}`
-        );
-      }
+    const requestedAdapter = this.adapters.get(requestedId);
+    if (requestedId !== "system" && requestedAdapter && !requestedAdapter.validate()) {
+      const providerName = requestedId.charAt(0).toUpperCase() + requestedId.slice(1);
+      const envVarHelp = API_KEY_HELP[requestedId];
+      throw new Error(
+        `${providerName} API key is required.${envVarHelp ? ` Run: ${envVarHelp}` : ""}`
+      );
     }
-    const providers = ["system", "openai", "elevenlabs", "groq", "gemini"];
     let lastError = null;
-    for (const providerName of providers) {
-      if (providerName === requestedProvider || lastError) {
-        try {
-          const provider = this.providers.get(providerName);
-          if (provider && provider.validateConfig()) {
-            const voice = this.getVoiceForProvider(providerName);
-            const rate = this.config.rate || 180;
-            const volume = this.config.volume !== void 0 ? this.config.volume : 0.7;
-            const tempDir = this.config.tempDir || "/tmp";
+    for (const providerId of PROVIDER_ORDER) {
+      if (providerId !== requestedId && !lastError)
+        continue;
+      const adapter = this.adapters.get(providerId);
+      if (!adapter?.validate())
+        continue;
+      try {
+        const request = this.buildRequest(text, providerId);
+        if (this.debug) {
+          console.log(`\u2705 Using provider: ${providerId}`);
+          console.log(`\u{1F399}\uFE0F  Voice/model: ${request.voice}`);
+          console.log(`\u26A1 Rate: ${request.rate} WPM`);
+          console.log(`\u{1F50A} Volume: ${(request.volume * 100).toFixed(0)}%`);
+        }
+        if (this.useCache && adapter.capabilities.cacheable && this.cache) {
+          const cacheKey = this.cache.generateCacheKey(
+            text,
+            providerId,
+            request.voice,
+            request.rate,
+            adapter.capabilities.instructions ? request.instructions : void 0
+          );
+          const cachedEntry = await this.cache.get(cacheKey);
+          if (cachedEntry) {
+            console.log("(already cached)");
             if (this.debug) {
-              console.log(`\u2705 Using provider: ${providerName}`);
-              console.log(`\u{1F399}\uFE0F  Voice/model: ${voice}`);
-              console.log(`\u26A1 Rate: ${rate} WPM`);
-              console.log(`\u{1F50A} Volume: ${(volume * 100).toFixed(0)}%`);
+              console.log(`\u{1F4E6} Using cached audio from: ${cachedEntry.audioFilePath}`);
             }
-            if (this.useCache && providerName !== "system" && this.cache) {
-              const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
-              const cachedEntry = await this.cache.get(cacheKey);
-              if (cachedEntry) {
-                console.log(`(already cached)`);
-                if (this.debug) {
-                  console.log(`\u{1F4E6} Using cached audio from: ${cachedEntry.audioFilePath}`);
-                }
-                await this.sendHUDNotification(text, providerName, true);
-                if (!silent) {
-                  await this.playCachedAudio(cachedEntry.audioFilePath);
-                }
-                return;
-              }
-            }
-            let audioBuffer = null;
-            if (providerName === "system") {
-              if (silent) {
-                console.log("\u26A0\uFE0F  Silent mode not supported with system provider (no audio file generated)");
-                return;
-              }
-              if (this.debug) {
-                console.log(`\u{1F399}\uFE0F  Using system voice: ${voice}`);
-              }
-              await this.sendHUDNotification(text, providerName, false);
-              await provider.speak({
-                text,
-                rate,
-                tempDir,
-                voice,
-                volume,
-                apiKey: this.getApiKeyForProvider(providerName) || ""
-              });
-              return;
-            } else {
-              const generateMethod = provider.generateAudio;
-              if (generateMethod) {
-                audioBuffer = await generateMethod.call(provider, {
-                  text,
-                  rate,
-                  tempDir,
-                  voice,
-                  volume,
-                  apiKey: this.getApiKeyForProvider(providerName) || ""
-                });
-              } else {
-                await provider.speak({
-                  text,
-                  rate,
-                  tempDir,
-                  voice,
-                  volume,
-                  apiKey: this.getApiKeyForProvider(providerName) || ""
-                });
-                return;
-              }
-            }
-            if (this.useCache && providerName !== "system" && this.cache && audioBuffer) {
-              const cacheKey = this.cache.generateCacheKey(text, providerName, voice, rate);
-              const startTime = Date.now();
-              await this.cache.set(cacheKey, {
-                provider: providerName,
-                voice,
-                rate,
-                text
-              }, audioBuffer, {
-                model: this.inferModel(providerName),
-                durationMs: Date.now() - startTime,
-                success: true,
-                extension: providerName === "gemini" ? "wav" : void 0
-              });
-              console.log("cached");
-              await this.sendHUDNotification(text, providerName, false);
-              if (!silent) {
-                const fileExt = providerName === "gemini" ? "wav" : "mp3";
-                const tempFile = path7.join(tempDir, `speech_${Date.now()}.${fileExt}`);
-                fs7.writeFileSync(tempFile, audioBuffer);
-                await playAudioWithLevels(tempFile, volume);
-                if (fs7.existsSync(tempFile)) {
-                  fs7.unlinkSync(tempFile);
-                }
-              }
-            } else if (audioBuffer) {
-              await this.sendHUDNotification(text, providerName, false);
-              if (!silent) {
-                const fileExt = providerName === "gemini" ? "wav" : "mp3";
-                const tempFile = path7.join(tempDir, `speech_${Date.now()}.${fileExt}`);
-                if (this.debug) {
-                  console.log(`\u{1F3B5} Playing generated audio: ${tempFile}`);
-                }
-                fs7.writeFileSync(tempFile, audioBuffer);
-                await playAudioWithLevels(tempFile, volume);
-                if (fs7.existsSync(tempFile)) {
-                  fs7.unlinkSync(tempFile);
-                }
-              }
+            await this.sendHUDNotification(text, providerId, true);
+            if (!silent) {
+              await playAudioFile(cachedEntry.audioFilePath, request.volume);
             }
             return;
           }
-        } catch (error) {
-          console.warn(`${providerName} provider failed:`, error);
-          lastError = error;
-          continue;
         }
+        const startTime = Date.now();
+        const result = await adapter.synthesize(request);
+        if (this.useCache && adapter.capabilities.cacheable && this.cache) {
+          const cacheKey = this.cache.generateCacheKey(
+            text,
+            providerId,
+            request.voice,
+            request.rate,
+            adapter.capabilities.instructions ? request.instructions : void 0
+          );
+          await this.cache.set(
+            cacheKey,
+            {
+              provider: providerId,
+              voice: request.voice,
+              rate: request.rate,
+              text
+            },
+            result.audio,
+            {
+              model: result.model ?? providerId,
+              durationMs: Date.now() - startTime,
+              success: true,
+              extension: result.format
+            }
+          );
+          console.log("cached");
+        }
+        await this.sendHUDNotification(text, providerId, false);
+        if (!silent) {
+          await playTTSResult(result, request.volume, request.tempDir);
+        }
+        return;
+      } catch (error) {
+        console.warn(`${providerId} provider failed:`, error);
+        lastError = error;
       }
     }
     if (lastError) {
-      if (requestedProvider !== "system") {
-        const providerName = requestedProvider.charAt(0).toUpperCase() + requestedProvider.slice(1);
-        let helpText = "";
-        if (lastError.message.includes("API key")) {
-          switch (requestedProvider) {
-            case "openai":
-              helpText = "Get your API key: https://platform.openai.com/api-keys";
-              break;
-            case "elevenlabs":
-              helpText = "Get your API key: https://elevenlabs.io/app/settings/api-keys";
-              break;
-            case "groq":
-              helpText = "Get your API key: https://console.groq.com/keys";
-              break;
-            case "gemini":
-              helpText = "Get your API key: https://makersuite.google.com/app/apikey";
-              break;
-          }
-        }
+      if (requestedId !== "system") {
+        const providerName = requestedId.charAt(0).toUpperCase() + requestedId.slice(1);
+        const helpUrl = lastError.message.includes("API key") ? API_KEY_URLS[requestedId] : void 0;
         throw new Error(
-          `${providerName} failed: ${lastError.message}${helpText ? `
-\u{1F4A1} ${helpText}` : ""}
+          `${providerName} failed: ${lastError.message}${helpUrl ? `
+\u{1F4A1} Get your API key: ${helpUrl}` : ""}
 \u{1F5E3}\uFE0F  Try: speakeasy --text "hello world" --provider system`
         );
       }
       throw new Error(`All providers failed. Last error: ${lastError.message}`);
     }
-    if (silent) {
-      console.log("\u26A0\uFE0F  Silent mode not supported with system provider (no audio file generated)");
-      return;
-    }
-    const systemProvider = this.providers.get("system");
-    if (systemProvider) {
-      try {
-        if (this.debug) {
-          console.log(`\u{1F5E3}\uFE0F  Falling back to system voice: ${this.config.systemVoice || "Samantha"}`);
-        }
-        await systemProvider.speak({
-          text,
-          rate: this.config.rate || 180,
-          tempDir: this.config.tempDir || "/tmp",
-          voice: this.config.systemVoice || "Samantha",
-          volume: this.config.volume !== void 0 ? this.config.volume : 0.7
-        });
-      } catch (error) {
-        throw new Error(`System voice failed: ${error}. Ensure you're on macOS.`);
-      }
-    }
+    throw new Error(`No available TTS provider. Ensure you're on macOS for system voice.`);
+  }
+  buildRequest(text, providerId) {
+    return {
+      text,
+      voice: this.getVoiceForProvider(providerId),
+      rate: this.config.rate || 180,
+      volume: this.config.volume !== void 0 ? this.config.volume : 0.7,
+      tempDir: this.config.tempDir || "/tmp",
+      apiKey: this.getApiKeyForProvider(providerId) || void 0,
+      instructions: providerId === "openai" ? this.config.instructions : void 0
+    };
   }
   printConfigDiagnostics() {
     console.log("\u{1F50D} Debug mode enabled");
@@ -1973,7 +2065,9 @@ var SpeakEasy = class {
     console.log(`   ElevenLabs Voice: ${this.config.elevenlabsVoiceId}`);
     console.log(`   Gemini Model: ${this.config.geminiModel}`);
     if (this.config.instructions) {
-      console.log(`   Instructions: "${this.config.instructions.substring(0, 50)}${this.config.instructions.length > 50 ? "..." : ""}"`);
+      console.log(
+        `   Instructions: "${this.config.instructions.substring(0, 50)}${this.config.instructions.length > 50 ? "..." : ""}"`
+      );
     }
     console.log("\u{1F511} API Key Status:");
     const providers = [
@@ -1999,10 +2093,6 @@ var SpeakEasy = class {
       console.log(`   Directory: ${this.cache.dir || "default"}`);
     }
     console.log("");
-  }
-  async playCachedAudio(audioFilePath) {
-    const volume = this.config.volume !== void 0 ? this.config.volume : 0.7;
-    await playAudioWithLevels(audioFilePath, volume);
   }
   getVoiceForProvider(provider) {
     switch (provider) {
@@ -2034,22 +2124,6 @@ var SpeakEasy = class {
         return "";
     }
   }
-  inferModel(provider) {
-    switch (provider) {
-      case "openai":
-        return "tts-1";
-      case "elevenlabs":
-        return "eleven_multilingual_v2";
-      case "groq":
-        return "tts-1-hd";
-      case "gemini":
-        return this.config.geminiModel || "gemini-2.5-flash-preview-tts";
-      case "system":
-        return "macOS-system";
-      default:
-        return provider;
-    }
-  }
   async sendHUDNotification(text, provider, cached) {
     const timestamp = Date.now();
     getHistory().add({
@@ -2062,7 +2136,6 @@ var SpeakEasy = class {
       return;
     notifyHUD({
       text: text.substring(0, 200),
-      // Limit to 200 chars for HUD display
       provider,
       cached,
       timestamp
@@ -2070,14 +2143,13 @@ var SpeakEasy = class {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   stopSpeaking() {
-    try {
-      (0, import_child_process6.execSync)('pkill -f "say|afplay"', { stdio: "ignore" });
-    } catch (error) {
-    }
+    stopPlayback();
   }
   requireCache() {
     if (!this.cache) {
-      throw new Error("Cache is not enabled. Configure cache.enabled or use an API provider with keys present.");
+      throw new Error(
+        "Cache is not enabled. Configure cache.enabled or use an API provider with keys present."
+      );
     }
     return this.cache;
   }
@@ -2133,11 +2205,16 @@ var speak = (text, options) => {
   GeminiProvider,
   GroqProvider,
   OpenAIProvider,
+  PROVIDER_ORDER,
   SpeakEasy,
   SystemProvider,
   TTSCache,
+  createAdapterRegistry,
   getAvailableVoices,
   getBestVoice,
+  playAudioFile,
+  playTTSResult,
   say,
-  speak
+  speak,
+  stopPlayback
 });

@@ -1,9 +1,16 @@
-import { execSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
 import { Provider, ProviderConfig } from '../types';
+import { TTSAdapter, TTSRequest, TTSResult } from '../adapters/types';
+import { toTTSRequest } from '../adapters/request';
+import { playTTSResult } from '../adapters/audio';
 
-export class GroqProvider implements Provider {
+export class GroqProvider implements TTSAdapter, Provider {
+  readonly id = 'groq' as const;
+  readonly capabilities = {
+    cacheable: true,
+    instructions: false,
+    silent: true,
+  };
+
   private apiKey: string;
   private voice: string;
 
@@ -12,23 +19,7 @@ export class GroqProvider implements Provider {
     this.voice = voice;
   }
 
-  async speak(config: ProviderConfig): Promise<void> {
-    const audioBuffer = await this.generateAudio(config);
-    if (audioBuffer) {
-      const tempFile = path.join(config.tempDir, `speech_${Date.now()}.mp3`);
-      fs.writeFileSync(tempFile, audioBuffer);
-      
-      const volume = config.volume !== undefined ? config.volume : 0.7;
-      const volumeFlag = volume !== 1.0 ? ` -v ${volume}` : '';
-      execSync(`afplay${volumeFlag} "${tempFile}"`);
-      
-      if (fs.existsSync(tempFile)) {
-        fs.unlinkSync(tempFile);
-      }
-    }
-  }
-
-  async generateAudio(config: ProviderConfig): Promise<Buffer | null> {
+  async synthesize(request: TTSRequest): Promise<TTSResult> {
     if (!this.apiKey) {
       throw new Error('Groq API key is required');
     }
@@ -37,13 +28,13 @@ export class GroqProvider implements Provider {
       const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           model: 'canopylabs/orpheus-v1-english',
-          voice: this.voice,
-          input: config.text,
+          voice: request.voice || this.voice,
+          input: request.text,
         }),
       });
 
@@ -51,32 +42,59 @@ export class GroqProvider implements Provider {
         const errorBody = await response.text().catch(() => '');
         if (response.status === 401) {
           throw new Error('Groq API error: Invalid API key');
-        } else if (response.status === 429) {
+        }
+        if (response.status === 429) {
           throw new Error('Groq API error: Rate limit exceeded');
-        } else if (response.status === 400) {
-          throw new Error(`Groq API error: Bad request - ${errorBody || 'check voice name and parameters'}`);
+        }
+        if (response.status === 400) {
+          throw new Error(
+            `Groq API error: Bad request - ${errorBody || 'check voice name and parameters'}`
+          );
         }
         throw new Error(`Groq API error: ${response.status} - ${errorBody}`);
       }
 
       const audioBuffer = await response.arrayBuffer();
-      return Buffer.from(audioBuffer);
+      return {
+        audio: Buffer.from(audioBuffer),
+        format: 'mp3',
+        model: 'canopylabs/orpheus-v1-english',
+      };
     } catch (error) {
       throw new Error(`Groq TTS failed: ${error}`);
     }
   }
 
-  validateConfig(): boolean {
+  validate(): boolean {
     return !!(this.apiKey && this.apiKey.length > 10);
   }
 
-  getErrorMessage(error: any): string {
-    if (error.message.includes('Invalid API key')) {
+  formatError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('Invalid API key')) {
       return '🔑 Invalid Groq API key. Get yours at: https://console.groq.com/keys';
     }
-    if (error.message.includes('Rate limit')) {
+    if (message.includes('Rate limit')) {
       return '⏰ Groq rate limit exceeded. Try again later or use system voice: `speakeasy "text" --provider system`';
     }
-    return `Groq TTS failed: ${error.message}`;
+    return `Groq TTS failed: ${message}`;
+  }
+
+  validateConfig(): boolean {
+    return this.validate();
+  }
+
+  getErrorMessage(error: unknown): string {
+    return this.formatError(error);
+  }
+
+  async generateAudio(config: ProviderConfig): Promise<Buffer | null> {
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    return result.audio;
+  }
+
+  async speak(config: ProviderConfig): Promise<void> {
+    const result = await this.synthesize(toTTSRequest(config, this.voice));
+    await playTTSResult(result, config.volume ?? 0.7, config.tempDir);
   }
 }

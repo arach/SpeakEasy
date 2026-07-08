@@ -7,10 +7,11 @@ interface ProviderConfig {
     volume?: number;
     instructions?: string;
 }
+/** @deprecated Use TTSAdapter from adapters/types instead. */
 interface Provider {
     speak(config: ProviderConfig): Promise<void>;
     validateConfig(): boolean;
-    getErrorMessage(error: any): string;
+    getErrorMessage(error: unknown): string;
 }
 interface SpeakEasyConfig {
     provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
@@ -199,7 +200,7 @@ declare class TTSCache {
         durationMs?: number;
         success?: boolean;
         errorMessage?: string;
-        extension?: 'mp3' | 'wav';
+        extension?: 'mp3' | 'wav' | 'aiff';
     }): Promise<boolean>;
     getCacheMetadata(): Promise<CacheMetadata[]>;
     findByText(text: string): Promise<CacheMetadata[]>;
@@ -225,79 +226,158 @@ declare class TTSCache {
     delete(key: string): Promise<boolean>;
     clear(): Promise<void>;
     cleanup(maxAge?: number): Promise<void>;
-    generateCacheKey(text: string, provider: string, voice: string, rate: number): string;
+    generateCacheKey(text: string, provider: string, voice: string, rate: number, instructions?: string): string;
     getCacheDir(): string;
     getEntryCount(): number;
     usesSqlite(): boolean;
     getSqliteBackend(): SqliteBackend | 'json';
 }
 
-/**
- * Get all available system voices on macOS
- */
-declare function getAvailableVoices(): string[];
-/**
- * Get the best available voice for the given language
- */
-declare function getBestVoice(language?: string): string;
-declare class SystemProvider implements Provider {
-    private voice;
-    constructor(voice?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    validateConfig(): boolean;
-    getErrorMessage(error: any): string;
+type TTSProviderId = 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
+type TTSAudioFormat = 'mp3' | 'wav' | 'aiff';
+interface TTSRequest {
+    text: string;
+    voice: string;
+    rate: number;
+    volume: number;
+    tempDir: string;
+    apiKey?: string;
+    instructions?: string;
+}
+interface TTSResult {
+    audio: Buffer;
+    format: TTSAudioFormat;
+    model?: string;
+}
+interface TTSAdapterCapabilities {
+    /** Audio can be written to the shared SQLite/file cache. */
+    cacheable: boolean;
+    /** Provider accepts steering instructions (accent, tone, etc.). */
+    instructions: boolean;
+    /** Caller can synthesize without playing (silent mode). */
+    silent: boolean;
+}
+interface TTSAdapter {
+    readonly id: TTSProviderId;
+    readonly capabilities: TTSAdapterCapabilities;
+    validate(): boolean;
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    formatError(error: unknown): string;
 }
 
-declare class OpenAIProvider implements Provider {
+declare const PROVIDER_ORDER: TTSProviderId[];
+declare function createAdapterRegistry(config: SpeakEasyConfig): Map<TTSProviderId, TTSAdapter>;
+
+declare function playAudioFile(filePath: string, volume?: number): Promise<void>;
+declare function playTTSResult(result: TTSResult, volume: number, tempDir: string): Promise<void>;
+declare function stopPlayback(): void;
+
+declare function getAvailableVoices(): string[];
+declare function getBestVoice(language?: string): string;
+declare class SystemProvider implements TTSAdapter, Provider {
+    readonly id: "system";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
+    private voice;
+    constructor(voice?: string);
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    validate(): boolean;
+    formatError(error: unknown): string;
+    validateConfig(): boolean;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
+}
+
+declare class OpenAIProvider implements TTSAdapter, Provider {
+    readonly id: "openai";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
     private apiKey;
     private voice;
     private instructions?;
     constructor(apiKey?: string, voice?: string, instructions?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
-    private generateAudioWithInstructions;
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    private synthesizeWithInstructions;
+    validate(): boolean;
+    formatError(error: unknown): string;
     validateConfig(): boolean;
-    getErrorMessage(error: any): string;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
 }
 
-declare class ElevenLabsProvider implements Provider {
+declare class ElevenLabsProvider implements TTSAdapter, Provider {
+    readonly id: "elevenlabs";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
     private apiKey;
     private voiceId;
     constructor(apiKey?: string, voiceId?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    validate(): boolean;
+    formatError(error: unknown): string;
     validateConfig(): boolean;
-    getErrorMessage(error: any): string;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
 }
 
-declare class GroqProvider implements Provider {
+declare class GroqProvider implements TTSAdapter, Provider {
+    readonly id: "groq";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
     private apiKey;
     private voice;
     constructor(apiKey?: string, voice?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    validate(): boolean;
+    formatError(error: unknown): string;
     validateConfig(): boolean;
-    getErrorMessage(error: any): string;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
 }
 
-declare class GeminiProvider implements Provider {
+declare class GeminiProvider implements TTSAdapter, Provider {
+    readonly id: "gemini";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
     private apiKey;
     private model;
     private voiceName;
     constructor(apiKey?: string, model?: string, voiceName?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    synthesize(request: TTSRequest): Promise<TTSResult>;
     private convertToWav;
     private parseMimeType;
     private createWavHeader;
+    validate(): boolean;
+    formatError(error: unknown): string;
     validateConfig(): boolean;
-    getErrorMessage(error: any): string;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
 }
 
 declare const CONFIG_FILE: string;
 declare class SpeakEasy {
     private config;
-    private providers;
+    private adapters;
     private isPlaying;
     private queue;
     private cache?;
@@ -305,15 +385,13 @@ declare class SpeakEasy {
     private debug;
     private hudEnabled;
     constructor(config: SpeakEasyConfig);
-    private initializeProviders;
     speak(text: string, options?: SpeakEasyOptions): Promise<void>;
     private processQueue;
     private speakText;
+    private buildRequest;
     private printConfigDiagnostics;
-    private playCachedAudio;
     private getVoiceForProvider;
     private getApiKeyForProvider;
-    private inferModel;
     private sendHUDNotification;
     private stopSpeaking;
     private requireCache;
@@ -330,4 +408,4 @@ declare const speak: (text: string, options?: SpeakEasyOptions & {
     volume?: number;
 }) => Promise<void>;
 
-export { CONFIG_FILE, type CacheMetadata, type CacheStats, ElevenLabsProvider, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, type Provider, type ProviderConfig, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, TTSCache, getAvailableVoices, getBestVoice, say, speak };
+export { CONFIG_FILE, type CacheMetadata, type CacheStats, ElevenLabsProvider, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, PROVIDER_ORDER, type Provider, type ProviderConfig, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, type TTSAdapter, type TTSAdapterCapabilities, type TTSAudioFormat, TTSCache, type TTSProviderId, type TTSRequest, type TTSResult, createAdapterRegistry, getAvailableVoices, getBestVoice, playAudioFile, playTTSResult, say, speak, stopPlayback };
