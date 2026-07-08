@@ -3,8 +3,6 @@ import remarkGfm from "remark-gfm"
 import rehypeSlug from "rehype-slug"
 import { CodeBlock } from "@/components/code-block"
 import { HeadingLink } from "@/components/heading-link"
-import "highlight.js/styles/github.css"
-
 function resolveDocHref(href?: string) {
   if (!href || href.startsWith("http") || href.startsWith("#")) return href
 
