@@ -14,7 +14,7 @@ export default {
       'Groq requires accepting model terms at console.groq.com before first use',
       'Cache is auto-enabled for API providers when keys are present',
       'Cache uses built-in SQLite (node:sqlite / bun:sqlite) — no native addons',
-      'Requires Node.js >= 22.5 or Bun >= 1.0 for SQLite cache',
+      'Requires Node.js >= 22.12 or Bun >= 1.0 for SQLite cache',
       'Use pnpm for package management',
     ],
 

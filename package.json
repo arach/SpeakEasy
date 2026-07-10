@@ -1,6 +1,6 @@
 {
   "name": "@arach/speakeasy",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "Convenient TTS CLI for Mac — centralized credentials + configurable caching so all your apps and agents can speak.",
   "homepage": "https://speakeasy.arach.dev",
   "repository": {
@@ -50,20 +50,27 @@
   "author": "arach",
   "license": "MIT",
   "engines": {
-    "node": ">=22.5.0",
+    "node": ">=22.12.0",
     "bun": ">=1.0.0"
   },
   "dependencies": {
-    "chalk": "^4.1.2",
-    "commander": "^11.1.0",
-    "uuid": "^11.1.0",
-    "zod": "^3.23.8"
+    "chalk": "^5.6.2",
+    "commander": "^15.0.0",
+    "uuid": "^14.0.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@arach/dewey": "^0.2.0",
     "@types/node": "^22.0.0",
-    "@types/uuid": "^10.0.0",
-    "tsup": "^7.0.0",
-    "typescript": "^5.0.0"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "rollup": ">=4.59.0",
+      "esbuild": ">=0.28.1",
+      "yaml": ">=2.8.3",
+      "picomatch@>=4": ">=4.0.4"
+    }
   }
 }

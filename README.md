@@ -118,7 +118,7 @@ await speech.speak('Build completed.');
 
 ## Requirements
 
-- **Node.js >= 22.5** or **Bun >= 1.0** (built-in SQLite)
+- **Node.js >= 22.12** or **Bun >= 1.0** (built-in SQLite)
 - **macOS** for system voice, `afplay` playback, and the companion app
 
 ## Install
