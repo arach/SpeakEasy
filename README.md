@@ -52,9 +52,12 @@ Implement `TTSAdapter` (`synthesize`, `validate`, `formatError`) and use SpeakEa
 
 Native menu-bar app: provider settings, cache management, speech history, and a floating HUD while the CLI speaks.
 
+![SpeakEasy macOS app — Dashboard with providers, volume, and speech rate](docs/images/macos-app.png)
+
 ```bash
-speakeasy --app          # install from GitHub Releases and open
+speakeasy --app          # install from GitHub Releases (if needed) and open
 speakeasy --update-app   # pull the latest signed DMG
+# both print the app version and install path (~/.speakeasy/SpeakEasy.app)
 ```
 
 Build from source: `cd app && ./build-app.sh` · release: `cd app && ./Scripts/build.sh`

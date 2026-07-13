@@ -81,8 +81,8 @@ async function run(): Promise<void> {
     .option('-s, --silent')
     .option('--set-key <provider>')
     .option('--set-default <provider>')
-    .option('--app', 'open settings app (downloads on first use)')
-    .option('--update-app', 'update the settings app')
+    .option('--app', 'open settings app (downloads on first use; prints version + path)')
+    .option('--update-app', 'update the settings app (prints version + path)')
     .option('--premium', 'use best available system voice (Premium > Enhanced > Standard)')
     .option('--list-voices', 'list available macOS system voices');
 
@@ -205,8 +205,9 @@ async function run(): Promise<void> {
       }
     }
 
-    console.log('🚀 Opening SpeakEasy settings...');
-    launchApp();
+    if (!launchApp(console.log)) {
+      process.exit(1);
+    }
     return;
   }
 

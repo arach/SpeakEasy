@@ -26,9 +26,43 @@ export function isAppInstalled(): boolean {
   return fs.existsSync(APP_PATH) && fs.existsSync(path.join(APP_PATH, 'Contents', 'MacOS', 'SpeakEasy'));
 }
 
+/** Absolute path to the installed SpeakEasy.app bundle. */
+export function getAppPath(): string {
+  return APP_PATH;
+}
+
+/**
+ * Version recorded at install time (~/.speakeasy/.app-version).
+ * Falls back to CFBundleShortVersionString from the app bundle when the tracker is missing.
+ */
 export function getInstalledVersion(): string | null {
-  if (!fs.existsSync(VERSION_FILE)) return null;
-  return fs.readFileSync(VERSION_FILE, 'utf8').trim();
+  if (fs.existsSync(VERSION_FILE)) {
+    return fs.readFileSync(VERSION_FILE, 'utf8').trim();
+  }
+  return readBundleShortVersion();
+}
+
+function readBundleShortVersion(): string | null {
+  const plist = path.join(APP_PATH, 'Contents', 'Info.plist');
+  if (!fs.existsSync(plist)) return null;
+  try {
+    const version = execSync(
+      `/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' '${plist}'`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim();
+    return version || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Emit version + install path lines after install/open/update. */
+export function reportAppLocation(onProgress?: (msg: string) => void, headline?: string): void {
+  if (!onProgress) return;
+  if (headline) onProgress(headline);
+  const version = getInstalledVersion() ?? 'unknown';
+  onProgress(`   Version: ${version}`);
+  onProgress(`   Path:    ${APP_PATH}`);
 }
 
 function ensureAppDir(): void {
@@ -224,7 +258,7 @@ export async function downloadAndInstallApp(onProgress?: (msg: string) => void):
   clearQuarantine();
   fs.writeFileSync(VERSION_FILE, release.tag_name);
 
-  onProgress?.(`✅ Installed SpeakEasy.app (${release.tag_name})`);
+  reportAppLocation(onProgress, `✅ Installed SpeakEasy.app (${release.tag_name})`);
   return true;
 }
 
@@ -237,7 +271,7 @@ export async function ensureAppInstalled(onProgress?: (msg: string) => void): Pr
   return await downloadAndInstallApp(onProgress);
 }
 
-export function launchApp(): boolean {
+export function launchApp(onProgress?: (msg: string) => void): boolean {
   if (!isAppInstalled()) {
     console.error('❌ SpeakEasy.app is not installed');
     console.error('   Run: speakeasy --app to install and launch');
@@ -246,6 +280,7 @@ export function launchApp(): boolean {
 
   try {
     spawn('open', [APP_PATH], { detached: true, stdio: 'ignore' }).unref();
+    reportAppLocation(onProgress, '🚀 Opened SpeakEasy settings app');
     return true;
   } catch (error) {
     console.error('❌ Failed to launch app:', (error as Error).message);
@@ -263,7 +298,7 @@ export async function updateApp(onProgress?: (msg: string) => void): Promise<boo
   }
 
   if (installedVersion === release.tag_name) {
-    onProgress?.(`✅ Already up to date (${installedVersion})`);
+    reportAppLocation(onProgress, `✅ Already up to date (${installedVersion})`);
     return true;
   }
 
