@@ -1,472 +1,150 @@
-# SpeakEasy 🎤
+# SpeakEasy
 
-A unified speech library for all your projects with support for multiple TTS providers and clean configuration structure.
+[![npm version](https://img.shields.io/npm/v/@arach/speakeasy.svg)](https://www.npmjs.com/package/@arach/speakeasy)
+[![license](https://img.shields.io/npm/l/@arach/speakeasy.svg)](https://github.com/arach/SpeakEasy/blob/master/package.json)
 
-## 🎉 Welcome Experience
+Convenient TTS CLI for Mac — centralized credentials + configurable caching so all your apps and agents can speak.
 
-When you first run SpeakEasy CLI, you're greeted with a professional welcome screen:
+**[speakeasy.arach.dev](https://speakeasy.arach.dev)** · **npm:** [@arach/speakeasy](https://www.npmjs.com/package/@arach/speakeasy) · **docs:** [quickstart](https://speakeasy.arach.dev/docs/quickstart)
 
-```
-+============================================================================+
-|                                                                            |
-| ███████╗██████╗ ███████╗ █████╗ ██╗  ██╗███████╗ █████╗ ███████╗██╗   ██╗ |
-| ██╔════╝██╔══██╗██╔════╝██╔══██╗██║ ██╔╝██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝ |
-| ███████╗██████╔╝█████╗  ███████║█████╔╝ █████╗  ███████║███████╗ ╚████╔╝  |
-| ╚════██║██╔═══╝ ██╔══╝  ██╔══██║██╔═██╗ ██╔══╝  ██╔══██║╚════██║  ╚██╔╝   |
-| ███████║██║     ███████╗██║  ██║██║  ██╗███████╗██║  ██║███████║   ██║    |
-| ╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝    |
-|                                                                            |
-+============================================================================+
+## What you get
 
-🎉 Welcome to SpeakEasy!
+| Surface | What it does |
+| --- | --- |
+| **CLI** | `speakeasy "hello"` — shell control, cache, diagnostics |
+| **SDK** | `import { say } from '@arach/speakeasy'` — queue, fallbacks, cache |
+| **macOS app** | Menu-bar settings + floating HUD (`speakeasy --app`) |
+| **Adapters** | Normalized `TTSAdapter` API — plug in bespoke providers |
 
-We didn't find a configuration file. Let's create one to get you started!
+Five built-in providers (system, OpenAI, ElevenLabs, Groq, Gemini). One config file. SQLite cache for API voices. macOS playback via `afplay`.
 
-📦 What is SpeakEasy?
-   A unified text-to-speech CLI that works with multiple providers.
-
-   Supported Providers:
-   • System Voices - macOS, Windows, Linux (no key needed)
-   • ElevenLabs - Premium voices (🔑 key required)
-   • OpenAI - High quality voices (🔑 key required)
-   • Groq - Fast & cheap (🔑 key required)
-   • Gemini - Google's advanced TTS (🔑 key required)
-
-🚀 Quick Start:
-   Try it now with built-in system voices:
-   
-   speakeasy "Hello! Welcome to SpeakEasy!" --provider system
-
-🔧 Setup API Keys (optional):
-   
-   For ElevenLabs:
-   export ELEVENLABS_API_KEY="your-api-key-here"
-   Get key: https://elevenlabs.io/app/settings/api-keys
-   
-   For OpenAI TTS:
-   export OPENAI_API_KEY="your-api-key-here"
-   Get key: https://platform.openai.com/api-keys
-   
-   For Groq (fast & cheap):
-   export GROQ_API_KEY="your-api-key-here"
-   Get key: https://console.groq.com/keys
-   
-   For Gemini (Google's TTS):
-   export GEMINI_API_KEY="your-api-key-here"
-   Get key: https://aistudio.google.com/apikey
-
-💾 Configuration:
-   Create config: speakeasy --config --edit
-   View settings: speakeasy --config
-
-🩺 Need Help?
-   Diagnose setup: speakeasy --doctor
-   Show all options: speakeasy --help
-
-────────────────────────────────────────────────────────────
-
-Built with ❤️ by Arach • https://arach.dev
-```
-
-**Experience the welcome screen:** `speakeasy --welcome`  
-**Get started instantly:** `speakeasy "Hello World!" --provider system`
-
-## ✨ Key Features
-
-### 🚀 **Intelligent Caching System**
-- **16x faster** repeated playback with SQLite-based cache
-- Automatic cache management with TTL and size limits
-- Content-aware deduplication prevents redundant API calls
-- Comprehensive analytics and cache inspection tools
-
-### ⚙️ **Centralized Configuration** 
-- **Single config file** at `~/.config/speakeasy/settings.json`
-- **No more scattered API keys** - configure once, use everywhere
-- Global defaults with per-call overrides
-- Environment variable integration
-
-### 🎯 **Core Capabilities**
-- **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq, Gemini
-- **Smart Fallbacks**: Automatic provider switching on failure
-- **Volume Control**: Precise control without affecting system volume
-- **Queue Management**: Priority-based speech queue with interruption
-- **TypeScript**: Full type safety and IntelliSense support
-
-### 🎧 **Demo**
-Listen to SpeakEasy in action: [welcome-demo.mp3](examples/welcome-demo.mp3)
-
-*Generated with: `speakeasy "Welcome to SpeakEasy! This unified text-to-speech service makes it easy to add voice to your applications" --provider openai --voice nova --rate 185 --out welcome-demo.mp3`*
-
-## Installation
+## Try it in 30 seconds
 
 ```bash
-npm install speakeasy
+npm install -g @arach/speakeasy
+
+speakeasy "Hello from SpeakEasy!" --provider system
+speakeasy --doctor
 ```
 
-## Quick Start
+No API key needed for macOS system voices. First run shows a welcome screen — replay anytime with `speakeasy --welcome`.
+
+### SDK
 
 ```typescript
-import { say } from 'speakeasy';
+import { say, SpeakEasy } from '@arach/speakeasy';
 
-await say('Hello world!');                    // system voice
-await say('Hello!', 'openai');                // OpenAI TTS
-await say('Hello!', 'elevenlabs');            // ElevenLabs TTS  
-await say('Hello!', 'groq');                  // Groq TTS
-await say('Hello!', 'gemini');                // Gemini TTS
+await say('Hello world!');           // system voice (macOS)
+await say('Hello!', 'openai');       // cloud providers
+
+const speaker = new SpeakEasy({
+  provider: 'groq',
+  cache: { enabled: true },
+});
+await speaker.speak('Cached on repeat.');
 ```
 
-## 🏃‍♂️ Performance Impact
+### Custom TTS backends
 
-**Caching makes a dramatic difference:**
+Implement `TTSAdapter` (`synthesize`, `validate`, `formatError`) and use SpeakEasy's playback + cache utilities — or wire into the registry for first-class CLI support. Guide: [custom providers](https://speakeasy.arach.dev/docs/custom-providers/).
 
-| Provider | Without Cache | With Cache | Speedup |
-|----------|---------------|------------|---------|
-| OpenAI | ~800ms | ~50ms | **16x faster** |
-| ElevenLabs | ~1200ms | ~50ms | **24x faster** |
-| Groq | ~400ms | ~50ms | **8x faster** |
-| Gemini | ~600ms | ~50ms | **12x faster** |
+## macOS companion app
 
-*Cache automatically enabled for API providers when keys are present.*
+Native menu-bar app: provider settings, cache management, speech history, and a floating HUD while the CLI speaks.
+
+![SpeakEasy macOS app — Dashboard with providers, volume, and speech rate](docs/images/macos-app.png)
+
+```bash
+speakeasy --app          # install from GitHub Releases (if needed) and open
+speakeasy --update-app   # pull the latest signed DMG
+# both print the app version and install path (~/.speakeasy/SpeakEasy.app)
+```
+
+Build from source: `cd app && ./build-app.sh` · release: `cd app && ./Scripts/build.sh`
+
+## Providers
+
+| Provider | API key | Notes |
+| --- | --- | --- |
+| **System** | No | macOS `say` — offline, instant |
+| **OpenAI** | Yes | Neural voices + optional steering instructions |
+| **ElevenLabs** | Yes | Premium voices (voice IDs, not names) |
+| **Groq** | Yes | Fast Orpheus TTS |
+| **Gemini** | Yes | Google TTS |
+
+```bash
+export OPENAI_API_KEY=sk-...
+export GROQ_API_KEY=gsk_...
+```
+
+Configure once in `~/.config/speakeasy/settings.json`. Details: [providers](https://speakeasy.arach.dev/docs/providers).
 
 ## Configuration
 
-**Stop copying API keys everywhere.** SpeakEasy uses a single, clean configuration file:
-
-**`~/.config/speakeasy/settings.json`**
-
 ```json
 {
-  "providers": {
-    "openai": {
-      "enabled": true,
-      "voice": "nova",
-      "model": "tts-1",
-      "apiKey": "sk-..."
-    },
-    "elevenlabs": {
-      "enabled": true,
-      "voiceId": "EXAVITQu4vr4xnSDxMaL",
-      "apiKey": "sk-..."
-    },
-    "system": {
-      "enabled": true,
-      "voice": "Samantha"
-    },
-    "groq": {
-      "enabled": true,
-      "voice": "onyx",
-      "model": "tts-1-hd",
-      "apiKey": "gsk-..."
-    },
-    "gemini": {
-      "enabled": true,
-      "model": "gemini-2.5-flash-preview-tts",
-      "apiKey": "AIza..."
-    }
-  },
   "defaults": {
     "provider": "groq",
     "fallbackOrder": ["groq", "openai", "elevenlabs", "gemini", "system"],
-    "rate": 180,
     "volume": 0.7
   },
-  "global": {
-    "tempDir": "/tmp",
-    "cleanup": true
+  "providers": {
+    "openai": { "enabled": true, "voice": "nova", "apiKey": "sk-..." },
+    "system": { "enabled": true, "voice": "Samantha" }
   }
 }
 ```
 
-**✅ Configure once, use everywhere**  
-**✅ No more environment variables in every project**  
-**✅ Secure API key storage with proper permissions**
+```bash
+speakeasy --config --edit
+```
 
-### Environment Variables
+## Caching
+
+API audio is cached in SQLite. Repeated phrases hit disk instead of the network — typically **8–24× faster** on cache hits.
 
 ```bash
-export OPENAI_API_KEY=your_openai_key
-export ELEVENLABS_API_KEY=your_elevenlabs_key
-export GROQ_API_KEY=your_groq_key
-export GEMINI_API_KEY=your_gemini_key
-```
-
-## Usage
-
-### Basic Usage
-
-```typescript
-import { say, speak } from 'speakeasy';
-
-// Quick one-liners
-await say('Hello world!');                    // system voice
-await say('Hello!', 'openai');                // OpenAI TTS
-await say('Hello!', 'elevenlabs');            // ElevenLabs TTS
-await say('Hello!', 'groq');                  // Groq TTS
-await say('Hello!', 'gemini');                // Gemini TTS
-
-// Full featured with volume control
-await speak('Hello world!', { priority: 'high', volume: 0.5 });
-await speak('Hello!', { provider: 'openai', priority: 'high', volume: 0.8 });
-
-// Custom configuration
-import { SpeakEasy } from 'speakeasy';
-const speech = new SpeakEasy({
-  provider: 'openai',
-  openaiVoice: 'nova',
-  rate: 180,
-  volume: 0.6, // 60% volume
-});
-await speech.speak('Hello world!');
-```
-
-### In Your Projects
-
-```typescript
-// notifications.ts
-import { say } from 'speakeasy';
-
-export async function speakNotification(message: string, project: string) {
-  await say(`In ${project}, ${message}`, { priority: 'high', volume: 0.8 });
-}
-```
-
-### Volume Control
-
-SpeakEasy provides granular volume control (0.0-1.0) that only affects speech playback without changing your system volume:
-
-```typescript
-import { say, speak, SpeakEasy } from 'speakeasy';
-
-// Quick volume control
-await say('Quiet message', 'openai', { volume: 0.3 });     // 30% volume
-await say('Normal message', 'system', { volume: 0.7 });    // 70% volume (default)
-await say('Loud message', 'elevenlabs', { volume: 1.0 });  // 100% volume
-
-// With speak function
-await speak('Custom volume', { provider: 'groq', volume: 0.5 });
-
-// Class instance with default volume
-const quietSpeaker = new SpeakEasy({
-  provider: 'openai',
-  volume: 0.4  // All speech will be at 40% volume by default
-});
-await quietSpeaker.speak('This will be quiet');
-await quietSpeaker.speak('This too', { volume: 0.9 }); // Override to 90%
-```
-
-**Volume Features:**
-- ✅ **Isolated**: Only affects SpeakEasy audio, never changes system volume
-- ✅ **Provider-agnostic**: Works with system voices, OpenAI, ElevenLabs, Groq, and Gemini
-- ✅ **Global config**: Set default volume in `~/.config/speakeasy/settings.json`
-- ✅ **Per-call override**: Specify volume for individual speech requests
-- ✅ **Debug visibility**: Shows current volume percentage in debug mode
-
-### Caching
-- **Auto-enabled** when API keys are present (OpenAI, ElevenLabs, Groq, Gemini)
-- **Deterministic UUID keys** - Same text+provider+voice+rate = identical cache key
-- **Collision-resistant** - Uses UUID v5 with deterministic construction
-- **Disabled for system voice** (macOS `say` command) - no benefit for local TTS
-- **Declarative TTL**: Configure with simple strings like `"7d"`, `"1h"`, `"30m"`
-- **Declarative max size**: Configure with strings like `"100mb"`, `"1gb"`
-- **Storage location**: `/tmp/speakeasy-cache/` by default
-
-**Cache Key Construction:**
-```
-UUID = SHA1(text|provider|voice|rate + namespace) → UUID v5
-```
-**Identical inputs always hit the same cache entry**
-
-### Convenience
-- `say('text')` - One-liner with system voice and caching
-- `say('text', 'openai' | 'elevenlabs' | 'groq' | 'gemini')` - One-liner with provider and caching
-- `say('text', provider, false)` - Disable caching for specific call
-- `speak('text', options, false)` - Full featured with caching control
-
-## Examples
-
-```bash
-npm run example
-```
-
-## Declarative Caching Configuration
-
-```typescript
-import { SpeakEasy } from 'speakeasy';
-
-// Simple declarative configuration
-const speaker = new SpeakEasy({
-  provider: 'openai',
-  cache: {
-    enabled: true,        // auto: true when API keys present, false for system
-    ttl: '7d',           // 7 days - '1h', '30m', '1w', '1M', etc.
-    maxSize: '100mb',    // '1gb', '500mb', etc.
-    dir: '/tmp/my-cache' // custom directory
-  }
-});
-
-// Using global config
-// ~/.config/speakeasy/settings.json
-{
-  "cache": {
-    "enabled": true,     // auto-enabled when API keys present
-    "ttl": "1d",
-    "maxSize": "500mb"
-  }
-}
-```
-
-## CLI Usage
-
-Install globally for command-line access:
-
-```bash
-npm install -g speakeasy
-
-# Basic usage
-speakeasy "Hello world"
-speakeasy --text "Hello from CLI" --provider openai --voice nova
-
-# Volume control
-speakeasy "Quiet message" --volume 0.3
-speakeasy "Loud message" --provider openai --volume 0.9 --voice nova
-
-# Save to file (plays audio AND saves file)
-speakeasy "Welcome message" --out welcome.mp3
-speakeasy "Notification" --provider openai --voice nova --out notification.mp3
-
-# With caching
-speakeasy --cache --text "Hello cached world"
-
-# Cache management
 speakeasy --cache --list
-speakeasy --cache --find "hello"
-speakeasy --cache --provider openai
-speakeasy --clear-cache
-speakeasy --config
-
-# Diagnostics and health checks
-speakeasy --diagnose          # Show configuration diagnostics
-speakeasy --doctor           # Run comprehensive health check on config
-speakeasy --debug "test"     # Run with debug logging
-
-# List all available voices
-speakeasy --help
-```
-
-## Cache Inspection
-
-### Programmatic
-```typescript
-const speaker = new SpeakEasy({ cache: { enabled: true } });
-
-// Get all cached entries
-const metadata = await speaker.getCacheMetadata();
-console.log(metadata);
-
-// Find by text
-const found = await speaker.findByText('hello world');
-
-// Find by provider
-const openaiEntries = await speaker.findByProvider('openai');
-```
-
-### CLI
-```bash
-# List all cached entries
-speakeasy --cache --list
-
-# Example output:
-📋 Cache Entries (1)
-═══════════════════════
-
-1. 8c957870-4741-5394-a0ed-b3db062d3ec3
-   Text: "Hello world"
-   Provider: openai
-   Voice: nova
-   Size: 15.5 KB
-   Created: 2025-07-26, 2:09:57 p.m.
-   File: 8c957870-4741-5394-a0ed-b3db062d3ec3.mp3
-   Model: tts-1
-
-💡 Use --id KEY to see full details, --play KEY to play audio
-
-# Search by text
-speakeasy --cache --find "hello"
-
-# Filter by provider
-speakeasy --cache --provider openai
-
-# Show cache stats
 speakeasy --cache --stats
 ```
 
-## Diagnostics and Health Checks
+## Claude Code & agents
 
-SpeakEasy includes comprehensive diagnostic tools to help troubleshoot configuration issues:
+Pair with [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) or [@arach/hooked](https://github.com/arach/hooked) so IDE events become spoken updates:
 
-### CLI Health Check
-```bash
-# Quick health check of your configuration
-speakeasy --doctor
+```typescript
+import { SpeakEasy } from '@arach/speakeasy';
 
-# Detailed configuration diagnostics
-speakeasy --diagnose
-
-# Debug mode with detailed logging
-speakeasy --debug "test message"
+const speech = new SpeakEasy({ provider: 'groq', cache: { enabled: true } });
+await speech.speak('Build completed.');
 ```
 
-### Health Check Features
-- **System compatibility** (macOS detection, required commands)
-- **Configuration file validation** (JSON syntax, permissions)
-- **API key detection** (both config file and environment variables)
-- **Voice configuration** (provider-specific settings)
-- **Cache configuration** (directory permissions, TTL settings)
-- **Actionable fixes** (specific commands to resolve issues)
+## Requirements
 
-### Example Output
-```bash
-$ speakeasy --doctor
-🏥 Speakeasy Configuration Health Check
+- **Node.js >= 22.12** or **Bun >= 1.0** (built-in SQLite)
+- **macOS** for system voice, `afplay` playback, and the companion app
 
-🔍 System Compatibility:
-   ✅ macOS detected - system voice support available
-   ✅ `say` command available
-   ✅ `afplay` command available
-
-🔧 Configuration Health:
-   ✅ Config file exists
-   ✅ Config file is valid JSON
-   ✅ Config directory permissions OK
-
-🔑 API Key Configuration:
-   ✅ OpenAI: Configured via environment
-   ❌ ElevenLabs: Not configured
-   ✅ Groq: Configured in file
-   ✅ Gemini: Configured in file
-
-🎙️  Voice Configuration:
-   system: Samantha
-   openai: nova
-   elevenlabs: EXAVITQu4vr4xnSDxMaL
-   groq: nova
-   gemini: Puck
-
-📦 Cache Configuration:
-   ✅ Cache enabled
-   📁 Cache dir: /tmp/speakeasy-cache
-   ✅ Cache directory accessible
-
-📋 Health Summary:
-   🎉 All checks passed! Speakeasy is healthy.
-```
-
-## Testing
+## Install
 
 ```bash
-npm run build
-npm test
-npm test cache  # Test caching specifically
-npm run cli -- --help  # Test CLI
-npm run cli -- --doctor  # Test health check
+npm install @arach/speakeasy      # library
+npm install -g @arach/speakeasy     # global CLI
 ```
+
+## Documentation
+
+- [Quickstart](https://speakeasy.arach.dev/docs/quickstart)
+- [SDK](https://speakeasy.arach.dev/docs/sdk)
+- [Custom providers](https://speakeasy.arach.dev/docs/custom-providers)
+- [Cache](https://speakeasy.arach.dev/docs/cache)
+- [Troubleshooting](https://speakeasy.arach.dev/docs/troubleshooting)
+
+## Development
+
+```bash
+pnpm install && pnpm run build && pnpm test
+```
+
+## License
+
+MIT · [Arach](https://arach.dev)

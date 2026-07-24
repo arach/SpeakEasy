@@ -237,20 +237,20 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             return
         }
 
-        let rootView = ThemedContentView()
+        let rootView = ShellRootView()
             .environmentObject(ConfigManager.shared)
 
         let hosting = NSHostingController(rootView: rootView)
-        let window = SolidColorWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 720),
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 920, height: 720),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "SpeakEasy"
         window.contentViewController = hosting
-        window.setContentSize(NSSize(width: 600, height: 720))
-        window.minSize = NSSize(width: 580, height: 660)
+        window.setContentSize(NSSize(width: 920, height: 720))
+        window.minSize = NSSize(width: 720, height: 640)
         window.center()
         window.isReleasedWhenClosed = false
         window.delegate = self

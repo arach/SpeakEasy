@@ -1,193 +1,11 @@
 import SwiftUI
 import AppKit
 import AVFoundation
-
-// MARK: - Theme System
-
-struct Theme {
-    let background: Color
-    let surface: Color
-    let surfaceHover: Color
-    let border: Color
-    let text: Color
-    let textSecondary: Color
-    let textTertiary: Color
-
-    static let dark = Theme(
-        background: Color(red: 0, green: 0, blue: 0),  // Pure black
-        surface: Color(red: 1, green: 1, blue: 1).opacity(0.06),
-        surfaceHover: Color(red: 1, green: 1, blue: 1).opacity(0.1),
-        border: Color(red: 1, green: 1, blue: 1).opacity(0.12),
-        text: Color(red: 1, green: 1, blue: 1),  // Pure white
-        textSecondary: Color(red: 1, green: 1, blue: 1).opacity(0.65),
-        textTertiary: Color(red: 1, green: 1, blue: 1).opacity(0.4)
-    )
-
-    static let light = Theme(
-        background: Color(red: 1, green: 1, blue: 1),  // Pure white
-        surface: Color(red: 0, green: 0, blue: 0).opacity(0.04),
-        surfaceHover: Color(red: 0, green: 0, blue: 0).opacity(0.06),
-        border: Color(red: 0, green: 0, blue: 0).opacity(0.08),
-        text: Color(red: 0, green: 0, blue: 0),  // Pure black
-        textSecondary: Color(red: 0, green: 0, blue: 0).opacity(0.65),
-        textTertiary: Color(red: 0, green: 0, blue: 0).opacity(0.4)
-    )
-}
-
-struct ThemeKey: EnvironmentKey {
-    static let defaultValue: Theme = .dark
-}
-
-extension EnvironmentValues {
-    var theme: Theme {
-        get { self[ThemeKey.self] }
-        set { self[ThemeKey.self] = newValue }
-    }
-}
-
-// MARK: - Glass Effect Components
-
-extension View {
-    @ViewBuilder
-    func glassBackground(cornerRadius: CGFloat = 12, intensity: GlassIntensity = .regular) -> some View {
-        self.background(
-            ZStack {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(Color.primary.opacity(intensity.fillOpacity))
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.primary.opacity(intensity.borderOpacity), lineWidth: 0.5)
-            }
-        )
-    }
-
-    @ViewBuilder
-    func glassCapsule(intensity: GlassIntensity = .regular) -> some View {
-        self.background(
-            ZStack {
-                Capsule()
-                    .fill(Color.primary.opacity(intensity.fillOpacity))
-                Capsule()
-                    .stroke(Color.primary.opacity(intensity.borderOpacity), lineWidth: 0.5)
-            }
-        )
-    }
-
-    @ViewBuilder
-    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
-        }
-    }
-}
-
-enum GlassIntensity {
-    case subtle, regular, prominent
-
-    var fillOpacity: Double {
-        switch self {
-        case .subtle: return 0.03
-        case .regular: return 0.05
-        case .prominent: return 0.08
-        }
-    }
-
-    var borderOpacity: Double {
-        switch self {
-        case .subtle: return 0.08
-        case .regular: return 0.12
-        case .prominent: return 0.16
-        }
-    }
-}
-
-// MARK: - Button Styles
-
-struct FlatButtonStyle: ButtonStyle {
-    @Environment(\.theme) var theme
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.subheadline)
-            .fontWeight(.medium)
-            .foregroundColor(theme.textSecondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(theme.surface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(theme.border, lineWidth: 0.5)
-                    )
-            )
-            .opacity(configuration.isPressed ? 0.7 : 1.0)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
-struct FlatProminentButtonStyle: ButtonStyle {
-    @Environment(\.theme) var theme
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.subheadline)
-            .fontWeight(.semibold)
-            .foregroundColor(theme.text)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(theme.surfaceHover)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(theme.border, lineWidth: 0.5)
-                    )
-            )
-            .opacity(configuration.isPressed ? 0.7 : 1.0)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
-extension ButtonStyle where Self == FlatButtonStyle {
-    static var flat: FlatButtonStyle { FlatButtonStyle() }
-}
-
-extension ButtonStyle where Self == FlatProminentButtonStyle {
-    static var flatProminent: FlatProminentButtonStyle { FlatProminentButtonStyle() }
-}
-
-// Legacy compatibility
-extension ButtonStyle where Self == FlatButtonStyle {
-    static var glassCompat: FlatButtonStyle { FlatButtonStyle() }
-}
-
-extension ButtonStyle where Self == FlatProminentButtonStyle {
-    static var glassProminentCompat: FlatProminentButtonStyle { FlatProminentButtonStyle() }
-}
-
-// Custom window class to force solid colors
-class SolidColorWindow: NSWindow {
-    override init(contentRect: NSRect, styleMask: NSWindow.StyleMask, backing: NSWindow.BackingStoreType, defer flag: Bool) {
-        super.init(contentRect: contentRect, styleMask: styleMask, backing: backing, defer: flag)
-
-        self.isOpaque = true
-        self.titlebarAppearsTransparent = false
-        self.hasShadow = true
-    }
-
-    override var isOpaque: Bool {
-        get { true }
-        set { }
-    }
-}
+import HudsonUI
+import HudsonShell
 
 @main
 struct SpeakEasyApp: App {
-    @StateObject private var configManager = ConfigManager.shared
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -215,16 +33,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Resident menu-bar shell + player IPC (no Dock icon via LSUIElement).
         MenuBarController.shared.start()
-
-        // Configure any existing windows once at launch (settings stay closed).
-        configureAllWindows()
-
-        // One more pass after a short delay to catch any late-arriving views
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.configureAllWindows()
-        }
-
-        // Check if HUD should be started
         checkAndStartHUD()
 
         // Observe config changes
@@ -333,365 +141,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hudWindow = nil
     }
 
-    private func configureAllWindows() {
-        for window in NSApplication.shared.windows {
-            window.isOpaque = true
-            window.hasShadow = true
-            window.titlebarAppearsTransparent = false
-
-            // Continuously remove visual effect views
-            if let contentView = window.contentView {
-                removeVisualEffectViews(from: contentView)
-
-                // Force solid background
-                contentView.wantsLayer = true
-                if let layer = contentView.layer {
-                    layer.isOpaque = true
-                }
-            }
-        }
-    }
-
-    private func removeVisualEffectViews(from view: NSView) {
-        var toRemove: [NSView] = []
-
-        for subview in view.subviews {
-            if subview is NSVisualEffectView {
-                toRemove.append(subview)
-            } else {
-                removeVisualEffectViews(from: subview)
-            }
-        }
-
-        for subview in toRemove {
-            subview.removeFromSuperview()
-        }
-    }
-}
-
-struct ThemedContentView: View {
-    @EnvironmentObject var config: ConfigManager
-    @Environment(\.colorScheme) var systemColorScheme
-
-    var effectiveColorScheme: ColorScheme {
-        switch config.appearanceMode {
-        case .system: return systemColorScheme
-        case .light: return .light
-        case .dark: return .dark
-        }
-    }
-
-    var theme: Theme {
-        effectiveColorScheme == .dark ? .dark : .light
-    }
-
-    var body: some View {
-        ContentView()
-            .environment(\.theme, theme)
-            .preferredColorScheme(config.appearanceMode == .system ? nil :
-                                  config.appearanceMode == .dark ? .dark : .light)
-            .background(SolidWindowBackground())
-    }
-}
-
-// MARK: - Window Background
-
-struct SolidWindowBackground: NSViewRepresentable {
-    @Environment(\.colorScheme) var colorScheme
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        view.wantsLayer = true
-        view.layer?.isOpaque = true
-
-        let backgroundColor = context.environment.colorScheme == .dark ?
-            NSColor(deviceRed: 0, green: 0, blue: 0, alpha: 1.0) :
-            NSColor(deviceRed: 1, green: 1, blue: 1, alpha: 1.0)
-
-        view.layer?.backgroundColor = backgroundColor.cgColor
-
-        // Configure window aggressively
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
-
-            // Force complete opacity
-            window.isOpaque = true
-            window.backgroundColor = backgroundColor
-            window.titlebarAppearsTransparent = false
-            window.styleMask.insert(.fullSizeContentView)
-
-            // Disable all vibrancy and effects
-            window.allowsToolTipsWhenApplicationIsInactive = false
-
-            // Force content view to solid color
-            if let contentView = window.contentView {
-                contentView.wantsLayer = true
-                contentView.layer?.isOpaque = true
-                contentView.layer?.backgroundColor = backgroundColor.cgColor
-                contentView.layerContentsRedrawPolicy = .onSetNeedsDisplay
-
-                // Remove any visual effect views
-                for subview in contentView.subviews {
-                    if subview is NSVisualEffectView {
-                        subview.removeFromSuperview()
-                    }
-                }
-            }
-
-            // Force the window appearance to not use vibrancy
-            if context.environment.colorScheme == .dark {
-                window.appearance = NSAppearance(named: .darkAqua)
-            } else {
-                window.appearance = NSAppearance(named: .aqua)
-            }
-
-            window.invalidateShadow()
-        }
-
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        // Only update if color scheme actually changed
-        let backgroundColor = context.environment.colorScheme == .dark ?
-            NSColor(deviceRed: 0, green: 0, blue: 0, alpha: 1.0) :
-            NSColor(deviceRed: 1, green: 1, blue: 1, alpha: 1.0)
-
-        guard nsView.layer?.backgroundColor != backgroundColor.cgColor else { return }
-
-        nsView.layer?.backgroundColor = backgroundColor.cgColor
-        nsView.layer?.isOpaque = true
-
-        DispatchQueue.main.async {
-            guard let window = nsView.window else { return }
-            window.backgroundColor = backgroundColor
-            window.contentView?.layer?.backgroundColor = backgroundColor.cgColor
-            window.contentView?.layer?.isOpaque = true
-
-            if context.environment.colorScheme == .dark {
-                window.appearance = NSAppearance(named: .darkAqua)
-            } else {
-                window.appearance = NSAppearance(named: .aqua)
-            }
-        }
-    }
-}
-
-// MARK: - Background
-
-struct MinimalBackground: View {
-    @Environment(\.theme) var theme
-
-    var body: some View {
-        theme.background
-            .ignoresSafeArea()
-    }
-}
-
-// MARK: - Main Content View
-
-struct ContentView: View {
-    @EnvironmentObject var config: ConfigManager
-    @Environment(\.theme) var theme
-    @State private var selectedTab = 0
-
-    var body: some View {
-        ZStack {
-            // Explicit solid background
-            Rectangle()
-                .fill(theme.background)
-                .ignoresSafeArea()
-
-            // Main content
-            VStack(spacing: 0) {
-                // Header - clean and minimal
-                HStack {
-                    HStack(spacing: 10) {
-                        Image(systemName: "speaker.wave.3.fill")
-                            .font(.title2)
-                            .foregroundColor(theme.textSecondary)
-                        Text("SpeakEasy")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(theme.text)
-
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .glassBackground(cornerRadius: 12, intensity: .subtle)
-
-                    Spacer()
-
-                    // Appearance mode picker
-                    Picker("", selection: $config.appearanceMode) {
-                        ForEach(AppearanceMode.allCases, id: \.self) { mode in
-                            Text(mode.displayName).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 160)
-
-                    if !config.isSaved {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(theme.text)
-                                .frame(width: 5, height: 5)
-                            Text("Unsaved")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(theme.textSecondary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .glassCapsule(intensity: .regular)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-
-                // Tab selector
-                HStack(spacing: 4) {
-                    ForEach(Array(["Dashboard", "OpenAI", "ElevenLabs", "System", "Cache", "HUD", "History"].enumerated()), id: \.offset) { index, title in
-                        Button(action: {
-                            withAnimation(.spring(duration: 0.25, bounce: 0.2)) {
-                                selectedTab = index
-                            }
-                        }) {
-                            Text(title)
-                                .font(.subheadline)
-                                .fontWeight(selectedTab == index ? .semibold : .medium)
-                                .foregroundColor(selectedTab == index ? theme.text : theme.textTertiary)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-                        .background(
-                            Group {
-                                if selectedTab == index {
-                                    Capsule()
-                                        .fill(theme.surfaceHover)
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(theme.border, lineWidth: 0.5)
-                                        )
-                                }
-                            }
-                        )
-                    }
-                }
-                .padding(6)
-                .glassBackground(cornerRadius: 24, intensity: .prominent)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-
-                // Content
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        switch selectedTab {
-                        case 0: DashboardView(selectedTab: $selectedTab)
-                        case 1: OpenAIPlaygroundView()
-                        case 2: ElevenLabsPlaygroundView()
-                        case 3: SystemSettingsView()
-                        case 4: CacheManagementView()
-                        case 5: HUDSettingsView()
-                        case 6: HistoryView()
-                        default: DashboardView(selectedTab: $selectedTab)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                }
-
-                // Footer
-                HStack {
-                    if let error = config.lastError {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(theme.textSecondary)
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(theme.textSecondary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .glassBackground(cornerRadius: 8, intensity: .subtle)
-                        .lineLimit(2)
-                    }
-                    Spacer()
-
-                    // Build indicator
-                    Text("Build: HUD-v2.0-\(Date().timeIntervalSince1970)")
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundColor(theme.textTertiary)
-                        .padding(.horizontal, 8)
-
-                    Button {
-                        config.loadConfig()
-                    } label: {
-                        Label("Reload", systemImage: "arrow.clockwise")
-                    }
-                    .buttonStyle(.flat)
-
-                    Button {
-                        config.saveConfig()
-                    } label: {
-                        Label("Save", systemImage: "checkmark.circle.fill")
-                    }
-                    .buttonStyle(.flatProminent)
-                    .disabled(config.isSaved)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .background(
-                    Rectangle()
-                        .fill(Color.primary.opacity(0.04))
-                        .overlay(
-                            Rectangle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.primary.opacity(0.08), Color.clear],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                        )
-                )
-            }
-
-            // Save confirmation toast
-            if config.showSaveConfirmation {
-                VStack {
-                    Spacer()
-                    SaveConfirmationToast()
-                        .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.9)))
-                        .padding(.bottom, 90)
-                }
-                .animation(.spring(duration: 0.4, bounce: 0.3), value: config.showSaveConfirmation)
-            }
-        }
-        .frame(minWidth: 580, minHeight: 660)
-    }
 }
 
 // MARK: - Save Confirmation Toast
 
 struct SaveConfirmationToast: View {
-    @Environment(\.theme) var theme
-
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "checkmark")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-            Text("Saved")
-                .font(.subheadline)
-                .fontWeight(.medium)
+        HudCard {
+            HStack(spacing: HudSpacing.md) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Saved")
+                    .font(HudFont.ui(13, weight: .medium))
+            }
+            .foregroundStyle(HudPalette.ink)
         }
-        .foregroundColor(theme.text)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 10)
-        .glassBackground(cornerRadius: 16, intensity: .prominent)
-        .shadow(color: .black.opacity(0.2), radius: 16, y: 8)
+        .shadow(color: Color.black.opacity(0.15), radius: 12, y: 6)
     }
 }
 
@@ -700,16 +165,25 @@ struct SaveConfirmationToast: View {
 struct DashboardView: View {
     @EnvironmentObject var config: ConfigManager
     @Environment(\.theme) var theme
-    @Binding var selectedTab: Int
+    @Binding var selectedSection: SpeakEasySection
+
+    private let providerColumns = [
+        GridItem(.adaptive(minimum: 300), spacing: HudSpacing.lg)
+    ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Configured Providers Section
-            Text("Configured Providers")
-                .font(.headline)
-                .foregroundColor(theme.text)
+        VStack(alignment: .leading, spacing: HudSpacing.xxxl) {
+            providersSection
+            quickSettingsSection
+            Spacer()
+        }
+    }
 
-            VStack(spacing: 10) {
+    private var providersSection: some View {
+        VStack(alignment: .leading, spacing: HudSpacing.lg) {
+            HudSectionLabel("Configured Providers")
+
+            LazyVGrid(columns: providerColumns, spacing: HudSpacing.lg) {
                 ProviderCard(
                     name: "OpenAI",
                     icon: "brain.head.profile",
@@ -719,7 +193,7 @@ struct DashboardView: View {
                     accentColor: .green
                 ) {
                     withAnimation(.spring(duration: 0.3)) {
-                        selectedTab = 1
+                        selectedSection = .openai
                     }
                 }
 
@@ -732,7 +206,7 @@ struct DashboardView: View {
                     accentColor: .purple
                 ) {
                     withAnimation(.spring(duration: 0.3)) {
-                        selectedTab = 2
+                        selectedSection = .elevenlabs
                     }
                 }
 
@@ -745,7 +219,7 @@ struct DashboardView: View {
                     accentColor: .blue
                 ) {
                     withAnimation(.spring(duration: 0.3)) {
-                        selectedTab = 3
+                        selectedSection = .system
                     }
                 }
 
@@ -771,78 +245,92 @@ struct DashboardView: View {
                     ) {}
                 }
             }
+        }
+    }
 
-            // Quick Settings
-            Text("Quick Settings")
-                .font(.headline)
-                .foregroundColor(theme.text)
-                .padding(.top, 8)
+    private var quickSettingsSection: some View {
+        VStack(alignment: .leading, spacing: HudSpacing.lg) {
+            HudSectionLabel("Quick Settings")
 
-            VStack(alignment: .leading, spacing: 16) {
-                // Default Provider
-                HStack {
-                    Text("Default Provider")
-                        .foregroundColor(theme.text)
-                    Spacer()
-                    Picker("", selection: Binding(
-                        get: { config.defaultProvider },
-                        set: { config.defaultProvider = $0 }
-                    )) {
-                        Text("System").tag("system")
-                        if !config.openaiApiKey.isEmpty {
-                            Text("OpenAI").tag("openai")
-                        }
-                        if !config.elevenlabsApiKey.isEmpty {
-                            Text("ElevenLabs").tag("elevenlabs")
-                        }
-                        if !config.groqApiKey.isEmpty {
-                            Text("Groq").tag("groq")
-                        }
-                        if !config.geminiApiKey.isEmpty {
-                            Text("Gemini").tag("gemini")
-                        }
-                    }
-                    .frame(width: 140)
-                }
-
-                Divider()
-
-                // Volume
-                VStack(alignment: .leading, spacing: 6) {
+            HudCard {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Default Provider
                     HStack {
-                        Text("Volume")
+                        Text("Default Provider")
                             .foregroundColor(theme.text)
                         Spacer()
-                        Text("\(Int(config.defaultVolume * 100))%")
-                            .foregroundColor(theme.textTertiary)
-                            .monospacedDigit()
+                        Picker("", selection: Binding(
+                            get: { config.defaultProvider },
+                            set: { config.defaultProvider = $0 }
+                        )) {
+                            Text("System").tag("system")
+                            if !config.openaiApiKey.isEmpty {
+                                Text("OpenAI").tag("openai")
+                            }
+                            if !config.elevenlabsApiKey.isEmpty {
+                                Text("ElevenLabs").tag("elevenlabs")
+                            }
+                            if !config.groqApiKey.isEmpty {
+                                Text("Groq").tag("groq")
+                            }
+                            if !config.geminiApiKey.isEmpty {
+                                Text("Gemini").tag("gemini")
+                            }
+                        }
+                        .frame(width: 140)
                     }
-                    Slider(value: Binding(
-                        get: { config.defaultVolume },
-                        set: { config.defaultVolume = $0 }
-                    ), in: 0...1, step: 0.05)
-                }
 
-                // Rate
-                VStack(alignment: .leading, spacing: 6) {
+                    Divider()
+
+                    // Appearance
                     HStack {
-                        Text("Speech Rate")
+                        Text("Appearance")
                             .foregroundColor(theme.text)
                         Spacer()
-                        Text("\(config.defaultRate) WPM")
-                            .foregroundColor(theme.textTertiary)
-                            .monospacedDigit()
+                        Picker("", selection: $config.appearanceMode) {
+                            ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 180)
                     }
-                    Slider(value: Binding(
-                        get: { Double(config.defaultRate) },
-                        set: { config.defaultRate = Int($0) }
-                    ), in: 80...300, step: 10)
+
+                    Divider()
+
+                    // Volume
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Volume")
+                                .foregroundColor(theme.text)
+                            Spacer()
+                            Text("\(Int(config.defaultVolume * 100))%")
+                                .foregroundColor(theme.textTertiary)
+                                .monospacedDigit()
+                        }
+                        Slider(value: Binding(
+                            get: { config.defaultVolume },
+                            set: { config.defaultVolume = $0 }
+                        ), in: 0...1, step: 0.05)
+                    }
+
+                    // Rate
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Speech Rate")
+                                .foregroundColor(theme.text)
+                            Spacer()
+                            Text("\(config.defaultRate) WPM")
+                                .foregroundColor(theme.textTertiary)
+                                .monospacedDigit()
+                        }
+                        Slider(value: Binding(
+                            get: { Double(config.defaultRate) },
+                            set: { config.defaultRate = Int($0) }
+                        ), in: 80...300, step: 10)
+                    }
                 }
             }
-            .padding(18)
-            .glassBackground(cornerRadius: 20, intensity: .regular)
-
-            Spacer()
         }
     }
 }
@@ -894,9 +382,10 @@ struct ProviderCard: View {
                     Text(detail)
                         .font(.caption)
                         .foregroundColor(theme.textTertiary)
+                        .lineLimit(1)
                 }
 
-                Spacer()
+                Spacer(minLength: HudSpacing.md)
 
                 HStack(spacing: 8) {
                     if isConfigured {
@@ -1031,41 +520,42 @@ struct OpenAIPlaygroundView: View {
             DisclosureGroup(
                 isExpanded: $showApiKeySection,
                 content: {
-                    GlassSection(title: "API Key", icon: "key.fill", color: .clear) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        if showApiKey {
-                            TextField("sk-...", text: Binding(
-                                get: { config.openaiApiKey },
-                                set: { config.openaiApiKey = $0 }
-                            ))
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
-                        } else {
-                            SecureField("sk-...", text: Binding(
-                                get: { config.openaiApiKey },
-                                set: { config.openaiApiKey = $0 }
-                            ))
-                            .textFieldStyle(.roundedBorder)
+                    HudCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                if showApiKey {
+                                    TextField("sk-...", text: Binding(
+                                        get: { config.openaiApiKey },
+                                        set: { config.openaiApiKey = $0 }
+                                    ))
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(.body, design: .monospaced))
+                                } else {
+                                    SecureField("sk-...", text: Binding(
+                                        get: { config.openaiApiKey },
+                                        set: { config.openaiApiKey = $0 }
+                                    ))
+                                    .textFieldStyle(.roundedBorder)
+                                }
+                                Button(action: { showApiKey.toggle() }) {
+                                    Image(systemName: showApiKey ? "eye.slash" : "eye")
+                                }
+                                .buttonStyle(.glassCompat)
+                            }
+                            HStack {
+                                Circle()
+                                    .fill(config.openaiApiKey.isEmpty ? theme.textTertiary : theme.text)
+                                    .frame(width: 5, height: 5)
+                                Text(config.openaiApiKey.isEmpty ? "Not configured" : "Configured")
+                                    .font(.caption)
+                                    .foregroundColor(theme.textTertiary)
+                                Spacer()
+                                Link("Get API Key", destination: URL(string: "https://platform.openai.com/api-keys")!)
+                                    .font(.caption)
+                            }
                         }
-                        Button(action: { showApiKey.toggle() }) {
-                            Image(systemName: showApiKey ? "eye.slash" : "eye")
-                        }
-                        .buttonStyle(.glassCompat)
                     }
-                    HStack {
-                        Circle()
-                            .fill(config.openaiApiKey.isEmpty ? theme.textTertiary : theme.text)
-                            .frame(width: 5, height: 5)
-                        Text(config.openaiApiKey.isEmpty ? "Not configured" : "Configured")
-                            .font(.caption)
-                            .foregroundColor(theme.textTertiary)
-                        Spacer()
-                        Link("Get API Key", destination: URL(string: "https://platform.openai.com/api-keys")!)
-                            .font(.caption)
-                    }
-                }
-            }
+                    .padding(.top, HudSpacing.sm)
                 },
                 label: {
                     HStack {
@@ -1177,37 +667,6 @@ struct OpenAIPlaygroundView: View {
         } catch {
             previewError = "Audio playback error: \(error.localizedDescription)"
         }
-    }
-}
-
-// MARK: - Glass Section Component
-
-struct GlassSection<Content: View>: View {
-    @Environment(\.theme) var theme
-    let title: String
-    let icon: String
-    let color: Color  // kept for API compatibility
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(theme.surface)
-                        .frame(width: 32, height: 32)
-                    Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textSecondary)
-                }
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(theme.text)
-            }
-            content
-        }
-        .padding(18)
-        .glassBackground(cornerRadius: 20, intensity: .regular)
     }
 }
 
@@ -1858,7 +1317,7 @@ struct CacheManagementView: View {
             // Cache Stats
             GlassSection(title: "Cache Statistics", icon: "chart.bar.fill", color: .cyan) {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
+                    HStack(spacing: HudSpacing.lg) {
                         VStack(alignment: .leading) {
                             Text("Cache Size")
                                 .font(.caption)
@@ -1868,12 +1327,11 @@ struct CacheManagementView: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(theme.text)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                         .glassBackground(cornerRadius: 10, intensity: .subtle)
 
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
+                        VStack(alignment: .leading) {
                             Text("Cached Files")
                                 .font(.caption)
                                 .foregroundColor(theme.textSecondary)
@@ -1882,6 +1340,7 @@ struct CacheManagementView: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(theme.text)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                         .glassBackground(cornerRadius: 10, intensity: .subtle)
                     }
@@ -2030,259 +1489,210 @@ struct CacheManagementView: View {
 
 struct HUDSettingsView: View {
     @EnvironmentObject var config: ConfigManager
-    @Environment(\.theme) var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            GlassSection(title: "HUD Settings", icon: "square.stack.3d.up.fill", color: .purple) {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Enable/Disable HUD
-                    Toggle(isOn: $config.hudEnabled) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Enable HUD")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("Show a floating notification when audio plays")
-                                .font(.caption)
-                                .foregroundColor(theme.textSecondary)
-                        }
-                    }
-                    .toggleStyle(.switch)
+        VStack(alignment: .leading, spacing: HudSpacing.lg) {
+            HudCard {
+                VStack(alignment: .leading, spacing: HudSpacing.lg) {
+                    Toggle("Enable HUD", isOn: $config.hudEnabled)
+                        .toggleStyle(.switch)
 
                     if config.hudEnabled {
-                        Divider()
-                            .background(theme.border)
+                        HudDivider()
 
-                        // Position
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Position")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
-
-                            Picker("Position", selection: $config.hudPosition) {
-                                Text("Top Left").tag("top-left")
-                                Text("Top Right").tag("top-right")
-                                Text("Bottom Left").tag("bottom-left")
-                                Text("Bottom Right").tag("bottom-right")
+                        hudStrip {
+                            inlineMenu("Position", width: 108) {
+                                Picker("", selection: $config.hudPosition) {
+                                    Text("Top Left").tag("top-left")
+                                    Text("Top Right").tag("top-right")
+                                    Text("Bottom Left").tag("bottom-left")
+                                    Text("Bottom Right").tag("bottom-right")
+                                }
+                                .labelsHidden()
                             }
-                            .pickerStyle(.segmented)
-                        }
 
-                        // Duration
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Display Duration")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
+                            Spacer(minLength: HudSpacing.md)
 
-                            HStack {
-                                Slider(value: Binding(
+                            inlineSlider(
+                                "Duration",
+                                value: Binding(
                                     get: { Double(config.hudDuration) },
                                     set: { config.hudDuration = Int($0) }
-                                ), in: 1000...10000, step: 500)
+                                ),
+                                range: 1000...10000,
+                                step: 500,
+                                valueLabel: "\(config.hudDuration / 1000)s",
+                                sliderWidth: 88
+                            )
 
-                                Text("\(config.hudDuration / 1000)s")
-                                    .font(.caption)
-                                    .foregroundColor(theme.textSecondary)
-                                    .frame(width: 40)
-                            }
+                            inlineSlider(
+                                "Opacity",
+                                value: $config.hudOpacity,
+                                range: 0.5...1.0,
+                                step: 0.05,
+                                valueLabel: "\(Int(config.hudOpacity * 100))%",
+                                sliderWidth: 88
+                            )
                         }
 
-                        // Opacity
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Opacity")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
-
-                            HStack {
-                                Slider(value: $config.hudOpacity, in: 0.5...1.0, step: 0.05)
-
-                                Text("\(Int(config.hudOpacity * 100))%")
-                                    .font(.caption)
-                                    .foregroundColor(theme.textSecondary)
-                                    .frame(width: 40)
-                            }
+                        hudStrip {
+                            HudButton("Preview", icon: "eye", style: .ghost, action: openPreviewWindow)
+                            HudButton("Test", icon: "play.fill", style: .ghost, action: testHUD)
+                            Spacer(minLength: 0)
                         }
 
-                        Divider()
-                            .background(theme.border)
+                        HudSectionLabel("Appearance")
 
-                        // Preview and Test buttons
-                        HStack(spacing: 12) {
-                            Button(action: openPreviewWindow) {
-                                Label("Preview Styles", systemImage: "eye.circle")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.glassCompat)
-
-                            Button(action: testHUD) {
-                                Label("Test HUD", systemImage: "play.circle")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.glassCompat)
-                        }
-                    }
-                }
-            }
-
-            // Appearance settings (only show when HUD is enabled)
-            if config.hudEnabled {
-                GlassSection(title: "Appearance", icon: "paintbrush.fill", color: .pink) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Style selector
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Style")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
-
-                            Picker("Style", selection: $config.hudStyle) {
-                                Text("Combined").tag("combined")
-                                Text("Waveform").tag("waveform")
-                                Text("Spectrum").tag("spectrum")
-                                Text("Particles").tag("particles")
-                                Text("Text").tag("text")
-                            }
-                            .pickerStyle(.segmented)
-                        }
-
-                        Divider().background(theme.border)
-
-                        // Waveform Settings
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Waveform")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
-
-                            // Bar count
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Bar Count")
-                                        .font(.caption2)
-                                        .foregroundColor(theme.textSecondary)
-                                    Spacer()
-                                    Text("\(config.hudWaveformBarCount)")
-                                        .font(.caption2.monospacedDigit())
-                                        .foregroundColor(theme.textSecondary)
+                        hudStrip {
+                            inlineMenu("Style", width: 96) {
+                                Picker("", selection: $config.hudStyle) {
+                                    Text("Combined").tag("combined")
+                                    Text("Waveform").tag("waveform")
+                                    Text("Spectrum").tag("spectrum")
+                                    Text("Particles").tag("particles")
+                                    Text("Text").tag("text")
                                 }
-                                Slider(value: Binding(
-                                    get: { Double(config.hudWaveformBarCount) },
-                                    set: { config.hudWaveformBarCount = Int($0) }
-                                ), in: 20...60, step: 5)
+                                .labelsHidden()
                             }
 
-                            // Amplitude
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Amplitude")
-                                        .font(.caption2)
-                                        .foregroundColor(theme.textSecondary)
-                                    Spacer()
-                                    Text(String(format: "%.1fx", config.hudWaveformAmplitude))
-                                        .font(.caption2.monospacedDigit())
-                                        .foregroundColor(theme.textSecondary)
+                            if showsWaveformSettings {
+                                inlineMenu("Color", width: 84) {
+                                    Picker("", selection: $config.hudWaveformColor) {
+                                        Text("White").tag("white")
+                                        Text("Blue").tag("blue")
+                                        Text("Purple").tag("purple")
+                                        Text("Green").tag("green")
+                                        Text("Orange").tag("orange")
+                                        Text("Cyan").tag("cyan")
+                                        Text("Pink").tag("pink")
+                                    }
+                                    .labelsHidden()
                                 }
-                                Slider(value: $config.hudWaveformAmplitude, in: 0.5...2.0, step: 0.1)
                             }
 
-                            // Color
-                            HStack {
-                                Text("Color")
-                                    .font(.caption2)
-                                    .foregroundColor(theme.textSecondary)
-                                Spacer()
-                                Picker("", selection: $config.hudWaveformColor) {
-                                    Label("White", systemImage: "circle.fill").tag("white")
-                                        .foregroundColor(.white)
-                                    Label("Blue", systemImage: "circle.fill").tag("blue")
-                                        .foregroundColor(.blue)
-                                    Label("Purple", systemImage: "circle.fill").tag("purple")
-                                        .foregroundColor(.purple)
-                                    Label("Green", systemImage: "circle.fill").tag("green")
-                                        .foregroundColor(.green)
-                                    Label("Orange", systemImage: "circle.fill").tag("orange")
-                                        .foregroundColor(.orange)
-                                    Label("Cyan", systemImage: "circle.fill").tag("cyan")
-                                        .foregroundColor(.cyan)
-                                    Label("Pink", systemImage: "circle.fill").tag("pink")
-                                        .foregroundColor(.pink)
+                            if showsTextSettings {
+                                inlineMenu("Font", width: 84) {
+                                    Picker("", selection: $config.hudTextFont) {
+                                        Text("System").tag("system")
+                                        Text("Mono").tag("mono")
+                                        Text("Serif").tag("serif")
+                                        Text("Rounded").tag("rounded")
+                                    }
+                                    .labelsHidden()
                                 }
-                                .pickerStyle(.menu)
-                                .frame(width: 120)
+
+                                inlineMenu("Size", width: 68) {
+                                    Picker("", selection: $config.hudTextSize) {
+                                        Text("XS").tag("xs")
+                                        Text("SM").tag("sm")
+                                        Text("MD").tag("md")
+                                        Text("LG").tag("lg")
+                                        Text("XL").tag("xl")
+                                    }
+                                    .labelsHidden()
+                                }
                             }
+
+                            Spacer(minLength: 0)
                         }
 
-                        Divider().background(theme.border)
+                        if showsWaveformSettings {
+                            HudSectionLabel("Waveform")
 
-                        // Text Settings
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Text")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(theme.textSecondary)
+                            hudStrip {
+                                inlineSlider(
+                                    "Bars",
+                                    value: Binding(
+                                        get: { Double(config.hudWaveformBarCount) },
+                                        set: { config.hudWaveformBarCount = Int($0) }
+                                    ),
+                                    range: 20...60,
+                                    step: 5,
+                                    valueLabel: "\(config.hudWaveformBarCount)",
+                                    sliderWidth: 96
+                                )
 
-                            // Font
-                            HStack {
-                                Text("Font")
-                                    .font(.caption2)
-                                    .foregroundColor(theme.textSecondary)
-                                Spacer()
-                                Picker("", selection: $config.hudTextFont) {
-                                    Text("System").tag("system")
-                                    Text("Monospace").tag("mono")
-                                    Text("Serif").tag("serif")
-                                    Text("Rounded").tag("rounded")
-                                }
-                                .pickerStyle(.menu)
-                                .frame(width: 120)
-                            }
+                                inlineSlider(
+                                    "Amp",
+                                    value: $config.hudWaveformAmplitude,
+                                    range: 0.5...2.0,
+                                    step: 0.1,
+                                    valueLabel: String(format: "%.1fx", config.hudWaveformAmplitude),
+                                    sliderWidth: 96
+                                )
 
-                            // Size
-                            HStack {
-                                Text("Size")
-                                    .font(.caption2)
-                                    .foregroundColor(theme.textSecondary)
-                                Spacer()
-                                Picker("", selection: $config.hudTextSize) {
-                                    Text("Extra Small").tag("xs")
-                                    Text("Small").tag("sm")
-                                    Text("Medium").tag("md")
-                                    Text("Large").tag("lg")
-                                    Text("Extra Large").tag("xl")
-                                }
-                                .pickerStyle(.menu)
-                                .frame(width: 120)
+                                Spacer(minLength: 0)
                             }
                         }
                     }
                 }
             }
 
-            // Info section
-            GlassSection(title: "How It Works", icon: "info.circle.fill", color: .blue) {
-                VStack(alignment: .leading, spacing: 12) {
-                    InfoRow(
-                        icon: "terminal",
-                        title: "CLI Integration",
-                        description: "When SpeakEasy CLI plays audio, it sends a notification to the HUD"
-                    )
+            Text("CLI pushes playback events to /tmp/speakeasy-hud.fifo.")
+                .font(HudFont.ui(11))
+                .foregroundStyle(HudPalette.dim)
+        }
+    }
 
-                    InfoRow(
-                        icon: "pipe.and.drop.fill",
-                        title: "Named Pipe",
-                        description: "Uses a Unix named pipe at /tmp/speakeasy-hud.fifo for IPC"
-                    )
+    private var showsWaveformSettings: Bool {
+        config.hudStyle != "text"
+    }
 
-                    InfoRow(
-                        icon: "sparkles",
-                        title: "Non-Blocking",
-                        description: "CLI continues immediately if HUD isn't running - no delays"
-                    )
-                }
-            }
+    private var showsTextSettings: Bool {
+        config.hudStyle == "combined" || config.hudStyle == "text"
+    }
+
+    @ViewBuilder
+    private func hudStrip<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .center, spacing: HudSpacing.md) {
+            content()
+        }
+        .padding(.horizontal, HudSpacing.md)
+        .padding(.vertical, HudSpacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: HudRadius.standard, style: .continuous)
+                .fill(HudPalette.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: HudRadius.standard, style: .continuous)
+                .stroke(HudPalette.border, lineWidth: HudStrokeWidth.thin)
+        )
+    }
+
+    @ViewBuilder
+    private func inlineMenu<Content: View>(_ label: String, width: CGFloat, @ViewBuilder menu: () -> Content) -> some View {
+        HStack(spacing: HudSpacing.xs) {
+            Text(label)
+                .font(HudFont.ui(11))
+                .foregroundStyle(HudPalette.muted)
+            menu()
+                .frame(width: width)
+        }
+    }
+
+    private func inlineSlider(
+        _ label: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        step: Double,
+        valueLabel: String,
+        sliderWidth: CGFloat
+    ) -> some View {
+        HStack(spacing: HudSpacing.xs) {
+            Text(label)
+                .font(HudFont.ui(11))
+                .foregroundStyle(HudPalette.muted)
+                .frame(width: 52, alignment: .leading)
+
+            Slider(value: value, in: range, step: step)
+                .frame(width: sliderWidth)
+
+            Text(valueLabel)
+                .font(HudFont.mono(10))
+                .foregroundStyle(HudPalette.muted)
+                .monospacedDigit()
+                .frame(width: 34, alignment: .trailing)
         }
     }
 
@@ -2291,47 +1701,17 @@ struct HUDSettingsView: View {
     }
 
     private func testHUD() {
-        // Write a test message to the pipe
         let testMessage = """
         {"text":"This is a test of the HUD overlay system!","provider":"system","cached":false,"timestamp":\(Date().timeIntervalSince1970)}
         """
 
         DispatchQueue.global(qos: .userInitiated).async {
             let pipePath = "/tmp/speakeasy-hud.fifo"
-
-            // Try to write to pipe (non-blocking)
             guard let data = (testMessage + "\n").data(using: .utf8) else { return }
 
             if let fileHandle = FileHandle(forWritingAtPath: pipePath) {
                 fileHandle.write(data)
                 fileHandle.closeFile()
-            }
-        }
-    }
-}
-
-struct InfoRow: View {
-    @Environment(\.theme) var theme
-    let icon: String
-    let title: String
-    let description: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(theme.text.opacity(0.6))
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(theme.text)
-
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(theme.textSecondary)
             }
         }
     }

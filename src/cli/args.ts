@@ -38,6 +38,8 @@ export const cliSchema = z.object({
   setDefault: z.string().optional(),
   app: z.boolean().optional(),
   updateApp: z.boolean().optional(),
+  premium: z.boolean().optional(),
+  listVoices: z.boolean().optional(),
 });
 
 export type CliOptions = z.infer<typeof cliSchema>;

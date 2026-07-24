@@ -461,8 +461,8 @@ struct HUDTextSection: View {
         .onAppear {
             updateAnimationMode()
         }
-        .onChange(of: text) { _ in updateAnimationMode() }
-        .onChange(of: playbackProgress) { _ in updateAnimationMode() }
+        .onChange(of: text) { _, _ in updateAnimationMode() }
+        .onChange(of: playbackProgress) { _, _ in updateAnimationMode() }
         .onDisappear {
             animationTimer?.invalidate()
         }

@@ -7,16 +7,18 @@ interface ProviderConfig {
     volume?: number;
     instructions?: string;
 }
+/** @deprecated Use TTSAdapter from adapters/types instead. */
 interface Provider {
     speak(config: ProviderConfig): Promise<void>;
     validateConfig(): boolean;
-    getErrorMessage(error: any): string;
+    getErrorMessage(error: unknown): string;
 }
 interface SpeakEasyConfig {
     provider?: 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
     systemVoice?: string;
     openaiVoice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
     elevenlabsVoiceId?: string;
+    groqVoice?: string;
     geminiModel?: string;
     rate?: number;
     volume?: number;
@@ -96,60 +98,6 @@ interface GlobalConfig {
     };
 }
 
-declare class SystemProvider implements Provider {
-    private voice;
-    constructor(voice?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    validateConfig(): boolean;
-    getErrorMessage(error: any): string;
-}
-
-declare class OpenAIProvider implements Provider {
-    private apiKey;
-    private voice;
-    private instructions?;
-    constructor(apiKey?: string, voice?: string, instructions?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
-    private generateAudioWithInstructions;
-    validateConfig(): boolean;
-    getErrorMessage(error: any): string;
-}
-
-declare class ElevenLabsProvider implements Provider {
-    private apiKey;
-    private voiceId;
-    constructor(apiKey?: string, voiceId?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
-    validateConfig(): boolean;
-    getErrorMessage(error: any): string;
-}
-
-declare class GroqProvider implements Provider {
-    private apiKey;
-    private voice;
-    constructor(apiKey?: string, voice?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
-    validateConfig(): boolean;
-    getErrorMessage(error: any): string;
-}
-
-declare class GeminiProvider implements Provider {
-    private apiKey;
-    private model;
-    private voiceName;
-    constructor(apiKey?: string, model?: string, voiceName?: string);
-    speak(config: ProviderConfig): Promise<void>;
-    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
-    private convertToWav;
-    private parseMimeType;
-    private createWavHeader;
-    validateConfig(): boolean;
-    getErrorMessage(error: any): string;
-}
-
 interface CacheLogger {
     debug: (message: string, ...args: any[]) => void;
     info: (message: string, ...args: any[]) => void;
@@ -200,35 +148,60 @@ interface CacheStats {
     avgFileSize: number;
     hitRate: number;
 }
+type SqliteBackend = 'node' | 'bun';
 declare class TTSCache {
-    private cache;
     private cacheDir;
+    private dbPath;
+    private metadataFile;
+    private statsFile;
+    private ttlMs;
     private maxSize?;
     private logger;
-    private metadataDb;
-    private statsFile;
+    private db;
+    private sqliteBackend;
+    private jsonEntries;
+    private useJsonFallback;
+    private metadataLoaded;
     private cacheHits;
     private cacheMisses;
     constructor(cacheDir: string, ttl?: string | number, maxSize?: string | number, logger?: CacheLogger);
-    private initializeMetadataDb;
     private createDefaultLogger;
-    get(key: string): Promise<CacheEntry | undefined>;
+    private initializeStorage;
+    private migrateJsonMetadataIfNeeded;
+    private migrateLegacySqliteIfNeeded;
+    private importStoredEntry;
+    private importLegacyMetadataDb;
+    private importLegacyKeyvDb;
+    private ensureMetadataLoaded;
+    private loadJsonMetadata;
+    private saveJsonMetadata;
     private loadStats;
     private saveStats;
+    private rowToStoredEntry;
+    private rowToMetadata;
+    private toMetadata;
+    private isExpired;
+    private isValidEntry;
+    private inferModel;
+    private getSource;
+    private getSessionId;
+    private upsertSqliteEntry;
+    private getSqliteEntry;
+    private deleteSqliteEntry;
+    private deleteEntry;
+    private enforceMaxSize;
+    private buildSearchQuery;
+    private filterJsonMetadata;
+    private calculateStats;
+    get(key: string): Promise<CacheEntry | undefined>;
     set(key: string, entry: Omit<CacheEntry, 'timestamp' | 'audioFilePath'>, audioBuffer: Buffer, options?: {
         model?: string;
         source?: string;
         durationMs?: number;
         success?: boolean;
         errorMessage?: string;
+        extension?: 'mp3' | 'wav' | 'aiff';
     }): Promise<boolean>;
-    private inferModel;
-    private getSource;
-    private getSessionId;
-    private addMetadata;
-    private getMetadataFromDb;
-    private deleteMetadata;
-    private loadMetadataIndex;
     getCacheMetadata(): Promise<CacheMetadata[]>;
     findByText(text: string): Promise<CacheMetadata[]>;
     findByProvider(provider: string): Promise<CacheMetadata[]>;
@@ -249,15 +222,156 @@ declare class TTSCache {
         offset?: number;
     }): Promise<CacheMetadata[]>;
     getStats(): Promise<CacheStats>;
-    private calculateStatsFromMetadata;
     getRecent(limit?: number): Promise<CacheMetadata[]>;
     delete(key: string): Promise<boolean>;
     clear(): Promise<void>;
     cleanup(maxAge?: number): Promise<void>;
-    private cleanupFileBased;
-    private isValidEntry;
-    generateCacheKey(text: string, provider: string, voice: string, rate: number): string;
+    generateCacheKey(text: string, provider: string, voice: string, rate: number, instructions?: string): string;
     getCacheDir(): string;
+    getEntryCount(): number;
+    usesSqlite(): boolean;
+    getSqliteBackend(): SqliteBackend | 'json';
+}
+
+type TTSProviderId = 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
+type TTSAudioFormat = 'mp3' | 'wav' | 'aiff';
+interface TTSRequest {
+    text: string;
+    voice: string;
+    rate: number;
+    volume: number;
+    tempDir: string;
+    apiKey?: string;
+    instructions?: string;
+}
+interface TTSResult {
+    audio: Buffer;
+    format: TTSAudioFormat;
+    model?: string;
+}
+interface TTSAdapterCapabilities {
+    /** Audio can be written to the shared SQLite/file cache. */
+    cacheable: boolean;
+    /** Provider accepts steering instructions (accent, tone, etc.). */
+    instructions: boolean;
+    /** Caller can synthesize without playing (silent mode). */
+    silent: boolean;
+}
+interface TTSAdapter {
+    readonly id: TTSProviderId;
+    readonly capabilities: TTSAdapterCapabilities;
+    validate(): boolean;
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    formatError(error: unknown): string;
+}
+
+declare const PROVIDER_ORDER: TTSProviderId[];
+declare function createAdapterRegistry(config: SpeakEasyConfig): Map<TTSProviderId, TTSAdapter>;
+
+declare function playAudioFile(filePath: string, volume?: number): Promise<void>;
+declare function playTTSResult(result: TTSResult, volume: number, tempDir: string): Promise<void>;
+declare function stopPlayback(): void;
+
+declare function getAvailableVoices(): string[];
+declare function getBestVoice(language?: string): string;
+declare class SystemProvider implements TTSAdapter, Provider {
+    readonly id: "system";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
+    private voice;
+    constructor(voice?: string);
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    validate(): boolean;
+    formatError(error: unknown): string;
+    validateConfig(): boolean;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
+}
+
+declare class OpenAIProvider implements TTSAdapter, Provider {
+    readonly id: "openai";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
+    private apiKey;
+    private voice;
+    private instructions?;
+    constructor(apiKey?: string, voice?: string, instructions?: string);
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    private synthesizeWithInstructions;
+    validate(): boolean;
+    formatError(error: unknown): string;
+    validateConfig(): boolean;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
+}
+
+declare class ElevenLabsProvider implements TTSAdapter, Provider {
+    readonly id: "elevenlabs";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
+    private apiKey;
+    private voiceId;
+    constructor(apiKey?: string, voiceId?: string);
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    validate(): boolean;
+    formatError(error: unknown): string;
+    validateConfig(): boolean;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
+}
+
+declare class GroqProvider implements TTSAdapter, Provider {
+    readonly id: "groq";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
+    private apiKey;
+    private voice;
+    constructor(apiKey?: string, voice?: string);
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    validate(): boolean;
+    formatError(error: unknown): string;
+    validateConfig(): boolean;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
+}
+
+declare class GeminiProvider implements TTSAdapter, Provider {
+    readonly id: "gemini";
+    readonly capabilities: {
+        cacheable: boolean;
+        instructions: boolean;
+        silent: boolean;
+    };
+    private apiKey;
+    private model;
+    private voiceName;
+    constructor(apiKey?: string, model?: string, voiceName?: string);
+    synthesize(request: TTSRequest): Promise<TTSResult>;
+    private convertToWav;
+    private parseMimeType;
+    private createWavHeader;
+    validate(): boolean;
+    formatError(error: unknown): string;
+    validateConfig(): boolean;
+    getErrorMessage(error: unknown): string;
+    generateAudio(config: ProviderConfig): Promise<Buffer | null>;
+    speak(config: ProviderConfig): Promise<void>;
 }
 
 declare const PLAYER_PROTOCOL_VERSION = 1;
@@ -329,7 +443,7 @@ declare function enqueueInPlayer(audioPath: string, options?: EnqueueOptions): P
 declare const CONFIG_FILE: string;
 declare class SpeakEasy {
     private config;
-    private providers;
+    private adapters;
     private isPlaying;
     private queue;
     private cache?;
@@ -337,21 +451,22 @@ declare class SpeakEasy {
     private debug;
     private hudEnabled;
     constructor(config: SpeakEasyConfig);
-    private initializeProviders;
     speak(text: string, options?: SpeakEasyOptions): Promise<void>;
     private processQueue;
     private speakText;
+    private buildRequest;
     private printConfigDiagnostics;
-    private playCachedAudio;
     private getVoiceForProvider;
     private getApiKeyForProvider;
-    private inferModel;
     private sendHUDNotification;
     private stopSpeaking;
-    getCacheStats(): Promise<{
-        size: number;
+    private requireCache;
+    getCacheStats(): Promise<CacheStats & {
         dir?: string;
     }>;
+    getCacheMetadata(): Promise<CacheMetadata[]>;
+    findByText(text: string): Promise<CacheMetadata[]>;
+    findByProvider(provider: string): Promise<CacheMetadata[]>;
 }
 declare const say: (text: string, provider?: "system" | "openai" | "elevenlabs" | "groq" | "gemini") => Promise<void>;
 declare const speak: (text: string, options?: SpeakEasyOptions & {
@@ -359,4 +474,4 @@ declare const speak: (text: string, options?: SpeakEasyOptions & {
     volume?: number;
 }) => Promise<void>;
 
-export { CONFIG_FILE, ElevenLabsProvider, EnqueueOptions, GeminiProvider, GlobalConfig, GroqProvider, OpenAIProvider, PLAYER_PROTOCOL_VERSION, PLAYER_SOCKET_PATH, PlaybackItem, PlaybackState, PlayerCommand, PlayerCommandArguments, PlayerCommandRequest, PlayerCommandResponse, PlayerSnapshot, PlayerUnavailableError, Provider, ProviderConfig, QueuePriority, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSCache, enqueueInPlayer, say, sendPlayerCommand, speak };
+export { CONFIG_FILE, CacheMetadata, CacheStats, ElevenLabsProvider, EnqueueOptions, GeminiProvider, GlobalConfig, GroqProvider, OpenAIProvider, PLAYER_PROTOCOL_VERSION, PLAYER_SOCKET_PATH, PROVIDER_ORDER, PlaybackItem, PlaybackState, PlayerCommand, PlayerCommandArguments, PlayerCommandRequest, PlayerCommandResponse, PlayerSnapshot, PlayerUnavailableError, Provider, ProviderConfig, QueuePriority, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSAdapter, TTSAdapterCapabilities, TTSAudioFormat, TTSCache, TTSProviderId, TTSRequest, TTSResult, createAdapterRegistry, enqueueInPlayer, getAvailableVoices, getBestVoice, playAudioFile, playTTSResult, say, sendPlayerCommand, speak, stopPlayback };
