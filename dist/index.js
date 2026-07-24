@@ -35,10 +35,15 @@ __export(src_exports, {
   GeminiProvider: () => GeminiProvider,
   GroqProvider: () => GroqProvider,
   OpenAIProvider: () => OpenAIProvider,
+  PLAYER_PROTOCOL_VERSION: () => PLAYER_PROTOCOL_VERSION,
+  PLAYER_SOCKET_PATH: () => PLAYER_SOCKET_PATH,
+  PlayerUnavailableError: () => PlayerUnavailableError,
   SpeakEasy: () => SpeakEasy,
   SystemProvider: () => SystemProvider,
   TTSCache: () => TTSCache,
+  enqueueInPlayer: () => enqueueInPlayer,
   say: () => say,
+  sendPlayerCommand: () => sendPlayerCommand,
   speak: () => speak
 });
 module.exports = __toCommonJS(src_exports);
@@ -1430,6 +1435,102 @@ function getHistory() {
   return historyInstance;
 }
 
+// src/player-client.ts
+var import_node_crypto = require("crypto");
+var import_node_net = require("net");
+
+// src/player-protocol.ts
+var PLAYER_PROTOCOL_VERSION = 1;
+var PLAYER_SOCKET_PATH = "/tmp/speakeasy-player.sock";
+
+// src/player-client.ts
+var PlayerUnavailableError = class extends Error {
+  constructor(message = "SpeakEasy player is unavailable") {
+    super(message);
+    this.name = "PlayerUnavailableError";
+  }
+};
+function sendPlayerCommand(command, commandArguments, timeoutMs = 5e3) {
+  const request = {
+    protocolVersion: PLAYER_PROTOCOL_VERSION,
+    requestId: (0, import_node_crypto.randomUUID)(),
+    command,
+    arguments: commandArguments
+  };
+  return new Promise((resolve, reject) => {
+    const socket = (0, import_node_net.createConnection)({ path: PLAYER_SOCKET_PATH });
+    let buffer = "";
+    let settled = false;
+    const finish = (error, response) => {
+      if (settled)
+        return;
+      settled = true;
+      socket.destroy();
+      if (error)
+        reject(error);
+      else if (response)
+        resolve(response);
+    };
+    socket.setTimeout(timeoutMs, () => {
+      finish(new PlayerUnavailableError("SpeakEasy player did not respond"));
+    });
+    socket.on("connect", () => {
+      socket.write(`${JSON.stringify(request)}
+`);
+    });
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      const newline = buffer.indexOf("\n");
+      if (newline < 0)
+        return;
+      try {
+        const response = JSON.parse(buffer.slice(0, newline));
+        if (response.protocolVersion !== PLAYER_PROTOCOL_VERSION) {
+          finish(new Error(`Unsupported SpeakEasy player protocol ${response.protocolVersion}`));
+          return;
+        }
+        if (response.requestId.toLowerCase() !== request.requestId.toLowerCase()) {
+          finish(new Error("SpeakEasy player returned a mismatched request id"));
+          return;
+        }
+        finish(void 0, response);
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+    socket.on("error", (error) => {
+      const code = error.code;
+      if (code === "ENOENT" || code === "ECONNREFUSED") {
+        finish(new PlayerUnavailableError());
+      } else {
+        finish(error);
+      }
+    });
+    socket.on("end", () => {
+      if (!settled)
+        finish(new Error("SpeakEasy player closed the connection without a response"));
+    });
+  });
+}
+function enqueueInPlayer(audioPath, options = {}) {
+  const item = {
+    id: (0, import_node_crypto.randomUUID)(),
+    audioPath,
+    title: options.title ?? "SpeakEasy narration",
+    text: options.text,
+    provider: options.provider,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    synthesisRateWPM: options.synthesisRateWPM,
+    sourceThreadId: options.sourceThreadId ?? process.env.CODEX_THREAD_ID
+  };
+  return sendPlayerCommand("enqueue", {
+    item,
+    priority: options.priority ?? "normal",
+    interrupt: options.interrupt ?? false,
+    autoplay: options.autoplay ?? true
+  });
+}
+
 // src/index.ts
 function playAudioWithLevels(audioFile, volume = 1) {
   return new Promise((resolve, reject) => {
@@ -1919,9 +2020,14 @@ var speak = (text, options) => {
   GeminiProvider,
   GroqProvider,
   OpenAIProvider,
+  PLAYER_PROTOCOL_VERSION,
+  PLAYER_SOCKET_PATH,
+  PlayerUnavailableError,
   SpeakEasy,
   SystemProvider,
   TTSCache,
+  enqueueInPlayer,
   say,
+  sendPlayerCommand,
   speak
 });

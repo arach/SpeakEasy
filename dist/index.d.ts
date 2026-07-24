@@ -260,6 +260,72 @@ declare class TTSCache {
     getCacheDir(): string;
 }
 
+declare const PLAYER_PROTOCOL_VERSION = 1;
+declare const PLAYER_SOCKET_PATH = "/tmp/speakeasy-player.sock";
+type PlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'failed';
+type QueuePriority = 'high' | 'normal' | 'low';
+type PlayerCommand = 'enqueue' | 'pause' | 'resume' | 'togglePlayback' | 'stop' | 'skip' | 'seek' | 'setVolume' | 'setPlaybackRate' | 'removeQueueItem' | 'clearQueue' | 'status';
+interface PlaybackItem {
+    id: string;
+    audioPath: string;
+    title: string;
+    text?: string;
+    provider?: string;
+    createdAt: string;
+    synthesisRateWPM?: number;
+    sourceThreadId?: string;
+}
+interface PlayerCommandArguments {
+    item?: PlaybackItem;
+    priority?: QueuePriority;
+    interrupt?: boolean;
+    autoplay?: boolean;
+    positionSeconds?: number;
+    volume?: number;
+    playbackRate?: number;
+    itemId?: string;
+}
+interface PlayerCommandRequest {
+    protocolVersion: typeof PLAYER_PROTOCOL_VERSION;
+    requestId: string;
+    command: PlayerCommand;
+    arguments?: PlayerCommandArguments;
+}
+interface PlayerSnapshot {
+    state: PlaybackState;
+    currentItem?: PlaybackItem;
+    queue: PlaybackItem[];
+    currentTime: number;
+    duration: number;
+    volume: number;
+    playbackRate: number;
+    autoplayEnabled: boolean;
+    audioLevel: number;
+}
+interface PlayerCommandResponse {
+    protocolVersion: number;
+    requestId: string;
+    ok: boolean;
+    snapshot: PlayerSnapshot;
+    error?: string;
+}
+
+interface EnqueueOptions {
+    title?: string;
+    text?: string;
+    provider?: string;
+    synthesisRateWPM?: number;
+    sourceThreadId?: string;
+    priority?: QueuePriority;
+    interrupt?: boolean;
+    autoplay?: boolean;
+}
+declare class PlayerUnavailableError extends Error {
+    constructor(message?: string);
+}
+declare function sendPlayerCommand(command: PlayerCommand, commandArguments?: PlayerCommandArguments, timeoutMs?: number): Promise<PlayerCommandResponse>;
+declare function enqueueInPlayer(audioPath: string, options?: EnqueueOptions): Promise<PlayerCommandResponse>;
+
 declare const CONFIG_FILE: string;
 declare class SpeakEasy {
     private config;
@@ -293,4 +359,4 @@ declare const speak: (text: string, options?: SpeakEasyOptions & {
     volume?: number;
 }) => Promise<void>;
 
-export { CONFIG_FILE, ElevenLabsProvider, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, type Provider, type ProviderConfig, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, TTSCache, say, speak };
+export { CONFIG_FILE, ElevenLabsProvider, EnqueueOptions, GeminiProvider, GlobalConfig, GroqProvider, OpenAIProvider, PLAYER_PROTOCOL_VERSION, PLAYER_SOCKET_PATH, PlaybackItem, PlaybackState, PlayerCommand, PlayerCommandArguments, PlayerCommandRequest, PlayerCommandResponse, PlayerSnapshot, PlayerUnavailableError, Provider, ProviderConfig, QueuePriority, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSCache, enqueueInPlayer, say, sendPlayerCommand, speak };

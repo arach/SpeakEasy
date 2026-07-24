@@ -10,6 +10,10 @@ let package = Package(
         .executableTarget(
             name: "SpeakEasy",
             path: "Sources/SpeakEasy"
+        ),
+        .testTarget(
+            name: "SpeakEasyTests",
+            dependencies: ["SpeakEasy"]
         )
     ]
 )
