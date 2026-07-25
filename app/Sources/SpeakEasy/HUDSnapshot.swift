@@ -58,7 +58,12 @@ enum HUDSnapshot {
             .padding(12)
 
         let hostingView = NSHostingView(rootView: rootView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 504, height: 204)
+        hostingView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: HUDLayout.width + 24,
+            height: HUDLayout.height + 24
+        )
         hostingView.layoutSubtreeIfNeeded()
 
         guard let representation = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds) else {

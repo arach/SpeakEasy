@@ -110,6 +110,40 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertEqual(presentation.laneNumber, 2)
     }
 
+    func testCueingHUDKeepsTaskInHeaderAndExplainsMicOffInBody() {
+        XCTAssertEqual(ListeningPhase.cueing.label, "Confirming")
+
+        let presentation = HUDConversationPresentation(
+            phase: .cueing,
+            taskTitle: "Prototype SpeakEasy listening mode",
+            taskID: "019f99a4-7867-7c23-ac29-0c0eca7da603",
+            laneNumber: 2,
+            transcript: "",
+            error: nil,
+            inputDeviceName: nil
+        )
+
+        XCTAssertEqual(presentation.title, "Lane 2 confirmed")
+        XCTAssertEqual(presentation.detail, "Status check · microphone is off")
+        XCTAssertFalse(presentation.detail.contains(presentation.taskTitle))
+        XCTAssertEqual(presentation.taskTitle, "Prototype SpeakEasy listening mode")
+    }
+
+    func testCompactConversationHUDLayoutKeepsReadableHierarchy() {
+        XCTAssertEqual(HUDLayout.width, 404)
+        XCTAssertEqual(HUDLayout.height, 132)
+        XCTAssertLessThan(HUDLayout.width, 480)
+        XCTAssertLessThan(HUDLayout.height, 180)
+        XCTAssertGreaterThanOrEqual(HUDLayout.titleSize, 13)
+        XCTAssertGreaterThanOrEqual(HUDLayout.detailSize, 10)
+        XCTAssertGreaterThanOrEqual(HUDLayout.iconSize, 30)
+        XCTAssertGreaterThanOrEqual(HUDLayout.energyHeight, 12)
+        XCTAssertGreaterThanOrEqual(HUDLayout.energyBarCount, 24)
+        XCTAssertLessThanOrEqual(HUDPhaseChrome.glowOpacity, 0.12)
+        XCTAssertLessThanOrEqual(HUDPhaseChrome.borderOpacity, 0.24)
+        XCTAssertLessThanOrEqual(HUDPhaseChrome.shadowOpacity, 0.10)
+    }
+
     func testVoiceLanePersistsItsExactTaskIdentity() throws {
         let lane = VoiceLane(
             number: 4,

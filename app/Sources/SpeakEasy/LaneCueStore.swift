@@ -38,9 +38,7 @@ actor LaneCueStore {
             attributes: [.posixPermissions: 0o700]
         )
 
-        // The HUD already names the lane. Speaking only the compact task title
-        // keeps the select-to-microphone interval short and useful.
-        let cue = "\(lane.spokenTitle)."
+        let cue = "Lane \(lane.number). \(lane.spokenTitle)."
         let temporary = try await narrator.render(text: cue, configuration: configuration)
         defer { try? FileManager.default.removeItem(at: temporary) }
 
@@ -89,7 +87,7 @@ actor LaneCueStore {
         configuration: SpeechNarrationConfiguration
     ) -> String {
         let identity = [
-            "cue-v2",
+            "cue-v3",
             lane.task.id,
             lane.task.title,
             configuration.provider,

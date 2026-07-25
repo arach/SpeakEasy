@@ -20,7 +20,7 @@ enum ListeningPhase: String, Sendable {
         switch self {
         case .unlocked: "Choose a task"
         case .validatingLock: "Checking task"
-        case .cueing: "Announcing lane"
+        case .cueing: "Confirming"
         case .ready: "Ready"
         case .warmingUp: "Opening microphone"
         case .recording: "Listening"
