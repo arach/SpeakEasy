@@ -58,13 +58,17 @@ dist/speakeasy-skill-0.1.0.zip.sha256
       `2U83JFPW66`, the expected four frameworks, no framework copies under `Contents/MacOS`, and
       a packaged executable hash identical to the signed source app. This is proof of the combined
       release path only; rebuild from the merged revision before publishing.
-- [ ] Build the release DMG from the merged revision:
+- [x] Build the final `0.2.17` release DMG from the exact tree merged by
+      [PR #3](https://github.com/arach/SpeakEasy/pull/3) as
+      `253a09e064c6536f5df8e7670749d6450e451842`. Apple accepted submission
+      `30d199cd-405a-454f-94cd-5b70f0933c15`, and the ticket was stapled successfully.
 
   ```bash
   app/tools/release/build-dmg.sh <version>
   ```
 
-- [ ] Verify the final artifact independently:
+- [x] Verify the final artifact independently with `codesign`, `stapler`, and Gatekeeper. The DMG
+      was accepted as a notarized Developer ID release.
 
   ```bash
   codesign --verify --verbose=2 app/dist/SpeakEasy.dmg
@@ -72,18 +76,23 @@ dist/speakeasy-skill-0.1.0.zip.sha256
   spctl --assess --type open --context context:primary-signature --verbose=4 app/dist/SpeakEasy.dmg
   ```
 
-- [ ] Mount the DMG and run `codesign --verify --deep --strict --verbose=2` on `SpeakEasy.app`.
-- [ ] Publish a new GitHub release containing both `SpeakEasy.dmg` and a versioned DMG asset.
-- [ ] Confirm the GitHub `releases/latest` endpoint resolves to the new release and both assets share
-      the expected SHA-256 digest.
-- [ ] Install once through the bundled skill runtime, proving that a reviewer receives the new
-      permanent player rather than `v0.2.16`.
+- [x] Mount the DMG through the hardened installer and run deep strict signature verification on
+      `SpeakEasy.app`. The installed app reports version `0.2.17` and team `2U83JFPW66`.
+- [x] Publish [SpeakEasy 0.2.17](https://github.com/arach/SpeakEasy/releases/tag/v0.2.17) with both
+      `SpeakEasy.dmg` and `SpeakEasy-0.2.17.dmg`.
+- [x] Confirm the GitHub `releases/latest` endpoint resolves to `v0.2.17` and both assets share
+      SHA-256 `93fe90fbdd5599ade46469a8a6af40b4d00da1c1950447dab0144b1e45f5b014`.
+- [x] Install through the bundled skill runtime. It upgraded the local app from `v0.2.7` to
+      `v0.2.17`, passed the signed/notarized DMG and expected-team checks, relaunched from
+      `~/.speakeasy/SpeakEasy.app`, and returned a healthy player status.
 
 ## 3. Public website and policies
 
 - [x] Privacy, terms, and support routes build in the production Next.js export.
-- [ ] Merge and deploy the legal-site changes.
-- [ ] Confirm each URL returns HTTP 200 publicly:
+- [x] Merge and deploy the legal-site changes in
+      [PR #3](https://github.com/arach/SpeakEasy/pull/3). The corrected player/download narrative
+      followed in [PR #4](https://github.com/arach/SpeakEasy/pull/4).
+- [x] Confirm each URL returns HTTP 200 publicly:
 
   ```text
   https://speakeasy.arach.dev/
@@ -92,11 +101,12 @@ dist/speakeasy-skill-0.1.0.zip.sha256
   https://speakeasy.arach.dev/terms/
   ```
 
-The support, privacy, and terms URLs returned HTTP 404 at the last audit.
+The homepage now links directly to the stable signed DMG and shows the real native player. The
+support, privacy, and terms pages all returned HTTP 200 after the production Pages deployment.
 
 ## 4. OpenAI Platform submission
 
-- [ ] Sign in to the OpenAI Platform organization that will own the listing.
+- [x] Sign in to the OpenAI Platform organization that will own the listing.
 - [ ] Confirm a verified individual or business identity that matches the public listing.
 - [ ] Confirm the submitter has `Apps Management: Write`.
 - [ ] Create a **Skills only** submission draft.
@@ -107,3 +117,8 @@ The support, privacy, and terms URLs returned HTTP 404 at the last audit.
 - [ ] State the macOS/Bun/native-player prerequisites prominently for reviewers and users.
 - [ ] Complete policy attestations only after the native release and all public URLs are live.
 - [ ] Run every reviewer fixture once against the exact uploaded ZIP, then submit for review.
+
+Current external blocker: the `Personal` OpenAI Platform organization shows both Individual and
+Business publisher verification as not started. The signed-in submitter is the organization Owner,
+but a publisher identity must be completed by the user before the skills-only submission can be
+created or sent for review.
