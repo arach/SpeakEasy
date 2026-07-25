@@ -1,4 +1,5 @@
 {
+  "originHash" : "de86578c859ed5e4cb23f2c28395243714d42a32076b7d47fa1347ff87dcd486",
   "pins" : [
     {
       "identity" : "hudsonkit-xcframework",
@@ -8,7 +9,15 @@
         "revision" : "913a62e8b6be2f457ba14a12685824b5b9d2aa3e",
         "version" : "0.3.3"
       }
+    },
+    {
+      "identity" : "vox",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/arach/vox.git",
+      "state" : {
+        "revision" : "19be9f1d30b2fd7a79c5f88feffcb44091854761"
+      }
     }
   ],
-  "version" : 2
+  "version" : 3
 }

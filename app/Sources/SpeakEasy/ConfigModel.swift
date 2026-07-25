@@ -232,6 +232,10 @@ class ConfigManager: ObservableObject {
         }
     }
 
+    var openaiModel: String {
+        config.providers?.openai?.model ?? "tts-1"
+    }
+
     var openaiInstructions: String {
         get { config.providers?.openai?.instructions ?? "" }
         set {
@@ -263,6 +267,10 @@ class ConfigManager: ObservableObject {
         }
     }
 
+    var elevenlabsModelId: String {
+        config.providers?.elevenlabs?.modelId ?? "eleven_multilingual_v2"
+    }
+
     // Groq
     var groqApiKey: String {
         get { config.providers?.groq?.apiKey ?? "" }
@@ -272,6 +280,14 @@ class ConfigManager: ObservableObject {
             config.providers?.groq?.apiKey = newValue.isEmpty ? nil : newValue
             markUnsaved()
         }
+    }
+
+    var groqVoice: String {
+        config.providers?.groq?.voice ?? "tara"
+    }
+
+    var groqModel: String {
+        config.providers?.groq?.model ?? "canopylabs/orpheus-v1-english"
     }
 
     // Gemini

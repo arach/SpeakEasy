@@ -47,6 +47,49 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertEqual(decoded.arguments?.priority, .high)
         XCTAssertEqual(decoded.arguments?.interrupt, true)
         XCTAssertEqual(decoded.arguments?.item?.sourceThreadId, item.sourceThreadId)
+        XCTAssertNil(decoded.arguments?.item?.cleanupAfterPlayback)
+    }
+
+    func testTemporaryNarrationCanRequestCleanupWithoutBreakingOlderWireItems() throws {
+        let legacyJSON = #"{"id":"daffdeaf-0000-4000-8000-000000000001","audioPath":"/tmp/legacy.aiff","title":"Legacy","createdAt":"2026-07-25T00:00:00Z"}"#
+        let legacy = try JSONDecoder().decode(PlaybackItem.self, from: Data(legacyJSON.utf8))
+        XCTAssertNil(legacy.cleanupAfterPlayback)
+
+        let temporary = PlaybackItem(
+            id: UUID(),
+            audioPath: "/tmp/temporary.aiff",
+            title: "Voice response",
+            text: "Done",
+            provider: "system",
+            createdAt: "2026-07-25T00:00:00Z",
+            synthesisRateWPM: 180,
+            sourceThreadId: "019f9573-3e55-7701-8968-09c12d4fafe5",
+            cleanupAfterPlayback: true
+        )
+        XCTAssertTrue(try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(temporary)) as? [String: Any]
+        )["cleanupAfterPlayback"] as? Bool ?? false)
+    }
+
+    func testNarrationFlattenRemovesCommonMarkdown() {
+        XCTAssertEqual(
+            ConfiguredResponseNarrator.flatten("## Result\n- **Passed** with `voice`"),
+            "Result. Passed with voice"
+        )
+    }
+
+    func testGeminiPCMIsWrappedInAPlayableWAVContainer() throws {
+        let pcm = Data([0, 1, 2, 3])
+        let wav = try ConfiguredResponseNarrator.pcmWAV(
+            audio: pcm,
+            mimeType: "audio/L16;codec=pcm;rate=24000"
+        )
+
+        XCTAssertEqual(String(data: wav.prefix(4), encoding: .ascii), "RIFF")
+        XCTAssertEqual(String(data: wav[8..<12], encoding: .ascii), "WAVE")
+        XCTAssertEqual(String(data: wav[36..<40], encoding: .ascii), "data")
+        XCTAssertEqual(wav.count, 44 + pcm.count)
+        XCTAssertEqual(wav.suffix(pcm.count), pcm)
     }
 
     func testCodexTaskLinkRejectsUnsafeThreadIdentifiers() {

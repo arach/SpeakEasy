@@ -250,6 +250,7 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     private func finishCurrentItem() {
+        let finishedItem = currentItem
         HUDWindowManager.shared.playbackDidFinish()
         progressTimer?.invalidate()
         progressTimer = nil
@@ -259,6 +260,9 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         duration = 0
         audioLevel = 0
         state = .idle
+        if finishedItem?.cleanupAfterPlayback == true {
+            try? FileManager.default.removeItem(atPath: finishedItem?.audioPath ?? "")
+        }
     }
 
     private func startProgressTimer() {

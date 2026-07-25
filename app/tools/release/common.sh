@@ -87,6 +87,16 @@ speakeasy_bundle_swiftpm_frameworks() {
     fi
 }
 
+speakeasy_bundle_swiftpm_resources() {
+    local build_bin_dir="$1"
+    local resources_dir="$2"
+    local resource_bundle
+
+    while IFS= read -r -d '' resource_bundle; do
+        ditto "$resource_bundle" "$resources_dir/$(basename "$resource_bundle")"
+    done < <(find -L "$build_bin_dir" -maxdepth 1 -type d -name '*.bundle' -print0)
+}
+
 speakeasy_verify_bundle_layout() {
     local bundle_path="$1"
     local executable="$bundle_path/Contents/MacOS/SpeakEasy"
@@ -139,6 +149,10 @@ speakeasy_bundle_app() {
         "$build_dir" \
         "$bundle_path/Contents/Frameworks" \
         "$app_root/.build/artifacts"
+
+    speakeasy_bundle_swiftpm_resources \
+        "$build_dir" \
+        "$bundle_path/Contents/Resources"
 
     cp "$app_root/Resources/Info.plist" "$bundle_path/Contents/"
 
