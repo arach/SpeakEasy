@@ -2,7 +2,9 @@ import SwiftUI
 
 struct ListeningPopoverSection: View {
     @ObservedObject private var listening = ListeningSessionController.shared
+    @ObservedObject private var config = ConfigManager.shared
     @Environment(\.theme) private var theme
+    @State private var laneVoiceDraft = ""
 
     private let accent = Color(red: 0.36, green: 0.87, blue: 0.66)
 
@@ -199,6 +201,7 @@ struct ListeningPopoverSection: View {
                     .font(.system(size: 9, weight: .medium))
                     .foregroundColor(theme.textTertiary)
                     .lineLimit(1)
+                laneVoiceEditor(for: assignment)
             } else {
                 Text("Tap an empty lane to assign this exact task.")
                     .font(.system(size: 9))
@@ -207,6 +210,99 @@ struct ListeningPopoverSection: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Exact task voice lanes")
+        .onAppear(perform: synchronizeVoiceDraft)
+        .onChange(of: listening.activeLaneNumber) { synchronizeVoiceDraft() }
+        .onChange(of: config.defaultProvider) { synchronizeVoiceDraft() }
+    }
+
+    private func laneVoiceEditor(for assignment: VoiceLane) -> some View {
+        HStack(spacing: 5) {
+            Text(config.defaultProvider.uppercased())
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                .foregroundColor(theme.textTertiary)
+
+            TextField("Inherit \(globalVoiceID)", text: $laneVoiceDraft)
+                .textFieldStyle(.plain)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(theme.textSecondary)
+                .padding(.horizontal, 6)
+                .frame(height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(theme.text.opacity(0.045))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(theme.text.opacity(0.09), lineWidth: 0.75)
+                }
+                .onSubmit { saveVoiceDraft(for: assignment.number) }
+                .accessibilityLabel("Voice ID for lane \(assignment.number)")
+                .accessibilityHint("Leave empty to inherit \(globalVoiceID) from the global \(config.defaultProvider) provider")
+
+            Button {
+                saveVoiceDraft(for: assignment.number)
+            } label: {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(accent)
+            .disabled(isBusy)
+            .help("Save voice for lane \(assignment.number)")
+            .accessibilityLabel("Save lane voice")
+
+            if assignment.voiceOverride != nil {
+                Button {
+                    laneVoiceDraft = ""
+                    listening.setVoiceOverride(
+                        provider: config.defaultProvider,
+                        voiceID: "",
+                        forLane: assignment.number
+                    )
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 8, weight: .semibold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(theme.textTertiary)
+                .disabled(isBusy)
+                .help("Inherit the global \(config.defaultProvider) voice")
+                .accessibilityLabel("Reset lane voice to the global provider default")
+            }
+        }
+    }
+
+    private var globalVoiceID: String {
+        switch config.defaultProvider {
+        case "openai": config.openaiVoice
+        case "elevenlabs": config.elevenlabsVoiceId
+        case "groq": config.groqVoice
+        case "gemini": "Puck"
+        case "system": config.systemVoice
+        default: "provider default"
+        }
+    }
+
+    private func synchronizeVoiceDraft() {
+        guard let active = listening.activeLaneNumber,
+              let assignment = listening.lane(active),
+              assignment.voiceOverride?.provider == config.defaultProvider.lowercased()
+        else {
+            laneVoiceDraft = ""
+            return
+        }
+        laneVoiceDraft = assignment.voiceOverride?.voiceID ?? ""
+    }
+
+    private func saveVoiceDraft(for laneNumber: Int) {
+        listening.setVoiceOverride(
+            provider: config.defaultProvider,
+            voiceID: laneVoiceDraft,
+            forLane: laneNumber
+        )
+        synchronizeVoiceDraft()
     }
 
     private func laneHelp(

@@ -204,6 +204,22 @@ final class ListeningSessionController: ObservableObject {
         diagnostic("lane \(number) removed")
     }
 
+    func setVoiceOverride(provider: String, voiceID: String, forLane number: Int) {
+        guard var assignment = lane(number) else { return }
+        let voiceOverride = LaneVoiceOverride(provider: provider, voiceID: voiceID)
+        guard assignment.voiceOverride != voiceOverride else { return }
+        assignment.voiceOverride = voiceOverride
+        lanes.removeAll { $0.number == number }
+        lanes.append(assignment)
+        lanes.sort { $0.number < $1.number }
+        persistLanes()
+        if let voiceOverride {
+            diagnostic("lane \(number) voice set for \(voiceOverride.provider)")
+        } else {
+            diagnostic("lane \(number) voice reset to the global provider default")
+        }
+    }
+
     func activateLane(_ number: Int, beginListening: Bool = false) {
         guard let assignment = lane(number) else {
             lastError = "Lane \(number) is not assigned yet. Lock a task, then assign it from SpeakEasy."
