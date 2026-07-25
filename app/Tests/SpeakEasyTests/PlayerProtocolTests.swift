@@ -152,7 +152,8 @@ final class PlayerProtocolTests: XCTestCase {
                 title: "Prototype SpeakEasy listening mode",
                 cwd: "/Users/arach/dev/SpeakEasy"
             ),
-            voiceOverride: LaneVoiceOverride(provider: "ElevenLabs", voiceID: "  voice-42  ")
+            voiceOverride: LaneVoiceOverride(provider: "ElevenLabs", voiceID: "  voice-42  "),
+            narrationCue: "  Warm, concise, and energized.  "
         )
 
         let decoded = try JSONDecoder().decode(
@@ -165,6 +166,7 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertEqual(decoded.task.id, lane.task.id)
         XCTAssertEqual(decoded.voiceOverride?.provider, "elevenlabs")
         XCTAssertEqual(decoded.voiceOverride?.voiceID, "voice-42")
+        XCTAssertEqual(decoded.narrationCue, "Warm, concise, and energized.")
     }
 
     func testVoiceLaneDecodesLegacyAssignmentsWithoutVoiceOverride() throws {
@@ -179,6 +181,72 @@ final class PlayerProtocolTests: XCTestCase {
     func testLaneVoiceOverrideRejectsBlankProviderOrVoice() {
         XCTAssertNil(LaneVoiceOverride(provider: "  ", voiceID: "nova"))
         XCTAssertNil(LaneVoiceOverride(provider: "openai", voiceID: "\n"))
+    }
+
+    func testLaneNarrationAppliesOnlyTheMatchingProviderVoice() throws {
+        let task = ListeningTaskLock(id: "task-2", title: "Voice task", cwd: "/tmp")
+        let lane = VoiceLane(
+            number: 2,
+            task: task,
+            voiceOverride: try XCTUnwrap(LaneVoiceOverride(provider: "openai", voiceID: "coral")),
+            narrationCue: "Speak with bright, compact energy."
+        )
+        let openAI = SpeechNarrationConfiguration(
+            provider: "openai",
+            voice: "nova",
+            model: "gpt-4o-mini-tts",
+            apiKey: "test-key",
+            instructions: "Pronounce product names precisely.",
+            rate: 190
+        )
+
+        let applied = openAI.applying(lane: lane)
+        XCTAssertEqual(applied.voice, "coral")
+        XCTAssertEqual(
+            applied.instructions,
+            "Pronounce product names precisely.\n\nSpeak with bright, compact energy."
+        )
+
+        let system = SpeechNarrationConfiguration(
+            provider: "system",
+            voice: "Samantha",
+            model: nil,
+            apiKey: "",
+            instructions: nil,
+            rate: 180
+        ).applying(lane: lane)
+        XCTAssertEqual(system.voice, "Samantha")
+    }
+
+    func testTurnContextKeepsItsNarrationSnapshot() {
+        let lock = ListeningTaskLock(id: "task-7", title: "Snapshot task", cwd: "/tmp")
+        let narration = SpeechNarrationConfiguration(
+            provider: "openai",
+            voice: "coral",
+            model: "gpt-4o-mini-tts",
+            apiKey: "test-key",
+            instructions: "Keep it crisp.",
+            rate: 205
+        )
+        let context = ListeningTurnContext(
+            lock: lock,
+            laneNumber: 7,
+            narration: narration,
+            playbackVolume: 0.65
+        )
+
+        XCTAssertEqual(context.lock, lock)
+        XCTAssertEqual(context.laneNumber, 7)
+        XCTAssertEqual(context.narration, narration)
+        XCTAssertEqual(context.playbackVolume, 0.65)
+    }
+
+    func testCodexDeliveryNamesNewTurnsAndActiveTurnSteers() {
+        XCTAssertEqual(CodexTurnDelivery.startedTurn.label, "Started a new turn in the exact task")
+        XCTAssertEqual(
+            CodexTurnDelivery.steeredActiveTurn.label,
+            "Steered the active turn in the exact task"
+        )
     }
 
     @MainActor

@@ -43,6 +43,13 @@ struct ListeningTaskLock: Codable, Equatable, Sendable {
     let cwd: String
 }
 
+struct ListeningTurnContext: Equatable, Sendable {
+    let lock: ListeningTaskLock
+    let laneNumber: Int?
+    let narration: SpeechNarrationConfiguration
+    let playbackVolume: Double
+}
+
 @MainActor
 final class ListeningSessionController: ObservableObject {
     static let shared = ListeningSessionController()
@@ -61,6 +68,7 @@ final class ListeningSessionController: ObservableObject {
     @Published private(set) var inputDeviceName: String?
     @Published private(set) var lastTranscript = ""
     @Published private(set) var lastResponse = ""
+    @Published private(set) var lastDelivery: CodexTurnDelivery?
     @Published private(set) var lastError: String?
 
     private let vox = VoxListeningService()
@@ -82,6 +90,7 @@ final class ListeningSessionController: ObservableObject {
     private var narrationDidStart = false
     private var validationID: UUID?
     private var recordingStartID: UUID?
+    private var recordingContext: ListeningTurnContext?
 
     private init() {
         restoreState()
@@ -127,6 +136,7 @@ final class ListeningSessionController: ObservableObject {
         maxRecordingTimer?.invalidate()
         maxRecordingTimer = nil
         recordingStartID = nil
+        recordingContext = nil
         validationID = nil
         shortcut?.unregisterAll()
         shortcut = nil
@@ -180,7 +190,8 @@ final class ListeningSessionController: ObservableObject {
         let assignment = VoiceLane(
             number: number,
             task: lock,
-            voiceOverride: previous?.voiceOverride
+            voiceOverride: previous?.voiceOverride,
+            narrationCue: previous?.narrationCue
         )
         lanes.removeAll { $0.number == number }
         lanes.append(assignment)
@@ -218,6 +229,22 @@ final class ListeningSessionController: ObservableObject {
         } else {
             diagnostic("lane \(number) voice reset to the global provider default")
         }
+        prepareCue(for: assignment)
+    }
+
+    func setNarrationCue(_ cue: String, forLane number: Int) {
+        guard var assignment = lane(number) else { return }
+        let narrationCue = VoiceLane.normalizedNarrationCue(cue)
+        guard assignment.narrationCue != narrationCue else { return }
+        assignment.narrationCue = narrationCue
+        lanes.removeAll { $0.number == number }
+        lanes.append(assignment)
+        lanes.sort { $0.number < $1.number }
+        persistLanes()
+        diagnostic(narrationCue == nil
+            ? "lane \(number) narration cue cleared"
+            : "lane \(number) narration cue updated")
+        prepareCue(for: assignment)
     }
 
     func activateLane(_ number: Int, beginListening: Bool = false) {
@@ -288,11 +315,16 @@ final class ListeningSessionController: ObservableObject {
         }
     }
 
+    func confirmActiveLane() {
+        announceActiveLane()
+    }
+
     func cancelRecording() {
         guard phase == .recording || phase == .warmingUp else { return }
         maxRecordingTimer?.invalidate()
         maxRecordingTimer = nil
         recordingStartID = nil
+        recordingContext = nil
         Task {
             await vox.cancelRecording()
             phase = lockedTask == nil ? .unlocked : .ready
@@ -382,7 +414,8 @@ final class ListeningSessionController: ObservableObject {
                     let refreshed = VoiceLane(
                         number: expectedLane,
                         task: lock,
-                        voiceOverride: lane(expectedLane)?.voiceOverride
+                        voiceOverride: lane(expectedLane)?.voiceOverride,
+                        narrationCue: lane(expectedLane)?.narrationCue
                     )
                     lanes.removeAll { $0.number == expectedLane }
                     lanes.append(refreshed)
@@ -425,9 +458,11 @@ final class ListeningSessionController: ObservableObject {
         lastError = nil
         lastTranscript = ""
         lastResponse = ""
+        lastDelivery = nil
         PlaybackEngine.shared.stop()
         let startID = UUID()
         recordingStartID = startID
+        recordingContext = turnContext(for: lock)
 
         Task {
             guard recordingStartID == startID, lockedTask?.id == lock.id else { return }
@@ -471,7 +506,10 @@ final class ListeningSessionController: ObservableObject {
             return
         }
 
-        let configuration = narrationConfiguration(from: ConfigManager.shared)
+        let configuration = narrationConfiguration(
+            from: ConfigManager.shared,
+            lane: assignment
+        )
         let volume = ConfigManager.shared.defaultVolume
         lastError = nil
         phase = .cueing
@@ -501,22 +539,24 @@ final class ListeningSessionController: ObservableObject {
     }
 
     private func finishRecording() {
-        guard phase == .recording, let lock = lockedTask else { return }
+        guard phase == .recording, let context = recordingContext else { return }
         maxRecordingTimer?.invalidate()
         maxRecordingTimer = nil
         recordingStartID = nil
+        recordingContext = nil
         phase = .transcribing
         Task {
             do {
                 let transcript = try await vox.stopAndTranscribe()
-                try await completeLoop(transcript: transcript, lock: lock)
+                try await completeLoop(transcript: transcript, context: context)
             } catch {
                 recordFailure(error)
             }
         }
     }
 
-    private func completeLoop(transcript: String, lock: ListeningTaskLock) async throws {
+    private func completeLoop(transcript: String, context: ListeningTurnContext) async throws {
+        let lock = context.lock
         let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw ListeningLoopError.emptyTranscript }
         guard lockedTask?.id == lock.id else { throw ListeningLoopError.taskLockChanged }
@@ -524,14 +564,14 @@ final class ListeningSessionController: ObservableObject {
         lastTranscript = text
         phase = .submitting
         diagnostic("transcript ready (\(text.count) characters)")
-        let response = try await router.submit(text, to: lock.id)
+        let result = try await router.submit(text, to: lock.id)
         guard lockedTask?.id == lock.id else { throw ListeningLoopError.taskLockChanged }
 
-        lastResponse = response
+        lastResponse = result.response
+        lastDelivery = result.delivery
         phase = .preparingSpeech
-        let config = ConfigManager.shared
-        let narration = narrationConfiguration(from: config)
-        let audioURL = try await narrator.render(text: response, configuration: narration)
+        let narration = context.narration
+        let audioURL = try await narrator.render(text: result.response, configuration: narration)
         guard lockedTask?.id == lock.id else {
             try? FileManager.default.removeItem(at: audioURL)
             throw ListeningLoopError.taskLockChanged
@@ -542,19 +582,19 @@ final class ListeningSessionController: ObservableObject {
             id: itemID,
             audioPath: audioURL.path,
             title: lock.title,
-            text: response,
+            text: result.response,
             provider: narration.provider,
             createdAt: ISO8601DateFormatter().string(from: Date()),
-            synthesisRateWPM: config.defaultRate,
+            synthesisRateWPM: narration.rate,
             sourceThreadId: lock.id,
             cleanupAfterPlayback: true
         )
-        PlaybackEngine.shared.setVolume(Float(config.defaultVolume))
+        PlaybackEngine.shared.setVolume(Float(context.playbackVolume))
         pendingNarrationItemID = itemID
         narrationDidStart = false
         phase = .speaking
         try PlaybackEngine.shared.enqueue(item, priority: .high, interrupt: true, autoplay: true)
-        diagnostic("response queued with \(narration.provider) narration from task \(lock.id)")
+        diagnostic("\(result.delivery.rawValue) response queued with \(narration.provider)/\(narration.voice) narration from task \(lock.id)")
     }
 
     private func restoreState() {
@@ -627,12 +667,13 @@ final class ListeningSessionController: ObservableObject {
               let lock = lockedTask
         else { return }
         fixtureHasRun = true
+        let context = turnContext(for: lock)
         phase = .transcribing
         diagnostic("running launch transcription fixture")
         Task {
             do {
                 let transcript = try await vox.transcribeFixture(url: URL(fileURLWithPath: path))
-                try await completeLoop(transcript: transcript, lock: lock)
+                try await completeLoop(transcript: transcript, context: context)
             } catch {
                 recordFailure(error)
             }
@@ -671,7 +712,7 @@ final class ListeningSessionController: ObservableObject {
     }
 
     private func prepareCue(for lane: VoiceLane) {
-        let configuration = narrationConfiguration(from: ConfigManager.shared)
+        let configuration = narrationConfiguration(from: ConfigManager.shared, lane: lane)
         Task {
             do {
                 _ = try await laneCueStore.prepare(for: lane, configuration: configuration)
@@ -684,39 +725,57 @@ final class ListeningSessionController: ObservableObject {
         }
     }
 
-    private func narrationConfiguration(from config: ConfigManager) -> SpeechNarrationConfiguration {
+    private func narrationConfiguration(
+        from config: ConfigManager,
+        lane: VoiceLane? = nil
+    ) -> SpeechNarrationConfiguration {
+        let configuration: SpeechNarrationConfiguration
         switch config.defaultProvider {
         case "openai":
-            return SpeechNarrationConfiguration(
+            configuration = SpeechNarrationConfiguration(
                 provider: "openai", voice: config.openaiVoice, model: config.openaiModel,
                 apiKey: config.openaiApiKey, instructions: config.openaiInstructions, rate: config.defaultRate
             )
         case "elevenlabs":
-            return SpeechNarrationConfiguration(
+            configuration = SpeechNarrationConfiguration(
                 provider: "elevenlabs", voice: config.elevenlabsVoiceId, model: config.elevenlabsModelId,
                 apiKey: config.elevenlabsApiKey, instructions: nil, rate: config.defaultRate
             )
         case "groq":
-            return SpeechNarrationConfiguration(
+            configuration = SpeechNarrationConfiguration(
                 provider: "groq", voice: config.groqVoice, model: config.groqModel,
                 apiKey: config.groqApiKey, instructions: nil, rate: config.defaultRate
             )
         case "gemini":
-            return SpeechNarrationConfiguration(
+            configuration = SpeechNarrationConfiguration(
                 provider: "gemini", voice: "Puck", model: config.geminiModel,
                 apiKey: config.geminiApiKey, instructions: nil, rate: config.defaultRate
             )
         case "system":
-            return SpeechNarrationConfiguration(
+            configuration = SpeechNarrationConfiguration(
                 provider: "system", voice: config.systemVoice, model: nil,
                 apiKey: "", instructions: nil, rate: config.defaultRate
             )
         default:
-            return SpeechNarrationConfiguration(
+            configuration = SpeechNarrationConfiguration(
                 provider: config.defaultProvider, voice: "", model: nil,
                 apiKey: "", instructions: nil, rate: config.defaultRate
             )
         }
+        return configuration.applying(lane: lane)
+    }
+
+    private func turnContext(for lock: ListeningTaskLock) -> ListeningTurnContext {
+        let lane = activeLaneNumber
+            .flatMap { self.lane($0) }
+            .flatMap { $0.task.id == lock.id ? $0 : nil }
+        let config = ConfigManager.shared
+        return ListeningTurnContext(
+            lock: lock,
+            laneNumber: lane?.number,
+            narration: narrationConfiguration(from: config, lane: lane),
+            playbackVolume: config.defaultVolume
+        )
     }
 
     private func openCodexTask(_ taskID: String) {
@@ -728,6 +787,7 @@ final class ListeningSessionController: ObservableObject {
         maxRecordingTimer?.invalidate()
         maxRecordingTimer = nil
         recordingStartID = nil
+        recordingContext = nil
         pendingNarrationItemID = nil
         narrationDidStart = false
         lastError = error.localizedDescription

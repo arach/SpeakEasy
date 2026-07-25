@@ -1,12 +1,32 @@
 import Foundation
 
-struct SpeechNarrationConfiguration: Sendable {
+struct SpeechNarrationConfiguration: Equatable, Sendable {
     let provider: String
     let voice: String
     let model: String?
     let apiKey: String
     let instructions: String?
     let rate: Int
+
+    func applying(lane: VoiceLane?) -> SpeechNarrationConfiguration {
+        guard let lane else { return self }
+        let effectiveVoice = lane.voiceOverride?.provider == provider
+            ? lane.voiceOverride?.voiceID ?? voice
+            : voice
+        let laneCue = VoiceLane.normalizedNarrationCue(lane.narrationCue)
+        let effectiveInstructions = [instructions?.nilIfEmpty, laneCue]
+            .compactMap { $0 }
+            .joined(separator: "\n\n")
+            .nilIfEmpty
+        return SpeechNarrationConfiguration(
+            provider: provider,
+            voice: effectiveVoice,
+            model: model,
+            apiKey: apiKey,
+            instructions: effectiveInstructions,
+            rate: rate
+        )
+    }
 }
 
 enum ConfiguredResponseNarratorError: LocalizedError {

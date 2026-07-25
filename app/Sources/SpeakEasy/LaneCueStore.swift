@@ -87,12 +87,13 @@ actor LaneCueStore {
         configuration: SpeechNarrationConfiguration
     ) -> String {
         let identity = [
-            "cue-v3",
+            "cue-v4",
             lane.task.id,
             lane.task.title,
             configuration.provider,
             configuration.voice,
             configuration.model ?? "",
+            configuration.instructions ?? "",
             String(configuration.rate),
         ].joined(separator: "\u{1f}")
         let digest = SHA256.hash(data: Data(identity.utf8))

@@ -17,15 +17,18 @@ struct VoiceLane: Codable, Equatable, Identifiable, Sendable {
     let number: Int
     let task: ListeningTaskLock
     var voiceOverride: LaneVoiceOverride?
+    var narrationCue: String?
 
     init(
         number: Int,
         task: ListeningTaskLock,
-        voiceOverride: LaneVoiceOverride? = nil
+        voiceOverride: LaneVoiceOverride? = nil,
+        narrationCue: String? = nil
     ) {
         self.number = number
         self.task = task
         self.voiceOverride = voiceOverride
+        self.narrationCue = Self.normalizedNarrationCue(narrationCue)
     }
 
     var id: Int { number }
@@ -37,5 +40,11 @@ struct VoiceLane: Codable, Equatable, Identifiable, Sendable {
             .prefix(7)
             .joined(separator: " ")
         return words.isEmpty ? "Task \(number)" : words
+    }
+
+    static func normalizedNarrationCue(_ cue: String?) -> String? {
+        guard let cue else { return nil }
+        let normalized = cue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : String(normalized.prefix(240))
     }
 }

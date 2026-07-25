@@ -8,6 +8,23 @@ struct CodexTaskSummary: Identifiable, Codable, Equatable, Sendable {
     let updatedAt: Date
 }
 
+enum CodexTurnDelivery: String, Codable, Equatable, Sendable {
+    case startedTurn = "started-turn"
+    case steeredActiveTurn = "steered-active-turn"
+
+    var label: String {
+        switch self {
+        case .startedTurn: "Started a new turn in the exact task"
+        case .steeredActiveTurn: "Steered the active turn in the exact task"
+        }
+    }
+}
+
+struct CodexTurnResult: Equatable, Sendable {
+    let response: String
+    let delivery: CodexTurnDelivery
+}
+
 enum CodexThreadRouterError: LocalizedError {
     case runtimeUnavailable
     case bridgeUnavailable
@@ -42,6 +59,7 @@ actor CodexThreadRouter {
         let tasks: [TaskPayload]?
         let task: TaskPayload?
         let response: String?
+        let delivery: String?
         let error: String?
         let code: String?
     }
@@ -72,7 +90,7 @@ actor CodexThreadRouter {
         return Self.summary(task)
     }
 
-    func submit(_ text: String, to threadID: String) async throws -> String {
+    func submit(_ text: String, to threadID: String) async throws -> CodexTurnResult {
         guard activeProcess == nil else { throw CodexThreadRouterError.turnAlreadyActive }
         let envelope = try await invoke(
             arguments: ["submit", threadID],
@@ -80,9 +98,11 @@ actor CodexThreadRouter {
         )
         guard envelope.ok,
               let response = envelope.response?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !response.isEmpty
+              !response.isEmpty,
+              let deliveryValue = envelope.delivery,
+              let delivery = CodexTurnDelivery(rawValue: deliveryValue)
         else { throw bridgeError(envelope) }
-        return response
+        return CodexTurnResult(response: response, delivery: delivery)
     }
 
     func shutdown() {

@@ -5,6 +5,7 @@ struct ListeningPopoverSection: View {
     @ObservedObject private var config = ConfigManager.shared
     @Environment(\.theme) private var theme
     @State private var laneVoiceDraft = ""
+    @State private var laneCueDraft = ""
 
     private let accent = Color(red: 0.36, green: 0.87, blue: 0.66)
 
@@ -33,11 +34,19 @@ struct ListeningPopoverSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel("Listening error: \(error)")
             } else if !listening.lastTranscript.isEmpty {
-                Text("“\(listening.lastTranscript)”")
-                    .font(.system(size: 10))
-                    .foregroundColor(theme.textTertiary)
-                    .lineLimit(2)
-                    .accessibilityLabel("Last transcript: \(listening.lastTranscript)")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("“\(listening.lastTranscript)”")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.textTertiary)
+                        .lineLimit(2)
+                        .accessibilityLabel("Last transcript: \(listening.lastTranscript)")
+                    if let delivery = listening.lastDelivery {
+                        Label(delivery.label, systemImage: delivery == .steeredActiveTurn ? "arrow.triangle.turn.up.right.diamond.fill" : "plus.bubble.fill")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(accent.opacity(0.82))
+                            .accessibilityLabel(delivery.label)
+                    }
+                }
             }
         }
         .padding(12)
@@ -138,6 +147,18 @@ struct ListeningPopoverSection: View {
                 Text("⌘⌥X says the active lane on demand")
                     .font(.system(size: 8, design: .rounded))
                     .foregroundColor(theme.textTertiary)
+                Spacer()
+                Button {
+                    listening.confirmActiveLane()
+                } label: {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.system(size: 8, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(accent)
+                .disabled(isBusy || listening.activeLaneNumber == nil)
+                .help("Play the active lane cue")
+                .accessibilityLabel("Play active lane cue")
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
@@ -202,6 +223,7 @@ struct ListeningPopoverSection: View {
                     .foregroundColor(theme.textTertiary)
                     .lineLimit(1)
                 laneVoiceEditor(for: assignment)
+                laneNarrationCueEditor(for: assignment)
             } else {
                 Text("Tap an empty lane to assign this exact task.")
                     .font(.system(size: 9))
@@ -274,6 +296,66 @@ struct ListeningPopoverSection: View {
         }
     }
 
+    private func laneNarrationCueEditor(for assignment: VoiceLane) -> some View {
+        HStack(spacing: 5) {
+            Text("CUE")
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                .foregroundColor(theme.textTertiary)
+                .frame(width: 31, alignment: .leading)
+
+            TextField(
+                providerSupportsNarrationCue ? "Warm, concise, energized…" : "OpenAI voices only",
+                text: $laneCueDraft
+            )
+            .textFieldStyle(.plain)
+            .font(.system(size: 9))
+            .foregroundColor(theme.textSecondary)
+            .padding(.horizontal, 6)
+            .frame(height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(theme.text.opacity(0.045))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .stroke(theme.text.opacity(0.09), lineWidth: 0.75)
+            }
+            .disabled(!providerSupportsNarrationCue || isBusy)
+            .onSubmit { saveNarrationCue(for: assignment.number) }
+            .accessibilityLabel("Narration cue for lane \(assignment.number)")
+            .accessibilityHint("A short speaking-style instruction for OpenAI narration")
+
+            Button {
+                saveNarrationCue(for: assignment.number)
+            } label: {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(accent)
+            .disabled(!providerSupportsNarrationCue || isBusy)
+            .help("Save narration cue for lane \(assignment.number)")
+            .accessibilityLabel("Save lane narration cue")
+
+            if assignment.narrationCue != nil {
+                Button {
+                    laneCueDraft = ""
+                    listening.setNarrationCue("", forLane: assignment.number)
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 8, weight: .semibold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(theme.textTertiary)
+                .disabled(isBusy)
+                .help("Clear the lane narration cue")
+                .accessibilityLabel("Clear lane narration cue")
+            }
+        }
+    }
+
     private var globalVoiceID: String {
         switch config.defaultProvider {
         case "openai": config.openaiVoice
@@ -285,15 +367,22 @@ struct ListeningPopoverSection: View {
         }
     }
 
+    private var providerSupportsNarrationCue: Bool {
+        config.defaultProvider == "openai"
+    }
+
     private func synchronizeVoiceDraft() {
         guard let active = listening.activeLaneNumber,
               let assignment = listening.lane(active),
               assignment.voiceOverride?.provider == config.defaultProvider.lowercased()
         else {
             laneVoiceDraft = ""
+            laneCueDraft = listening.activeLaneNumber
+                .flatMap { listening.lane($0)?.narrationCue } ?? ""
             return
         }
         laneVoiceDraft = assignment.voiceOverride?.voiceID ?? ""
+        laneCueDraft = assignment.narrationCue ?? ""
     }
 
     private func saveVoiceDraft(for laneNumber: Int) {
@@ -302,6 +391,11 @@ struct ListeningPopoverSection: View {
             voiceID: laneVoiceDraft,
             forLane: laneNumber
         )
+        synchronizeVoiceDraft()
+    }
+
+    private func saveNarrationCue(for laneNumber: Int) {
+        listening.setNarrationCue(laneCueDraft, forLane: laneNumber)
         synchronizeVoiceDraft()
     }
 
