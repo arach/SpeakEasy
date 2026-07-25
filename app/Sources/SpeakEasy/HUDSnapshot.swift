@@ -27,6 +27,7 @@ enum HUDSnapshot {
                 phase: $0,
                 taskTitle: "Prototype SpeakEasy listening mode",
                 taskID: "019f99a4-7867-7c23-ac29-0c0eca7da603",
+                laneNumber: 2,
                 transcript: "Can you make the voice loop feel more alive?",
                 error: $0 == .failed ? "Codex Desktop is unavailable." : nil,
                 inputDeviceName: "MacBook Air Microphone"

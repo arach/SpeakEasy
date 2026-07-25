@@ -22,6 +22,7 @@ struct HUDConversationPresentation: Equatable {
     let phase: ListeningPhase
     let taskTitle: String
     let taskID: String
+    let laneNumber: Int?
     let transcript: String
     let error: String?
     let inputDeviceName: String?
@@ -29,6 +30,7 @@ struct HUDConversationPresentation: Equatable {
     var accent: Color {
         switch phase {
         case .recording: Color(red: 0.28, green: 0.94, blue: 0.68)
+        case .cueing: Color(red: 1, green: 0.72, blue: 0.32)
         case .warmingUp, .transcribing: Color(red: 0.58, green: 0.72, blue: 1)
         case .submitting: Color(red: 0.37, green: 0.82, blue: 1)
         case .preparingSpeech, .speaking: Color(red: 0.76, green: 0.56, blue: 1)
@@ -40,6 +42,7 @@ struct HUDConversationPresentation: Equatable {
     var title: String {
         switch phase {
         case .validatingLock: "Locking onto task"
+        case .cueing: laneNumber.map { "Lane \($0) selected" } ?? "Lane selected"
         case .ready: "Ready when you are"
         case .warmingUp: "Warming up Vox"
         case .recording: "Listening to you"
@@ -56,8 +59,11 @@ struct HUDConversationPresentation: Equatable {
         if phase == .failed, let error, !error.isEmpty { return error }
         switch phase {
         case .validatingLock: return "Verifying the exact Codex task"
-        case .ready: return "Press ⌃⌥Space and speak"
-        case .warmingUp: return "Loading local speech recognition"
+        case .cueing: return "Opening the microphone after this cue"
+        case .ready:
+            if let laneNumber { return "Press ⌘⌥\(laneNumber) for this lane or ⌃⌥Space" }
+            return "Press ⌃⌥Space and speak"
+        case .warmingUp: return "Opening the microphone before Vox warmup"
         case .recording:
             if let inputDeviceName { return "⌃⌥Space to send · \(inputDeviceName)" }
             return "⌃⌥Space to stop and send"
@@ -74,6 +80,7 @@ struct HUDConversationPresentation: Equatable {
     var symbol: String {
         switch phase {
         case .validatingLock: "scope"
+        case .cueing: "speaker.wave.2.fill"
         case .ready: "waveform.badge.mic"
         case .warmingUp: "brain.head.profile"
         case .recording: "mic.fill"
@@ -132,17 +139,22 @@ class HUDWindowManager: ObservableObject {
 
     func bindListening(_ controller: ListeningSessionController) {
         guard listeningObservation == nil else { return }
-        listeningObservation = Publishers.CombineLatest4(
-            controller.$phase,
-            controller.$lockedTask,
-            controller.$lastTranscript,
-            controller.$lastError
+        listeningObservation = Publishers.CombineLatest(
+            Publishers.CombineLatest4(
+                controller.$phase,
+                controller.$lockedTask,
+                controller.$lastTranscript,
+                controller.$lastError
+            ),
+            controller.$activeLaneNumber
         )
         .receive(on: RunLoop.main)
-        .sink { [weak self, weak controller] phase, lock, transcript, error in
+        .sink { [weak self, weak controller] values, laneNumber in
+            let (phase, lock, transcript, error) = values
             self?.updateListening(
                 phase: phase,
                 lock: lock,
+                laneNumber: laneNumber,
                 transcript: transcript,
                 error: error,
                 inputDeviceName: controller?.inputDeviceName
@@ -186,6 +198,7 @@ class HUDWindowManager: ObservableObject {
     private func updateListening(
         phase: ListeningPhase,
         lock: ListeningTaskLock?,
+        laneNumber: Int?,
         transcript: String,
         error: String?,
         inputDeviceName: String?
@@ -201,6 +214,7 @@ class HUDWindowManager: ObservableObject {
             phase: phase,
             taskTitle: lock.title,
             taskID: lock.id,
+            laneNumber: laneNumber,
             transcript: transcript,
             error: error,
             inputDeviceName: inputDeviceName
@@ -638,7 +652,7 @@ struct ConversationHUDContent: View {
     }
 
     private var isEnergetic: Bool {
-        [.warmingUp, .recording, .transcribing, .submitting, .preparingSpeech, .speaking]
+        [.cueing, .warmingUp, .recording, .transcribing, .submitting, .preparingSpeech, .speaking]
             .contains(presentation.phase)
     }
 
@@ -682,7 +696,7 @@ struct HUDTaskLockHeader: View {
                 .frame(width: 6, height: 6)
                 .shadow(color: presentation.accent.opacity(0.8), radius: 4)
                 .accessibilityHidden(true)
-            Text(presentation.phase == .recording ? "LIVE" : presentation.phase.label.uppercased())
+            Text(statusLabel)
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                 .foregroundStyle(presentation.accent)
             Spacer()
@@ -699,6 +713,12 @@ struct HUDTaskLockHeader: View {
         .padding(.trailing, 28)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(presentation.phase.label). Locked to \(presentation.taskTitle)")
+    }
+
+    private var statusLabel: String {
+        let status = presentation.phase == .recording ? "LIVE" : presentation.phase.label.uppercased()
+        guard let lane = presentation.laneNumber else { return status }
+        return "LANE \(lane) · \(status)"
     }
 }
 

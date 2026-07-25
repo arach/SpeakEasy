@@ -105,7 +105,8 @@ Rules:
 unlocked
   -> validatingLock
   -> ready
-  -> warmingUp
+  -> cueing (assigned lane with a cached cue only)
+  -> opening microphone + concurrent Vox warmup
   -> recording
   -> transcribing
   -> submitting
@@ -115,8 +116,8 @@ unlocked
 ```
 
 1. Pick and lock an exact task.
-2. Press `Control-Option-Space`. SpeakEasy stops its playback first, warms Vox,
-   requests microphone permission if needed, and begins recording.
+2. Press `Control-Option-Space`. SpeakEasy stops its playback, opens the
+   microphone immediately, and warms Vox in parallel with the utterance.
 3. Press the hotkey again to end the utterance. A 120-second ceiling prevents
    accidental indefinite capture.
 4. Vox transcribes the temporary audio locally. Empty transcripts do not
@@ -134,6 +135,26 @@ unlocked
 The first slice uses toggle recording because the existing Carbon abstraction
 has a dependable global pressed event but no tested global key-up lifecycle.
 Push-to-talk can follow after key-up, sleep, and lost-event behavior are proven.
+
+### Voice lanes
+
+Nine persistent voice lanes map `Option-Command-1` through
+`Option-Command-9` to exact task locks. A lane shortcut selects its task,
+revalidates Desktop ownership, and begins listening in one action. The original
+`Control-Option-Space` shortcut continues toggling the current lock.
+
+- Lane registration is independent; a chord conflict disables only that lane
+  and is shown in the popover.
+- An unassigned lane never guesses a task. The popover explains how to assign
+  the current exact lock.
+- A lane cannot reroute audio already being recorded or a turn already being
+  submitted. The current utterance keeps its snapshotted task ID.
+- Assignment generates a compact task-name cue with the configured premium
+  provider. Cues are cached privately. A cached cue finishes before capture to
+  prevent feedback; a missing/failed cue is skipped without system-voice
+  fallback or microphone delay.
+- Every lane activation reopens and revalidates the exact task, including after
+  app restarts or Codex task changes.
 
 ## Interruption and echo prevention
 
@@ -226,6 +247,7 @@ Included in this prototype:
 
 - explicit exact-ID Desktop-validated lock
 - `Control-Option-Space` toggle capture
+- persistent exact-task lanes on `Option-Command-1...9`
 - embedded Vox final transcription
 - exact Desktop-owned submission and response correlation
 - explicit same-task steering when the locked task is already active
@@ -272,6 +294,11 @@ Explicit non-goals:
   the visible 72-character user message, the Desktop bridge explicitly steered
   the active turn, the response was `Exact task voice loop passed.`, ElevenLabs
   queued the audio, and the native player logged playback completion.
+- The signed lane build registered all nine `Option-Command` shortcuts, restored
+  lane 1 to the originating task, revalidated the exact task, played a cached
+  ElevenLabs task-name cue before capture, opened the MacBook Air microphone,
+  warmed Vox concurrently, and canceled the validation recording without
+  transcription or submission.
 - `node --check` passes for the bundled bridge.
 - `pnpm build` passes for the TypeScript package.
 - `pnpm test:privacy` passes both privacy tests.

@@ -11,6 +11,7 @@ enum PlayerPopoverSnapshot {
         }
 
         let outputPath = CommandLine.arguments[argumentIndex + 1]
+        ListeningSessionController.shared.installLaneSnapshotFixture()
         let rootView = PlayerPopoverView()
             .environment(\.theme, .dark)
             .preferredColorScheme(.dark)

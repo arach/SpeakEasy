@@ -74,6 +74,8 @@ struct ListeningPopoverSection: View {
                 .foregroundStyle(theme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            laneStrip(currentTask: lock)
+
             Button(action: listening.toggleListening) {
                 HStack(spacing: 7) {
                     Image(systemName: listening.phase == .recording ? "stop.fill" : "mic.fill")
@@ -114,6 +116,96 @@ struct ListeningPopoverSection: View {
         }
     }
 
+    private func laneStrip(currentTask: ListeningTaskLock) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("VOICE LANES")
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundColor(theme.textTertiary)
+                Spacer()
+                Text("⌘⌥1–9 selects + listens")
+                    .font(.system(size: 8, design: .rounded))
+                    .foregroundColor(theme.textTertiary)
+            }
+
+            HStack(spacing: 5) {
+                ForEach(ListeningSessionController.laneRange, id: \.self) { number in
+                    let assignment = listening.lane(number)
+                    let isCurrent = assignment?.task.id == currentTask.id
+                    Button {
+                        if assignment == nil {
+                            listening.assignLockedTask(toLane: number)
+                        } else {
+                            listening.activateLane(number)
+                        }
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Text("\(number)")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            Circle()
+                                .fill(listening.laneShortcutAvailable(number) ? Color.green : Color.orange)
+                                .frame(width: 4, height: 4)
+                                .padding(3)
+                                .accessibilityHidden(true)
+                        }
+                        .frame(width: 25, height: 25)
+                        .foregroundStyle(
+                            isCurrent ? Color.black.opacity(0.78) : (assignment == nil ? theme.textSecondary : accent)
+                        )
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(isCurrent ? accent : (assignment == nil ? theme.text.opacity(0.035) : accent.opacity(0.14)))
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(
+                                    listening.activeLaneNumber == number ? accent : theme.text.opacity(0.08),
+                                    lineWidth: listening.activeLaneNumber == number ? 1.5 : 0.75
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isBusy)
+                    .help(laneHelp(number: number, assignment: assignment, currentTask: currentTask))
+                    .contextMenu {
+                        Button("Assign current task") { listening.assignLockedTask(toLane: number) }
+                        if assignment != nil {
+                            Button("Clear lane") { listening.removeLane(number) }
+                        }
+                    }
+                    .accessibilityLabel(laneHelp(number: number, assignment: assignment, currentTask: currentTask))
+                }
+            }
+
+            if let active = listening.activeLaneNumber, let assignment = listening.lane(active) {
+                Text("Lane \(active): \(assignment.task.title)")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(theme.textTertiary)
+                    .lineLimit(1)
+            } else {
+                Text("Tap an empty lane to assign this exact task.")
+                    .font(.system(size: 9))
+                    .foregroundColor(theme.textTertiary)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Exact task voice lanes")
+    }
+
+    private func laneHelp(
+        number: Int,
+        assignment: VoiceLane?,
+        currentTask: ListeningTaskLock
+    ) -> String {
+        let shortcut = GlobalListeningShortcut.title(forLane: number)
+        let availability = listening.laneShortcutAvailable(number) ? "shortcut active" : "shortcut unavailable"
+        guard let assignment else {
+            return "Lane \(number), unassigned. Tap to assign \(currentTask.title). \(shortcut), \(availability)."
+        }
+        return "Lane \(number), \(assignment.task.title). \(shortcut), \(availability)."
+    }
+
     private var taskPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Choose a task. SpeakEasy opens it in Codex and verifies the exact lock before listening.")
@@ -148,7 +240,7 @@ struct ListeningPopoverSection: View {
 
     private var isBusy: Bool {
         switch listening.phase {
-        case .validatingLock, .warmingUp, .transcribing, .submitting, .preparingSpeech, .speaking: true
+        case .validatingLock, .cueing, .warmingUp, .transcribing, .submitting, .preparingSpeech, .speaking: true
         default: false
         }
     }

@@ -97,6 +97,7 @@ final class PlayerProtocolTests: XCTestCase {
             phase: .recording,
             taskTitle: "Prototype SpeakEasy listening mode",
             taskID: "019f99a4-7867-7c23-ac29-0c0eca7da603",
+            laneNumber: 2,
             transcript: "",
             error: nil,
             inputDeviceName: "MacBook Air Microphone"
@@ -106,6 +107,35 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertTrue(presentation.detail.contains("⌃⌥Space to send"))
         XCTAssertTrue(presentation.detail.contains("MacBook Air Microphone"))
         XCTAssertEqual(presentation.taskTitle, "Prototype SpeakEasy listening mode")
+        XCTAssertEqual(presentation.laneNumber, 2)
+    }
+
+    func testVoiceLanePersistsItsExactTaskIdentity() throws {
+        let lane = VoiceLane(
+            number: 4,
+            task: ListeningTaskLock(
+                id: "019f99a4-7867-7c23-ac29-0c0eca7da603",
+                title: "Prototype SpeakEasy listening mode",
+                cwd: "/Users/arach/dev/SpeakEasy"
+            )
+        )
+
+        let decoded = try JSONDecoder().decode(
+            VoiceLane.self,
+            from: JSONEncoder().encode(lane)
+        )
+
+        XCTAssertEqual(decoded, lane)
+        XCTAssertEqual(decoded.shortcutTitle, "⌘⌥4")
+        XCTAssertEqual(decoded.task.id, lane.task.id)
+    }
+
+    @MainActor
+    func testLaneShortcutsUseDistinctNumberKeyCodes() {
+        let codes = ListeningSessionController.laneRange.map(GlobalListeningShortcut.keyCode(forLane:))
+        XCTAssertEqual(Set(codes).count, 9)
+        XCTAssertEqual(GlobalListeningShortcut.title(forLane: 1), "⌘⌥1")
+        XCTAssertEqual(GlobalListeningShortcut.title(forLane: 9), "⌘⌥9")
     }
 
     func testCodexTaskLinkRejectsUnsafeThreadIdentifiers() {

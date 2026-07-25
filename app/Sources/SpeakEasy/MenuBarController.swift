@@ -84,7 +84,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 accessibilityDescription: description
             ) ?? SpeakeasyIcon.tumbler(filled: true)
             statusItem?.button?.contentTintColor = .systemRed
-        } else if [.validatingLock, .warmingUp, .transcribing, .submitting, .preparingSpeech].contains(listening) {
+        } else if [.validatingLock, .cueing, .warmingUp, .transcribing, .submitting, .preparingSpeech].contains(listening) {
             description = listening.label
             image = NSImage(
                 systemSymbolName: "waveform",
@@ -175,7 +175,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
-        popover.contentSize = NSSize(width: 320, height: 590)
+        popover.contentSize = NSSize(width: 320, height: 640)
         popover.contentViewController = NSHostingController(rootView: makePopoverRoot())
         self.popover = popover
     }
