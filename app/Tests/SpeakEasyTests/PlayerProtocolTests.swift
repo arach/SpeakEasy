@@ -1,4 +1,5 @@
 import XCTest
+import VoxCore
 @testable import SpeakEasy
 
 final class PlayerProtocolTests: XCTestCase {
@@ -268,6 +269,20 @@ final class PlayerProtocolTests: XCTestCase {
             VoxListeningService.preferredEngine(parakeetReady: true),
             .parakeet
         )
+    }
+
+    func testDedicatedMicrophonePreferenceRetainsStableIdentity() throws {
+        let preference = ListeningInputPreference(id: "device-uid-42", name: "Studio Mic")
+        let decoded = try JSONDecoder().decode(
+            ListeningInputPreference.self,
+            from: JSONEncoder().encode(preference)
+        )
+
+        XCTAssertEqual(decoded, preference)
+        XCTAssertTrue(preference.isAvailable(in: [
+            AudioInputDeviceInfo(id: "device-uid-42", name: "Studio Mic", isSystemDefault: false)
+        ]))
+        XCTAssertFalse(preference.isAvailable(in: []))
     }
 
     @MainActor

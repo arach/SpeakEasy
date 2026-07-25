@@ -50,6 +50,15 @@ struct ListeningTurnContext: Equatable, Sendable {
     let playbackVolume: Double
 }
 
+struct ListeningInputPreference: Codable, Equatable, Sendable {
+    let id: String
+    let name: String
+
+    func isAvailable(in devices: [AudioInputDeviceInfo]) -> Bool {
+        devices.contains { $0.id == id }
+    }
+}
+
 enum CodexTaskLockPresentation: Equatable, Sendable {
     case background
     case revealInCodex
@@ -72,6 +81,8 @@ final class ListeningSessionController: ObservableObject {
     @Published private(set) var shortcutAvailable = false
     @Published private(set) var laneShortcutAvailability: [Int: Bool] = [:]
     @Published private(set) var confirmationShortcutAvailable = false
+    @Published private(set) var inputDevices: [AudioInputDeviceInfo] = []
+    @Published private(set) var inputPreference: ListeningInputPreference?
     @Published private(set) var inputDeviceName: String?
     @Published private(set) var lastTranscript = ""
     @Published private(set) var lastResponse = ""
@@ -85,6 +96,7 @@ final class ListeningSessionController: ObservableObject {
     private let lockDefaultsKey = "speakeasy.listening.task-lock.v1"
     private let lanesDefaultsKey = "speakeasy.listening.voice-lanes.v1"
     private let activeLaneDefaultsKey = "speakeasy.listening.active-lane.v1"
+    private let inputPreferenceDefaultsKey = "speakeasy.listening.input-device.v1"
     private var shortcut: GlobalListeningShortcut?
     private var maxRecordingTimer: Timer?
     private var playbackObservation: AnyCancellable?
@@ -119,6 +131,7 @@ final class ListeningSessionController: ObservableObject {
 
     func start() {
         diagnostic("starting listening controller")
+        refreshInputDevices()
         if shortcut == nil {
             let shortcut = GlobalListeningShortcut { [weak self] action in
                 self?.handleShortcut(action)
@@ -353,6 +366,49 @@ final class ListeningSessionController: ObservableObject {
         laneShortcutAvailability[number] == true
     }
 
+    var selectedInputDeviceLabel: String {
+        if let inputPreference {
+            return inputPreference.isAvailable(in: inputDevices)
+                ? inputPreference.name
+                : "\(inputPreference.name) · unavailable"
+        }
+        return AudioInputDevices.effectiveLabel(preferredID: nil)
+    }
+
+    var selectedInputDeviceShortLabel: String {
+        if let inputPreference { return inputPreference.name }
+        return inputDevices.first(where: \.isSystemDefault)?.name ?? "System Default"
+    }
+
+    var selectedInputIsAvailable: Bool {
+        guard let inputPreference else { return !inputDevices.isEmpty }
+        return inputPreference.isAvailable(in: inputDevices)
+    }
+
+    func refreshInputDevices() {
+        inputDevices = AudioInputDevices.available()
+        diagnostic("found \(inputDevices.count) microphone inputs")
+    }
+
+    func selectSystemDefaultInput() {
+        guard canChangeInputDevice else { return }
+        inputPreference = nil
+        UserDefaults.standard.removeObject(forKey: inputPreferenceDefaultsKey)
+        refreshInputDevices()
+        diagnostic("microphone follows the system default")
+    }
+
+    func selectInputDevice(_ device: AudioInputDeviceInfo) {
+        guard canChangeInputDevice else { return }
+        let preference = ListeningInputPreference(id: device.id, name: device.name)
+        inputPreference = preference
+        if let data = try? JSONEncoder().encode(preference) {
+            UserDefaults.standard.set(data, forKey: inputPreferenceDefaultsKey)
+        }
+        refreshInputDevices()
+        diagnostic("dedicated microphone set to \(device.name)")
+    }
+
     #if DEBUG
     func installLaneSnapshotFixture() {
         let task = ListeningTaskLock(
@@ -373,12 +429,21 @@ final class ListeningSessionController: ObservableObject {
             uniqueKeysWithValues: Self.laneRange.map { ($0, $0 != 4) }
         )
         confirmationShortcutAvailable = true
+        inputDevices = [
+            AudioInputDeviceInfo(id: "studio-mic", name: "Studio USB Mic", isSystemDefault: false),
+            AudioInputDeviceInfo(id: "system-mic", name: "MacBook Air Mic", isSystemDefault: true)
+        ]
+        inputPreference = ListeningInputPreference(id: "studio-mic", name: "Studio USB Mic")
         phase = .ready
     }
     #endif
 
     private var isRoutingTurn: Bool {
         [.transcribing, .submitting, .preparingSpeech].contains(phase)
+    }
+
+    private var canChangeInputDevice: Bool {
+        ![.warmingUp, .recording, .transcribing, .submitting, .preparingSpeech].contains(phase)
     }
 
     private func handleShortcut(_ action: ListeningShortcutAction) {
@@ -488,7 +553,10 @@ final class ListeningSessionController: ObservableObject {
             do {
                 // Vox starts capture before it warms the model. Natural speech
                 // at hotkey-down is retained while recognition becomes ready.
-                let device = try await vox.startRecordingAndWarm()
+                let device = try await vox.startRecordingAndWarm(
+                    preferredInputDeviceID: inputPreference?.id,
+                    preferredInputDeviceName: inputPreference?.name
+                )
                 guard recordingStartID == startID, lockedTask?.id == lock.id else {
                     await vox.cancelRecording()
                     return
@@ -509,6 +577,7 @@ final class ListeningSessionController: ObservableObject {
                 }
             } catch {
                 guard recordingStartID == startID else { return }
+                refreshInputDevices()
                 recordFailure(error)
             }
         }
@@ -617,6 +686,10 @@ final class ListeningSessionController: ObservableObject {
     }
 
     private func restoreState() {
+        if let data = UserDefaults.standard.data(forKey: inputPreferenceDefaultsKey),
+           let preference = try? JSONDecoder().decode(ListeningInputPreference.self, from: data) {
+            inputPreference = preference
+        }
         if let data = UserDefaults.standard.data(forKey: lanesDefaultsKey),
            let restored = try? JSONDecoder().decode([VoiceLane].self, from: data) {
             lanes = restored
