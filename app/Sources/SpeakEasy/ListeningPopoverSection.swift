@@ -69,6 +69,11 @@ struct ListeningPopoverSection: View {
                     .disabled(isBusy)
             }
 
+            Text("Voice stays routed to this task—even when you change apps or Codex windows.")
+                .font(.system(size: 9))
+                .foregroundStyle(theme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
             Button(action: listening.toggleListening) {
                 HStack(spacing: 7) {
                     Image(systemName: listening.phase == .recording ? "stop.fill" : "mic.fill")
@@ -111,6 +116,11 @@ struct ListeningPopoverSection: View {
 
     private var taskPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Text("Choose a task. SpeakEasy opens it in Codex and verifies the exact lock before listening.")
+                .font(.system(size: 9))
+                .foregroundStyle(theme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
             Picker("Codex task", selection: $listening.selectedTaskID) {
                 if listening.tasks.isEmpty {
                     Text("No recent tasks found").tag("")

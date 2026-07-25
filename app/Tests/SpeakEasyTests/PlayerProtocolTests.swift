@@ -92,6 +92,22 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertEqual(wav.suffix(pcm.count), pcm)
     }
 
+    func testConversationHUDNamesTheLockAndExplainsTheHotkey() {
+        let presentation = HUDConversationPresentation(
+            phase: .recording,
+            taskTitle: "Prototype SpeakEasy listening mode",
+            taskID: "019f99a4-7867-7c23-ac29-0c0eca7da603",
+            transcript: "",
+            error: nil,
+            inputDeviceName: "MacBook Air Microphone"
+        )
+
+        XCTAssertEqual(presentation.title, "Listening to you")
+        XCTAssertTrue(presentation.detail.contains("⌃⌥Space to send"))
+        XCTAssertTrue(presentation.detail.contains("MacBook Air Microphone"))
+        XCTAssertEqual(presentation.taskTitle, "Prototype SpeakEasy listening mode")
+    }
+
     func testCodexTaskLinkRejectsUnsafeThreadIdentifiers() {
         XCTAssertEqual(
             CodexTaskLink.url(threadId: "019f9573-3e55-7701-8968-09c12d4fafe5")?.absoluteString,

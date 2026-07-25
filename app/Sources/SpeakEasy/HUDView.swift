@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 import AppKit
+import Combine
 
 // MARK: - HUD Message Model
 
@@ -17,8 +18,78 @@ struct HUDMessage: Codable {
     }
 }
 
+struct HUDConversationPresentation: Equatable {
+    let phase: ListeningPhase
+    let taskTitle: String
+    let taskID: String
+    let transcript: String
+    let error: String?
+    let inputDeviceName: String?
+
+    var accent: Color {
+        switch phase {
+        case .recording: Color(red: 0.28, green: 0.94, blue: 0.68)
+        case .warmingUp, .transcribing: Color(red: 0.58, green: 0.72, blue: 1)
+        case .submitting: Color(red: 0.37, green: 0.82, blue: 1)
+        case .preparingSpeech, .speaking: Color(red: 0.76, green: 0.56, blue: 1)
+        case .failed: Color(red: 1, green: 0.53, blue: 0.36)
+        default: Color(red: 0.36, green: 0.87, blue: 0.66)
+        }
+    }
+
+    var title: String {
+        switch phase {
+        case .validatingLock: "Locking onto task"
+        case .ready: "Ready when you are"
+        case .warmingUp: "Warming up Vox"
+        case .recording: "Listening to you"
+        case .transcribing: "Understanding that"
+        case .submitting: "Talking to this task"
+        case .preparingSpeech: "Preparing its voice"
+        case .speaking: "Speaking back"
+        case .failed: "Voice loop needs attention"
+        case .unlocked: "Choose a task"
+        }
+    }
+
+    var detail: String {
+        if phase == .failed, let error, !error.isEmpty { return error }
+        switch phase {
+        case .validatingLock: return "Verifying the exact Codex task"
+        case .ready: return "Press ⌃⌥Space and speak"
+        case .warmingUp: return "Loading local speech recognition"
+        case .recording:
+            if let inputDeviceName { return "⌃⌥Space to send · \(inputDeviceName)" }
+            return "⌃⌥Space to stop and send"
+        case .transcribing: return "Turning this utterance into text"
+        case .submitting:
+            return transcript.isEmpty ? "Routing through Codex Desktop" : transcript
+        case .preparingSpeech: return "Using your configured SpeakEasy voice"
+        case .speaking: return "⌃⌥Space interrupts and listens again"
+        case .failed: return "Open SpeakEasy for details"
+        case .unlocked: return "Lock SpeakEasy before listening"
+        }
+    }
+
+    var symbol: String {
+        switch phase {
+        case .validatingLock: "scope"
+        case .ready: "waveform.badge.mic"
+        case .warmingUp: "brain.head.profile"
+        case .recording: "mic.fill"
+        case .transcribing: "text.bubble.fill"
+        case .submitting: "arrow.up.forward"
+        case .preparingSpeech: "sparkles"
+        case .speaking: "speaker.wave.2.fill"
+        case .failed: "exclamationmark.triangle.fill"
+        case .unlocked: "lock.open.fill"
+        }
+    }
+}
+
 // MARK: - HUD Window Manager (Singleton)
 
+@MainActor
 class HUDWindowManager: ObservableObject {
     static let shared = HUDWindowManager()
 
@@ -26,11 +97,14 @@ class HUDWindowManager: ObservableObject {
     @Published var isVisible = false
     @Published var audioLevel: Float = 0.0  // Current audio level for waveform
     @Published var playbackProgress: Double?
+    @Published var conversation: HUDConversationPresentation?
 
     private var hideTimer: Timer?
     private var hudDuration: TimeInterval = 3.0
     private var isStarted = false
     private var visibilityHandler: ((Bool) -> Void)?
+    private var listeningObservation: AnyCancellable?
+    private var lastListeningPhase: ListeningPhase = .unlocked
 
     private init() {}
 
@@ -53,6 +127,27 @@ class HUDWindowManager: ObservableObject {
         // Don't actually stop - keep pipe reader running as singleton
         hideTimer?.invalidate()
         hideTimer = nil
+        listeningObservation = nil
+    }
+
+    func bindListening(_ controller: ListeningSessionController) {
+        guard listeningObservation == nil else { return }
+        listeningObservation = Publishers.CombineLatest4(
+            controller.$phase,
+            controller.$lockedTask,
+            controller.$lastTranscript,
+            controller.$lastError
+        )
+        .receive(on: RunLoop.main)
+        .sink { [weak self, weak controller] phase, lock, transcript, error in
+            self?.updateListening(
+                phase: phase,
+                lock: lock,
+                transcript: transcript,
+                error: error,
+                inputDeviceName: controller?.inputDeviceName
+            )
+        }
     }
 
     func setVisibilityHandler(_ handler: @escaping (Bool) -> Void) {
@@ -88,6 +183,44 @@ class HUDWindowManager: ObservableObject {
         scheduleHide()
     }
 
+    private func updateListening(
+        phase: ListeningPhase,
+        lock: ListeningTaskLock?,
+        transcript: String,
+        error: String?,
+        inputDeviceName: String?
+    ) {
+        defer { lastListeningPhase = phase }
+        guard let lock, phase != .unlocked else {
+            conversation = nil
+            if playbackProgress == nil { hideMessage() }
+            return
+        }
+
+        conversation = HUDConversationPresentation(
+            phase: phase,
+            taskTitle: lock.title,
+            taskID: lock.id,
+            transcript: transcript,
+            error: error,
+            inputDeviceName: inputDeviceName
+        )
+
+        hideTimer?.invalidate()
+        hideTimer = nil
+        showWindow()
+        switch phase {
+        case .ready:
+            if lastListeningPhase != .ready { scheduleHide(after: 2.8) }
+        case .failed:
+            scheduleHide(after: 8)
+        case .speaking:
+            break // Playback completion owns dismissal.
+        default:
+            break // Keep active work visible until the phase changes.
+        }
+    }
+
     private func handleMessage(_ message: HUDMessage) {
         if message.isLevelUpdate {
             // Just update audio level, don't reset timer
@@ -113,10 +246,10 @@ class HUDWindowManager: ObservableObject {
         visibilityHandler?(true)
     }
 
-    private func scheduleHide() {
+    private func scheduleHide(after duration: TimeInterval? = nil) {
         hideTimer?.invalidate()
-        hideTimer = Timer.scheduledTimer(withTimeInterval: hudDuration, repeats: false) { [weak self] _ in
-            self?.hideMessage()
+        hideTimer = Timer.scheduledTimer(withTimeInterval: duration ?? hudDuration, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.hideMessage() }
         }
     }
 
@@ -264,13 +397,28 @@ struct HUDOverlayView: View {
 
     var body: some View {
         Group {
-            if manager.isVisible, let message = manager.currentMessage {
-                HUDContent(
-                    message: message,
-                    theme: theme,
-                    audioLevel: manager.audioLevel,
-                    playbackProgress: manager.playbackProgress
-                )
+            if manager.isVisible {
+                Group {
+                    if let message = manager.currentMessage,
+                       manager.playbackProgress != nil {
+                        HUDContent(
+                            message: message,
+                            theme: theme,
+                            audioLevel: manager.audioLevel,
+                            playbackProgress: manager.playbackProgress,
+                            conversation: manager.conversation
+                        )
+                    } else if let conversation = manager.conversation {
+                        ConversationHUDContent(presentation: conversation)
+                    } else if let message = manager.currentMessage {
+                        HUDContent(
+                            message: message,
+                            theme: theme,
+                            audioLevel: manager.audioLevel,
+                            playbackProgress: manager.playbackProgress
+                        )
+                    }
+                }
                 .opacity(opacity)
                 .transition(.asymmetric(
                     insertion: .move(edge: entryEdge).combined(with: .opacity),
@@ -306,6 +454,7 @@ struct HUDContent: View {
     let theme: Theme
     let audioLevel: Float
     let playbackProgress: Double?
+    var conversation: HUDConversationPresentation? = nil
     @ObservedObject private var config = ConfigManager.shared
 
     private var waveformColor: Color {
@@ -348,6 +497,12 @@ struct HUDContent: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
+                if let conversation {
+                    HUDTaskLockHeader(presentation: conversation)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                }
+
                 // Text section at top
                 HUDTextSection(
                     text: message.text ?? "",
@@ -412,6 +567,175 @@ struct HUDContent: View {
                     .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
             }
         )
+    }
+}
+
+// MARK: - Thread-locked conversation HUD
+
+struct ConversationHUDContent: View {
+    let presentation: HUDConversationPresentation
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 24.0)) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HUDTaskLockHeader(presentation: presentation)
+
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle()
+                                .fill(presentation.accent.opacity(0.12))
+                                .frame(width: 54, height: 54)
+                            Circle()
+                                .stroke(presentation.accent.opacity(0.34), lineWidth: 1)
+                                .frame(width: 54, height: 54)
+                                .scaleEffect(pulseScale(time))
+                                .opacity(pulseOpacity(time))
+                            Image(systemName: presentation.symbol)
+                                .font(.system(size: 21, weight: .semibold))
+                                .foregroundStyle(presentation.accent)
+                        }
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(presentation.title)
+                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white)
+                            Text(presentation.detail)
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.58))
+                                .lineLimit(2)
+                        }
+                        Spacer(minLength: 8)
+                    }
+
+                    ConversationEnergyField(
+                        phase: presentation.phase,
+                        accent: presentation.accent,
+                        time: reduceMotion ? 0 : time
+                    )
+                    .frame(height: 24)
+                }
+                .padding(16)
+
+                Button { HUDWindowManager.shared.dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.42))
+                        .frame(width: 22, height: 22)
+                        .background(.white.opacity(0.08), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(9)
+                .accessibilityLabel("Dismiss SpeakEasy conversation HUD")
+            }
+            .frame(width: 480, height: 180)
+            .background(conversationBackground)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("SpeakEasy \(presentation.title). Locked to \(presentation.taskTitle). \(presentation.detail)")
+        }
+    }
+
+    private var isEnergetic: Bool {
+        [.warmingUp, .recording, .transcribing, .submitting, .preparingSpeech, .speaking]
+            .contains(presentation.phase)
+    }
+
+    private func pulseScale(_ time: TimeInterval) -> CGFloat {
+        guard isEnergetic, !reduceMotion else { return 1 }
+        return 1 + CGFloat((sin(time * 4.2) + 1) * 0.045)
+    }
+
+    private func pulseOpacity(_ time: TimeInterval) -> Double {
+        guard isEnergetic, !reduceMotion else { return 1 }
+        return 0.42 + (sin(time * 4.2) + 1) * 0.18
+    }
+
+    private var conversationBackground: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(Color.black.opacity(0.9))
+            .overlay {
+                RadialGradient(
+                    colors: [presentation.accent.opacity(0.19), .clear],
+                    center: .topLeading,
+                    startRadius: 0,
+                    endRadius: 360
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(presentation.accent.opacity(0.32), lineWidth: 0.75)
+            }
+            .shadow(color: presentation.accent.opacity(0.14), radius: 24, y: 10)
+    }
+}
+
+struct HUDTaskLockHeader: View {
+    let presentation: HUDConversationPresentation
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(presentation.accent)
+                .frame(width: 6, height: 6)
+                .shadow(color: presentation.accent.opacity(0.8), radius: 4)
+                .accessibilityHidden(true)
+            Text(presentation.phase == .recording ? "LIVE" : presentation.phase.label.uppercased())
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(presentation.accent)
+            Spacer()
+            Image(systemName: "lock.fill")
+                .font(.system(size: 8, weight: .bold))
+            Text(presentation.taskTitle)
+                .lineLimit(1)
+            Text(String(presentation.taskID.prefix(8)))
+                .fontDesign(.monospaced)
+                .foregroundStyle(.white.opacity(0.34))
+        }
+        .font(.system(size: 10, weight: .semibold, design: .rounded))
+        .foregroundStyle(.white.opacity(0.68))
+        .padding(.trailing, 28)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(presentation.phase.label). Locked to \(presentation.taskTitle)")
+    }
+}
+
+struct ConversationEnergyField: View {
+    let phase: ListeningPhase
+    let accent: Color
+    let time: TimeInterval
+
+    private let count = 34
+
+    var body: some View {
+        GeometryReader { geometry in
+            HStack(alignment: .center, spacing: 3) {
+                ForEach(0..<count, id: \.self) { index in
+                    Capsule()
+                        .fill(accent.opacity(opacity(for: index)))
+                        .frame(
+                            width: max(2, (geometry.size.width - CGFloat(count - 1) * 3) / CGFloat(count)),
+                            height: height(for: index)
+                        )
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func height(for index: Int) -> CGFloat {
+        guard phase != .ready && phase != .failed else { return index.isMultiple(of: 5) ? 4 : 2 }
+        let phaseOffset = Double(index) * 0.52
+        let primary = (sin(time * 5.2 + phaseOffset) + 1) * 0.5
+        let secondary = (sin(time * 2.3 - phaseOffset * 0.7) + 1) * 0.5
+        return 3 + CGFloat(primary * 13 + secondary * 5)
+    }
+
+    private func opacity(for index: Int) -> Double {
+        0.34 + (sin(time * 2.1 + Double(index) * 0.31) + 1) * 0.24
     }
 }
 

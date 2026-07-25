@@ -17,6 +17,7 @@ struct SpeakEasyApp: App {
     }
 }
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     var hudWindow: NSPanel?
     private var hudWindowManager: HUDWindowManager?
@@ -111,6 +112,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         manager.start(duration: duration)
+        manager.bindListening(ListeningSessionController.shared)
         if manager.isVisible {
             window.orderFrontRegardless()
         } else {
