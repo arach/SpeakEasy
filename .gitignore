@@ -48,7 +48,10 @@ config.local.json
 
 # Agent skill symlinks (created by dewey/skills installers)
 .agent/
-.agents/
+.agents/*
+!.agents/plugins/
+.agents/plugins/*
+!.agents/plugins/marketplace.json
 .cline/
 .codebuddy/
 .codex/
@@ -75,6 +78,8 @@ config.local.json
 .windsurf/
 .zencoder/
 skills/
+!plugins/speakeasy/skills/
+!plugins/speakeasy/skills/**
 
 # Test files
 test-*.js

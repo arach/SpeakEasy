@@ -1,0 +1,47 @@
+{
+  "name": "speakeasy",
+  "version": "0.1.0+codex.20260725021545",
+  "description": "Give Codex and ChatGPT Work a controllable voice through the native SpeakEasy menu-bar player.",
+  "author": {
+    "name": "Arach",
+    "url": "https://arach.dev"
+  },
+  "homepage": "https://speakeasy.arach.dev",
+  "repository": "https://github.com/arach/SpeakEasy",
+  "license": "MIT",
+  "keywords": [
+    "audio",
+    "macos",
+    "narration",
+    "text-to-speech",
+    "voice"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SpeakEasy",
+    "shortDescription": "A controllable voice for your agents",
+    "longDescription": "Generate narration with local or configured speech providers, then listen through a permanent native macOS player with autoplay, queueing, transport controls, playback speed, volume, a word-synced HUD, and one-click return to the originating Codex task.",
+    "developerName": "Arach",
+    "category": "Productivity",
+    "capabilities": [
+      "Audio",
+      "Local",
+      "macOS"
+    ],
+    "websiteURL": "https://speakeasy.arach.dev",
+    "privacyPolicyURL": "https://speakeasy.arach.dev/privacy/",
+    "termsOfServiceURL": "https://speakeasy.arach.dev/terms/",
+    "defaultPrompt": [
+      "Read this summary aloud in SpeakEasy.",
+      "Queue a spoken update and autoplay it.",
+      "Show the current SpeakEasy player status."
+    ],
+    "brandColor": "#34D399",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png",
+    "screenshots": [
+      "./assets/menu-bar-player.png",
+      "./assets/narration-hud.png"
+    ]
+  }
+}

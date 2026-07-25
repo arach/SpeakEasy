@@ -30,7 +30,7 @@ We didn't find a configuration file. Let's create one to get you started!
 
 🚀 Quick Start:
    Try it now with built-in system voices:
-   
+
    ${chalk.green('speakeasy "Hello! Welcome to SpeakEasy!" --provider system')}
 
 🔧 Setup API Keys (optional):
@@ -130,5 +130,4 @@ Examples:
   speakeasy "Welcome!" --provider openai --instructions "Sound excited and energetic"
 `);
 }
-
 
