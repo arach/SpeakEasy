@@ -1,6 +1,6 @@
 {
   "name": "@arach/speakeasy",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "description": "Convenient TTS CLI for Mac — centralized credentials + configurable caching so all your apps and agents can speak.",
   "homepage": "https://speakeasy.arach.dev",
   "repository": {
@@ -24,9 +24,13 @@
   },
   "scripts": {
     "build": "tsup src/index.ts src/bin/speakeasy-cli.ts --dts --format cjs --external node:sqlite --external bun:sqlite",
+    "build:plugin-runtime": "bun build src/bin/speakeasy-cli.ts --target=bun --outfile plugins/speakeasy/skills/speakeasy/runtime/speakeasy-cli.js",
+    "package:plugin-submission": "plugins/speakeasy/tools/build-submission.sh",
+    "verify:plugin-bundle": "plugins/speakeasy/tools/verify-skill-bundle.sh",
     "prepublishOnly": "pnpm run build && rm -f dist/test.js dist/test.d.ts dist/test.js.map dist/test.d.ts.map",
     "dev": "tsc --watch",
     "test": "node dist/test.js",
+    "test:privacy": "bun test src/privacy-permissions.test.ts",
     "test:cache": "pnpm run build && node scripts/cache-test.js",
     "example": "pnpm run build && node examples/basic-usage.js",
     "cli": "pnpm run build && node dist/bin/speakeasy-cli.js",

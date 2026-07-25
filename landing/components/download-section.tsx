@@ -68,7 +68,7 @@ export default function DownloadSection() {
               <div>
                 <h4 className="font-text font-medium text-slate-700 mb-3">macOS</h4>
                 <ul className="font-text text-sm text-slate-600 space-y-1">
-                  <li>• macOS 11.0 or later</li>
+                  <li>• macOS 14.0 or later</li>
                   <li>• Apple Silicon or Intel processor</li>
                   <li>• 50MB free disk space</li>
                 </ul>

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { DEFAULTS } from './constants';
 
 export const cliSchema = z.object({
   text: z.string().optional(),
@@ -7,12 +6,10 @@ export const cliSchema = z.object({
   voice: z.string().optional(),
   rate: z
     .preprocess((v) => (typeof v === 'string' ? parseInt(v, 10) : v), z.number().int().min(60).max(480))
-    .optional()
-    .default(DEFAULTS.rate),
+    .optional(),
   volume: z
     .preprocess((v) => (typeof v === 'string' ? parseFloat(v) : v), z.number().min(0).max(1))
-    .optional()
-    .default(DEFAULTS.volume),
+    .optional(),
   instructions: z.string().optional(), // OpenAI-only: steering instructions for voice style
   interrupt: z.boolean().optional(),
   cache: z.boolean().optional(),
@@ -54,5 +51,4 @@ export function parseAndValidate(raw: Record<string, unknown>): CliOptions {
   }
   return result.data;
 }
-
 

@@ -87,11 +87,44 @@ speakeasy_bundle_swiftpm_frameworks() {
     fi
 }
 
+speakeasy_verify_bundle_layout() {
+    local bundle_path="$1"
+    local executable="$bundle_path/Contents/MacOS/SpeakEasy"
+    local frameworks_dir="$bundle_path/Contents/Frameworks"
+    local framework_name
+
+    if [ ! -x "$executable" ]; then
+        echo "Bundle executable is missing or not executable: $executable" >&2
+        return 1
+    fi
+
+    if find "$bundle_path/Contents/MacOS" -maxdepth 1 -type d -name '*.framework' -print -quit \
+        | grep -q .; then
+        echo "Frameworks must live only in Contents/Frameworks, not Contents/MacOS." >&2
+        return 1
+    fi
+
+    while IFS= read -r framework_name; do
+        if [ ! -d "$frameworks_dir/$framework_name" ]; then
+            echo "Linked framework is missing from the app bundle: $framework_name" >&2
+            return 1
+        fi
+    done < <(
+        otool -L "$executable" \
+            | awk '/@rpath\/.*\.framework\// { split($1, parts, "/"); print parts[2] }' \
+            | sort -u
+    )
+}
+
 speakeasy_bundle_app() {
     local app_root="$1"
     local bundle_path="$2"
     local build_dir="$app_root/.build/release"
     local executable_path="$bundle_path/Contents/MacOS/SpeakEasy"
+
+    if [[ -d "$build_dir" ]]; then
+        build_dir="$(cd "$build_dir" && pwd -P)"
+    fi
 
     rm -rf "$bundle_path"
     mkdir -p "$bundle_path/Contents/MacOS"
@@ -106,11 +139,6 @@ speakeasy_bundle_app() {
         "$build_dir" \
         "$bundle_path/Contents/Frameworks" \
         "$app_root/.build/artifacts"
-
-    for fw in "$build_dir"/*.framework; do
-        [ -e "$fw" ] || continue
-        ditto "$fw" "$bundle_path/Contents/MacOS/$(basename "$fw")"
-    done
 
     cp "$app_root/Resources/Info.plist" "$bundle_path/Contents/"
 

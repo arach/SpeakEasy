@@ -2,7 +2,8 @@ import * as fs from 'fs';
 import { mkdtempSync } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { execSync, spawn } from 'child_process';
+import { randomUUID } from 'crypto';
+import { execFileSync, spawn, spawnSync } from 'child_process';
 import https from 'https';
 
 const APP_DIR = path.join(os.homedir(), '.speakeasy');
@@ -11,6 +12,7 @@ const VERSION_FILE = path.join(APP_DIR, '.app-version');
 
 const GITHUB_REPO = 'arach/SpeakEasy';
 const RELEASE_APP_ASSET_NAMES = ['SpeakEasy.dmg'];
+const EXPECTED_DEVELOPER_TEAM_ID = '2U83JFPW66';
 
 interface ReleaseAsset {
   name: string;
@@ -46,8 +48,9 @@ function readBundleShortVersion(): string | null {
   const plist = path.join(APP_PATH, 'Contents', 'Info.plist');
   if (!fs.existsSync(plist)) return null;
   try {
-    const version = execSync(
-      `/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' '${plist}'`,
+    const version = execFileSync(
+      '/usr/libexec/PlistBuddy',
+      ['-c', 'Print :CFBundleShortVersionString', plist],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
     ).trim();
     return version || null;
@@ -136,63 +139,95 @@ function findAppAsset(assets: ReleaseAsset[]): ReleaseAsset | undefined {
   );
 }
 
+function verifyAppBundle(bundlePath: string): void {
+  execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', bundlePath], {
+    stdio: 'pipe',
+  });
+
+  const details = spawnSync('/usr/bin/codesign', ['--display', '--verbose=4', bundlePath], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  if (details.status !== 0) {
+    throw new Error('Could not inspect the SpeakEasy app signature');
+  }
+
+  const signatureOutput = `${details.stdout}\n${details.stderr}`;
+  const teamIdentifier = signatureOutput.match(/^TeamIdentifier=(.+)$/m)?.[1]?.trim();
+  if (teamIdentifier !== EXPECTED_DEVELOPER_TEAM_ID) {
+    throw new Error(
+      `SpeakEasy app signature has unexpected TeamIdentifier ${teamIdentifier ?? 'missing'}`
+    );
+  }
+}
+
+function verifyDiskImage(dmgPath: string): void {
+  execFileSync('/usr/bin/codesign', ['--verify', '--verbose=2', dmgPath], { stdio: 'pipe' });
+  execFileSync(
+    '/usr/sbin/spctl',
+    ['--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=4', dmgPath],
+    { stdio: 'pipe' }
+  );
+}
+
+function replaceInstalledBundle(sourceBundle: string): void {
+  const stagingPath = path.join(APP_DIR, `.SpeakEasy.app.installing-${randomUUID()}`);
+  const backupPath = path.join(APP_DIR, `.SpeakEasy.app.backup-${randomUUID()}`);
+  let movedExistingBundle = false;
+  let installedReplacement = false;
+
+  try {
+    execFileSync('/usr/bin/ditto', [sourceBundle, stagingPath], { stdio: 'pipe' });
+    verifyAppBundle(stagingPath);
+
+    if (fs.existsSync(APP_PATH)) {
+      fs.renameSync(APP_PATH, backupPath);
+      movedExistingBundle = true;
+    }
+
+    fs.renameSync(stagingPath, APP_PATH);
+    installedReplacement = true;
+    if (movedExistingBundle) {
+      fs.rmSync(backupPath, { recursive: true, force: true });
+    }
+  } catch (error) {
+    if (installedReplacement && fs.existsSync(APP_PATH)) {
+      fs.rmSync(APP_PATH, { recursive: true, force: true });
+    }
+    if (movedExistingBundle && fs.existsSync(backupPath)) {
+      fs.renameSync(backupPath, APP_PATH);
+    }
+    throw error;
+  } finally {
+    fs.rmSync(stagingPath, { recursive: true, force: true });
+    if (!movedExistingBundle) {
+      fs.rmSync(backupPath, { recursive: true, force: true });
+    }
+  }
+}
+
 function installBundleFromDmg(dmgPath: string): void {
   const mountPoint = mkdtempSync(path.join(os.tmpdir(), 'speakeasy-mount-'));
   try {
-    execSync(`hdiutil attach -nobrowse -readonly -mountpoint '${mountPoint}' '${dmgPath}'`, { stdio: 'pipe' });
+    verifyDiskImage(dmgPath);
+    execFileSync(
+      '/usr/bin/hdiutil',
+      ['attach', '-nobrowse', '-readonly', '-mountpoint', mountPoint, dmgPath],
+      { stdio: 'pipe' }
+    );
     const mountedBundle = path.join(mountPoint, 'SpeakEasy.app');
     if (!fs.existsSync(mountedBundle)) {
       throw new Error('SpeakEasy.app not found in mounted disk image');
     }
-    if (fs.existsSync(APP_PATH)) {
-      fs.rmSync(APP_PATH, { recursive: true, force: true });
-    }
-    execSync(`cp -R '${mountedBundle}' '${APP_PATH}'`);
+    verifyAppBundle(mountedBundle);
+    replaceInstalledBundle(mountedBundle);
   } finally {
     try {
-      execSync(`hdiutil detach '${mountPoint}' -quiet`, { stdio: 'pipe' });
+      execFileSync('/usr/bin/hdiutil', ['detach', mountPoint, '-quiet'], { stdio: 'pipe' });
     } catch {
       // Ignore detach failures after a successful copy.
     }
     fs.rmSync(mountPoint, { recursive: true, force: true });
-  }
-}
-
-async function installFromZip(asset: ReleaseAsset, onProgress?: (msg: string) => void): Promise<boolean> {
-  const zipPath = path.join(APP_DIR, asset.name);
-
-  try {
-    await downloadFile(asset.browser_download_url, zipPath);
-  } catch (error) {
-    onProgress?.(`❌ Download failed: ${(error as Error).message}`);
-    return false;
-  }
-
-  if (fs.existsSync(APP_PATH)) {
-    fs.rmSync(APP_PATH, { recursive: true, force: true });
-  }
-
-  try {
-    execSync(`unzip -q -o "${zipPath}" -d "${APP_DIR}"`, { stdio: 'pipe' });
-  } catch {
-    onProgress?.('❌ Failed to unzip app');
-    return false;
-  }
-
-  fs.unlinkSync(zipPath);
-  const macosxDir = path.join(APP_DIR, '__MACOSX');
-  if (fs.existsSync(macosxDir)) {
-    fs.rmSync(macosxDir, { recursive: true, force: true });
-  }
-
-  return true;
-}
-
-function clearQuarantine(): void {
-  try {
-    execSync(`xattr -rd com.apple.quarantine "${APP_PATH}"`, { stdio: 'pipe' });
-  } catch {
-    // Ignore if xattr fails.
   }
 }
 
@@ -222,40 +257,29 @@ export async function downloadAndInstallApp(onProgress?: (msg: string) => void):
   }
 
   const dmgAsset = findAppAsset(release.assets);
-  const zipAsset = release.assets.find((asset) =>
-    asset.name === 'SpeakEasy.app.zip' || asset.name === 'SpeakEasy-macos.zip'
-  );
-
-  if (!dmgAsset && !zipAsset) {
-    onProgress?.('❌ No macOS app found in latest release');
+  if (!dmgAsset) {
+    onProgress?.('❌ No signed macOS disk image found in latest release');
     onProgress?.('   Available assets: ' + release.assets.map((asset) => asset.name).join(', '));
     return false;
   }
 
-  onProgress?.(`📥 Downloading ${(dmgAsset ?? zipAsset)!.name}...`);
+  onProgress?.(`📥 Downloading ${dmgAsset.name}...`);
 
   try {
-    if (dmgAsset) {
-      const tempDir = mkdtempSync(path.join(os.tmpdir(), 'speakeasy-download-'));
-      const dmgPath = path.join(tempDir, dmgAsset.name);
-      try {
-        await downloadFile(dmgAsset.browser_download_url, dmgPath);
-        onProgress?.('📦 Installing from disk image...');
-        installBundleFromDmg(dmgPath);
-      } finally {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      }
-    } else if (zipAsset) {
-      onProgress?.('📦 Installing from zip...');
-      const installed = await installFromZip(zipAsset, onProgress);
-      if (!installed) return false;
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), 'speakeasy-download-'));
+    const dmgPath = path.join(tempDir, dmgAsset.name);
+    try {
+      await downloadFile(dmgAsset.browser_download_url, dmgPath);
+      onProgress?.('🔐 Verifying signed and notarized disk image...');
+      installBundleFromDmg(dmgPath);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   } catch (error) {
     onProgress?.(`❌ Install failed: ${(error as Error).message}`);
     return false;
   }
 
-  clearQuarantine();
   fs.writeFileSync(VERSION_FILE, release.tag_name);
 
   reportAppLocation(onProgress, `✅ Installed SpeakEasy.app (${release.tag_name})`);
