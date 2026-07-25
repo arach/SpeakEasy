@@ -11,7 +11,7 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(url: "https://github.com/arach/hudsonkit-xcframework.git", exact: "0.3.2")
+        .package(url: "https://github.com/arach/hudsonkit-xcframework.git", exact: "0.3.3")
     ],
     targets: [
         .executableTarget(
@@ -21,6 +21,10 @@ let package = Package(
                 .product(name: "HudsonShell", package: "hudsonkit-xcframework"),
             ],
             path: "Sources/SpeakEasy"
+        ),
+        .testTarget(
+            name: "SpeakEasyTests",
+            dependencies: ["SpeakEasy"]
         )
     ]
 )

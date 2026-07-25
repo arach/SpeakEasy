@@ -491,3 +491,5 @@ export { ElevenLabsProvider } from './providers/elevenlabs';
 export { GroqProvider } from './providers/groq';
 export { GeminiProvider } from './providers/gemini';
 export { TTSCache, CacheMetadata, CacheStats } from './cache';
+export * from './player-client';
+export * from './player-protocol';

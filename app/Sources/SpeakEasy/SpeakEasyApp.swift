@@ -6,28 +6,33 @@ import HudsonShell
 
 @main
 struct SpeakEasyApp: App {
-    @StateObject private var configManager = ConfigManager.shared
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    init() {
-        NSApplication.shared.activate(ignoringOtherApps: true)
-    }
-
     var body: some Scene {
-        WindowGroup {
-            ShellRootView()
-                .environmentObject(configManager)
+        // Primary surface is the menu-bar status item (MenuBarController).
+        // Settings open on demand as a secondary window — do not open at launch.
+        Settings {
+            EmptyView()
         }
-        .defaultSize(width: 920, height: 720)
-        .hudChromeWindow()
     }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    var hudWindow: NSWindow?
+    var hudWindow: NSPanel?
     private var hudWindowManager: HUDWindowManager?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+#if DEBUG
+        if PlayerPopoverSnapshot.renderIfRequested() {
+            return
+        }
+        if HUDSnapshot.renderIfRequested() {
+            return
+        }
+#endif
+
+        // Resident menu-bar shell + player IPC (no Dock icon via LSUIElement).
+        MenuBarController.shared.start()
         checkAndStartHUD()
 
         // Observe config changes
@@ -40,6 +45,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        MenuBarController.shared.stop()
         hudWindowManager?.stop()
     }
 
@@ -62,34 +68,70 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let hudPosition = HUDPosition(rawValue: position) ?? .topRight
         let manager = HUDWindowManager.shared
-        manager.start()
         hudWindowManager = manager
 
-        // Create a floating, transparent window
+        // A compact non-activating panel stays interactive without blocking the
+        // rest of the screen while narration is playing.
         let screen = NSScreen.main ?? NSScreen.screens.first!
-        let window = NSWindow(
-            contentRect: screen.frame,
-            styleMask: [.borderless],
+        let panelSize = NSSize(width: 480, height: 180)
+        let panelOrigin = hudOrigin(
+            position: hudPosition,
+            size: panelSize,
+            visibleFrame: screen.visibleFrame
+        )
+        let window = NSPanel(
+            contentRect: NSRect(origin: panelOrigin, size: panelSize),
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        window.isFloatingPanel = true
+        window.hidesOnDeactivate = false
+        window.becomesKeyOnlyIfNeeded = true
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.ignoresMouseEvents = true  // Let clicks through to windows below
-        window.hasShadow = false
+        window.ignoresMouseEvents = false
+        window.hasShadow = true
 
         let hostingView = NSHostingView(rootView:
             HUDOverlayView(position: hudPosition, opacity: opacity)
         )
-        hostingView.frame = window.contentView!.bounds
+        hostingView.frame = NSRect(origin: .zero, size: panelSize)
         hostingView.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
         window.contentView = hostingView
 
-        window.orderFrontRegardless()
+        manager.setVisibilityHandler { [weak window] isVisible in
+            if isVisible {
+                window?.orderFrontRegardless()
+            } else {
+                window?.orderOut(nil)
+            }
+        }
+        manager.start(duration: duration)
+        if manager.isVisible {
+            window.orderFrontRegardless()
+        } else {
+            window.orderOut(nil)
+        }
         hudWindow = window
+    }
+
+    private func hudOrigin(position: HUDPosition, size: NSSize, visibleFrame: NSRect) -> NSPoint {
+        let padding: CGFloat = 20
+        let left = visibleFrame.minX + padding
+        let right = visibleFrame.maxX - size.width - padding
+        let bottom = visibleFrame.minY + padding
+        let top = visibleFrame.maxY - size.height - padding
+
+        switch position {
+        case .topLeft: return NSPoint(x: left, y: top)
+        case .topRight: return NSPoint(x: right, y: top)
+        case .bottomLeft: return NSPoint(x: left, y: bottom)
+        case .bottomRight: return NSPoint(x: right, y: bottom)
+        }
     }
 
     private func stopHUD() {

@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import AppKit
 
 // MARK: - HUD Message Model
 
@@ -9,6 +10,7 @@ struct HUDMessage: Codable {
     let cached: Bool?
     let timestamp: TimeInterval?
     let audioLevel: Float?     // 0.0 to 1.0, for waveform amplitude
+    let sourceThreadId: String?
 
     var isLevelUpdate: Bool {
         text == nil && audioLevel != nil
@@ -23,14 +25,19 @@ class HUDWindowManager: ObservableObject {
     @Published var currentMessage: HUDMessage?
     @Published var isVisible = false
     @Published var audioLevel: Float = 0.0  // Current audio level for waveform
+    @Published var playbackProgress: Double?
 
     private var hideTimer: Timer?
     private var hudDuration: TimeInterval = 3.0
     private var isStarted = false
+    private var visibilityHandler: ((Bool) -> Void)?
 
     private init() {}
 
-    func start() {
+    func start(duration: TimeInterval? = nil) {
+        if let duration {
+            hudDuration = duration
+        }
         guard !isStarted else { return }
         isStarted = true
 
@@ -48,6 +55,39 @@ class HUDWindowManager: ObservableObject {
         hideTimer = nil
     }
 
+    func setVisibilityHandler(_ handler: @escaping (Bool) -> Void) {
+        visibilityHandler = handler
+    }
+
+    func showPlayback(_ item: PlaybackItem) {
+        hideTimer?.invalidate()
+        hideTimer = nil
+        playbackProgress = 0
+        currentMessage = HUDMessage(
+            text: item.text ?? item.title,
+            provider: item.provider,
+            cached: nil,
+            timestamp: Date().timeIntervalSince1970,
+            audioLevel: 0,
+            sourceThreadId: item.sourceThreadId
+        )
+        audioLevel = 0
+        showWindow()
+    }
+
+    func updatePlayback(audioLevel: Float, currentTime: TimeInterval, duration: TimeInterval) {
+        self.audioLevel = audioLevel
+        guard playbackProgress != nil, duration > 0 else { return }
+        playbackProgress = min(max(currentTime / duration, 0), 1)
+    }
+
+    func playbackDidFinish() {
+        guard playbackProgress != nil else { return }
+        playbackProgress = 1
+        audioLevel = 0
+        scheduleHide()
+    }
+
     private func handleMessage(_ message: HUDMessage) {
         if message.isLevelUpdate {
             // Just update audio level, don't reset timer
@@ -59,14 +99,21 @@ class HUDWindowManager: ObservableObject {
     }
 
     private func showMessage(_ message: HUDMessage) {
+        playbackProgress = nil
         currentMessage = message
         audioLevel = message.audioLevel ?? 0.0
+        showWindow()
+        scheduleHide()
+    }
 
-        withAnimation(.easeOut(duration: 0.3)) {
+    private func showWindow() {
+        withAnimation(.easeOut(duration: 0.25)) {
             isVisible = true
         }
+        visibilityHandler?(true)
+    }
 
-        // Schedule hide
+    private func scheduleHide() {
         hideTimer?.invalidate()
         hideTimer = Timer.scheduledTimer(withTimeInterval: hudDuration, repeats: false) { [weak self] _ in
             self?.hideMessage()
@@ -78,12 +125,23 @@ class HUDWindowManager: ObservableObject {
             isVisible = false
         }
         audioLevel = 0.0
+        playbackProgress = nil
+        visibilityHandler?(false)
     }
 
     func dismiss() {
         hideTimer?.invalidate()
         hideTimer = nil
         hideMessage()
+    }
+}
+
+enum CodexTaskLink {
+    static func url(threadId: String?) -> URL? {
+        guard let threadId, !threadId.isEmpty else { return nil }
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        guard threadId.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
+        return URL(string: "codex://threads/\(threadId)")
     }
 }
 
@@ -205,24 +263,22 @@ struct HUDOverlayView: View {
     let opacity: Double
 
     var body: some View {
-        GeometryReader { geometry in
+        Group {
             if manager.isVisible, let message = manager.currentMessage {
-                HUDContent(message: message, theme: theme, audioLevel: manager.audioLevel)
-                    .opacity(opacity)
-                    .position(getPosition(in: geometry.size))
-                    .transition(.asymmetric(
-                        insertion: .move(edge: entryEdge).combined(with: .opacity),
-                        removal: .opacity
-                    ))
+                HUDContent(
+                    message: message,
+                    theme: theme,
+                    audioLevel: manager.audioLevel,
+                    playbackProgress: manager.playbackProgress
+                )
+                .opacity(opacity)
+                .transition(.asymmetric(
+                    insertion: .move(edge: entryEdge).combined(with: .opacity),
+                    removal: .opacity
+                ))
             }
         }
-        .ignoresSafeArea()
-        .onAppear {
-            manager.start()
-        }
-        .onDisappear {
-            // Don't stop - singleton keeps running
-        }
+        .frame(width: 480, height: 180)
     }
 
     private var entryEdge: Edge {
@@ -234,23 +290,6 @@ struct HUDOverlayView: View {
         }
     }
 
-    private func getPosition(in size: CGSize) -> CGPoint {
-        let padding: CGFloat = 20
-        let menuBarHeight: CGFloat = 28 // Account for macOS menu bar at top
-        let hudWidth: CGFloat = 450
-        let hudHeight: CGFloat = 120
-
-        switch position {
-        case .topLeft:
-            return CGPoint(x: hudWidth / 2 + padding, y: hudHeight / 2 + padding + menuBarHeight)
-        case .topRight:
-            return CGPoint(x: size.width - hudWidth / 2 - padding, y: hudHeight / 2 + padding + menuBarHeight)
-        case .bottomLeft:
-            return CGPoint(x: hudWidth / 2 + padding, y: size.height - hudHeight / 2 - padding)
-        case .bottomRight:
-            return CGPoint(x: size.width - hudWidth / 2 - padding, y: size.height - hudHeight / 2 - padding)
-        }
-    }
 }
 
 enum HUDPosition: String, CaseIterable {
@@ -266,6 +305,7 @@ struct HUDContent: View {
     let message: HUDMessage
     let theme: Theme
     let audioLevel: Float
+    let playbackProgress: Double?
     @ObservedObject private var config = ConfigManager.shared
 
     private var waveformColor: Color {
@@ -313,20 +353,37 @@ struct HUDContent: View {
                     text: message.text ?? "",
                     cached: message.cached ?? false,
                     fontSize: fontSize,
-                    fontDesign: fontDesign
+                    fontDesign: fontDesign,
+                    playbackProgress: playbackProgress
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // Waveform at bottom
-                HUDWaveformSection(
-                    barCount: config.hudWaveformBarCount,
-                    amplitudeMultiplier: config.hudWaveformAmplitude,
-                    color: waveformColor,
-                    audioLevel: audioLevel
-                )
-                .frame(height: 35)
+                HStack(spacing: 12) {
+                    HUDWaveformSection(
+                        barCount: config.hudWaveformBarCount,
+                        amplitudeMultiplier: config.hudWaveformAmplitude,
+                        color: waveformColor,
+                        audioLevel: audioLevel
+                    )
+                    .frame(height: 30)
+
+                    if let url = CodexTaskLink.url(threadId: message.sourceThreadId) {
+                        Button {
+                            NSWorkspace.shared.open(url)
+                        } label: {
+                            Label("Back to Codex", systemImage: "arrow.turn.up.left")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.82))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(Color.white.opacity(0.1), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open the Codex task that created this narration")
+                    }
+                }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, 14)
             }
 
             // Dismiss button
@@ -343,7 +400,7 @@ struct HUDContent: View {
             .buttonStyle(.plain)
             .padding(8)
         }
-        .frame(width: 450, height: 120)
+        .frame(width: 480, height: 180)
         .background(
             ZStack {
                 // Super dark black background
@@ -365,6 +422,7 @@ struct HUDTextSection: View {
     let cached: Bool
     let fontSize: CGFloat
     let fontDesign: Font.Design
+    let playbackProgress: Double?
 
     @State private var visibleWordCount: Int = 0
     @State private var animationTimer: Timer?
@@ -393,7 +451,7 @@ struct HUDTextSection: View {
             // Animated word-by-word text
             FlowingText(
                 words: words,
-                visibleCount: visibleWordCount,
+                visibleCount: progressWordCount,
                 fontSize: fontSize,
                 fontDesign: fontDesign
             )
@@ -401,8 +459,10 @@ struct HUDTextSection: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            startWordAnimation()
+            updateAnimationMode()
         }
+        .onChange(of: text) { _, _ in updateAnimationMode() }
+        .onChange(of: playbackProgress) { _, _ in updateAnimationMode() }
         .onDisappear {
             animationTimer?.invalidate()
         }
@@ -422,6 +482,19 @@ struct HUDTextSection: View {
             }
         }
     }
+
+    private var progressWordCount: Int {
+        guard let playbackProgress, !words.isEmpty else { return visibleWordCount }
+        return min(words.count, max(1, Int(ceil(playbackProgress * Double(words.count)))))
+    }
+
+    private func updateAnimationMode() {
+        animationTimer?.invalidate()
+        animationTimer = nil
+        if playbackProgress == nil {
+            startWordAnimation()
+        }
+    }
 }
 
 struct FlowingText: View {
@@ -431,17 +504,21 @@ struct FlowingText: View {
     let fontDesign: Font.Design
 
     var body: some View {
-        // Use Text concatenation for proper line wrapping
-        words.enumerated().reduce(Text("")) { result, item in
-            let (index, word) = item
-            let separator = index == 0 ? "" : " "
+        let end = min(words.count, max(visibleCount, 1))
+        let start = max(0, end - 42)
+        let visibleWords = Array(words[start..<end])
+
+        visibleWords.enumerated().reduce(Text("")) { result, item in
+            let (localIndex, word) = item
+            let globalIndex = start + localIndex
+            let separator = localIndex == 0 ? "" : " "
             let wordText = Text(separator + word)
-                .font(.system(size: fontSize, weight: index == visibleCount - 1 ? .medium : .light, design: fontDesign))
-                .foregroundColor(index < visibleCount ? .white.opacity(index == visibleCount - 1 ? 0.95 : 0.7) : .clear)
+                .font(.system(size: fontSize, weight: globalIndex == visibleCount - 1 ? .semibold : .regular, design: fontDesign))
+                .foregroundColor(.white.opacity(globalIndex == visibleCount - 1 ? 1 : 0.62))
             return result + wordText
         }
         .multilineTextAlignment(.center)
-        .lineLimit(3)
+        .lineLimit(5)
     }
 }
 
