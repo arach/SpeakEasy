@@ -50,6 +50,13 @@ struct ListeningTurnContext: Equatable, Sendable {
     let playbackVolume: Double
 }
 
+enum CodexTaskLockPresentation: Equatable, Sendable {
+    case background
+    case revealInCodex
+
+    var revealsCodex: Bool { self == .revealInCodex }
+}
+
 @MainActor
 final class ListeningSessionController: ObservableObject {
     static let shared = ListeningSessionController()
@@ -178,7 +185,12 @@ final class ListeningSessionController: ObservableObject {
     }
 
     func lock(_ task: CodexTaskSummary) {
-        validateAndLock(taskID: task.id, expectedLane: nil, beginAfterLock: false)
+        validateAndLock(
+            taskID: task.id,
+            expectedLane: nil,
+            beginAfterLock: false,
+            presentation: .revealInCodex
+        )
     }
 
     func assignLockedTask(toLane number: Int) {
@@ -281,7 +293,8 @@ final class ListeningSessionController: ObservableObject {
         validateAndLock(
             taskID: assignment.task.id,
             expectedLane: number,
-            beginAfterLock: beginListening
+            beginAfterLock: beginListening,
+            presentation: .background
         )
     }
 
@@ -382,7 +395,8 @@ final class ListeningSessionController: ObservableObject {
     private func validateAndLock(
         taskID: String,
         expectedLane: Int?,
-        beginAfterLock: Bool
+        beginAfterLock: Bool,
+        presentation: CodexTaskLockPresentation
     ) {
         if lockedTask?.id != taskID {
             lockedTask = nil
@@ -391,7 +405,9 @@ final class ListeningSessionController: ObservableObject {
         selectedTaskID = taskID
         phase = .validatingLock
         lastError = nil
-        openCodexTask(taskID)
+        if presentation.revealsCodex {
+            openCodexTask(taskID)
+        }
         let requestID = UUID()
         validationID = requestID
         Task {
@@ -432,7 +448,9 @@ final class ListeningSessionController: ObservableObject {
                 }
                 persistLock(lock)
                 phase = .ready
-                diagnostic("locked to Desktop-owned Codex task \(taskID)")
+                diagnostic(presentation.revealsCodex
+                    ? "locked to Desktop-owned Codex task \(taskID) and revealed it"
+                    : "locked to Desktop-owned Codex task \(taskID) in the background")
                 applyLaunchLaneAssignmentIfPresent()
                 runLaunchFixtureIfPresent()
                 runLaunchHotkeyTestIfPresent()
@@ -547,8 +565,9 @@ final class ListeningSessionController: ObservableObject {
         phase = .transcribing
         Task {
             do {
-                let transcript = try await vox.stopAndTranscribe()
-                try await completeLoop(transcript: transcript, context: context)
+                let result = try await vox.stopAndTranscribe()
+                diagnostic("\(result.engine.rawValue) transcript selected")
+                try await completeLoop(transcript: result.text, context: context)
             } catch {
                 recordFailure(error)
             }
@@ -633,7 +652,12 @@ final class ListeningSessionController: ObservableObject {
         guard let requestedID = ProcessInfo.processInfo.environment["SPEAKEASY_LOCK_THREAD_ID"],
               let requested = recent.first(where: { $0.id == requestedID })
         else { return false }
-        lock(requested)
+        validateAndLock(
+            taskID: requested.id,
+            expectedLane: nil,
+            beginAfterLock: false,
+            presentation: .background
+        )
         return true
     }
 
@@ -649,7 +673,12 @@ final class ListeningSessionController: ObservableObject {
         guard let candidate = restoredLockCandidate else { return }
         restoredLockCandidate = nil
         if let task = recent.first(where: { $0.id == candidate.id }) {
-            lock(task)
+            validateAndLock(
+                taskID: task.id,
+                expectedLane: activeLaneNumber,
+                beginAfterLock: false,
+                presentation: .background
+            )
         } else {
             UserDefaults.standard.removeObject(forKey: lockDefaultsKey)
             selectedTaskID = recent.first?.id ?? ""
@@ -682,7 +711,8 @@ final class ListeningSessionController: ObservableObject {
 
     private func runLaunchHotkeyTestIfPresent() {
         guard !fixtureHasRun, !launchHotkeyHasRun,
-              ProcessInfo.processInfo.environment["SPEAKEASY_TRIGGER_HOTKEY_ON_LAUNCH"] == "1"
+              ProcessInfo.processInfo.environment["SPEAKEASY_TRIGGER_HOTKEY_ON_LAUNCH"] == "1",
+              phase == .ready || phase == .failed
         else { return }
         launchHotkeyHasRun = true
         diagnostic("triggering registered hotkey action for launch test")
@@ -692,7 +722,8 @@ final class ListeningSessionController: ObservableObject {
     private func runLaunchLaneTestIfPresent() {
         guard !fixtureHasRun, !launchLaneHasRun,
               let raw = ProcessInfo.processInfo.environment["SPEAKEASY_TRIGGER_LANE_ON_LAUNCH"],
-              let number = Int(raw), lane(number) != nil
+              let number = Int(raw), lane(number) != nil,
+              phase == .ready || phase == .failed
         else { return }
         launchLaneHasRun = true
         diagnostic("triggering lane \(number) for launch test")

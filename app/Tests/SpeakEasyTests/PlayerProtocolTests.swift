@@ -254,6 +254,22 @@ final class PlayerProtocolTests: XCTestCase {
         )
     }
 
+    func testOnlyExplicitTaskSelectionRevealsCodex() {
+        XCTAssertFalse(CodexTaskLockPresentation.background.revealsCodex)
+        XCTAssertTrue(CodexTaskLockPresentation.revealInCodex.revealsCodex)
+    }
+
+    func testColdStartUsesAppleSpeechUntilParakeetIsReady() {
+        XCTAssertEqual(
+            VoxListeningService.preferredEngine(parakeetReady: false),
+            .appleSpeech
+        )
+        XCTAssertEqual(
+            VoxListeningService.preferredEngine(parakeetReady: true),
+            .parakeet
+        )
+    }
+
     @MainActor
     func testLaneShortcutsUseDistinctNumberKeyCodes() {
         let codes = ListeningSessionController.laneRange.map(GlobalListeningShortcut.keyCode(forLane:))
