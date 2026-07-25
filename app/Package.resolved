@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/arach/hudsonkit-xcframework.git",
       "state" : {
-        "revision" : "7a7c861f7852ba9b7c9f1a16100e4384e9bd6ae0",
-        "version" : "0.3.2"
+        "revision" : "913a62e8b6be2f457ba14a12685824b5b9d2aa3e",
+        "version" : "0.3.3"
       }
     }
   ],
