@@ -87,29 +87,7 @@ struct ListeningPopoverSection: View {
 
             laneStrip(currentTask: lock)
 
-            Button(action: listening.toggleListening) {
-                HStack(spacing: 7) {
-                    Image(systemName: listening.phase == .recording ? "stop.fill" : "mic.fill")
-                    Text(buttonLabel)
-                    Spacer()
-                    Text(ListeningSessionController.shortcutTitle)
-                        .font(.system(size: 10, design: .rounded))
-                        .opacity(0.75)
-                }
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(listening.phase == .recording ? .white : .black.opacity(0.78))
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(listening.phase == .recording ? Color.red : accent)
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(!listening.phase.acceptsHotkey)
-            .opacity(listening.phase.acceptsHotkey ? 1 : 0.55)
-            .accessibilityLabel(buttonLabel)
-            .accessibilityHint("Global shortcut \(ListeningSessionController.shortcutTitle)")
+            captureComposer
 
             HStack(spacing: 5) {
                 Circle()
@@ -117,6 +95,7 @@ struct ListeningPopoverSection: View {
                     .frame(width: 5, height: 5)
                     .accessibilityHidden(true)
                 Text(listening.shortcutAvailable ? "Global shortcut active" : "Shortcut unavailable")
+                Text("· \(ListeningSessionController.shortcutTitle)")
                 if let device = listening.inputDeviceName, listening.phase == .recording {
                     Text("· \(device)")
                 }
@@ -125,6 +104,117 @@ struct ListeningPopoverSection: View {
             .foregroundColor(theme.textTertiary)
             .accessibilityElement(children: .combine)
         }
+        .onAppear { listening.refreshInputDevices() }
+    }
+
+    private var captureComposer: some View {
+        HStack(spacing: 0) {
+            Button(action: listening.toggleListening) {
+                HStack(spacing: 7) {
+                    Image(systemName: listening.phase == .recording ? "stop.fill" : "mic.fill")
+                    Text(buttonLabel)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(listening.phase == .recording ? .white : .black.opacity(0.78))
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(listening.phase == .recording ? Color.red : accent)
+            }
+            .buttonStyle(.plain)
+            .disabled(!listening.phase.acceptsHotkey)
+            .opacity(listening.phase.acceptsHotkey ? 1 : 0.55)
+            .accessibilityLabel(buttonLabel)
+            .accessibilityHint("Global shortcut \(ListeningSessionController.shortcutTitle)")
+
+            Rectangle()
+                .fill(theme.text.opacity(0.12))
+                .frame(width: 0.5)
+
+            microphoneMenu
+                .frame(width: 126)
+        }
+        .frame(height: 34)
+        .background(theme.text.opacity(0.045))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(theme.text.opacity(0.10), lineWidth: 0.75)
+        }
+    }
+
+    private var microphoneMenu: some View {
+        Menu {
+            Button {
+                listening.selectSystemDefaultInput()
+            } label: {
+                HStack {
+                    Text("System Default")
+                    if listening.inputPreference == nil {
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            if !listening.inputDevices.isEmpty {
+                Divider()
+            }
+
+            ForEach(listening.inputDevices) { device in
+                Button {
+                    listening.selectInputDevice(device)
+                } label: {
+                    HStack {
+                        Text(device.isSystemDefault ? "\(device.name) · default" : device.name)
+                        if listening.inputPreference?.id == device.id {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+
+            if let preference = listening.inputPreference,
+               !preference.isAvailable(in: listening.inputDevices) {
+                Divider()
+                Label("\(preference.name) unavailable", systemImage: "exclamationmark.triangle")
+            }
+
+            Divider()
+            Button {
+                listening.refreshInputDevices()
+            } label: {
+                Label("Refresh Inputs", systemImage: "arrow.clockwise")
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 7, weight: .semibold))
+                    .foregroundStyle(theme.textTertiary)
+
+                Text(listening.phase == .recording
+                    ? (listening.inputDeviceName ?? listening.selectedInputDeviceShortLabel)
+                    : listening.selectedInputDeviceShortLabel)
+                    .font(.system(size: 9.5, weight: .medium))
+                    .foregroundColor(listening.selectedInputIsAvailable ? theme.textSecondary : .orange)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(listening.selectedInputIsAvailable ? Color.clear : Color.orange.opacity(0.10))
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .disabled(isBusy || listening.phase == .recording)
+        .help(listening.selectedInputDeviceLabel)
+        .accessibilityLabel("Microphone: \(listening.selectedInputDeviceLabel)")
+        .accessibilityHint("Choose a fixed microphone or follow the system default")
     }
 
     private func laneStrip(currentTask: ListeningTaskLock) -> some View {

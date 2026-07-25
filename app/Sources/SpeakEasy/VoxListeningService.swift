@@ -12,6 +12,17 @@ struct ListeningTranscriptionResult: Equatable, Sendable {
     let engine: ListeningTranscriptionEngine
 }
 
+enum VoxListeningServiceError: LocalizedError {
+    case selectedInputUnavailable(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .selectedInputUnavailable(let name):
+            "Your dedicated microphone “\(name)” is unavailable. Reconnect it or choose another input."
+        }
+    }
+}
+
 actor VoxListeningService {
     static let modelID = "parakeet:v3"
 
@@ -40,8 +51,23 @@ actor VoxListeningService {
 
     /// Opens the microphone first, then warms the local model in parallel with
     /// the utterance. Apple Speech handles the result until Parakeet is ready.
-    func startRecordingAndWarm() async throws -> AudioInputDeviceInfo {
-        let recording = try await recorder.start(filePrefix: "speakeasy-listen")
+    func startRecordingAndWarm(
+        preferredInputDeviceID: String? = nil,
+        preferredInputDeviceName: String? = nil
+    ) async throws -> AudioInputDeviceInfo {
+        let normalizedID = preferredInputDeviceID?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let normalizedID, !normalizedID.isEmpty,
+           !AudioInputDevices.available().contains(where: { $0.id == normalizedID }) {
+            throw VoxListeningServiceError.selectedInputUnavailable(
+                preferredInputDeviceName ?? "Selected microphone"
+            )
+        }
+
+        let recording = try await recorder.start(
+            preferredInputDeviceID: normalizedID,
+            filePrefix: "speakeasy-listen"
+        )
         try? FileManager.default.setAttributes(
             [.posixPermissions: 0o600],
             ofItemAtPath: recording.url.path
