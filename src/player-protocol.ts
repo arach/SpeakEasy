@@ -27,6 +27,7 @@ export interface PlaybackItem {
   createdAt: string;
   synthesisRateWPM?: number;
   sourceThreadId?: string;
+  cleanupAfterPlayback?: boolean;
 }
 
 export interface PlayerCommandArguments {

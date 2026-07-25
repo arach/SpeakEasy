@@ -41,6 +41,29 @@ struct PlaybackItem: Codable, Identifiable, Equatable {
     let createdAt: String
     let synthesisRateWPM: Int?
     let sourceThreadId: String?
+    let cleanupAfterPlayback: Bool?
+
+    init(
+        id: UUID,
+        audioPath: String,
+        title: String,
+        text: String?,
+        provider: String?,
+        createdAt: String,
+        synthesisRateWPM: Int?,
+        sourceThreadId: String?,
+        cleanupAfterPlayback: Bool? = nil
+    ) {
+        self.id = id
+        self.audioPath = audioPath
+        self.title = title
+        self.text = text
+        self.provider = provider
+        self.createdAt = createdAt
+        self.synthesisRateWPM = synthesisRateWPM
+        self.sourceThreadId = sourceThreadId
+        self.cleanupAfterPlayback = cleanupAfterPlayback
+    }
 }
 
 struct PlayerCommandArguments: Codable {

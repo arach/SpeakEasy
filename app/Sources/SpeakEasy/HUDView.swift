@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 import AppKit
+import Combine
 
 // MARK: - HUD Message Model
 
@@ -17,8 +18,87 @@ struct HUDMessage: Codable {
     }
 }
 
+struct HUDConversationPresentation: Equatable {
+    let phase: ListeningPhase
+    let taskTitle: String
+    let taskID: String
+    let laneNumber: Int?
+    let transcript: String
+    let error: String?
+    let inputDeviceName: String?
+
+    /// Restrained phase accents keep state distinct against the near-black shell.
+    var accent: Color {
+        switch phase {
+        case .recording: Color(red: 0.46, green: 0.78, blue: 0.64)       // jade
+        case .cueing: Color(red: 0.88, green: 0.70, blue: 0.42)           // warm gold
+        case .warmingUp, .transcribing: Color(red: 0.62, green: 0.70, blue: 0.88) // periwinkle
+        case .submitting: Color(red: 0.52, green: 0.70, blue: 0.84)       // steel sky
+        case .preparingSpeech, .speaking: Color(red: 0.70, green: 0.62, blue: 0.86) // soft lavender
+        case .failed: Color(red: 0.90, green: 0.56, blue: 0.48)           // muted coral
+        default: Color(red: 0.52, green: 0.74, blue: 0.64)                // sage
+        }
+    }
+
+    var title: String {
+        switch phase {
+        case .validatingLock: "Locking onto task"
+        case .cueing: laneNumber.map { "Lane \($0) confirmed" } ?? "Lane confirmed"
+        case .ready: "Ready when you are"
+        case .warmingUp: "Warming up Vox"
+        case .recording: "Listening to you"
+        case .transcribing: "Understanding that"
+        case .submitting: "Talking to this task"
+        case .preparingSpeech: "Preparing its voice"
+        case .speaking: "Speaking back"
+        case .failed: "Voice loop needs attention"
+        case .unlocked: "Choose a task"
+        }
+    }
+
+    var detail: String {
+        if phase == .failed, let error, !error.isEmpty { return error }
+        switch phase {
+        case .validatingLock: return "Verifying the exact Codex task"
+        // Header already shows the exact task; body explains the status check.
+        case .cueing: return "Status check · microphone is off"
+        case .ready:
+            if let laneNumber { return "Press ⌘⌥\(laneNumber) for this lane or ⌃⌥Space" }
+            return "Press ⌃⌥Space and speak"
+        case .warmingUp: return "Opening the microphone before Vox warmup"
+        case .recording:
+            if let inputDeviceName { return "⌃⌥Space to send · \(inputDeviceName)" }
+            return "⌃⌥Space to stop and send"
+        case .transcribing: return "Turning this utterance into text"
+        case .submitting:
+            return transcript.isEmpty ? "Routing through Codex Desktop" : transcript
+        case .preparingSpeech: return "Using your configured SpeakEasy voice"
+        case .speaking: return "⌃⌥Space interrupts and listens again"
+        case .failed: return "Open SpeakEasy for details"
+        case .unlocked: return "Lock SpeakEasy before listening"
+        }
+    }
+
+    var symbol: String {
+        switch phase {
+        case .validatingLock: "scope"
+        case .cueing: "speaker.wave.2.fill"
+        case .ready: "waveform.badge.mic"
+        case .warmingUp: "brain.head.profile"
+        case .recording: "mic.fill"
+        case .transcribing: "text.bubble.fill"
+        case .submitting: "arrow.up.forward"
+        case .preparingSpeech: "sparkles"
+        case .speaking: "speaker.wave.2.fill"
+        case .failed: "exclamationmark.triangle.fill"
+        case .unlocked: "lock.open.fill"
+        }
+    }
+}
+
 // MARK: - HUD Window Manager (Singleton)
 
+@MainActor
 class HUDWindowManager: ObservableObject {
     static let shared = HUDWindowManager()
 
@@ -26,11 +106,14 @@ class HUDWindowManager: ObservableObject {
     @Published var isVisible = false
     @Published var audioLevel: Float = 0.0  // Current audio level for waveform
     @Published var playbackProgress: Double?
+    @Published var conversation: HUDConversationPresentation?
 
     private var hideTimer: Timer?
     private var hudDuration: TimeInterval = 3.0
     private var isStarted = false
     private var visibilityHandler: ((Bool) -> Void)?
+    private var listeningObservation: AnyCancellable?
+    private var lastListeningPhase: ListeningPhase = .unlocked
 
     private init() {}
 
@@ -53,6 +136,32 @@ class HUDWindowManager: ObservableObject {
         // Don't actually stop - keep pipe reader running as singleton
         hideTimer?.invalidate()
         hideTimer = nil
+        listeningObservation = nil
+    }
+
+    func bindListening(_ controller: ListeningSessionController) {
+        guard listeningObservation == nil else { return }
+        listeningObservation = Publishers.CombineLatest(
+            Publishers.CombineLatest4(
+                controller.$phase,
+                controller.$lockedTask,
+                controller.$lastTranscript,
+                controller.$lastError
+            ),
+            controller.$activeLaneNumber
+        )
+        .receive(on: RunLoop.main)
+        .sink { [weak self, weak controller] values, laneNumber in
+            let (phase, lock, transcript, error) = values
+            self?.updateListening(
+                phase: phase,
+                lock: lock,
+                laneNumber: laneNumber,
+                transcript: transcript,
+                error: error,
+                inputDeviceName: controller?.inputDeviceName
+            )
+        }
     }
 
     func setVisibilityHandler(_ handler: @escaping (Bool) -> Void) {
@@ -88,6 +197,46 @@ class HUDWindowManager: ObservableObject {
         scheduleHide()
     }
 
+    private func updateListening(
+        phase: ListeningPhase,
+        lock: ListeningTaskLock?,
+        laneNumber: Int?,
+        transcript: String,
+        error: String?,
+        inputDeviceName: String?
+    ) {
+        defer { lastListeningPhase = phase }
+        guard let lock, phase != .unlocked else {
+            conversation = nil
+            if playbackProgress == nil { hideMessage() }
+            return
+        }
+
+        conversation = HUDConversationPresentation(
+            phase: phase,
+            taskTitle: lock.title,
+            taskID: lock.id,
+            laneNumber: laneNumber,
+            transcript: transcript,
+            error: error,
+            inputDeviceName: inputDeviceName
+        )
+
+        hideTimer?.invalidate()
+        hideTimer = nil
+        showWindow()
+        switch phase {
+        case .ready:
+            if lastListeningPhase != .ready { scheduleHide(after: 2.8) }
+        case .failed:
+            scheduleHide(after: 8)
+        case .speaking:
+            break // Playback completion owns dismissal.
+        default:
+            break // Keep active work visible until the phase changes.
+        }
+    }
+
     private func handleMessage(_ message: HUDMessage) {
         if message.isLevelUpdate {
             // Just update audio level, don't reset timer
@@ -113,10 +262,10 @@ class HUDWindowManager: ObservableObject {
         visibilityHandler?(true)
     }
 
-    private func scheduleHide() {
+    private func scheduleHide(after duration: TimeInterval? = nil) {
         hideTimer?.invalidate()
-        hideTimer = Timer.scheduledTimer(withTimeInterval: hudDuration, repeats: false) { [weak self] _ in
-            self?.hideMessage()
+        hideTimer = Timer.scheduledTimer(withTimeInterval: duration ?? hudDuration, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.hideMessage() }
         }
     }
 
@@ -264,13 +413,28 @@ struct HUDOverlayView: View {
 
     var body: some View {
         Group {
-            if manager.isVisible, let message = manager.currentMessage {
-                HUDContent(
-                    message: message,
-                    theme: theme,
-                    audioLevel: manager.audioLevel,
-                    playbackProgress: manager.playbackProgress
-                )
+            if manager.isVisible {
+                Group {
+                    if let message = manager.currentMessage,
+                       manager.playbackProgress != nil {
+                        HUDContent(
+                            message: message,
+                            theme: theme,
+                            audioLevel: manager.audioLevel,
+                            playbackProgress: manager.playbackProgress,
+                            conversation: manager.conversation
+                        )
+                    } else if let conversation = manager.conversation {
+                        ConversationHUDContent(presentation: conversation)
+                    } else if let message = manager.currentMessage {
+                        HUDContent(
+                            message: message,
+                            theme: theme,
+                            audioLevel: manager.audioLevel,
+                            playbackProgress: manager.playbackProgress
+                        )
+                    }
+                }
                 .opacity(opacity)
                 .transition(.asymmetric(
                     insertion: .move(edge: entryEdge).combined(with: .opacity),
@@ -278,7 +442,7 @@ struct HUDOverlayView: View {
                 ))
             }
         }
-        .frame(width: 480, height: 180)
+        .frame(width: HUDLayout.width, height: HUDLayout.height)
     }
 
     private var entryEdge: Edge {
@@ -299,6 +463,41 @@ enum HUDPosition: String, CaseIterable {
     case bottomRight = "bottom-right"
 }
 
+/// Shared geometry for the floating conversation and playback HUD.
+enum HUDLayout {
+    static let width: CGFloat = 404
+    static let height: CGFloat = 132
+    static let cornerRadius: CGFloat = 14
+    static let contentPadding: CGFloat = 12
+    static let sectionSpacing: CGFloat = 10
+    static let iconSize: CGFloat = 34
+    static let iconSymbolSize: CGFloat = 14
+    static let titleSize: CGFloat = 14
+    static let detailSize: CGFloat = 10
+    static let headerStatusSize: CGFloat = 8
+    static let headerMetaSize: CGFloat = 9
+    static let energyHeight: CGFloat = 14
+    static let energyBarCount = 28
+    static let energyBarSpacing: CGFloat = 2
+    static let dismissSize: CGFloat = 18
+    static let dismissPadding: CGFloat = 6
+}
+
+/// Shared phase-surface treatment so conversation phases and speaking stay one family.
+enum HUDPhaseChrome {
+    static let fillOpacity: Double = 0.9
+    static let glowOpacity: Double = 0.09
+    static let borderOpacity: Double = 0.20
+    static let shadowOpacity: Double = 0.07
+    static let shadowRadius: CGFloat = 14
+    static let shadowY: CGFloat = 7
+    static let glowEndRadius: CGFloat = 260
+    static let statusDotShadowOpacity: Double = 0.42
+    static let statusDotShadowRadius: CGFloat = 2.5
+    static let iconFillOpacity: Double = 0.10
+    static let iconStrokeOpacity: Double = 0.26
+}
+
 // MARK: - Combined Style HUD Content (matches preview)
 
 struct HUDContent: View {
@@ -306,9 +505,14 @@ struct HUDContent: View {
     let theme: Theme
     let audioLevel: Float
     let playbackProgress: Double?
+    var conversation: HUDConversationPresentation? = nil
     @ObservedObject private var config = ConfigManager.shared
 
     private var waveformColor: Color {
+        // Locked narration shares the same phase system as the conversation HUD.
+        if let conversation {
+            return conversation.accent
+        }
         switch config.hudWaveformColor.lowercased() {
         case "blue": return .blue
         case "purple": return .purple
@@ -348,42 +552,48 @@ struct HUDContent: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
+                if let conversation {
+                    HUDTaskLockHeader(presentation: conversation)
+                        .padding(.horizontal, HUDLayout.contentPadding)
+                        .padding(.top, 10)
+                }
+
                 // Text section at top
                 HUDTextSection(
                     text: message.text ?? "",
                     cached: message.cached ?? false,
-                    fontSize: fontSize,
+                    fontSize: min(fontSize, 13),
                     fontDesign: fontDesign,
                     playbackProgress: playbackProgress
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     HUDWaveformSection(
                         barCount: config.hudWaveformBarCount,
                         amplitudeMultiplier: config.hudWaveformAmplitude,
                         color: waveformColor,
                         audioLevel: audioLevel
                     )
-                    .frame(height: 30)
+                    .frame(height: 22)
 
                     if let url = CodexTaskLink.url(threadId: message.sourceThreadId) {
                         Button {
                             NSWorkspace.shared.open(url)
                         } label: {
                             Label("Back to Codex", systemImage: "arrow.turn.up.left")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(.white.opacity(0.82))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 7)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
                                 .background(Color.white.opacity(0.1), in: Capsule())
                         }
                         .buttonStyle(.plain)
                         .help("Open the Codex task that created this narration")
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 14)
+                .padding(.horizontal, HUDLayout.contentPadding)
+                .padding(.bottom, 10)
             }
 
             // Dismiss button
@@ -391,27 +601,239 @@ struct HUDContent: View {
                 HUDWindowManager.shared.dismiss()
             }) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-                    .frame(width: 20, height: 20)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.42))
+                    .frame(width: HUDLayout.dismissSize, height: HUDLayout.dismissSize)
                     .background(Color.white.opacity(0.1))
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
-            .padding(8)
+            .padding(HUDLayout.dismissPadding)
+            .accessibilityLabel("Dismiss SpeakEasy conversation HUD")
         }
-        .frame(width: 480, height: 180)
-        .background(
-            ZStack {
-                // Super dark black background
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.black.opacity(0.85))
+        .frame(width: HUDLayout.width, height: HUDLayout.height)
+        .background(hudSurfaceBackground)
+    }
 
-                // Subtle border for definition
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
-            }
+    @ViewBuilder
+    private var hudSurfaceBackground: some View {
+        if let conversation {
+            phaseSurface(accent: conversation.accent)
+        } else {
+            RoundedRectangle(cornerRadius: HUDLayout.cornerRadius, style: .continuous)
+                .fill(Color.black.opacity(0.85))
+                .overlay {
+                    RoundedRectangle(cornerRadius: HUDLayout.cornerRadius, style: .continuous)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                }
+        }
+    }
+}
+
+/// Shared surface: near-black fill, soft phase glow, thin accent border, quiet shadow.
+@ViewBuilder
+func phaseSurface(accent: Color) -> some View {
+    RoundedRectangle(cornerRadius: HUDLayout.cornerRadius, style: .continuous)
+        .fill(Color.black.opacity(HUDPhaseChrome.fillOpacity))
+        .overlay {
+            RadialGradient(
+                colors: [accent.opacity(HUDPhaseChrome.glowOpacity), .clear],
+                center: .topLeading,
+                startRadius: 0,
+                endRadius: HUDPhaseChrome.glowEndRadius
+            )
+            .clipShape(RoundedRectangle(cornerRadius: HUDLayout.cornerRadius, style: .continuous))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: HUDLayout.cornerRadius, style: .continuous)
+                .stroke(accent.opacity(HUDPhaseChrome.borderOpacity), lineWidth: 0.75)
+        }
+        .shadow(
+            color: accent.opacity(HUDPhaseChrome.shadowOpacity),
+            radius: HUDPhaseChrome.shadowRadius,
+            y: HUDPhaseChrome.shadowY
         )
+}
+
+// MARK: - Thread-locked conversation HUD
+
+struct ConversationHUDContent: View {
+    let presentation: HUDConversationPresentation
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 24.0)) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: HUDLayout.sectionSpacing) {
+                    HUDTaskLockHeader(presentation: presentation)
+
+                    HStack(spacing: 10) {
+                        ZStack {
+                            Circle()
+                                .fill(presentation.accent.opacity(HUDPhaseChrome.iconFillOpacity))
+                                .frame(width: HUDLayout.iconSize, height: HUDLayout.iconSize)
+                            Circle()
+                                .stroke(presentation.accent.opacity(HUDPhaseChrome.iconStrokeOpacity), lineWidth: 1)
+                                .frame(width: HUDLayout.iconSize, height: HUDLayout.iconSize)
+                                .scaleEffect(pulseScale(time))
+                                .opacity(pulseOpacity(time))
+                            Image(systemName: presentation.symbol)
+                                .font(.system(size: HUDLayout.iconSymbolSize, weight: .semibold))
+                                .foregroundStyle(presentation.accent)
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                        .accessibilityHidden(true)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(presentation.title)
+                                .font(.system(size: HUDLayout.titleSize, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                            Text(presentation.detail)
+                                .font(.system(size: HUDLayout.detailSize, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.56))
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 4)
+                    }
+
+                    ConversationEnergyField(
+                        phase: presentation.phase,
+                        accent: presentation.accent,
+                        time: reduceMotion ? 0 : time
+                    )
+                    .frame(height: HUDLayout.energyHeight)
+                }
+                .padding(HUDLayout.contentPadding)
+
+                Button { HUDWindowManager.shared.dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.45))
+                        .frame(width: HUDLayout.dismissSize, height: HUDLayout.dismissSize)
+                        .background(.white.opacity(0.08), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(HUDLayout.dismissPadding)
+                .accessibilityLabel("Dismiss SpeakEasy conversation HUD")
+            }
+            .frame(width: HUDLayout.width, height: HUDLayout.height)
+            .background(conversationBackground)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("SpeakEasy \(presentation.title). Locked to \(presentation.taskTitle). \(presentation.detail)")
+        }
+    }
+
+    private var isEnergetic: Bool {
+        [.cueing, .warmingUp, .recording, .transcribing, .submitting, .preparingSpeech, .speaking]
+            .contains(presentation.phase)
+    }
+
+    private func pulseScale(_ time: TimeInterval) -> CGFloat {
+        guard isEnergetic, !reduceMotion else { return 1 }
+        return 1 + CGFloat((sin(time * 4.2) + 1) * 0.04)
+    }
+
+    private func pulseOpacity(_ time: TimeInterval) -> Double {
+        guard isEnergetic, !reduceMotion else { return 1 }
+        return 0.4 + (sin(time * 4.2) + 1) * 0.16
+    }
+
+    private var conversationBackground: some View {
+        phaseSurface(accent: presentation.accent)
+    }
+}
+
+struct HUDTaskLockHeader: View {
+    let presentation: HUDConversationPresentation
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(presentation.accent)
+                .frame(width: 5, height: 5)
+                .shadow(
+                    color: presentation.accent.opacity(HUDPhaseChrome.statusDotShadowOpacity),
+                    radius: HUDPhaseChrome.statusDotShadowRadius
+                )
+                .accessibilityHidden(true)
+            Text(statusLabel)
+                .font(.system(size: HUDLayout.headerStatusSize, weight: .bold, design: .monospaced))
+                .foregroundStyle(presentation.accent)
+                .lineLimit(1)
+                .layoutPriority(1)
+            Spacer(minLength: 6)
+            Image(systemName: "lock.fill")
+                .font(.system(size: 7, weight: .bold))
+                .foregroundStyle(.white.opacity(0.55))
+            Text(presentation.taskTitle)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(2)
+            Text(String(presentation.taskID.prefix(8)))
+                .font(.system(size: HUDLayout.headerMetaSize, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.32))
+                .layoutPriority(0)
+        }
+        .font(.system(size: HUDLayout.headerMetaSize, weight: .semibold, design: .rounded))
+        .foregroundStyle(.white.opacity(0.66))
+        .padding(.trailing, HUDLayout.dismissSize + HUDLayout.dismissPadding)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(presentation.phase.label). Locked to \(presentation.taskTitle)")
+    }
+
+    private var statusLabel: String {
+        // Prefer short phase chips so the locked task title keeps horizontal room.
+        let status: String
+        switch presentation.phase {
+        case .recording: status = "LIVE"
+        case .cueing: status = "CONFIRMING"
+        case .submitting: status = "SUBMITTING"
+        case .preparingSpeech: status = "PREPARING"
+        default: status = presentation.phase.label.uppercased()
+        }
+        guard let lane = presentation.laneNumber else { return status }
+        return "LANE \(lane) · \(status)"
+    }
+}
+
+struct ConversationEnergyField: View {
+    let phase: ListeningPhase
+    let accent: Color
+    let time: TimeInterval
+
+    private let count = HUDLayout.energyBarCount
+
+    var body: some View {
+        GeometryReader { geometry in
+            HStack(alignment: .center, spacing: HUDLayout.energyBarSpacing) {
+                ForEach(0..<count, id: \.self) { index in
+                    Capsule()
+                        .fill(accent.opacity(opacity(for: index)))
+                        .frame(
+                            width: max(1.5, (geometry.size.width - CGFloat(count - 1) * HUDLayout.energyBarSpacing) / CGFloat(count)),
+                            height: height(for: index)
+                        )
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func height(for index: Int) -> CGFloat {
+        guard phase != .ready && phase != .failed else { return index.isMultiple(of: 5) ? 3 : 1.5 }
+        let phaseOffset = Double(index) * 0.52
+        let primary = (sin(time * 5.2 + phaseOffset) + 1) * 0.5
+        let secondary = (sin(time * 2.3 - phaseOffset * 0.7) + 1) * 0.5
+        // Fit energetic bars inside the compact energy strip.
+        return 2 + CGFloat(primary * 8 + secondary * 3)
+    }
+
+    private func opacity(for index: Int) -> Double {
+        0.28 + (sin(time * 2.1 + Double(index) * 0.31) + 1) * 0.18
     }
 }
 

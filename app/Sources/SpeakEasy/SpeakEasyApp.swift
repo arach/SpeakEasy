@@ -17,6 +17,7 @@ struct SpeakEasyApp: App {
     }
 }
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     var hudWindow: NSPanel?
     private var hudWindowManager: HUDWindowManager?
@@ -73,7 +74,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // A compact non-activating panel stays interactive without blocking the
         // rest of the screen while narration is playing.
         let screen = NSScreen.main ?? NSScreen.screens.first!
-        let panelSize = NSSize(width: 480, height: 180)
+        let panelSize = NSSize(width: HUDLayout.width, height: HUDLayout.height)
         let panelOrigin = hudOrigin(
             position: hudPosition,
             size: panelSize,
@@ -111,6 +112,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         manager.start(duration: duration)
+        manager.bindListening(ListeningSessionController.shared)
         if manager.isVisible {
             window.orderFrontRegardless()
         } else {

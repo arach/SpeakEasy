@@ -388,6 +388,7 @@ interface PlaybackItem {
     createdAt: string;
     synthesisRateWPM?: number;
     sourceThreadId?: string;
+    cleanupAfterPlayback?: boolean;
 }
 interface PlayerCommandArguments {
     item?: PlaybackItem;
@@ -474,4 +475,4 @@ declare const speak: (text: string, options?: SpeakEasyOptions & {
     volume?: number;
 }) => Promise<void>;
 
-export { CONFIG_FILE, CacheMetadata, CacheStats, ElevenLabsProvider, EnqueueOptions, GeminiProvider, GlobalConfig, GroqProvider, OpenAIProvider, PLAYER_PROTOCOL_VERSION, PLAYER_SOCKET_PATH, PROVIDER_ORDER, PlaybackItem, PlaybackState, PlayerCommand, PlayerCommandArguments, PlayerCommandRequest, PlayerCommandResponse, PlayerSnapshot, PlayerUnavailableError, Provider, ProviderConfig, QueuePriority, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSAdapter, TTSAdapterCapabilities, TTSAudioFormat, TTSCache, TTSProviderId, TTSRequest, TTSResult, createAdapterRegistry, enqueueInPlayer, getAvailableVoices, getBestVoice, playAudioFile, playTTSResult, say, sendPlayerCommand, speak, stopPlayback };
+export { CONFIG_FILE, type CacheMetadata, type CacheStats, ElevenLabsProvider, type EnqueueOptions, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, PLAYER_PROTOCOL_VERSION, PLAYER_SOCKET_PATH, PROVIDER_ORDER, type PlaybackItem, type PlaybackState, type PlayerCommand, type PlayerCommandArguments, type PlayerCommandRequest, type PlayerCommandResponse, type PlayerSnapshot, PlayerUnavailableError, type Provider, type ProviderConfig, type QueuePriority, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, type TTSAdapter, type TTSAdapterCapabilities, type TTSAudioFormat, TTSCache, type TTSProviderId, type TTSRequest, type TTSResult, createAdapterRegistry, enqueueInPlayer, getAvailableVoices, getBestVoice, playAudioFile, playTTSResult, say, sendPlayerCommand, speak, stopPlayback };

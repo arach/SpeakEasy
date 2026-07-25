@@ -11,7 +11,13 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(url: "https://github.com/arach/hudsonkit-xcframework.git", exact: "0.3.3")
+        .package(url: "https://github.com/arach/hudsonkit-xcframework.git", exact: "0.3.3"),
+        // 0.4.5's root SwiftPM manifest points at a resource absent from that
+        // tag. Pin the first known-good repository package revision instead.
+        .package(
+            url: "https://github.com/arach/vox.git",
+            revision: "19be9f1d30b2fd7a79c5f88feffcb44091854761"
+        )
     ],
     targets: [
         .executableTarget(
@@ -19,8 +25,13 @@ let package = Package(
             dependencies: [
                 .product(name: "HudsonUI", package: "hudsonkit-xcframework"),
                 .product(name: "HudsonShell", package: "hudsonkit-xcframework"),
+                .product(name: "VoxCore", package: "vox"),
+                .product(name: "VoxEngine", package: "vox"),
             ],
-            path: "Sources/SpeakEasy"
+            path: "Sources/SpeakEasy",
+            resources: [
+                .copy("Resources/codex-desktop-bridge.cjs")
+            ]
         ),
         .testTarget(
             name: "SpeakEasyTests",

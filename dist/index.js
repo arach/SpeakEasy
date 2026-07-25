@@ -28,8 +28,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.ts
-var src_exports = {};
-__export(src_exports, {
+var index_exports = {};
+__export(index_exports, {
   CONFIG_FILE: () => CONFIG_FILE,
   ElevenLabsProvider: () => ElevenLabsProvider,
   GeminiProvider: () => GeminiProvider,
@@ -53,7 +53,7 @@ __export(src_exports, {
   speak: () => speak,
   stopPlayback: () => stopPlayback
 });
-module.exports = __toCommonJS(src_exports);
+module.exports = __toCommonJS(index_exports);
 var fs5 = __toESM(require("fs"));
 var path5 = __toESM(require("path"));
 
@@ -182,8 +182,7 @@ var PREFERRED_VOICES = [
 ];
 var cachedVoices = null;
 function getAvailableVoices() {
-  if (cachedVoices)
-    return cachedVoices;
+  if (cachedVoices) return cachedVoices;
   try {
     const output = (0, import_child_process2.execSync)('say -v "?"', { encoding: "utf-8" });
     cachedVoices = output.split("\n").filter((line) => line.trim()).map((line) => {
@@ -205,13 +204,11 @@ function getBestVoice(language = "en_US") {
   const englishPremium = available.find(
     (v) => v.includes("(Premium)") && (v.includes("en_") || !v.includes("_"))
   );
-  if (englishPremium)
-    return englishPremium;
+  if (englishPremium) return englishPremium;
   const englishEnhanced = available.find(
     (v) => v.includes("(Enhanced)") && (v.includes("en_") || !v.includes("_"))
   );
-  if (englishEnhanced)
-    return englishEnhanced;
+  if (englishEnhanced) return englishEnhanced;
   return "Samantha";
 }
 var SystemProvider = class {
@@ -281,8 +278,7 @@ var import_uuid = require("uuid");
 
 // src/cache-config.ts
 function parseTTL(ttl) {
-  if (typeof ttl === "number")
-    return ttl;
+  if (typeof ttl === "number") return ttl;
   const units = {
     "ms": 1,
     "s": 1e3,
@@ -294,8 +290,7 @@ function parseTTL(ttl) {
     "y": 365 * 24 * 60 * 60 * 1e3
   };
   const match = ttl.toString().match(/^(\d+(?:\.\d+)?)([a-zA-Z]+)$/);
-  if (!match)
-    throw new Error(`Invalid TTL format: ${ttl}`);
+  if (!match) throw new Error(`Invalid TTL format: ${ttl}`);
   const value = parseFloat(match[1]);
   const unit = match[2];
   if (!(unit in units)) {
@@ -304,8 +299,7 @@ function parseTTL(ttl) {
   return value * units[unit];
 }
 function parseSize(size) {
-  if (typeof size === "number")
-    return size;
+  if (typeof size === "number") return size;
   const units = {
     "B": 1,
     "KB": 1024,
@@ -317,8 +311,7 @@ function parseSize(size) {
     "gb": 1024 * 1024 * 1024
   };
   const match = size.toString().match(/^(\d+(?:\.\d+)?)([a-zA-Z]+)$/);
-  if (!match)
-    throw new Error(`Invalid size format: ${size}`);
+  if (!match) throw new Error(`Invalid size format: ${size}`);
   const value = parseFloat(match[1]);
   const unit = match[2];
   if (!(unit in units)) {
@@ -476,13 +469,11 @@ var TTSCache = class {
     this.loadJsonMetadata();
   }
   migrateJsonMetadataIfNeeded() {
-    if (!this.db || !fs3.existsSync(this.metadataFile))
-      return;
+    if (!this.db || !fs3.existsSync(this.metadataFile)) return;
     try {
       const data = JSON.parse(fs3.readFileSync(this.metadataFile, "utf8"));
       const entries = Object.entries(data.entries || {});
-      if (entries.length === 0)
-        return;
+      if (entries.length === 0) return;
       let imported = 0;
       for (const [cacheKey, entry] of entries) {
         if (this.importStoredEntry(cacheKey, entry)) {
@@ -499,28 +490,23 @@ var TTSCache = class {
     }
   }
   migrateLegacySqliteIfNeeded() {
-    if (!this.db)
-      return;
+    if (!this.db) return;
     const legacyMetadataPath = path3.join(this.cacheDir, "metadata.sqlite");
     const legacyKeyvPath = path3.join(this.cacheDir, "tts-cache.sqlite");
     this.importLegacyMetadataDb(legacyMetadataPath);
     this.importLegacyKeyvDb(legacyKeyvPath);
   }
   importStoredEntry(cacheKey, entry) {
-    if (!this.db || this.getSqliteEntry(cacheKey))
-      return false;
-    if (!entry.audioFilePath || !fs3.existsSync(entry.audioFilePath))
-      return false;
+    if (!this.db || this.getSqliteEntry(cacheKey)) return false;
+    if (!entry.audioFilePath || !fs3.existsSync(entry.audioFilePath)) return false;
     this.upsertSqliteEntry(cacheKey, entry);
     return true;
   }
   importLegacyMetadataDb(legacyPath) {
-    if (!this.db || !fs3.existsSync(legacyPath))
-      return;
+    if (!this.db || !fs3.existsSync(legacyPath)) return;
     try {
       const legacy = openBuiltinSqlite(legacyPath);
-      if (!legacy)
-        return;
+      if (!legacy) return;
       const rows = legacy.db.prepare("SELECT * FROM metadata").all();
       let imported = 0;
       for (const row of rows) {
@@ -558,26 +544,20 @@ var TTSCache = class {
     }
   }
   importLegacyKeyvDb(legacyPath) {
-    if (!this.db || !fs3.existsSync(legacyPath))
-      return;
+    if (!this.db || !fs3.existsSync(legacyPath)) return;
     try {
       const legacy = openBuiltinSqlite(legacyPath);
-      if (!legacy)
-        return;
+      if (!legacy) return;
       const rows = legacy.db.prepare("SELECT key, value FROM keyv").all();
       let imported = 0;
       for (const row of rows) {
         const cacheKey = row.key;
-        if (this.getSqliteEntry(cacheKey))
-          continue;
+        if (this.getSqliteEntry(cacheKey)) continue;
         const parsed = JSON.parse(row.value);
         const entry = parsed.value;
-        if (!entry || !this.isValidEntry(entry))
-          continue;
-        if (parsed.expires && Date.now() > parsed.expires)
-          continue;
-        if (!fs3.existsSync(entry.audioFilePath))
-          continue;
+        if (!entry || !this.isValidEntry(entry)) continue;
+        if (parsed.expires && Date.now() > parsed.expires) continue;
+        if (!fs3.existsSync(entry.audioFilePath)) continue;
         const storedEntry = {
           ...entry,
           fileSize: fs3.statSync(entry.audioFilePath).size
@@ -733,18 +713,15 @@ var TTSCache = class {
     }
   }
   getSource() {
-    if (process.argv[1]?.includes("speakeasy-cli"))
-      return "cli";
-    if (process.env.NODE_ENV === "test")
-      return "test";
+    if (process.argv[1]?.includes("speakeasy-cli")) return "cli";
+    if (process.env.NODE_ENV === "test") return "test";
     return "api";
   }
   getSessionId() {
     return `${Date.now()}-${process.pid}`;
   }
   upsertSqliteEntry(cacheKey, entry) {
-    if (!this.db)
-      return;
+    if (!this.db) return;
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO entries (
         cache_key, original_text, provider, voice, rate, timestamp,
@@ -777,14 +754,12 @@ var TTSCache = class {
     );
   }
   getSqliteEntry(cacheKey) {
-    if (!this.db)
-      return void 0;
+    if (!this.db) return void 0;
     const row = this.db.prepare("SELECT * FROM entries WHERE cache_key = ?").get(cacheKey);
     return row ? this.rowToStoredEntry(row) : void 0;
   }
   deleteSqliteEntry(cacheKey) {
-    if (!this.db)
-      return;
+    if (!this.db) return;
     this.db.prepare("DELETE FROM entries WHERE cache_key = ?").run(cacheKey);
   }
   deleteEntry(cacheKey, entry) {
@@ -800,21 +775,17 @@ var TTSCache = class {
     }
   }
   enforceMaxSize() {
-    if (!this.maxSize)
-      return;
+    if (!this.maxSize) return;
     const entries = this.useJsonFallback ? Object.entries(this.jsonEntries).map(([cacheKey, entry]) => ({ cacheKey, entry })) : (this.db?.prepare("SELECT cache_key, file_size, timestamp FROM entries ORDER BY timestamp ASC").all() || []).map((row) => ({
       cacheKey: row.cache_key,
       entry: { fileSize: row.file_size }
     }));
     let totalSize = entries.reduce((sum, item) => sum + (item.entry.fileSize || 0), 0);
-    if (totalSize <= this.maxSize)
-      return;
+    if (totalSize <= this.maxSize) return;
     for (const item of entries) {
-      if (totalSize <= this.maxSize)
-        break;
+      if (totalSize <= this.maxSize) break;
       const entry = this.useJsonFallback ? this.jsonEntries[item.cacheKey] : this.getSqliteEntry(item.cacheKey);
-      if (!entry)
-        continue;
+      if (!entry) continue;
       totalSize -= entry.fileSize;
       this.deleteEntry(item.cacheKey, entry);
     }
@@ -892,34 +863,22 @@ var TTSCache = class {
       const needle = options.text.toLowerCase();
       results = results.filter((entry) => entry.originalText.toLowerCase().includes(needle));
     }
-    if (options.provider)
-      results = results.filter((entry) => entry.provider === options.provider);
-    if (options.model)
-      results = results.filter((entry) => entry.model === options.model);
-    if (options.source)
-      results = results.filter((entry) => entry.source === options.source);
-    if (options.fromDate)
-      results = results.filter((entry) => entry.timestamp >= options.fromDate.getTime());
-    if (options.toDate)
-      results = results.filter((entry) => entry.timestamp <= options.toDate.getTime());
-    if (options.minSize !== void 0)
-      results = results.filter((entry) => entry.fileSize >= options.minSize);
-    if (options.maxSize !== void 0)
-      results = results.filter((entry) => entry.fileSize <= options.maxSize);
-    if (options.success !== void 0)
-      results = results.filter((entry) => entry.success === options.success);
+    if (options.provider) results = results.filter((entry) => entry.provider === options.provider);
+    if (options.model) results = results.filter((entry) => entry.model === options.model);
+    if (options.source) results = results.filter((entry) => entry.source === options.source);
+    if (options.fromDate) results = results.filter((entry) => entry.timestamp >= options.fromDate.getTime());
+    if (options.toDate) results = results.filter((entry) => entry.timestamp <= options.toDate.getTime());
+    if (options.minSize !== void 0) results = results.filter((entry) => entry.fileSize >= options.minSize);
+    if (options.maxSize !== void 0) results = results.filter((entry) => entry.fileSize <= options.maxSize);
+    if (options.success !== void 0) results = results.filter((entry) => entry.success === options.success);
     if (options.workingDirectory) {
       const needle = options.workingDirectory.toLowerCase();
       results = results.filter((entry) => entry.workingDirectory?.toLowerCase().includes(needle));
     }
-    if (options.user)
-      results = results.filter((entry) => entry.user === options.user);
-    if (options.sessionId)
-      results = results.filter((entry) => entry.sessionId === options.sessionId);
-    if (options.offset)
-      results = results.slice(options.offset);
-    if (options.limit)
-      results = results.slice(0, options.limit);
+    if (options.user) results = results.filter((entry) => entry.user === options.user);
+    if (options.sessionId) results = results.filter((entry) => entry.sessionId === options.sessionId);
+    if (options.offset) results = results.slice(options.offset);
+    if (options.limit) results = results.slice(0, options.limit);
     return results;
   }
   calculateStats(metadata) {
@@ -1033,8 +992,7 @@ var TTSCache = class {
     if (this.useJsonFallback) {
       return this.filterJsonMetadata(options);
     }
-    if (!this.db)
-      return [];
+    if (!this.db) return [];
     const { sql, params } = this.buildSearchQuery(options);
     return this.db.prepare(sql).all(...params).map((row) => this.rowToMetadata(row));
   }
@@ -1124,8 +1082,7 @@ var TTSCache = class {
         }
         return;
       }
-      if (!this.db)
-        return;
+      if (!this.db) return;
       const oldEntries = this.db.prepare("SELECT cache_key, file_path FROM entries WHERE timestamp < ?").all(cutoff);
       for (const row of oldEntries) {
         const cacheKey = row.cache_key;
@@ -1160,8 +1117,7 @@ var TTSCache = class {
     return !this.useJsonFallback && this.db !== null;
   }
   getSqliteBackend() {
-    if (this.useJsonFallback)
-      return "json";
+    if (this.useJsonFallback) return "json";
     return this.sqliteBackend || "json";
   }
 };
@@ -1252,8 +1208,7 @@ var NotificationHistory = class {
   getAllHistory() {
     const allEntries = [];
     try {
-      if (!fs4.existsSync(this.historyDir))
-        return allEntries;
+      if (!fs4.existsSync(this.historyDir)) return allEntries;
       const files = fs4.readdirSync(this.historyDir).filter((f) => f.startsWith("history-") && f.endsWith(".json")).sort().reverse();
       for (const file of files) {
         try {
@@ -1871,14 +1826,11 @@ function sendPlayerCommand(command, commandArguments, timeoutMs = 5e3) {
     let buffer = "";
     let settled = false;
     const finish = (error, response) => {
-      if (settled)
-        return;
+      if (settled) return;
       settled = true;
       socket.destroy();
-      if (error)
-        reject(error);
-      else if (response)
-        resolve(response);
+      if (error) reject(error);
+      else if (response) resolve(response);
     };
     socket.setTimeout(timeoutMs, () => {
       finish(new PlayerUnavailableError("SpeakEasy player did not respond"));
@@ -1890,8 +1842,7 @@ function sendPlayerCommand(command, commandArguments, timeoutMs = 5e3) {
     socket.on("data", (chunk) => {
       buffer += chunk.toString("utf8");
       const newline = buffer.indexOf("\n");
-      if (newline < 0)
-        return;
+      if (newline < 0) return;
       try {
         const response = JSON.parse(buffer.slice(0, newline));
         if (response.protocolVersion !== PLAYER_PROTOCOL_VERSION) {
@@ -1916,8 +1867,7 @@ function sendPlayerCommand(command, commandArguments, timeoutMs = 5e3) {
       }
     });
     socket.on("end", () => {
-      if (!settled)
-        finish(new Error("SpeakEasy player closed the connection without a response"));
+      if (!settled) finish(new Error("SpeakEasy player closed the connection without a response"));
     });
   });
 }
@@ -2029,8 +1979,7 @@ var SpeakEasy = class {
     }
   }
   async processQueue() {
-    if (this.queue.length === 0)
-      return;
+    if (this.queue.length === 0) return;
     this.isPlaying = true;
     const { text, options } = this.queue.shift();
     try {
@@ -2052,8 +2001,7 @@ var SpeakEasy = class {
     if (this.debug) {
       console.log(`\u{1F50D} Requested provider: ${requestedId}`);
       console.log(`\u{1F50D} Text: "${text}"`);
-      if (silent)
-        console.log(`\u{1F507} Silent mode: audio will not be played`);
+      if (silent) console.log(`\u{1F507} Silent mode: audio will not be played`);
     }
     const requestedAdapter = this.adapters.get(requestedId);
     if (requestedId !== "system" && requestedAdapter && !requestedAdapter.validate()) {
@@ -2065,11 +2013,9 @@ var SpeakEasy = class {
     }
     let lastError = null;
     for (const providerId of PROVIDER_ORDER) {
-      if (providerId !== requestedId && !lastError)
-        continue;
+      if (providerId !== requestedId && !lastError) continue;
       const adapter = this.adapters.get(providerId);
-      if (!adapter?.validate())
-        continue;
+      if (!adapter?.validate()) continue;
       try {
         const request = this.buildRequest(text, providerId);
         if (this.debug) {
@@ -2240,8 +2186,7 @@ var SpeakEasy = class {
       timestamp,
       cached
     });
-    if (!this.hudEnabled)
-      return;
+    if (!this.hudEnabled) return;
     notifyHUD({
       text: text.substring(0, 200),
       provider,

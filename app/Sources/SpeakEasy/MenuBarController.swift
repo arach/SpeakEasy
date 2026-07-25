@@ -24,13 +24,15 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         NSApp.setActivationPolicy(.accessory)
         installStatusItem()
         installPopover()
-        observePlaybackState()
+        observeActivityState()
         startIPCServer()
+        ListeningSessionController.shared.start()
     }
 
     func stop() {
         closePopover()
         removeEventMonitor()
+        ListeningSessionController.shared.stop()
         PlayerIPCServer.shared.stop()
 
         if let statusItem {
@@ -61,18 +63,37 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         statusItem = item
     }
 
-    private func observePlaybackState() {
-        stateObservation = PlaybackEngine.shared.$state
+    private func observeActivityState() {
+        stateObservation = Publishers.CombineLatest(
+            PlaybackEngine.shared.$state,
+            ListeningSessionController.shared.$phase
+        )
             .receive(on: RunLoop.main)
-            .sink { [weak self] state in
-                self?.updateStatusIcon(for: state)
+            .sink { [weak self] playback, listening in
+                self?.updateStatusIcon(playback: playback, listening: listening)
             }
     }
 
-    private func updateStatusIcon(for state: PlaybackState) {
+    private func updateStatusIcon(playback: PlaybackState, listening: ListeningPhase) {
         let description: String
         let image: NSImage
-        switch state {
+        if listening == .recording {
+            description = "SpeakEasy is listening"
+            image = NSImage(
+                systemSymbolName: "mic.fill",
+                accessibilityDescription: description
+            ) ?? SpeakeasyIcon.tumbler(filled: true)
+            statusItem?.button?.contentTintColor = .systemRed
+        } else if [.validatingLock, .cueing, .warmingUp, .transcribing, .submitting, .preparingSpeech].contains(listening) {
+            description = listening.label
+            image = NSImage(
+                systemSymbolName: "waveform",
+                accessibilityDescription: description
+            ) ?? SpeakeasyIcon.tumbler(filled: false)
+            statusItem?.button?.contentTintColor = nil
+        } else {
+            statusItem?.button?.contentTintColor = nil
+            switch playback {
         case .playing:
             description = "SpeakEasy is playing"
             image = SpeakeasyIcon.tumbler(filled: true)
@@ -91,6 +112,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         case .idle:
             description = "SpeakEasy"
             image = SpeakeasyIcon.tumbler(filled: false)
+            }
         }
         image.isTemplate = true
         statusItem?.button?.image = image
@@ -153,7 +175,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
-        popover.contentSize = NSSize(width: 320, height: 420)
+        popover.contentSize = NSSize(width: 320, height: 640)
         popover.contentViewController = NSHostingController(rootView: makePopoverRoot())
         self.popover = popover
     }
