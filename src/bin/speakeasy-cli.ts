@@ -134,6 +134,7 @@ async function run(): Promise<void> {
   if (
     (
       (!hasConfigFile()
+        && !text
         && !options.config
         && !options.help
         && !options.diagnose
@@ -238,8 +239,8 @@ async function run(): Promise<void> {
 
   try {
     const config: SpeakEasyConfig = {
-      provider: (options.provider as any) || 'system',
-      rate: options.rate || 180,
+      ...(options.provider && { provider: options.provider }),
+      ...(options.rate !== undefined && { rate: options.rate }),
       volume: options.volume !== undefined ? options.volume : undefined,
       instructions: options.instructions,
       debug: options.debug || false,
@@ -253,7 +254,7 @@ async function run(): Promise<void> {
     }
 
     if (options.voice) {
-      switch (options.provider) {
+      switch (config.provider) {
         case 'system':
           config.systemVoice = options.voice;
           break;
@@ -292,6 +293,7 @@ async function run(): Promise<void> {
 
             if (fs.existsSync(latestEntry.filePath)) {
               fs.copyFileSync(latestEntry.filePath, options.out);
+              fs.chmodSync(options.out, 0o600);
               const stats = fs.statSync(options.out);
               console.log(`💾 Audio saved to: ${options.out} (${(stats.size / 1024).toFixed(1)} KB)`);
             } else {
@@ -368,5 +370,3 @@ async function run(): Promise<void> {
 if (require.main === module) {
   run().catch(console.error);
 }
-
-

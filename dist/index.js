@@ -156,7 +156,7 @@ async function playTTSResult(result, volume, tempDir) {
     tempDir,
     `speech_${Date.now()}.${extensionForFormat(result.format)}`
   );
-  fs.writeFileSync(tempFile, result.audio);
+  fs.writeFileSync(tempFile, result.audio, { mode: 384 });
   try {
     await playAudioFile(tempFile, volume);
   } finally {
@@ -437,8 +437,9 @@ var TTSCache = class {
     this.logger.debug("Initializing TTSCache with dir:", this.cacheDir, "ttl:", ttl, "maxSize:", maxSize);
     if (!fs3.existsSync(this.cacheDir)) {
       this.logger.debug("Creating cache directory:", this.cacheDir);
-      fs3.mkdirSync(this.cacheDir, { recursive: true });
     }
+    fs3.mkdirSync(this.cacheDir, { recursive: true, mode: 448 });
+    fs3.chmodSync(this.cacheDir, 448);
     this.initializeStorage();
   }
   createDefaultLogger() {
@@ -615,8 +616,9 @@ var TTSCache = class {
   saveJsonMetadata() {
     const data = { version: 1, entries: this.jsonEntries };
     const tempFile = `${this.metadataFile}.tmp`;
-    fs3.writeFileSync(tempFile, JSON.stringify(data, null, 2));
+    fs3.writeFileSync(tempFile, JSON.stringify(data, null, 2), { mode: 384 });
     fs3.renameSync(tempFile, this.metadataFile);
+    fs3.chmodSync(this.metadataFile, 384);
   }
   loadStats() {
     try {
@@ -635,7 +637,8 @@ var TTSCache = class {
         cacheHits: this.cacheHits,
         cacheMisses: this.cacheMisses,
         timestamp: Date.now()
-      }, null, 2));
+      }, null, 2), { mode: 384 });
+      fs3.chmodSync(this.statsFile, 384);
     } catch (error) {
       this.logger.warn("Error saving stats:", error);
     }
@@ -981,7 +984,8 @@ var TTSCache = class {
     try {
       const extension = options?.extension || detectAudioExtension(audioBuffer);
       const audioFilePath = path3.join(this.cacheDir, `${key}.${extension}`);
-      fs3.writeFileSync(audioFilePath, audioBuffer);
+      fs3.writeFileSync(audioFilePath, audioBuffer, { mode: 384 });
+      fs3.chmodSync(audioFilePath, 384);
       const timestamp = Date.now();
       const storedEntry = {
         ...entry,
@@ -1176,23 +1180,25 @@ function getWeekNumber(date) {
   const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 864e5 + 1) / 7);
   return { year: d.getUTCFullYear(), week };
 }
-function getHistoryFile(date = /* @__PURE__ */ new Date()) {
+function getHistoryFile(historyDir, date = /* @__PURE__ */ new Date()) {
   const { year, week } = getWeekNumber(date);
   const weekStr = week.toString().padStart(2, "0");
-  return path4.join(HISTORY_DIR, `history-${year}-W${weekStr}.json`);
+  return path4.join(historyDir, `history-${year}-W${weekStr}.json`);
 }
 var NotificationHistory = class {
   entries = [];
   currentFile;
-  constructor() {
-    this.currentFile = getHistoryFile();
+  maxEntries = 1e3;
+  historyDir;
+  constructor(historyDir = HISTORY_DIR) {
+    this.historyDir = historyDir;
+    this.currentFile = getHistoryFile(this.historyDir);
     this.ensureDir();
     this.load();
   }
   ensureDir() {
-    if (!fs4.existsSync(HISTORY_DIR)) {
-      fs4.mkdirSync(HISTORY_DIR, { recursive: true });
-    }
+    fs4.mkdirSync(this.historyDir, { recursive: true, mode: 448 });
+    fs4.chmodSync(this.historyDir, 448);
   }
   load() {
     try {
@@ -1206,14 +1212,15 @@ var NotificationHistory = class {
     }
   }
   save() {
-    const newFile = getHistoryFile();
+    const newFile = getHistoryFile(this.historyDir);
     if (newFile !== this.currentFile) {
       this.currentFile = newFile;
       this.entries = [];
     }
     try {
       this.ensureDir();
-      fs4.writeFileSync(this.currentFile, JSON.stringify(this.entries, null, 2));
+      fs4.writeFileSync(this.currentFile, JSON.stringify(this.entries, null, 2), { mode: 384 });
+      fs4.chmodSync(this.currentFile, 384);
     } catch (error) {
       console.warn("Failed to save history:", error);
     }
@@ -1245,12 +1252,12 @@ var NotificationHistory = class {
   getAllHistory() {
     const allEntries = [];
     try {
-      if (!fs4.existsSync(HISTORY_DIR))
+      if (!fs4.existsSync(this.historyDir))
         return allEntries;
-      const files = fs4.readdirSync(HISTORY_DIR).filter((f) => f.startsWith("history-") && f.endsWith(".json")).sort().reverse();
+      const files = fs4.readdirSync(this.historyDir).filter((f) => f.startsWith("history-") && f.endsWith(".json")).sort().reverse();
       for (const file of files) {
         try {
-          const data = fs4.readFileSync(path4.join(HISTORY_DIR, file), "utf8");
+          const data = fs4.readFileSync(path4.join(this.historyDir, file), "utf8");
           const entries = JSON.parse(data);
           allEntries.push(...entries);
         } catch {
@@ -1262,7 +1269,7 @@ var NotificationHistory = class {
     return allEntries.sort((a, b) => b.timestamp - a.timestamp);
   }
   getHistoryDir() {
-    return HISTORY_DIR;
+    return this.historyDir;
   }
 };
 var historyInstance = null;

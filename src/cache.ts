@@ -224,8 +224,9 @@ export class TTSCache {
 
     if (!fs.existsSync(this.cacheDir)) {
       this.logger.debug('Creating cache directory:', this.cacheDir);
-      fs.mkdirSync(this.cacheDir, { recursive: true });
     }
+    fs.mkdirSync(this.cacheDir, { recursive: true, mode: 0o700 });
+    fs.chmodSync(this.cacheDir, 0o700);
 
     this.initializeStorage();
   }
@@ -417,8 +418,9 @@ export class TTSCache {
   private saveJsonMetadata(): void {
     const data: MetadataStore = { version: 1, entries: this.jsonEntries };
     const tempFile = `${this.metadataFile}.tmp`;
-    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2));
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), { mode: 0o600 });
     fs.renameSync(tempFile, this.metadataFile);
+    fs.chmodSync(this.metadataFile, 0o600);
   }
 
   private loadStats(): void {
@@ -439,7 +441,8 @@ export class TTSCache {
         cacheHits: this.cacheHits,
         cacheMisses: this.cacheMisses,
         timestamp: Date.now(),
-      }, null, 2));
+      }, null, 2), { mode: 0o600 });
+      fs.chmodSync(this.statsFile, 0o600);
     } catch (error) {
       this.logger.warn('Error saving stats:', error);
     }
@@ -853,7 +856,8 @@ export class TTSCache {
     try {
       const extension = options?.extension || detectAudioExtension(audioBuffer);
       const audioFilePath = path.join(this.cacheDir, `${key}.${extension}`);
-      fs.writeFileSync(audioFilePath, audioBuffer);
+      fs.writeFileSync(audioFilePath, audioBuffer, { mode: 0o600 });
+      fs.chmodSync(audioFilePath, 0o600);
 
       const timestamp = Date.now();
       const storedEntry: StoredEntry = {

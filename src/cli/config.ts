@@ -2,6 +2,25 @@ import * as fs from 'fs';
 import { spawn } from 'child_process';
 import { CONFIG_DIR, CONFIG_FILE, DEFAULTS, PROVIDERS, ProviderKey } from './constants';
 
+function writeConfig(config: Record<string, unknown>): void {
+  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  fs.chmodSync(CONFIG_DIR, 0o700);
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+  fs.chmodSync(CONFIG_FILE, 0o600);
+}
+
+function redactConfigSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactConfigSecrets);
+  if (value === null || typeof value !== 'object') return value;
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      /(api.?key|token|secret|password)/i.test(key) && entry ? '[configured]' : redactConfigSecrets(entry),
+    ])
+  );
+}
+
 export function loadGlobalConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -49,7 +68,7 @@ export function showConfig(edit: boolean = false): void {
           },
         };
 
-        fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
+        writeConfig(defaultConfig);
         console.log('✅ Created default configuration file');
       }
 
@@ -76,7 +95,7 @@ export function showConfig(edit: boolean = false): void {
       const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
       const config = JSON.parse(configData);
       console.log('📋 Current Configuration:');
-      console.log(JSON.stringify(config, null, 2));
+      console.log(JSON.stringify(redactConfigSecrets(config), null, 2));
     } else {
       console.log('📊 No configuration file found');
       console.log('');
@@ -127,9 +146,9 @@ export function diagnoseConfig(): void {
       const fromEnv = process.env[envKey];
 
       if (fromConfig && fromConfig.length > 10) {
-        console.log(`   ✅ ${name}: Available from config file (${fromConfig.substring(0, 8)}...)`);
+        console.log(`   ✅ ${name}: Available from config file`);
       } else if (fromEnv && fromEnv.length > 10) {
-        console.log(`   ✅ ${name}: Available from environment (${fromEnv.substring(0, 8)}...)`);
+        console.log(`   ✅ ${name}: Available from environment`);
       } else {
         console.log(`   ❌ ${name}: Not configured`);
         if (globalConfig.providers?.[configKey as keyof typeof globalConfig.providers]?.enabled) {
@@ -203,7 +222,7 @@ export function setApiKey(provider: string, apiKey: string): void {
     config.providers[provider].enabled = true;
 
     // Write config
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    writeConfig(config);
 
     const providerInfo = PROVIDERS.find(p => p.key === provider);
     console.log(`✅ ${providerInfo?.name || provider} API key saved to config`);
@@ -255,7 +274,7 @@ export function setDefaultProvider(provider: string): void {
     config.defaults.provider = provider;
 
     // Write config
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    writeConfig(config);
 
     console.log(`✅ Default provider set to: ${provider}`);
     console.log('');
@@ -266,5 +285,3 @@ export function setDefaultProvider(provider: string): void {
     process.exit(1);
   }
 }
-
-

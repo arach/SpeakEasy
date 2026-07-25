@@ -15,7 +15,7 @@ VERSION="${1:-$(speakeasy_default_version)}"
 
 SKIP_SIGN="${SPEAKEASY_SKIP_SIGN:-0}"
 SKIP_NOTARIZE="${SPEAKEASY_SKIP_NOTARIZE:-0}"
-NOTARY_PROFILE="${SPEAKEASY_NOTARY_PROFILE:-notarytool-art}"
+NOTARY_PROFILE="${SPEAKEASY_NOTARY_PROFILE:-notarytool-air}"
 
 if [ "$SKIP_SIGN" != "1" ]; then
     if [ -z "${SPEAKEASY_SIGN_IDENTITY:-}" ] && [ -z "$(speakeasy_default_sign_identity || true)" ]; then
@@ -23,6 +23,11 @@ if [ "$SKIP_SIGN" != "1" ]; then
         echo "Set SPEAKEASY_SIGN_IDENTITY or run with SPEAKEASY_SKIP_SIGN=1 for a local smoke DMG." >&2
         exit 1
     fi
+fi
+
+if [ "$SKIP_NOTARIZE" != "1" ] && [ "$SKIP_SIGN" != "1" ]; then
+    echo "==> Verifying notarization credentials ($NOTARY_PROFILE)..."
+    xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null
 fi
 
 echo "==> Building SpeakEasy v$VERSION (release)..."
@@ -40,6 +45,7 @@ echo "==> Creating app bundle..."
 mkdir -p "$DIST_DIR"
 speakeasy_bundle_app "$APP_ROOT" "$BUNDLE"
 speakeasy_set_bundle_version "$BUNDLE" "$VERSION"
+speakeasy_verify_bundle_layout "$BUNDLE"
 echo "    App bundle created at $BUNDLE"
 
 SPEAKEASY_SIGN_STRICT=1 "$SCRIPT_DIR/sign-bundle.sh" "$BUNDLE"
@@ -76,13 +82,14 @@ else
 
     echo "==> Stapling notarization ticket..."
     xcrun stapler staple "$DIST_DIR/$DMG_NAME"
+    xcrun stapler validate "$DIST_DIR/$DMG_NAME"
 fi
 
 echo ""
 echo "==> Done: $DIST_DIR/$DMG_NAME"
 ls -lh "$DIST_DIR/$DMG_NAME"
 if [ "$SKIP_SIGN" != "1" ]; then
-    spctl --assess --type open --context context:primary-signature -v "$DIST_DIR/$DMG_NAME" 2>&1 || true
+    spctl --assess --type open --context context:primary-signature -v "$DIST_DIR/$DMG_NAME"
 fi
 
 echo ""

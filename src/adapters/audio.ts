@@ -62,7 +62,7 @@ export async function playTTSResult(
     `speech_${Date.now()}.${extensionForFormat(result.format)}`
   );
 
-  fs.writeFileSync(tempFile, result.audio);
+  fs.writeFileSync(tempFile, result.audio, { mode: 0o600 });
   try {
     await playAudioFile(tempFile, volume);
   } finally {
