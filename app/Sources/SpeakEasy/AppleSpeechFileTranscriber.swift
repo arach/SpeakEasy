@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 @preconcurrency import Speech
 
@@ -53,6 +54,15 @@ actor AppleSpeechFileTranscriber {
             if let authorizationTask {
                 return await authorizationTask.value
             }
+            // Background lane hotkeys should never reveal Codex. The one-time
+            // system consent sheet is the exception: macOS may defer it for an
+            // inactive LSUIElement app, so briefly activate SpeakEasy and then
+            // return the user to whichever app they were working in.
+            let consent = await presentSystemConsentPreflight()
+            guard consent.shouldRequest else {
+                await restoreAfterSystemConsent(consent.previousApplication)
+                return false
+            }
             let task = Task {
                 await withCheckedContinuation { continuation in
                     SFSpeechRecognizer.requestAuthorization { status in
@@ -63,12 +73,38 @@ actor AppleSpeechFileTranscriber {
             authorizationTask = task
             let authorized = await task.value
             authorizationTask = nil
+            await restoreAfterSystemConsent(consent.previousApplication)
             return authorized
         case .denied, .restricted:
             return false
         @unknown default:
             return false
         }
+    }
+
+    @MainActor
+    private func presentSystemConsentPreflight() -> (
+        shouldRequest: Bool,
+        previousApplication: NSRunningApplication?
+    ) {
+        let current = NSWorkspace.shared.frontmostApplication
+        let previous = current?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : current
+
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Enable Speech Recognition?"
+        alert.informativeText = "SpeakEasy uses Apple Speech for an immediate first voice turn while its on-device Parakeet model warms. Audio is captured only after your listening hotkey."
+        alert.addButton(withTitle: "Continue")
+        alert.addButton(withTitle: "Not Now")
+
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        let response = alert.runModal()
+        return (response == .alertFirstButtonReturn, previous)
+    }
+
+    @MainActor
+    private func restoreAfterSystemConsent(_ application: NSRunningApplication?) {
+        application?.activate(options: [])
     }
 
     func transcribe(url: URL) async throws -> String {
