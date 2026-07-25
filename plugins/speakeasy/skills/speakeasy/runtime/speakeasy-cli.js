@@ -1056,7 +1056,7 @@ var init_cache = __esm(() => {
 var require_package = __commonJS((exports, module) => {
   module.exports = {
     name: "@arach/speakeasy",
-    version: "0.2.16",
+    version: "0.2.17",
     description: "Convenient TTS CLI for Mac \u2014 centralized credentials + configurable caching so all your apps and agents can speak.",
     homepage: "https://speakeasy.arach.dev",
     repository: {
