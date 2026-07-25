@@ -32,6 +32,8 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>SpeakEasy uses the microphone only while you explicitly record an utterance for a locked Codex task.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>SpeakEasy uses Apple Speech to transcribe explicit voice turns while its on-device Parakeet model becomes ready.</string>
     <key>NSSupportsAutomaticGraphicsSwitching</key>
     <true/>
     <key>LSApplicationCategoryType</key>

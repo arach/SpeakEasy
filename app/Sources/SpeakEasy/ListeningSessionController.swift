@@ -565,8 +565,9 @@ final class ListeningSessionController: ObservableObject {
         phase = .transcribing
         Task {
             do {
-                let transcript = try await vox.stopAndTranscribe()
-                try await completeLoop(transcript: transcript, context: context)
+                let result = try await vox.stopAndTranscribe()
+                diagnostic("\(result.engine.rawValue) transcript selected")
+                try await completeLoop(transcript: result.text, context: context)
             } catch {
                 recordFailure(error)
             }
