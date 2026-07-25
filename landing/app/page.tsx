@@ -4,11 +4,13 @@ import FeaturesSection from "@/components/features-section"
 import CodeExamples from "@/components/code-examples"
 import ClaudeIntegrationSection from "@/components/claude-integration-section"
 import QuickStartSection from "@/components/quick-start-section"
+import DownloadSection from "@/components/download-section"
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 relative overflow-hidden">
       <HeroSection />
+      <DownloadSection />
       <Suspense fallback={<div className="h-96" />}>
         <CodeExamples />
       </Suspense>
