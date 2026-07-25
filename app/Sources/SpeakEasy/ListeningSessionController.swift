@@ -173,10 +173,15 @@ final class ListeningSessionController: ObservableObject {
 
     func assignLockedTask(toLane number: Int) {
         guard Self.laneRange.contains(number), let lock = lockedTask else { return }
-        if let previous = lane(number) {
+        let previous = lane(number)
+        if let previous {
             Task { await laneCueStore.removeCue(for: previous) }
         }
-        let assignment = VoiceLane(number: number, task: lock)
+        let assignment = VoiceLane(
+            number: number,
+            task: lock,
+            voiceOverride: previous?.voiceOverride
+        )
         lanes.removeAll { $0.number == number }
         lanes.append(assignment)
         lanes.sort { $0.number < $1.number }
@@ -358,7 +363,11 @@ final class ListeningSessionController: ObservableObject {
                 if let expectedLane {
                     activeLaneNumber = expectedLane
                     UserDefaults.standard.set(expectedLane, forKey: activeLaneDefaultsKey)
-                    let refreshed = VoiceLane(number: expectedLane, task: lock)
+                    let refreshed = VoiceLane(
+                        number: expectedLane,
+                        task: lock,
+                        voiceOverride: lane(expectedLane)?.voiceOverride
+                    )
                     lanes.removeAll { $0.number == expectedLane }
                     lanes.append(refreshed)
                     lanes.sort { $0.number < $1.number }

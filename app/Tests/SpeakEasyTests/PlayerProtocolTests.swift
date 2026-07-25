@@ -151,7 +151,8 @@ final class PlayerProtocolTests: XCTestCase {
                 id: "019f99a4-7867-7c23-ac29-0c0eca7da603",
                 title: "Prototype SpeakEasy listening mode",
                 cwd: "/Users/arach/dev/SpeakEasy"
-            )
+            ),
+            voiceOverride: LaneVoiceOverride(provider: "ElevenLabs", voiceID: "  voice-42  ")
         )
 
         let decoded = try JSONDecoder().decode(
@@ -162,6 +163,22 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertEqual(decoded, lane)
         XCTAssertEqual(decoded.shortcutTitle, "⌘⌥4")
         XCTAssertEqual(decoded.task.id, lane.task.id)
+        XCTAssertEqual(decoded.voiceOverride?.provider, "elevenlabs")
+        XCTAssertEqual(decoded.voiceOverride?.voiceID, "voice-42")
+    }
+
+    func testVoiceLaneDecodesLegacyAssignmentsWithoutVoiceOverride() throws {
+        let legacyJSON = #"{"number":3,"task":{"id":"task-3","title":"Legacy task","cwd":"/tmp"}}"#
+        let lane = try JSONDecoder().decode(VoiceLane.self, from: Data(legacyJSON.utf8))
+
+        XCTAssertEqual(lane.number, 3)
+        XCTAssertEqual(lane.task.id, "task-3")
+        XCTAssertNil(lane.voiceOverride)
+    }
+
+    func testLaneVoiceOverrideRejectsBlankProviderOrVoice() {
+        XCTAssertNil(LaneVoiceOverride(provider: "  ", voiceID: "nova"))
+        XCTAssertNil(LaneVoiceOverride(provider: "openai", voiceID: "\n"))
     }
 
     @MainActor
