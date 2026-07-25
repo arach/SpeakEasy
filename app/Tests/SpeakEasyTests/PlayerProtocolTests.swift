@@ -136,6 +136,7 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertEqual(Set(codes).count, 9)
         XCTAssertEqual(GlobalListeningShortcut.title(forLane: 1), "⌘⌥1")
         XCTAssertEqual(GlobalListeningShortcut.title(forLane: 9), "⌘⌥9")
+        XCTAssertEqual(GlobalListeningShortcut.confirmationTitle, "⌘⌥X")
     }
 
     func testCodexTaskLinkRejectsUnsafeThreadIdentifiers() {

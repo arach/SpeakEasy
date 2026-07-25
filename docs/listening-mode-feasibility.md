@@ -105,7 +105,7 @@ Rules:
 unlocked
   -> validatingLock
   -> ready
-  -> cueing (assigned lane with a cached cue only)
+  -> cueing (only when identification is explicitly requested)
   -> opening microphone + concurrent Vox warmup
   -> recording
   -> transcribing
@@ -149,10 +149,10 @@ revalidates Desktop ownership, and begins listening in one action. The original
   the current exact lock.
 - A lane cannot reroute audio already being recorded or a turn already being
   submitted. The current utterance keeps its snapshotted task ID.
-- Assignment generates a compact task-name cue with the configured premium
-  provider. Cues are cached privately. A cached cue finishes before capture to
-  prevent feedback; a missing/failed cue is skipped without system-voice
-  fallback or microphone delay.
+- Assignment generates and privately caches a compact task-name cue with the
+  configured provider. Normal lane activation is silent and immediate.
+  `Option-Command-X` announces the active lane on demand without opening the
+  microphone; provider failure is visible and never invokes a fallback voice.
 - Every lane activation reopens and revalidates the exact task, including after
   app restarts or Codex task changes.
 
@@ -294,11 +294,12 @@ Explicit non-goals:
   the visible 72-character user message, the Desktop bridge explicitly steered
   the active turn, the response was `Exact task voice loop passed.`, ElevenLabs
   queued the audio, and the native player logged playback completion.
-- The signed lane build registered all nine `Option-Command` shortcuts, restored
-  lane 1 to the originating task, revalidated the exact task, played a cached
-  ElevenLabs task-name cue before capture, opened the MacBook Air microphone,
-  warmed Vox concurrently, and canceled the validation recording without
-  transcription or submission.
+- The signed lane build registered all nine `Option-Command` lane shortcuts,
+  restored lane 1 to the originating task, revalidated the exact task, opened
+  the MacBook Air microphone immediately, warmed Vox concurrently, and canceled
+  the validation recording without transcription or submission. The separate
+  `Option-Command-X` confirmation path played the cached ElevenLabs task name
+  without opening the microphone.
 - `node --check` passes for the bundled bridge.
 - `pnpm build` passes for the TypeScript package.
 - `pnpm test:privacy` passes both privacy tests.

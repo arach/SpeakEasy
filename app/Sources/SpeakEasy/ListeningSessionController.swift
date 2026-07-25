@@ -57,6 +57,7 @@ final class ListeningSessionController: ObservableObject {
     @Published private(set) var activeLaneNumber: Int?
     @Published private(set) var shortcutAvailable = false
     @Published private(set) var laneShortcutAvailability: [Int: Bool] = [:]
+    @Published private(set) var confirmationShortcutAvailable = false
     @Published private(set) var inputDeviceName: String?
     @Published private(set) var lastTranscript = ""
     @Published private(set) var lastResponse = ""
@@ -75,6 +76,7 @@ final class ListeningSessionController: ObservableObject {
     private var fixtureHasRun = false
     private var launchHotkeyHasRun = false
     private var launchLaneHasRun = false
+    private var launchConfirmationHasRun = false
     private var restoredLockCandidate: ListeningTaskLock?
     private var pendingNarrationItemID: UUID?
     private var narrationDidStart = false
@@ -108,11 +110,15 @@ final class ListeningSessionController: ObservableObject {
             self.shortcut = shortcut
             shortcutAvailable = shortcut.registerCurrentLane()
             laneShortcutAvailability = shortcut.registerLanes()
+            confirmationShortcutAvailable = shortcut.registerLaneConfirmation()
             diagnostic(shortcutAvailable
                 ? "global shortcut \(Self.shortcutTitle) registered"
                 : "global shortcut \(Self.shortcutTitle) unavailable")
             let registered = laneShortcutAvailability.filter(\.value).keys.sorted()
             diagnostic("lane shortcuts registered: \(registered.map(String.init).joined(separator: ","))")
+            diagnostic(confirmationShortcutAvailable
+                ? "lane confirmation shortcut \(GlobalListeningShortcut.confirmationTitle) registered"
+                : "lane confirmation shortcut \(GlobalListeningShortcut.confirmationTitle) unavailable")
         }
         refreshTasks()
     }
@@ -126,6 +132,7 @@ final class ListeningSessionController: ObservableObject {
         shortcut = nil
         shortcutAvailable = false
         laneShortcutAvailability = [:]
+        confirmationShortcutAvailable = false
         Task {
             await vox.cancelRecording()
             await router.shutdown()
@@ -148,6 +155,7 @@ final class ListeningSessionController: ObservableObject {
                 runLaunchFixtureIfPresent()
                 runLaunchHotkeyTestIfPresent()
                 runLaunchLaneTestIfPresent()
+                runLaunchConfirmationTestIfPresent()
             } catch {
                 recordFailure(error)
             }
@@ -203,6 +211,10 @@ final class ListeningSessionController: ObservableObject {
             NSSound.beep()
             return
         }
+        guard ![.validatingLock, .cueing, .warmingUp].contains(phase) else {
+            NSSound.beep()
+            return
+        }
         if phase == .recording {
             if activeLaneNumber == number { finishRecording() }
             else {
@@ -246,10 +258,10 @@ final class ListeningSessionController: ObservableObject {
         case .recording:
             finishRecording()
         case .ready, .failed:
-            beginRecording(cueFor: nil)
+            beginRecording()
         case .speaking:
             PlaybackEngine.shared.stop()
-            beginRecording(cueFor: nil)
+            beginRecording()
         default:
             NSSound.beep()
         }
@@ -294,6 +306,7 @@ final class ListeningSessionController: ObservableObject {
         laneShortcutAvailability = Dictionary(
             uniqueKeysWithValues: Self.laneRange.map { ($0, $0 != 4) }
         )
+        confirmationShortcutAvailable = true
         phase = .ready
     }
     #endif
@@ -308,6 +321,8 @@ final class ListeningSessionController: ObservableObject {
             toggleListening()
         case .selectLane(let number):
             activateLane(number, beginListening: true)
+        case .announceActiveLane:
+            announceActiveLane()
         }
     }
 
@@ -364,8 +379,9 @@ final class ListeningSessionController: ObservableObject {
                 runLaunchFixtureIfPresent()
                 runLaunchHotkeyTestIfPresent()
                 runLaunchLaneTestIfPresent()
+                runLaunchConfirmationTestIfPresent()
                 if beginAfterLock {
-                    beginRecording(cueFor: expectedLane.flatMap(lane))
+                    beginRecording()
                 }
             } catch {
                 guard validationID == requestID else { return }
@@ -374,7 +390,7 @@ final class ListeningSessionController: ObservableObject {
         }
     }
 
-    private func beginRecording(cueFor lane: VoiceLane?) {
+    private func beginRecording() {
         guard let lock = lockedTask else {
             phase = .unlocked
             NSSound.beep()
@@ -387,20 +403,8 @@ final class ListeningSessionController: ObservableObject {
         PlaybackEngine.shared.stop()
         let startID = UUID()
         recordingStartID = startID
-        let narration = narrationConfiguration(from: ConfigManager.shared)
-        let volume = ConfigManager.shared.defaultVolume
 
         Task {
-            if let lane {
-                if let cached = await laneCueStore.cachedCue(for: lane, configuration: narration) {
-                    phase = .cueing
-                    diagnostic("playing cached lane \(lane.number) cue before microphone")
-                    do { try await laneCueStore.play(cached, volume: volume) }
-                    catch { diagnostic("lane cue skipped: \(error.localizedDescription)") }
-                } else {
-                    prepareCue(for: lane)
-                }
-            }
             guard recordingStartID == startID, lockedTask?.id == lock.id else { return }
             phase = .warmingUp
             do {
@@ -427,6 +431,45 @@ final class ListeningSessionController: ObservableObject {
                 }
             } catch {
                 guard recordingStartID == startID else { return }
+                recordFailure(error)
+            }
+        }
+    }
+
+    private func announceActiveLane() {
+        guard phase == .ready || phase == .failed,
+              let number = activeLaneNumber,
+              let assignment = lane(number),
+              lockedTask?.id == assignment.task.id
+        else {
+            NSSound.beep()
+            return
+        }
+
+        let configuration = narrationConfiguration(from: ConfigManager.shared)
+        let volume = ConfigManager.shared.defaultVolume
+        lastError = nil
+        phase = .cueing
+        Task {
+            do {
+                let cue: URL
+                if let cached = await laneCueStore.cachedCue(
+                    for: assignment,
+                    configuration: configuration
+                ) {
+                    cue = cached
+                } else {
+                    cue = try await laneCueStore.prepare(
+                        for: assignment,
+                        configuration: configuration
+                    )
+                }
+                guard activeLaneNumber == number, lockedTask?.id == assignment.task.id else { return }
+                diagnostic("announcing active lane \(number) on demand")
+                try await laneCueStore.play(cue, volume: volume)
+                guard activeLaneNumber == number, lockedTask?.id == assignment.task.id else { return }
+                phase = .ready
+            } catch {
                 recordFailure(error)
             }
         }
@@ -588,6 +631,18 @@ final class ListeningSessionController: ObservableObject {
         launchLaneHasRun = true
         diagnostic("triggering lane \(number) for launch test")
         shortcut?.triggerLaneForTesting(number)
+    }
+
+    private func runLaunchConfirmationTestIfPresent() {
+        guard !fixtureHasRun, !launchConfirmationHasRun,
+              ProcessInfo.processInfo.environment["SPEAKEASY_TRIGGER_LANE_CONFIRMATION_ON_LAUNCH"] == "1",
+              activeLaneNumber != nil,
+              lockedTask != nil,
+              phase == .ready || phase == .failed
+        else { return }
+        launchConfirmationHasRun = true
+        diagnostic("triggering active lane confirmation for launch test")
+        shortcut?.triggerConfirmationForTesting()
     }
 
     private func prepareCue(for lane: VoiceLane) {

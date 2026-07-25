@@ -6,14 +6,17 @@ private let speakEasyHotKeySignature: OSType = 0x53_50_4B_59 // SPKY
 enum ListeningShortcutAction: Equatable, Sendable {
     case toggleCurrentLane
     case selectLane(Int)
+    case announceActiveLane
 }
 
 @MainActor
 final class GlobalListeningShortcut {
     static let title = "⌃⌥Space"
+    static let confirmationTitle = "⌘⌥X"
     static let laneRange = 1...9
 
     private static let currentLaneID: UInt32 = 1
+    private static let confirmationID: UInt32 = 2
     private static let firstLaneID: UInt32 = 101
 
     private var hotKeys: [UInt32: EventHotKeyRef] = [:]
@@ -84,6 +87,16 @@ final class GlobalListeningShortcut {
         })
     }
 
+    @discardableResult
+    func registerLaneConfirmation() -> Bool {
+        register(
+            id: Self.confirmationID,
+            keyCode: UInt32(kVK_ANSI_X),
+            modifiers: UInt32(cmdKey | optionKey),
+            action: .announceActiveLane
+        )
+    }
+
     func unregisterAll() {
         for reference in hotKeys.values { UnregisterEventHotKey(reference) }
         hotKeys.removeAll()
@@ -104,6 +117,13 @@ final class GlobalListeningShortcut {
               Self.laneRange.contains(lane)
         else { return }
         action(.selectLane(lane))
+    }
+
+    func triggerConfirmationForTesting() {
+        guard ProcessInfo.processInfo.environment["SPEAKEASY_TRIGGER_LANE_CONFIRMATION_ON_LAUNCH"] == "1" else {
+            return
+        }
+        action(.announceActiveLane)
     }
 
     nonisolated static func title(forLane lane: Int) -> String { "⌘⌥\(lane)" }

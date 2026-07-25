@@ -42,7 +42,7 @@ struct HUDConversationPresentation: Equatable {
     var title: String {
         switch phase {
         case .validatingLock: "Locking onto task"
-        case .cueing: laneNumber.map { "Lane \($0) selected" } ?? "Lane selected"
+        case .cueing: laneNumber.map { "Lane \($0) confirmed" } ?? "Lane confirmed"
         case .ready: "Ready when you are"
         case .warmingUp: "Warming up Vox"
         case .recording: "Listening to you"
@@ -59,7 +59,7 @@ struct HUDConversationPresentation: Equatable {
         if phase == .failed, let error, !error.isEmpty { return error }
         switch phase {
         case .validatingLock: return "Verifying the exact Codex task"
-        case .cueing: return "Opening the microphone after this cue"
+        case .cueing: return taskTitle
         case .ready:
             if let laneNumber { return "Press ⌘⌥\(laneNumber) for this lane or ⌃⌥Space" }
             return "Press ⌃⌥Space and speak"

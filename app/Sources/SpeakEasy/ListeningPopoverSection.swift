@@ -129,6 +129,22 @@ struct ListeningPopoverSection: View {
             }
 
             HStack(spacing: 5) {
+                Circle()
+                    .fill(listening.confirmationShortcutAvailable ? Color.green : Color.orange)
+                    .frame(width: 5, height: 5)
+                    .accessibilityHidden(true)
+                Text("⌘⌥X says the active lane on demand")
+                    .font(.system(size: 8, design: .rounded))
+                    .foregroundColor(theme.textTertiary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                listening.confirmationShortcutAvailable
+                    ? "Command Option X announces the active lane"
+                    : "Command Option X confirmation shortcut unavailable"
+            )
+
+            HStack(spacing: 5) {
                 ForEach(ListeningSessionController.laneRange, id: \.self) { number in
                     let assignment = listening.lane(number)
                     let isCurrent = assignment?.task.id == currentTask.id
