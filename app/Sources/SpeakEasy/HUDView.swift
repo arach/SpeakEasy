@@ -442,7 +442,7 @@ struct HUDOverlayView: View {
                 ))
             }
         }
-        .frame(width: HUDLayout.width, height: HUDLayout.height)
+        .frame(width: HUDLayout.width, height: HUDLayout.height, alignment: .top)
     }
 
     private var entryEdge: Edge {
@@ -467,20 +467,25 @@ enum HUDPosition: String, CaseIterable {
 enum HUDLayout {
     static let width: CGFloat = 404
     static let height: CGFloat = 132
+    static let conversationHeight: CGFloat = 116
+    static let screenInset: CGFloat = 12
     static let cornerRadius: CGFloat = 14
     static let contentPadding: CGFloat = 12
-    static let sectionSpacing: CGFloat = 10
-    static let iconSize: CGFloat = 34
-    static let iconSymbolSize: CGFloat = 14
+    static let sectionSpacing: CGFloat = 12
+    static let headerRowHeight: CGFloat = 20
+    static let headerGap: CGFloat = 8
+    static let iconSize: CGFloat = 32
+    static let iconSymbolSize: CGFloat = 13
+    static let iconTextGap: CGFloat = 12
     static let titleSize: CGFloat = 14
-    static let detailSize: CGFloat = 10
-    static let headerStatusSize: CGFloat = 8
+    static let detailSize: CGFloat = 11
+    static let headerStatusSize: CGFloat = 9
     static let headerMetaSize: CGFloat = 9
-    static let energyHeight: CGFloat = 14
-    static let energyBarCount = 28
-    static let energyBarSpacing: CGFloat = 2
-    static let dismissSize: CGFloat = 18
-    static let dismissPadding: CGFloat = 6
+    static let energyHeight: CGFloat = 16
+    static let energyBarCount = 44
+    static let energyBarSpacing: CGFloat = 3
+    static let dismissSize: CGFloat = 20
+    static let dismissPadding: CGFloat = 12
 }
 
 /// Shared phase-surface treatment so conversation phases and speaking stay one family.
@@ -596,20 +601,7 @@ struct HUDContent: View {
                 .padding(.bottom, 10)
             }
 
-            // Dismiss button
-            Button(action: {
-                HUDWindowManager.shared.dismiss()
-            }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.42))
-                    .frame(width: HUDLayout.dismissSize, height: HUDLayout.dismissSize)
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .padding(HUDLayout.dismissPadding)
-            .accessibilityLabel("Dismiss SpeakEasy conversation HUD")
+            HUDDismissButton()
         }
         .frame(width: HUDLayout.width, height: HUDLayout.height)
         .background(hudSurfaceBackground)
@@ -627,6 +619,23 @@ struct HUDContent: View {
                         .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
                 }
         }
+    }
+}
+
+struct HUDDismissButton: View {
+    var body: some View {
+        Button { HUDWindowManager.shared.dismiss() } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.50))
+                .frame(width: HUDLayout.dismissSize, height: HUDLayout.dismissSize)
+                .background(.white.opacity(0.10), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(HUDLayout.dismissPadding)
+        .help("Dismiss")
+        .accessibilityLabel("Dismiss SpeakEasy HUD")
     }
 }
 
@@ -668,7 +677,7 @@ struct ConversationHUDContent: View {
                 VStack(alignment: .leading, spacing: HUDLayout.sectionSpacing) {
                     HUDTaskLockHeader(presentation: presentation)
 
-                    HStack(spacing: 10) {
+                    HStack(spacing: HUDLayout.iconTextGap) {
                         ZStack {
                             Circle()
                                 .fill(presentation.accent.opacity(HUDPhaseChrome.iconFillOpacity))
@@ -685,14 +694,14 @@ struct ConversationHUDContent: View {
                         }
                         .accessibilityHidden(true)
 
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(presentation.title)
                                 .font(.system(size: HUDLayout.titleSize, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
                             Text(presentation.detail)
                                 .font(.system(size: HUDLayout.detailSize, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.56))
+                                .foregroundStyle(.white.opacity(0.62))
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -708,18 +717,9 @@ struct ConversationHUDContent: View {
                 }
                 .padding(HUDLayout.contentPadding)
 
-                Button { HUDWindowManager.shared.dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.45))
-                        .frame(width: HUDLayout.dismissSize, height: HUDLayout.dismissSize)
-                        .background(.white.opacity(0.08), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .padding(HUDLayout.dismissPadding)
-                .accessibilityLabel("Dismiss SpeakEasy conversation HUD")
+                HUDDismissButton()
             }
-            .frame(width: HUDLayout.width, height: HUDLayout.height)
+            .frame(width: HUDLayout.width, height: HUDLayout.conversationHeight)
             .background(conversationBackground)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("SpeakEasy \(presentation.title). Locked to \(presentation.taskTitle). \(presentation.detail)")
@@ -763,7 +763,8 @@ struct HUDTaskLockHeader: View {
                 .font(.system(size: HUDLayout.headerStatusSize, weight: .bold, design: .monospaced))
                 .foregroundStyle(presentation.accent)
                 .lineLimit(1)
-                .layoutPriority(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(3)
             Spacer(minLength: 6)
             Image(systemName: "lock.fill")
                 .font(.system(size: 7, weight: .bold))
@@ -771,15 +772,18 @@ struct HUDTaskLockHeader: View {
             Text(presentation.taskTitle)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .layoutPriority(2)
+                .layoutPriority(0)
             Text(String(presentation.taskID.prefix(8)))
                 .font(.system(size: HUDLayout.headerMetaSize, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.32))
-                .layoutPriority(0)
+                .foregroundStyle(.white.opacity(0.44))
+                .lineLimit(1)
+                .fixedSize()
+                .layoutPriority(2)
         }
         .font(.system(size: HUDLayout.headerMetaSize, weight: .semibold, design: .rounded))
         .foregroundStyle(.white.opacity(0.66))
-        .padding(.trailing, HUDLayout.dismissSize + HUDLayout.dismissPadding)
+        .frame(height: HUDLayout.headerRowHeight)
+        .padding(.trailing, HUDLayout.dismissSize + HUDLayout.headerGap)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(presentation.phase.label). Locked to \(presentation.taskTitle)")
     }
@@ -792,6 +796,7 @@ struct HUDTaskLockHeader: View {
         case .cueing: status = "CONFIRMING"
         case .submitting: status = "SUBMITTING"
         case .preparingSpeech: status = "PREPARING"
+        case .failed: status = "ATTENTION"
         default: status = presentation.phase.label.uppercased()
         }
         guard let lane = presentation.laneNumber else { return status }
@@ -829,11 +834,12 @@ struct ConversationEnergyField: View {
         let primary = (sin(time * 5.2 + phaseOffset) + 1) * 0.5
         let secondary = (sin(time * 2.3 - phaseOffset * 0.7) + 1) * 0.5
         // Fit energetic bars inside the compact energy strip.
-        return 2 + CGFloat(primary * 8 + secondary * 3)
+        return 3 + CGFloat(primary * 8 + secondary * 3)
     }
 
     private func opacity(for index: Int) -> Double {
-        0.28 + (sin(time * 2.1 + Double(index) * 0.31) + 1) * 0.18
+        guard phase != .ready && phase != .failed else { return 0.30 }
+        return 0.28 + (sin(time * 2.1 + Double(index) * 0.31) + 1) * 0.18
     }
 }
 
