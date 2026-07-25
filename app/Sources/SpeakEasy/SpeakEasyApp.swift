@@ -122,11 +122,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func hudOrigin(position: HUDPosition, size: NSSize, visibleFrame: NSRect) -> NSPoint {
-        let padding: CGFloat = 20
-        let left = visibleFrame.minX + padding
-        let right = visibleFrame.maxX - size.width - padding
-        let bottom = visibleFrame.minY + padding
-        let top = visibleFrame.maxY - size.height - padding
+        // Match the card's own inset so the HUD reads as docked to the
+        // usable screen corner instead of floating beneath the menu bar.
+        let inset = HUDLayout.screenInset
+        let left = visibleFrame.minX + inset
+        let right = visibleFrame.maxX - size.width - inset
+        let bottom = visibleFrame.minY + inset
+        let top = visibleFrame.maxY - size.height - inset
 
         switch position {
         case .topLeft: return NSPoint(x: left, y: top)
