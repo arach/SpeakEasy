@@ -711,7 +711,8 @@ final class ListeningSessionController: ObservableObject {
 
     private func runLaunchHotkeyTestIfPresent() {
         guard !fixtureHasRun, !launchHotkeyHasRun,
-              ProcessInfo.processInfo.environment["SPEAKEASY_TRIGGER_HOTKEY_ON_LAUNCH"] == "1"
+              ProcessInfo.processInfo.environment["SPEAKEASY_TRIGGER_HOTKEY_ON_LAUNCH"] == "1",
+              phase == .ready || phase == .failed
         else { return }
         launchHotkeyHasRun = true
         diagnostic("triggering registered hotkey action for launch test")
@@ -721,7 +722,8 @@ final class ListeningSessionController: ObservableObject {
     private func runLaunchLaneTestIfPresent() {
         guard !fixtureHasRun, !launchLaneHasRun,
               let raw = ProcessInfo.processInfo.environment["SPEAKEASY_TRIGGER_LANE_ON_LAUNCH"],
-              let number = Int(raw), lane(number) != nil
+              let number = Int(raw), lane(number) != nil,
+              phase == .ready || phase == .failed
         else { return }
         launchLaneHasRun = true
         diagnostic("triggering lane \(number) for launch test")
