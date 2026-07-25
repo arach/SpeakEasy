@@ -254,6 +254,11 @@ final class PlayerProtocolTests: XCTestCase {
         )
     }
 
+    func testOnlyExplicitTaskSelectionRevealsCodex() {
+        XCTAssertFalse(CodexTaskLockPresentation.background.revealsCodex)
+        XCTAssertTrue(CodexTaskLockPresentation.revealInCodex.revealsCodex)
+    }
+
     @MainActor
     func testLaneShortcutsUseDistinctNumberKeyCodes() {
         let codes = ListeningSessionController.laneRange.map(GlobalListeningShortcut.keyCode(forLane:))
