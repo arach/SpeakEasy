@@ -3,6 +3,54 @@ import VoxCore
 @testable import SpeakEasy
 
 final class PlayerProtocolTests: XCTestCase {
+    func testCodexTaskSearchMatchesMultipleTermsAcrossTaskMetadata() {
+        let task = CodexTaskSummary(
+            id: "019fa197-2f03-7b50-973e-064e01f167e8",
+            title: "Delightful lane mapping",
+            preview: "Add a searchable lock picker",
+            cwd: "/Users/arach/dev/SpeakEasy",
+            updatedAt: Date(timeIntervalSince1970: 1_785_000_000)
+        )
+
+        XCTAssertTrue(task.matchesSearch("lane SpeakEasy"))
+        XCTAssertTrue(task.matchesSearch("SEARCHABLE lock"))
+        XCTAssertTrue(task.matchesSearch("019fa197"))
+        XCTAssertFalse(task.matchesSearch("lane calendar"))
+        XCTAssertEqual(task.projectName, "SpeakEasy")
+    }
+
+    func testCodexTaskSearchTreatsBlankAndDiacriticQueriesNaturally() {
+        let task = CodexTaskSummary(
+            id: "task-1",
+            title: "Résumé narration",
+            preview: "",
+            cwd: "/tmp/VoiceLab",
+            updatedAt: .distantPast
+        )
+
+        XCTAssertTrue(task.matchesSearch(""))
+        XCTAssertTrue(task.matchesSearch("   "))
+        XCTAssertTrue(task.matchesSearch("resume"))
+    }
+
+    func testCodexTaskActivityUsesCompactRecentLabels() {
+        let now = Date(timeIntervalSince1970: 1_785_000_000)
+        func task(secondsAgo: TimeInterval) -> CodexTaskSummary {
+            CodexTaskSummary(
+                id: UUID().uuidString,
+                title: "Conversation",
+                preview: "",
+                cwd: "/tmp/SpeakEasy",
+                updatedAt: now.addingTimeInterval(-secondsAgo)
+            )
+        }
+
+        XCTAssertEqual(task(secondsAgo: 12).activityLabel(relativeTo: now), "now")
+        XCTAssertEqual(task(secondsAgo: 90).activityLabel(relativeTo: now), "1m")
+        XCTAssertEqual(task(secondsAgo: 7_200).activityLabel(relativeTo: now), "2h")
+        XCTAssertEqual(task(secondsAgo: 691_200).activityLabel(relativeTo: now), "1w")
+    }
+
     func testStatusRequestDecodesFromTypeScriptWireShape() throws {
         let json = #"{"protocolVersion":1,"requestId":"5f2ea40a-7471-4cd8-9ead-6549396fc564","command":"status"}"#
         let request = try JSONDecoder().decode(PlayerCommandRequest.self, from: Data(json.utf8))

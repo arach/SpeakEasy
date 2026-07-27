@@ -6,6 +6,32 @@ struct CodexTaskSummary: Identifiable, Codable, Equatable, Sendable {
     let preview: String
     let cwd: String
     let updatedAt: Date
+
+    func matchesSearch(_ query: String) -> Bool {
+        let terms = query
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .split(whereSeparator: \Character.isWhitespace)
+            .map(String.init)
+        guard !terms.isEmpty else { return true }
+
+        let haystack = [title, preview, cwd, id]
+            .joined(separator: "\n")
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        return terms.allSatisfy(haystack.contains)
+    }
+
+    var projectName: String {
+        URL(fileURLWithPath: cwd).lastPathComponent
+    }
+
+    func activityLabel(relativeTo now: Date = Date()) -> String {
+        let seconds = max(0, now.timeIntervalSince(updatedAt))
+        if seconds < 60 { return "now" }
+        if seconds < 3_600 { return "\(Int(seconds / 60))m" }
+        if seconds < 86_400 { return "\(Int(seconds / 3_600))h" }
+        if seconds < 604_800 { return "\(Int(seconds / 86_400))d" }
+        return "\(Int(seconds / 604_800))w"
+    }
 }
 
 enum CodexTurnDelivery: String, Codable, Equatable, Sendable {
