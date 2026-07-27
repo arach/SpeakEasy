@@ -74,6 +74,7 @@ final class ListeningSessionController: ObservableObject {
 
     @Published private(set) var phase: ListeningPhase = .unlocked
     @Published private(set) var tasks: [CodexTaskSummary] = []
+    @Published private(set) var isRefreshingTasks = false
     @Published var selectedTaskID = ""
     @Published private(set) var lockedTask: ListeningTaskLock?
     @Published private(set) var lanes: [VoiceLane] = []
@@ -170,8 +171,11 @@ final class ListeningSessionController: ObservableObject {
     }
 
     func refreshTasks() {
+        guard !isRefreshingTasks else { return }
+        isRefreshingTasks = true
         diagnostic("loading recent Codex tasks")
         Task {
+            defer { isRefreshingTasks = false }
             do {
                 let recent = try await router.listRecentTasks(limit: 50)
                 diagnostic("loaded \(recent.count) recent Codex tasks")
@@ -208,6 +212,19 @@ final class ListeningSessionController: ObservableObject {
 
     func assignLockedTask(toLane number: Int) {
         guard Self.laneRange.contains(number), let lock = lockedTask else { return }
+        assign(lock, toLane: number, makeActive: true)
+    }
+
+    func assign(_ task: CodexTaskSummary, toLane number: Int) {
+        guard Self.laneRange.contains(number) else { return }
+        assign(
+            ListeningTaskLock(id: task.id, title: task.title, cwd: task.cwd),
+            toLane: number,
+            makeActive: false
+        )
+    }
+
+    private func assign(_ lock: ListeningTaskLock, toLane number: Int, makeActive: Bool) {
         let previous = lane(number)
         if let previous {
             Task { await laneCueStore.removeCue(for: previous) }
@@ -221,8 +238,13 @@ final class ListeningSessionController: ObservableObject {
         lanes.removeAll { $0.number == number }
         lanes.append(assignment)
         lanes.sort { $0.number < $1.number }
-        activeLaneNumber = number
-        UserDefaults.standard.set(number, forKey: activeLaneDefaultsKey)
+        if makeActive {
+            activeLaneNumber = number
+            UserDefaults.standard.set(number, forKey: activeLaneDefaultsKey)
+        } else if activeLaneNumber == number, lockedTask?.id != lock.id {
+            activeLaneNumber = nil
+            UserDefaults.standard.removeObject(forKey: activeLaneDefaultsKey)
+        }
         persistLanes()
         diagnostic("lane \(number) assigned to task \(lock.id)")
         prepareCue(for: assignment)
@@ -421,6 +443,36 @@ final class ListeningSessionController: ObservableObject {
             title: "Polish the Scout relay",
             cwd: "/Users/arach/dev/openscout"
         )
+        tasks = [
+            CodexTaskSummary(
+                id: task.id,
+                title: task.title,
+                preview: "Make voice lanes fast and dependable",
+                cwd: task.cwd,
+                updatedAt: Date()
+            ),
+            CodexTaskSummary(
+                id: secondTask.id,
+                title: secondTask.title,
+                preview: "Route work across local agents",
+                cwd: secondTask.cwd,
+                updatedAt: Date().addingTimeInterval(-90)
+            ),
+            CodexTaskSummary(
+                id: "019fa197-2f03-7b50-973e-064e01f167e8",
+                title: "Add lane mapping search",
+                preview: "Make the task lock delightful",
+                cwd: "/Users/arach/dev/SpeakEasy",
+                updatedAt: Date().addingTimeInterval(-180)
+            ),
+            CodexTaskSummary(
+                id: "019f8a79-20ad-7f88-9b69-29337de2fb15",
+                title: "Review the Hudson shell",
+                preview: "Tighten the native navigation chrome",
+                cwd: "/Users/arach/dev/hudson",
+                updatedAt: Date().addingTimeInterval(-270)
+            )
+        ]
         lockedTask = task
         lanes = [VoiceLane(number: 2, task: task), VoiceLane(number: 5, task: secondTask)]
         activeLaneNumber = 2

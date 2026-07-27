@@ -1,13 +1,32 @@
 import SwiftUI
 
 struct ListeningPopoverSection: View {
+    private enum TaskBrowserPurpose: Equatable {
+        case lock
+        case lane(Int)
+    }
+
     @ObservedObject private var listening = ListeningSessionController.shared
     @ObservedObject private var config = ConfigManager.shared
     @Environment(\.theme) private var theme
     @State private var laneVoiceDraft = ""
     @State private var laneCueDraft = ""
+    @State private var taskSearch = ""
+    @State private var taskBrowserPurpose: TaskBrowserPurpose?
 
     private let accent = Color(red: 0.36, green: 0.87, blue: 0.66)
+
+    init(snapshotLaneBrowserNumber: Int? = nil) {
+        _taskBrowserPurpose = State(
+            initialValue: snapshotLaneBrowserNumber.map(TaskBrowserPurpose.lane)
+        )
+    }
+
+    #if DEBUG
+    static func laneBrowserSnapshot(lane number: Int) -> some View {
+        ListeningPopoverSection(snapshotLaneBrowserNumber: number).taskBrowser
+    }
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -60,18 +79,44 @@ struct ListeningPopoverSection: View {
         )
         .padding(.horizontal, 14)
         .padding(.bottom, 10)
+        .popover(isPresented: taskBrowserPresented, arrowEdge: .trailing) {
+            taskBrowser
+        }
     }
 
     private func lockedTask(_ lock: ListeningTaskLock) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 10))
-                    .foregroundColor(accent)
-                Text(lock.title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(theme.textSecondary)
-                    .lineLimit(1)
+                Button {
+                    presentTaskBrowser(.lock)
+                } label: {
+                    HStack(spacing: 7) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(accent)
+                        Text(lock.title)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(theme.textSecondary)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 7, weight: .semibold))
+                            .foregroundColor(theme.textTertiary)
+                    }
+                    .padding(.horizontal, 8)
+                    .frame(height: 26)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(accent.opacity(0.10))
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(accent.opacity(0.24), lineWidth: 0.75)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isBusy)
+                .help("Search recent Codex tasks and change the conversation lock")
+                .accessibilityLabel("Locked to \(lock.title). Choose another task")
                 Spacer(minLength: 4)
                 Button("Unlock") { listening.unlock() }
                     .buttonStyle(.plain)
@@ -263,7 +308,7 @@ struct ListeningPopoverSection: View {
                     let isCurrent = assignment?.task.id == currentTask.id
                     Button {
                         if assignment == nil {
-                            listening.assignLockedTask(toLane: number)
+                            presentTaskBrowser(.lane(number))
                         } else {
                             listening.activateLane(number)
                         }
@@ -299,6 +344,9 @@ struct ListeningPopoverSection: View {
                     .help(laneHelp(number: number, assignment: assignment, currentTask: currentTask))
                     .contextMenu {
                         Button("Assign current task") { listening.assignLockedTask(toLane: number) }
+                        Button(assignment == nil ? "Choose another task…" : "Remap lane…") {
+                            presentTaskBrowser(.lane(number))
+                        }
                         if assignment != nil {
                             Button("Clear lane") { listening.removeLane(number) }
                         }
@@ -308,14 +356,22 @@ struct ListeningPopoverSection: View {
             }
 
             if let active = listening.activeLaneNumber, let assignment = listening.lane(active) {
-                Text("Lane \(active): \(assignment.task.title)")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(theme.textTertiary)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text("Lane \(active): \(assignment.task.title)")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(theme.textTertiary)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Button("Remap") { presentTaskBrowser(.lane(active)) }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundColor(accent)
+                        .disabled(isBusy)
+                }
                 laneVoiceEditor(for: assignment)
                 laneNarrationCueEditor(for: assignment)
             } else {
-                Text("Tap an empty lane to assign this exact task.")
+                Text("Choose an empty lane, then search for the task you want.")
                     .font(.system(size: 9))
                     .foregroundColor(theme.textTertiary)
             }
@@ -497,7 +553,7 @@ struct ListeningPopoverSection: View {
         let shortcut = GlobalListeningShortcut.title(forLane: number)
         let availability = listening.laneShortcutAvailable(number) ? "shortcut active" : "shortcut unavailable"
         guard let assignment else {
-            return "Lane \(number), unassigned. Tap to assign \(currentTask.title). \(shortcut), \(availability)."
+            return "Lane \(number), unassigned. Tap to choose a task. \(shortcut), \(availability)."
         }
         return "Lane \(number), \(assignment.task.title). \(shortcut), \(availability)."
     }
@@ -520,6 +576,14 @@ struct ListeningPopoverSection: View {
             .labelsHidden()
             .frame(maxWidth: .infinity)
 
+            Button {
+                presentTaskBrowser(.lock)
+            } label: {
+                Label("Search recent tasks", systemImage: "magnifyingglass")
+                    .frame(maxWidth: .infinity)
+            }
+            .disabled(listening.tasks.isEmpty)
+
             HStack {
                 Button("Refresh") { listening.refreshTasks() }
                     .buttonStyle(.plain)
@@ -532,6 +596,326 @@ struct ListeningPopoverSection: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Choose a Codex task to lock for voice conversation")
+    }
+
+    private var taskBrowserPresented: Binding<Bool> {
+        Binding(
+            get: { taskBrowserPurpose != nil },
+            set: { isPresented in
+                if !isPresented {
+                    taskBrowserPurpose = nil
+                    taskSearch = ""
+                }
+            }
+        )
+    }
+
+    private var filteredTasks: [CodexTaskSummary] {
+        listening.tasks.filter { $0.matchesSearch(taskSearch) }
+    }
+
+    private var taskBrowser: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            taskBrowserHeader
+
+            taskBrowserSearchField
+
+            taskBrowserSectionHeader
+
+            if filteredTasks.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: taskSearch.isEmpty ? "clock" : "magnifyingglass")
+                        .font(.system(size: 18))
+                        .foregroundColor(theme.textTertiary)
+                    Text(taskSearch.isEmpty ? "No recent tasks found" : "No matching tasks")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(theme.textSecondary)
+                    if !taskSearch.isEmpty {
+                        Button("Clear search") { taskSearch = "" }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(accent)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 3) {
+                        ForEach(filteredTasks) { task in
+                            taskBrowserRow(task)
+                        }
+                    }
+                    .padding(.top, 1)
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 300, height: 350)
+        .background(theme.background)
+        .onAppear { listening.refreshTasks() }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled else { return }
+                listening.refreshTasks()
+            }
+        }
+    }
+
+    private var taskBrowserHeader: some View {
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(taskBrowserTitle)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(theme.text)
+                    if case .lane(let number) = taskBrowserPurpose {
+                        Text("\(number)")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundColor(accent)
+                            .frame(minWidth: 14, minHeight: 14)
+                            .padding(.horizontal, 4)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(accent.opacity(0.16))
+                            )
+                            .overlay {
+                                Capsule(style: .continuous)
+                                    .stroke(accent.opacity(0.32), lineWidth: 0.75)
+                            }
+                            .accessibilityHidden(true)
+                    }
+                }
+                Text(taskBrowserSubtitle)
+                    .font(.system(size: 9.5))
+                    .foregroundColor(theme.textTertiary)
+                    .lineSpacing(1)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 6)
+            Button {
+                listening.refreshTasks()
+            } label: {
+                Group {
+                    if listening.isRefreshingTasks {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                }
+                .frame(width: 24, height: 24)
+                .foregroundColor(theme.textSecondary)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(theme.text.opacity(0.05))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(theme.text.opacity(0.08), lineWidth: 0.75)
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(listening.isRefreshingTasks)
+            .help("Refresh recent tasks")
+            .accessibilityLabel("Refresh recent tasks")
+        }
+    }
+
+    private var taskBrowserSearchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(theme.textTertiary)
+            TextField("Title, project, or task ID", text: $taskSearch)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundColor(theme.text)
+            if !taskSearch.isEmpty {
+                Button {
+                    taskSearch = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(theme.text.opacity(0.06))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(theme.text.opacity(0.10), lineWidth: 0.75)
+        }
+    }
+
+    private var taskBrowserSectionHeader: some View {
+        HStack(spacing: 6) {
+            Text("RECENT")
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .tracking(0.6)
+                .foregroundColor(theme.textTertiary)
+            Rectangle()
+                .fill(theme.text.opacity(0.07))
+                .frame(height: 0.75)
+                .frame(maxWidth: .infinity)
+            Text("\(filteredTasks.count)")
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundColor(theme.textTertiary)
+                .padding(.horizontal, 5)
+                .frame(minWidth: 16, minHeight: 14)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(theme.text.opacity(0.06))
+                )
+        }
+    }
+
+    private func taskBrowserRow(_ task: CodexTaskSummary) -> some View {
+        let selected = taskIsSelected(task)
+        let laneAssignmentNumber = listening.lanes.first(where: { $0.task.id == task.id })?.number
+        let isLocked = listening.lockedTask?.id == task.id
+        let isMappingLane: Bool
+        if case .lane = taskBrowserPurpose { isMappingLane = true } else { isMappingLane = false }
+
+        let leadingBarColor: Color = {
+            if selected { return accent }
+            if isLocked && isMappingLane { return accent.opacity(0.55) }
+            if laneAssignmentNumber != nil { return accent.opacity(0.28) }
+            return theme.text.opacity(0.10)
+        }()
+
+        return Button {
+            chooseTask(task)
+        } label: {
+            HStack(alignment: .center, spacing: 9) {
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(leadingBarColor)
+                    .frame(width: 2.5, height: 30)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(task.title.isEmpty ? "Untitled task" : task.title)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(theme.text)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        if isLocked && isMappingLane {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 7, weight: .semibold))
+                                .foregroundColor(accent.opacity(0.85))
+                                .accessibilityHidden(true)
+                        }
+                        Spacer(minLength: 4)
+                        Text(task.activityLabel())
+                            .font(.system(size: 8.5, weight: .medium, design: .monospaced))
+                            .foregroundColor(theme.textTertiary)
+                            .lineLimit(1)
+                            .frame(minWidth: 22, alignment: .trailing)
+                    }
+                    HStack(spacing: 5) {
+                        if let assignedLane = laneAssignmentNumber {
+                            Text("LANE \(assignedLane)")
+                                .font(.system(size: 7.5, weight: .bold, design: .monospaced))
+                                .tracking(0.4)
+                                .foregroundColor(accent)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(accent.opacity(0.13))
+                                )
+                                .accessibilityHidden(true)
+                        }
+                        Text(task.projectName.isEmpty ? task.cwd : task.projectName)
+                            .foregroundColor(theme.textSecondary.opacity(0.72))
+                        if !task.preview.isEmpty {
+                            Circle()
+                                .fill(theme.text.opacity(0.22))
+                                .frame(width: 2, height: 2)
+                            Text(task.preview)
+                                .foregroundColor(theme.textTertiary)
+                        }
+                    }
+                    .font(.system(size: 9))
+                    .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(accent)
+                }
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(selected ? accent.opacity(0.09) : Color.clear)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(selected ? accent.opacity(0.24) : Color.clear, lineWidth: 0.75)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(taskRowAccessibilityLabel(task))
+    }
+
+    private var taskBrowserTitle: String {
+        switch taskBrowserPurpose {
+        case .lane: "Map lane"
+        default: "Choose conversation task"
+        }
+    }
+
+    private var taskBrowserSubtitle: String {
+        switch taskBrowserPurpose {
+        case .lane: "Pick an exact Codex task. Your current lock stays put."
+        default: "Search recent tasks, then move the voice lock."
+        }
+    }
+
+    private func presentTaskBrowser(_ purpose: TaskBrowserPurpose) {
+        guard !isBusy else { return }
+        taskSearch = ""
+        taskBrowserPurpose = purpose
+        listening.refreshTasks()
+    }
+
+    private func chooseTask(_ task: CodexTaskSummary) {
+        let purpose = taskBrowserPurpose
+        taskBrowserPurpose = nil
+        taskSearch = ""
+        switch purpose {
+        case .lane(let number):
+            listening.assign(task, toLane: number)
+        case .lock:
+            listening.lock(task)
+        case nil:
+            break
+        }
+    }
+
+    private func taskIsSelected(_ task: CodexTaskSummary) -> Bool {
+        switch taskBrowserPurpose {
+        case .lane(let number): listening.lane(number)?.task.id == task.id
+        default: listening.lockedTask?.id == task.id || listening.selectedTaskID == task.id
+        }
+    }
+
+    private func taskRowAccessibilityLabel(_ task: CodexTaskSummary) -> String {
+        let project = task.projectName.isEmpty ? task.cwd : task.projectName
+        return "\(task.title), project \(project)\(taskIsSelected(task) ? ", selected" : "")"
     }
 
     private var isBusy: Bool {
