@@ -17,6 +17,7 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var playbackRate: Float = 1
 
     private var player: AVAudioPlayer?
+    private var preparedAudioFile: PreparedAudioFile?
     private var progressTimer: Timer?
 
     private override init() {
@@ -39,6 +40,8 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         guard FileManager.default.fileExists(atPath: item.audioPath) else {
             throw PlayerEngineError.audioFileMissing(item.audioPath)
         }
+
+        clearFailure()
 
         if interrupt {
             stopCurrent(resetPosition: true)
@@ -63,7 +66,10 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     func resume() throws {
         if let player, currentItem != nil {
-            player.play()
+            guard player.play() else {
+                state = .failed
+                throw PlayerEngineError.playbackDidNotStart
+            }
             state = .playing
             startProgressTimer()
             return
@@ -90,6 +96,10 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     func clearQueue() {
         queue.removeAll()
+    }
+
+    func dismissError() {
+        clearFailure()
     }
 
     func removeQueueItem(id: UUID) {
@@ -183,6 +193,9 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
             }
             return response(to: request)
         } catch {
+            if [.enqueue, .resume, .togglePlayback, .skip].contains(request.command) {
+                state = .failed
+            }
             lastError = error.localizedDescription
             return response(to: request, error: error.localizedDescription)
         }
@@ -214,29 +227,49 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         let item = queue.removeFirst()
         state = .loading
 
+        let preparedAudio: PreparedAudioFile
         do {
-            let nextPlayer = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: item.audioPath))
+            preparedAudio = try AudioFilePreparer.prepare(path: item.audioPath)
+        } catch {
+            player = nil
+            currentItem = nil
+            state = .failed
+            throw PlayerEngineError.couldNotOpenAudio(error.localizedDescription)
+        }
+
+        do {
+            let nextPlayer = try AVAudioPlayer(contentsOf: preparedAudio.url)
             nextPlayer.delegate = self
             nextPlayer.enableRate = true
             nextPlayer.volume = volume
             nextPlayer.rate = playbackRate
             nextPlayer.isMeteringEnabled = true
-            nextPlayer.prepareToPlay()
+            guard nextPlayer.prepareToPlay() else {
+                throw PlayerEngineError.couldNotPrepareAudio
+            }
 
             player = nextPlayer
+            preparedAudioFile = preparedAudio
             currentItem = item
             currentTime = 0
             duration = nextPlayer.duration
             audioLevel = 0
             lastError = nil
-            nextPlayer.play()
+            guard nextPlayer.play() else {
+                throw PlayerEngineError.playbackDidNotStart
+            }
             state = .playing
             HUDWindowManager.shared.showPlayback(item)
             startProgressTimer()
         } catch {
             player = nil
+            preparedAudio.cleanup()
+            preparedAudioFile = nil
             currentItem = nil
             state = .failed
+            if let engineError = error as? PlayerEngineError {
+                throw engineError
+            }
             throw PlayerEngineError.couldNotOpenAudio(error.localizedDescription)
         }
     }
@@ -254,11 +287,20 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         progressTimer?.invalidate()
         progressTimer = nil
         player = nil
+        preparedAudioFile?.cleanup()
+        preparedAudioFile = nil
         currentItem = nil
         currentTime = 0
         duration = 0
         audioLevel = 0
         state = .idle
+    }
+
+    private func clearFailure() {
+        lastError = nil
+        if state == .failed {
+            state = .idle
+        }
     }
 
     private func startProgressTimer() {
@@ -303,6 +345,8 @@ enum PlayerEngineError: LocalizedError {
     case audioPathMustBeAbsolute
     case audioFileMissing(String)
     case couldNotOpenAudio(String)
+    case couldNotPrepareAudio
+    case playbackDidNotStart
     case missingArgument(String)
 
     var errorDescription: String? {
@@ -313,6 +357,10 @@ enum PlayerEngineError: LocalizedError {
             return "audio_file_missing:\(path)"
         case .couldNotOpenAudio(let detail):
             return "could_not_open_audio:\(detail)"
+        case .couldNotPrepareAudio:
+            return "could_not_prepare_audio"
+        case .playbackDidNotStart:
+            return "playback_did_not_start"
         case .missingArgument(let name):
             return "missing_argument:\(name)"
         }

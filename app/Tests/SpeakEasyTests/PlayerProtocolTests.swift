@@ -2,6 +2,34 @@ import XCTest
 @testable import SpeakEasy
 
 final class PlayerProtocolTests: XCTestCase {
+    func testMislabeledAIFFIsNormalizedBeforePlayback() throws {
+        let sourceURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("speakeasy-test-\(UUID().uuidString)")
+            .appendingPathExtension("mp3")
+        defer { try? FileManager.default.removeItem(at: sourceURL) }
+        try Data("FORM0000AIFF0000".utf8).write(to: sourceURL)
+
+        let prepared = try AudioFilePreparer.prepare(path: sourceURL.path)
+        defer { prepared.cleanup() }
+
+        XCTAssertTrue(prepared.isTemporary)
+        XCTAssertEqual(prepared.url.pathExtension, "aiff")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: prepared.url.path))
+    }
+
+    func testMatchingAudioExtensionUsesOriginalFile() throws {
+        let sourceURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("speakeasy-test-\(UUID().uuidString)")
+            .appendingPathExtension("aiff")
+        defer { try? FileManager.default.removeItem(at: sourceURL) }
+        try Data("FORM0000AIFF0000".utf8).write(to: sourceURL)
+
+        let prepared = try AudioFilePreparer.prepare(path: sourceURL.path)
+
+        XCTAssertFalse(prepared.isTemporary)
+        XCTAssertEqual(prepared.url, sourceURL)
+    }
+
     func testStatusRequestDecodesFromTypeScriptWireShape() throws {
         let json = #"{"protocolVersion":1,"requestId":"5f2ea40a-7471-4cd8-9ead-6549396fc564","command":"status"}"#
         let request = try JSONDecoder().decode(PlayerCommandRequest.self, from: Data(json.utf8))

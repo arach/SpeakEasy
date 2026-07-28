@@ -95,14 +95,12 @@ struct PlayerPopoverView: View {
 
     private var nowPlayingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let item = engine.currentItem {
+            if engine.state == .failed, let error = engine.lastError {
+                failureCard(error)
+            } else if let item = engine.currentItem {
                 activeNowPlaying(item)
             } else {
                 idleNowPlaying
-            }
-
-            if let error = engine.lastError, engine.state == .failed {
-                errorBanner(error)
             }
         }
         .padding(.horizontal, outerInset)
@@ -203,28 +201,48 @@ struct PlayerPopoverView: View {
         .accessibilityLabel("\(idleTitle). \(idleSubtitle)")
     }
 
-    private func errorBanner(_ message: String) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 11))
-                .foregroundColor(.orange)
-            Text(message)
-                .font(.system(size: 11))
-                .foregroundColor(theme.textSecondary)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
+    private func failureCard(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.orange.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.orange)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Couldn’t play this narration")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(theme.text)
+                Text(friendlyPlaybackError(message))
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 4)
+
+            Button("Dismiss") {
+                engine.dismissError()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(theme.textSecondary)
         }
-        .padding(8)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.orange.opacity(0.12))
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(theme.text.opacity(0.05))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(Color.orange.opacity(0.25), lineWidth: 0.5)
                 )
         )
-        .accessibilityLabel("Playback error: \(message)")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Playback error: \(friendlyPlaybackError(message))")
     }
 
     // MARK: - Scrubber
@@ -763,6 +781,19 @@ struct PlayerPopoverView: View {
         default:
             return "Nothing playing"
         }
+    }
+
+    private func friendlyPlaybackError(_ message: String) -> String {
+        if message.contains("unsupported_audio_container") {
+            return "The audio file is incomplete or uses an unsupported format. The item was skipped."
+        }
+        if message.contains("audio_file_missing") {
+            return "The audio file is no longer available. Generate the narration again to retry."
+        }
+        if message.contains("playback_did_not_start") || message.contains("could_not_prepare_audio") {
+            return "macOS couldn’t start playback. Generate the narration again to retry."
+        }
+        return "SpeakEasy couldn’t open the audio file. The item was skipped; a new narration will clear this message."
     }
 
     private var idleSubtitle: String {
