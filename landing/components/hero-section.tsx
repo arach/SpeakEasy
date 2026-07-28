@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, Star } from "lucide-react"
+import { ArrowRight, ExternalLink, Star } from "lucide-react"
 import { Volume2, BookOpen, Play, Pause, Copy, Check } from "./icons"
 import Link from "next/link"
 import PackageManagerTabs from "@/components/package-manager-tabs"
@@ -271,11 +271,19 @@ export default function HeroSection() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(59,130,246,0.03),transparent_50%)]" />
 
         <div className="relative z-10 text-center max-w-4xl mx-auto">
+        <a
+          href="#agent-player"
+          className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/75 px-3 py-1.5 text-xs font-medium text-emerald-700 shadow-sm backdrop-blur-sm transition hover:border-emerald-300 hover:bg-white"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          New: the macOS menu-bar player
+          <ArrowRight className="h-3 w-3" />
+        </a>
         <h1 className="text-4xl sm:text-5xl md:text-6xl mb-2 md:mb-3 text-slate-900 leading-[0.9] tracking-tight">
           <span className="font-silkscreen">SpeakEasy</span>
           <br />
           <span className="font-display font-light bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
-            Unified TTS
+            Voice for your agents
           </span>
         </h1>
 
