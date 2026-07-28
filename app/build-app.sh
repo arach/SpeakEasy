@@ -25,14 +25,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+"$SCRIPT_DIR/Scripts/sync-pad-assets.sh"
+
 echo "Building SpeakEasy..."
 swift build -c release
 
 echo "Creating app bundle..."
 speakeasy_bundle_app "$SCRIPT_DIR" "$APP_DIR"
+speakeasy_verify_bundle_layout "$APP_DIR"
 
 echo "Signing app..."
 "$SCRIPT_DIR/tools/release/sign-bundle.sh" "$APP_DIR"
+speakeasy_verify_signed_bundle "$APP_DIR"
 
 echo ""
 echo "App bundle created: $APP_DIR"

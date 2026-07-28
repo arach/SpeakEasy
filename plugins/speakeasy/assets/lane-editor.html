@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f7f4;
+      --surface: rgba(255,255,255,.92);
+      --surface-2: #f2f5f1;
+      --surface-3: #e9f7f0;
+      --text: #172019;
+      --muted: #6c756e;
+      --faint: #929a94;
+      --line: rgba(23,32,25,.11);
+      --line-strong: rgba(23,32,25,.18);
+      --accent: #139767;
+      --accent-2: #0c7650;
+      --accent-soft: rgba(19,151,103,.12);
+      --danger: #b8473f;
+      --shadow: 0 18px 50px rgba(18,38,26,.09);
+      --menu-shadow: 0 18px 46px rgba(10,26,16,.18), 0 2px 8px rgba(10,26,16,.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #101411;
+        --surface: rgba(27,33,29,.95);
+        --surface-2: #202822;
+        --surface-3: #183428;
+        --text: #f0f6f2;
+        --muted: #a2aea6;
+        --faint: #78837c;
+        --line: rgba(240,246,242,.11);
+        --line-strong: rgba(240,246,242,.2);
+        --accent: #55dca7;
+        --accent-2: #7de8bb;
+        --accent-soft: rgba(85,220,167,.13);
+        --danger: #ff8b82;
+        --shadow: 0 20px 54px rgba(0,0,0,.27);
+        --menu-shadow: 0 20px 50px rgba(0,0,0,.42), 0 2px 8px rgba(0,0,0,.3);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: transparent;
+      color: var(--text);
+      font: 13px/1.42 ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+    .shell {
+      max-width: 760px;
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: visible;
+    }
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .eyebrow { margin: 0 0 4px; color: var(--accent-2); font-size: 10px; font-weight: 760; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: 20px; line-height: 1.15; font-weight: 680; letter-spacing: -.025em; }
+    .subtitle { margin: 5px 0 0; color: var(--muted); }
+    .status-pill { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 999px; background: var(--accent-soft); font-size: 11px; font-weight: 680; white-space: nowrap; }
+    .status-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .body { display: grid; gap: 16px; padding: 18px 22px 20px; }
+    .lane-rail { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; }
+    .lane-chip {
+      position: relative;
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 130ms ease, background 130ms ease, color 130ms ease, transform 130ms ease;
+    }
+    .lane-chip::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 3px; height: 3px; margin-left: -1.5px; border-radius: 50%; background: transparent; }
+    .lane-chip[data-assigned="true"]::after { background: var(--faint); }
+    .lane-chip:hover { color: var(--text); border-color: var(--line-strong); background: var(--surface-2); }
+    .lane-chip:active { transform: translateY(1px); }
+    .lane-chip[aria-pressed="true"] { color: var(--accent-2); border-color: var(--accent); background: var(--accent-soft); font-weight: 720; }
+    .lane-chip[aria-pressed="true"]::after { background: var(--accent); }
+    .parameter-card {
+      display: grid;
+      grid-template-columns: minmax(0,.82fr) minmax(0,1.18fr);
+      gap: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: var(--surface-2);
+    }
+    .parameter-side { display: grid; align-content: start; gap: 8px; }
+    .field-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 11px; font-weight: 650; }
+    .field-label strong { color: var(--text); font-weight: 650; }
+    .hotkey { padding: 3px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); font: 600 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .route-context { min-width: 0; padding: 3px 2px 0; }
+    .route-kicker { color: var(--accent-2); font-size: 10px; font-weight: 740; letter-spacing: .1em; text-transform: uppercase; }
+    .route-title { margin: 4px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 670; letter-spacing: -.015em; }
+    .route-meta { margin: 3px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
+    .section { display: grid; gap: 11px; padding-top: 2px; }
+    .section + .section { padding-top: 15px; border-top: 1px solid var(--line); }
+    .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
+    .section-head h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+    .section-head p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    .grid-delivery { display: grid; grid-template-columns: minmax(0,.76fr) minmax(0,1.24fr); gap: 10px; }
+    .field { display: grid; gap: 6px; min-width: 0; }
+    .control, .picker-button {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color 130ms ease, box-shadow 130ms ease, background 130ms ease;
+    }
+    .control { padding: 9px 11px; outline: none; }
+    textarea.control { min-height: 72px; resize: vertical; }
+    .control:hover, .picker-button:hover { border-color: var(--line-strong); }
+    .control:focus, .picker-button:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+    .picker { position: relative; min-width: 0; }
+    .picker-button { display: grid; grid-template-columns: 9px minmax(0,1fr) 14px; align-items: center; gap: 9px; padding: 7px 10px; text-align: left; cursor: pointer; }
+    .picker-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+    .picker-copy { min-width: 0; }
+    .picker-value { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+    .picker-detail { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; color: var(--muted); font-size: 10px; font-weight: 480; }
+    .chevron { width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg) translateY(-2px); transition: transform 130ms ease; }
+    .picker-button[aria-expanded="true"] .chevron { transform: rotate(225deg) translate(-2px,-1px); }
+    .picker-menu {
+      position: absolute;
+      z-index: 50;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      max-height: 224px;
+      overflow: auto;
+      padding: 6px;
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--surface) 96%, transparent);
+      box-shadow: var(--menu-shadow);
+      backdrop-filter: blur(24px) saturate(1.3);
+    }
+    .picker-menu[hidden] { display: none; }
+    .picker-option { display: grid; grid-template-columns: 9px minmax(0,1fr) auto; align-items: center; gap: 9px; width: 100%; min-height: 39px; padding: 7px 8px; border: 0; border-radius: 9px; background: transparent; text-align: left; cursor: pointer; }
+    .picker-option:hover, .picker-option[data-focused="true"] { background: var(--surface-2); }
+    .picker-option[aria-selected="true"] { background: var(--accent-soft); }
+    .picker-option .check { color: var(--accent-2); font-size: 12px; font-weight: 800; }
+    .picker-option .picker-dot[data-ready="false"] { background: var(--faint); }
+    .task-identity { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 18px; color: var(--muted); font-size: 10px; }
+    .task-identity code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font-size: 9px; }
+    .voice-row { display: grid; grid-template-columns: minmax(0,.82fr) minmax(0,1.18fr) auto; gap: 10px; align-items: end; }
+    .button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; padding: 0 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; font-weight: 660; }
+    .button:hover { border-color: var(--line-strong); background: var(--surface-2); }
+    .button.primary { border-color: var(--text); background: var(--text); color: var(--bg); }
+    .button.primary:hover { opacity: .88; }
+    .button.danger { color: var(--danger); }
+    .button:disabled { cursor: not-allowed; opacity: .42; }
+    .play { width: 0; height: 0; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 7px solid currentColor; }
+    .toggle-row { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; cursor: pointer; }
+    .toggle-row input { accent-color: var(--accent); }
+    .footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 2px; }
+    .actions { display: flex; gap: 8px; }
+    .feedback { min-height: 18px; margin: 0; color: var(--muted); font-size: 11px; text-align: right; }
+    .feedback[data-state="success"] { color: var(--accent-2); }
+    .feedback[data-state="error"] { color: var(--danger); }
+    @media (max-width: 620px) {
+      body { padding: 8px; }
+      .shell { border-radius: 19px; }
+      .topbar, .body { padding-left: 15px; padding-right: 15px; }
+      .lane-rail { grid-template-columns: repeat(3,1fr); }
+      .parameter-card, .grid-2, .grid-delivery, .voice-row { grid-template-columns: 1fr; }
+      .button.preview { width: 100%; }
+      .footer { align-items: flex-start; flex-direction: column; }
+      .feedback { text-align: left; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">SpeakEasy lanes</p>
+        <h1>Route a voice to one exact task</h1>
+        <p class="subtitle">Choose the lane, assignment, and voice in one place.</p>
+      </div>
+      <span class="status-pill" id="status">Active</span>
+    </header>
+
+    <div class="body">
+      <nav class="lane-rail" id="lane-rail" aria-label="Lane shortcuts"></nav>
+
+      <section class="parameter-card" aria-labelledby="lane-parameter-label">
+        <div class="parameter-side">
+          <div class="field-label"><strong id="lane-parameter-label">Lane parameter</strong><span class="hotkey" id="hotkey">⌥⌘1</span></div>
+          <div class="picker" id="lane-picker"></div>
+        </div>
+        <div class="route-context" aria-live="polite">
+          <span class="route-kicker">Current destination</span>
+          <p class="route-title" id="route-title">Choose a task</p>
+          <p class="route-meta" id="route-meta">This lane is unassigned</p>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="route-heading">
+        <div class="section-head">
+          <div><h2 id="route-heading">Exact-task route</h2><p>Every utterance and spoken response stays with this task.</p></div>
+        </div>
+        <div class="grid-2">
+          <label class="field"><span class="field-label">Project</span><span class="picker" id="project-picker"></span></label>
+          <label class="field"><span class="field-label">Task</span><span class="picker" id="task-picker"></span></label>
+        </div>
+        <div class="task-identity"><span id="task-path">No task selected</span><code id="task-id"></code></div>
+      </section>
+
+      <section class="section" aria-labelledby="voice-heading">
+        <div class="section-head">
+          <div><h2 id="voice-heading">Lane voice</h2><p>Give each lane a recognizable voice, or inherit the global default.</p></div>
+          <span class="hotkey" id="provider-state">Ready</span>
+        </div>
+        <div class="voice-row">
+          <label class="field"><span class="field-label">Provider</span><span class="picker" id="provider-picker"></span></label>
+          <label class="field"><span class="field-label">Voice</span><span class="picker" id="voice-picker"></span></label>
+          <button class="button preview" id="preview" type="button"><span class="play"></span><span>Preview</span></button>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="delivery-heading">
+        <div class="section-head"><div><h2 id="delivery-heading">Delivery</h2><p>Name the lane and shape how its replies are narrated.</p></div></div>
+        <div class="grid-delivery">
+          <label class="field"><span class="field-label">Lane name</span><input class="control" id="lane-label" maxlength="80" placeholder="Primary orchestrator"></label>
+          <label class="field"><span class="field-label">Narration cue</span><textarea class="control" id="lane-cue" maxlength="240" placeholder="Concise, warm, and decision-oriented"></textarea></label>
+        </div>
+        <label class="toggle-row"><input id="activate" type="checkbox" checked> Make this the active listening lane when saved</label>
+      </section>
+
+      <footer class="footer">
+        <div class="actions">
+          <button class="button primary" id="save" type="button">Save lane</button>
+          <button class="button danger" id="clear" type="button">Clear</button>
+        </div>
+        <p class="feedback" id="feedback" aria-live="polite"></p>
+      </footer>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const pending = new Map();
+      const pickers = new Set();
+      let nextID = 1;
+      let data;
+      let selectedProject;
+      let selectedTask;
+      let selectedProvider;
+      let selectedVoice;
+
+      const $ = (id) => document.getElementById(id);
+      const feedback = $("feedback");
+
+      function request(method, params) {
+        const id = nextID++;
+        window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+        return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+      }
+
+      async function callTool(name, args) {
+        if (window.openai?.callTool) return window.openai.callTool(name, args);
+        return request("tools/call", { name, arguments: args });
+      }
+
+      function toolData(result) {
+        return result?.structuredContent || result?.structured_content || result;
+      }
+
+      function closePickers(except) {
+        pickers.forEach((picker) => { if (picker !== except) picker.close(); });
+      }
+
+      function createPicker(root, { placeholder = "Choose…", onChange = () => {} } = {}) {
+        let items = [];
+        let value = "";
+        let focusIndex = 0;
+        root.innerHTML = '<button class="picker-button" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false"><span class="picker-dot"></span><span class="picker-copy"><span class="picker-value"></span><span class="picker-detail"></span></span><span class="chevron"></span></button><div class="picker-menu" role="listbox" hidden></div>';
+        const button = root.querySelector(".picker-button");
+        const menu = root.querySelector(".picker-menu");
+        const valueNode = root.querySelector(".picker-value");
+        const detailNode = root.querySelector(".picker-detail");
+        const dot = root.querySelector(".picker-dot");
+
+        function selected() { return items.find((item) => String(item.value) === String(value)); }
+        function paintButton() {
+          const item = selected();
+          valueNode.textContent = item?.label || placeholder;
+          detailNode.textContent = item?.detail || "";
+          detailNode.hidden = !item?.detail;
+          dot.dataset.ready = String(item?.ready !== false);
+          button.disabled = !items.length;
+        }
+        function paintMenu() {
+          menu.replaceChildren(...items.map((item, index) => {
+            const option = document.createElement("button");
+            option.type = "button";
+            option.className = "picker-option";
+            option.setAttribute("role", "option");
+            option.setAttribute("aria-selected", String(String(item.value) === String(value)));
+            option.dataset.focused = String(index === focusIndex);
+            option.innerHTML = '<span class="picker-dot"></span><span class="picker-copy"><span class="picker-value"></span><span class="picker-detail"></span></span><span class="check"></span>';
+            option.querySelector(".picker-dot").dataset.ready = String(item.ready !== false);
+            option.querySelector(".picker-value").textContent = item.label;
+            const detail = option.querySelector(".picker-detail");
+            detail.textContent = item.detail || "";
+            detail.hidden = !item.detail;
+            option.querySelector(".check").textContent = String(item.value) === String(value) ? "✓" : item.badge || "";
+            option.addEventListener("click", () => choose(item.value));
+            return option;
+          }));
+        }
+        function open() {
+          if (!items.length) return;
+          closePickers(api);
+          menu.hidden = false;
+          button.setAttribute("aria-expanded", "true");
+          focusIndex = Math.max(0, items.findIndex((item) => String(item.value) === String(value)));
+          paintMenu();
+        }
+        function close() {
+          menu.hidden = true;
+          button.setAttribute("aria-expanded", "false");
+        }
+        function choose(next, silent = false) {
+          value = String(next ?? "");
+          paintButton();
+          paintMenu();
+          close();
+          if (!silent) onChange(value, selected());
+        }
+        button.addEventListener("click", () => menu.hidden ? open() : close());
+        button.addEventListener("keydown", (event) => {
+          if (["ArrowDown", "ArrowUp", "Home", "End", "Enter", " ", "Escape"].includes(event.key)) event.preventDefault();
+          if (event.key === "Escape") return close();
+          if (menu.hidden) return open();
+          if (event.key === "ArrowDown") focusIndex = Math.min(items.length - 1, focusIndex + 1);
+          if (event.key === "ArrowUp") focusIndex = Math.max(0, focusIndex - 1);
+          if (event.key === "Home") focusIndex = 0;
+          if (event.key === "End") focusIndex = items.length - 1;
+          if (event.key === "Enter" || event.key === " ") return choose(items[focusIndex]?.value);
+          paintMenu();
+          menu.children[focusIndex]?.scrollIntoView({ block: "nearest" });
+        });
+        const api = {
+          setItems(next, preferred = value) {
+            items = next || [];
+            value = items.some((item) => String(item.value) === String(preferred)) ? String(preferred) : String(items[0]?.value ?? "");
+            focusIndex = Math.max(0, items.findIndex((item) => String(item.value) === String(value)));
+            paintButton();
+            paintMenu();
+          },
+          setValue(next, silent = true) { choose(next, silent); },
+          getValue() { return value; },
+          getItem() { return selected(); },
+          close,
+        };
+        pickers.add(api);
+        paintButton();
+        return api;
+      }
+
+      const lanePicker = createPicker($("lane-picker"), { onChange: (value) => selectLane(Number(value)) });
+      const projectPicker = createPicker($("project-picker"), { placeholder: "Choose a project", onChange: (value) => selectProject(value) });
+      const taskPicker = createPicker($("task-picker"), { placeholder: "Choose a task", onChange: (value) => selectTask(value) });
+      const providerPicker = createPicker($("provider-picker"), { placeholder: "Inherit global voice", onChange: (value) => selectProvider(value) });
+      const voicePicker = createPicker($("voice-picker"), { placeholder: "Choose a voice", onChange: (value) => { selectedVoice = value; } });
+
+      function currentLane() { return data?.lanes?.find((lane) => lane.number === data.selectedLane) || { number: data?.selectedLane || 1 }; }
+      function projectForTask(task) { return data?.projects?.find((project) => project.tasks?.some((candidate) => candidate.id === task?.id)); }
+
+      function laneItems() {
+        return data.lanes.map((lane) => ({
+          value: lane.number,
+          label: "Lane " + lane.number + (lane.label ? " · " + lane.label : ""),
+          detail: lane.task?.title || "Unassigned",
+          ready: Boolean(lane.task),
+          badge: data.activeLane === lane.number ? "Active" : "",
+        }));
+      }
+
+      function projectItems() {
+        return (data.projects || []).map((project) => ({ value: project.id, label: project.name, detail: project.tasks.length + (project.tasks.length === 1 ? " task" : " tasks") }));
+      }
+
+      function taskItems(project) {
+        return (project?.tasks || []).map((task) => ({ value: task.id, label: task.title, detail: task.id.slice(0, 8), ready: true }));
+      }
+
+      function providerItems() {
+        return [
+          { value: "", label: "Inherit global", detail: "Use the default SpeakEasy voice", ready: true },
+          ...(data.providers || []).map((provider) => ({
+            value: provider.id,
+            label: provider.name,
+            detail: provider.configured ? "Ready" : "Needs API key",
+            ready: provider.configured,
+          })),
+        ];
+      }
+
+      function voiceItems(provider) {
+        return (provider?.voices || []).map((voice) => ({ value: voice, label: voice, detail: provider.name + " voice", ready: provider.configured }));
+      }
+
+      function renderRail() {
+        $("lane-rail").replaceChildren(...data.lanes.map((lane) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "lane-chip";
+          button.textContent = lane.number;
+          button.dataset.assigned = String(Boolean(lane.task));
+          button.setAttribute("aria-pressed", String(lane.number === data.selectedLane));
+          button.setAttribute("aria-label", "Lane " + lane.number + ", " + (lane.label || lane.task?.title || "unassigned"));
+          button.addEventListener("click", () => selectLane(lane.number));
+          return button;
+        }));
+      }
+
+      function selectProject(projectID, preferredTaskID) {
+        selectedProject = (data.projects || []).find((project) => String(project.id) === String(projectID));
+        projectPicker.setValue(selectedProject?.id || "");
+        taskPicker.setItems(taskItems(selectedProject), preferredTaskID);
+        selectTask(taskPicker.getValue());
+      }
+
+      function selectTask(taskID) {
+        selectedTask = selectedProject?.tasks?.find((task) => String(task.id) === String(taskID));
+        if (selectedTask) taskPicker.setValue(selectedTask.id);
+        $("task-path").textContent = selectedTask?.cwd || "No task selected";
+        $("task-id").textContent = selectedTask?.id || "";
+        $("route-title").textContent = selectedTask?.title || "Choose a task";
+        $("route-meta").textContent = selectedTask ? (selectedProject?.name || "Project") + " · " + selectedTask.id.slice(0, 8) : "This lane is unassigned";
+        $("save").disabled = !selectedTask;
+      }
+
+      function selectProvider(providerID, preferredVoice) {
+        selectedProvider = providerID || "";
+        providerPicker.setValue(selectedProvider);
+        const provider = (data.providers || []).find((candidate) => candidate.id === selectedProvider);
+        voicePicker.setItems(voiceItems(provider), preferredVoice || data.defaultVoices?.[selectedProvider]);
+        selectedVoice = voicePicker.getValue();
+        $("provider-state").textContent = !selectedProvider ? "Global" : provider?.configured ? "Ready" : "Needs key";
+        $("preview").disabled = !selectedProvider || !selectedVoice;
+      }
+
+      function selectLane(number) {
+        data.selectedLane = number;
+        const lane = currentLane();
+        lanePicker.setItems(laneItems(), number);
+        $("hotkey").textContent = "⌥⌘" + number;
+        $("status").textContent = data.activeLane === number ? "Active" : lane.task ? "Assigned" : "Open";
+        $("lane-label").value = lane.label || "";
+        $("lane-cue").value = lane.narrationCue || "";
+        $("activate").checked = data.activeLane === number || !lane.task;
+        const project = projectForTask(lane.task) || data.projects?.[0];
+        projectPicker.setItems(projectItems(), project?.id);
+        selectProject(project?.id, lane.task?.id);
+        providerPicker.setItems(providerItems(), lane.voiceOverride?.provider || "");
+        selectProvider(lane.voiceOverride?.provider || "", lane.voiceOverride?.voiceID);
+        $("clear").disabled = !lane.task;
+        renderRail();
+        feedback.textContent = "";
+        feedback.dataset.state = "";
+      }
+
+      function render(next) {
+        if (!next?.lanes) return;
+        data = next;
+        selectLane(next.selectedLane || next.activeLane || 1);
+      }
+
+      $("preview").addEventListener("click", async () => {
+        const lane = currentLane();
+        const phrase = "Lane " + lane.number + ". " + ($("lane-label").value.trim() || selectedTask?.title || "Voice preview") + ".";
+        $("preview").disabled = true;
+        $("preview").querySelector("span:last-child").textContent = "Playing…";
+        feedback.textContent = "Preparing voice preview";
+        try {
+          await callTool("preview_voice", { provider: selectedProvider, voice: selectedVoice, text: phrase });
+          feedback.textContent = "Playing in SpeakEasy";
+          feedback.dataset.state = "success";
+        } catch (error) {
+          feedback.textContent = error?.message || "Voice preview failed";
+          feedback.dataset.state = "error";
+        } finally {
+          $("preview").disabled = false;
+          $("preview").querySelector("span:last-child").textContent = "Preview";
+        }
+      });
+
+      $("save").addEventListener("click", async () => {
+        if (!selectedTask) return;
+        $("save").disabled = true;
+        feedback.textContent = "Saving Lane " + data.selectedLane + "…";
+        try {
+          const result = await callTool("save_lane", {
+            lane: data.selectedLane,
+            task: { id: selectedTask.id, title: selectedTask.title, cwd: selectedTask.cwd },
+            label: $("lane-label").value.trim(),
+            narrationCue: $("lane-cue").value.trim(),
+            provider: selectedProvider || undefined,
+            voice: selectedProvider ? selectedVoice : undefined,
+            activate: $("activate").checked,
+          });
+          render(toolData(result));
+          feedback.textContent = "Lane " + data.selectedLane + " saved";
+          feedback.dataset.state = "success";
+        } catch (error) {
+          feedback.textContent = error?.message || "Could not save lane";
+          feedback.dataset.state = "error";
+        } finally { $("save").disabled = !selectedTask; }
+      });
+
+      $("clear").addEventListener("click", async () => {
+        $("clear").disabled = true;
+        try {
+          const result = await callTool("clear_lane", { lane: data.selectedLane });
+          render(toolData(result));
+          feedback.textContent = "Lane cleared";
+          feedback.dataset.state = "success";
+        } catch (error) {
+          feedback.textContent = error?.message || "Could not clear lane";
+          feedback.dataset.state = "error";
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        if (![...document.querySelectorAll(".picker")].some((node) => node.contains(event.target))) closePickers();
+      });
+      window.addEventListener("message", (event) => {
+        if (event.source !== window.parent) return;
+        const message = event.data;
+        if (!message || message.jsonrpc !== "2.0") return;
+        if (message.id !== undefined && pending.has(message.id)) {
+          const state = pending.get(message.id);
+          pending.delete(message.id);
+          message.error ? state.reject(message.error) : state.resolve(message.result);
+          return;
+        }
+        if (message.method === "ui/notifications/tool-result") render(message.params?.structuredContent);
+      }, { passive: true });
+
+      if (window.openai?.toolOutput) render(window.openai.toolOutput);
+      void request("ui/initialize", { appInfo: { name: "SpeakEasy lanes", version: "2.0.0" }, capabilities: {} }).catch(() => {});
+    })();
+  </script>
+</body>
+</html>

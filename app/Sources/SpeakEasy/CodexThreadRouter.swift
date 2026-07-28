@@ -6,6 +6,23 @@ struct CodexTaskSummary: Identifiable, Codable, Equatable, Sendable {
     let preview: String
     let cwd: String
     let updatedAt: Date
+
+    func matchesSearch(_ query: String) -> Bool {
+        let terms = query
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .split(whereSeparator: \Character.isWhitespace)
+            .map(String.init)
+        guard !terms.isEmpty else { return true }
+
+        let haystack = [title, preview, cwd, id]
+            .joined(separator: "\n")
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        return terms.allSatisfy(haystack.contains)
+    }
+
+    var projectName: String {
+        URL(fileURLWithPath: cwd).lastPathComponent
+    }
 }
 
 enum CodexTurnDelivery: String, Codable, Equatable, Sendable {

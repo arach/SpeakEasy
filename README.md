@@ -13,10 +13,14 @@ Convenient TTS CLI for Mac — centralized credentials + configurable caching so
 | --- | --- |
 | **CLI** | `speakeasy "hello"` — shell control, cache, diagnostics |
 | **SDK** | `import { say } from '@arach/speakeasy'` — queue, fallbacks, cache |
-| **macOS app** | Menu-bar settings + floating HUD (`speakeasy --app`) |
+| **macOS app** | Permanent menu-bar player, live HUD, settings, history (`speakeasy --app`) |
+| **Listening mode** | Thread-locked Codex voice turns + dedicated mic picker (technical preview in current app sources) |
+| **Codex skill** | Bundled runtime under `plugins/speakeasy` for agent distribution |
 | **Adapters** | Normalized `TTSAdapter` API — plug in bespoke providers |
 
-Five built-in providers (system, OpenAI, ElevenLabs, Groq, Gemini). One config file. SQLite cache for API voices. macOS playback via `afplay`.
+Five built-in providers (system, OpenAI, ElevenLabs, Groq, Gemini). One config file. SQLite cache for API voices. Playback prefers the native menu-bar player when available, with direct `afplay` as a fallback.
+
+Docs: [menu-bar player](https://speakeasy.arach.dev/docs/menu-bar-player/), [listening mode](https://speakeasy.arach.dev/docs/listening-mode/).
 
 ## Try it in 30 seconds
 
@@ -50,7 +54,9 @@ Implement `TTSAdapter` (`synthesize`, `validate`, `formatError`) and use SpeakEa
 
 ## macOS companion app
 
-Native menu-bar app: provider settings, cache management, speech history, and a floating HUD while the CLI speaks.
+Native menu-bar app: permanent player (queue, transport, volume, playback speed), optional word-synced HUD with **Back to Codex** when a task id is present, provider settings, cache management, and speech history.
+
+Thread-locked **listening mode** (exact Codex task lock, ⌃⌥Space capture, voice lanes, dedicated microphone picker) is documented in [listening mode](docs/listening-mode.mdx). It is a technical preview in current app sources; the public **0.2.17** DMG centers on the menu-bar player.
 
 ![SpeakEasy macOS app — Dashboard with providers, volume, and speech rate](docs/images/macos-app.png)
 

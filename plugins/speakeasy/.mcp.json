@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "speakeasy": {
+      "command": "bash",
+      "args": ["./scripts/run-speakeasy-mcp.sh"],
+      "cwd": "."
+    }
+  }
+}

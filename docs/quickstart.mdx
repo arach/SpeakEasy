@@ -10,8 +10,8 @@ Get up and running with **SpeakEasy** in under 5 minutes.
 
 ## Prerequisites
 
-- **Node.js >= 22.5** (built-in `node:sqlite` for cache) or **Bun >= 1.0** (`bun:sqlite`)
-- **macOS** for system voice playback (`say` / `afplay`)
+- **Node.js >= 22.12** (built-in `node:sqlite` for cache) or **Bun >= 1.0** (`bun:sqlite`)
+- **macOS** for system voice, the menu-bar player (`speakeasy --app`), and optional listening mode
 - API keys for cloud providers (optional — system voice works without keys)
 
 ## Installation
@@ -63,7 +63,12 @@ speakeasy "Build completed" --provider openai --voice nova --cache
 
 # Health check
 speakeasy --doctor
+
+# Open the macOS menu-bar player (installs signed app if needed)
+speakeasy --app
 ```
+
+Thread-locked Codex listening mode and the dedicated microphone picker live in the app popover once you have a build that includes them — see [Listening mode](./listening-mode).
 
 ## API Keys (optional)
 

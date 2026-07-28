@@ -1,6 +1,6 @@
 ---
 name: speakeasy
-description: Generate text-to-speech audio and control it through the permanent native SpeakEasy macOS menu-bar player. Use for narration, voice notes, spoken summaries, voice/provider tests, autoplay, queue management, pause/resume/stop, scrubbing, volume, playback speed, player status, or returning from the live HUD to the originating Codex task.
+description: Generate text-to-speech audio, control the native SpeakEasy macOS player, and manage thread-locked voice lanes. Use for narration, voice notes, spoken summaries, voice/provider tests, autoplay, queue management, player controls, lane assignment/configuration, viewing or editing lanes, or returning from the live HUD to the originating Codex task.
 ---
 
 # SpeakEasy
@@ -49,6 +49,100 @@ bun scripts/control-player.ts \
 ```
 
 Do not invoke direct system playback or raw `afplay`. Generate silently and let the permanent player decide whether to autoplay.
+
+## Manage voice lanes
+
+Voice lanes are a versioned local contract shared with the native app. Always use the bundled lane
+manager instead of editing `lanes.json` by hand. Read the current assignments before every mutation,
+change only the requested lane, and read once afterward to confirm the result.
+
+```bash
+bun scripts/manage-lanes.ts --list
+bun scripts/manage-lanes.ts --list --json
+bun scripts/manage-lanes.ts --path
+```
+
+Assign the current exact Codex task only when `CODEX_THREAD_ID` is available. Pass a useful title and
+working directory when known; never infer a task id from its title.
+
+```bash
+bun scripts/manage-lanes.ts --assign-current 1 \
+  --title "Coordinate the current launch" \
+  --cwd /absolute/project/path \
+  --label "Primary orchestrator"
+```
+
+For another confirmed task, provide its exact id and metadata. Update settings without replacing the
+task mapping via `--set`.
+
+```bash
+bun scripts/manage-lanes.ts --assign 2 --task-id 019f... --title "Project task" --cwd /absolute/path
+bun scripts/manage-lanes.ts --set 2 --label "Main project"
+bun scripts/manage-lanes.ts --set 2 --provider openai --voice coral --cue "Be concise."
+bun scripts/manage-lanes.ts --set 2 --inherit-voice --clear-cue
+bun scripts/manage-lanes.ts --activate 2
+bun scripts/manage-lanes.ts --clear 2
+```
+
+The manager validates slots 1–9 and writes atomically. The current native app loads external edits on
+launch, so describe a mutation as saved rather than live until the app has been relaunched.
+
+### Show the lane editor
+
+When the plugin's `show_lane_editor` MCP tool is available, prefer it for viewing and editing lanes.
+Use the available Codex task-listing integration first and pass recent exact task metadata through
+the tool's `tasks` argument when practical. The server can reuse the latest local inventory, but an
+explicit inventory keeps the project and task pickers current. The MCP UI calls component-only
+`preview_voice`, `save_lane`, and `clear_lane` tools directly, so previewing or changing a mapping
+does not create a follow-up message or another model turn.
+
+If MCP UI is unavailable, render the plugin's portable interactive lane editor into the current
+task's visualization directory and return it inline. First use the available
+Codex task-listing integration to collect recent tasks. Write only display/routing metadata—never
+messages or transcripts—to a task inventory shaped like this:
+
+```json
+{
+  "tasks": [
+    {
+      "id": "019f...",
+      "title": "Coordinate the current launch",
+      "cwd": "/absolute/project/path",
+      "project": "SpeakEasy",
+      "projectId": "saved-project-id"
+    }
+  ]
+}
+```
+
+Pass that inventory to the renderer. It groups tasks by project/working directory and always merges
+in already-assigned lane targets so an older mapping remains editable.
+
+```bash
+bun scripts/render-lanes.ts \
+  --tasks /absolute/task-visualization-dir/speakeasy-task-inventory.json \
+  --out /absolute/task-visualization-dir/speakeasy-lanes.html
+```
+
+Then emit `::codex-inline-vis{file="speakeasy-lanes.html"}` on its own line. This fallback does not write
+local files directly: its actions send a precise follow-up request, which must be applied with
+`manage-lanes.ts` using the read-mutate-read sequence above.
+
+### Preview a lane voice
+
+Use the bundled preview command when an editor action or direct request specifies a provider and
+voice. It generates the real provider audio, interrupts only SpeakEasy playback, queues the sample in
+the native player, and removes the temporary audio after playback.
+
+```bash
+bun scripts/preview-voice.ts \
+  --provider openai \
+  --voice nova \
+  --text "Lane one. Primary orchestrator."
+```
+
+Do not preview ElevenLabs by a display name; it requires an exact voice ID. Never expose provider
+credentials while inspecting configured providers.
 
 ## Control the player
 

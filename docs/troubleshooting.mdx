@@ -385,7 +385,65 @@ speakeasy "try openai" --provider openai --volume 0.8
 system_profiler SPAudioDataType
 ```
 
-### 8. Performance Issues
+### 8. macOS menu-bar player and listening mode
+
+#### Player does not open / speech only uses direct `afplay`
+
+**Cause:** SpeakEasy.app is not installed, not running, or the IPC socket is unavailable.
+
+**Solutions:**
+```bash
+speakeasy --app
+speakeasy --update-app
+# Confirm the app is running from the menu bar (no Dock icon)
+ls -la /tmp/speakeasy-player.sock
+```
+
+See [Menu-bar player](./menu-bar-player) for the IPC contract. Direct CLI playback remains a compatibility fallback when the app is down.
+
+#### Microphone permission denied (listening mode)
+
+**Cause:** macOS has not granted SpeakEasy microphone access.
+
+**Solutions:**
+1. Open **System Settings → Privacy & Security → Microphone** and enable SpeakEasy.
+2. Keep the task lock; retry capture after granting permission.
+3. Confirm `NSMicrophoneUsageDescription` is present in a signed build (source: `app/Resources/Info.plist`).
+
+#### "Your dedicated microphone … is unavailable"
+
+**Cause:** A fixed input was saved, but that device is disconnected or missing.
+
+**Solutions:**
+1. Open the microphone menu in the listening composer.
+2. Reconnect the hardware, or choose another input / **System Default**.
+3. Use **Refresh Inputs** after plugging devices back in.
+4. SpeakEasy will **not** silently capture on a different mic when a dedicated preference is set.
+
+Device changes are blocked while recording or while the app is warming, transcribing, submitting, or preparing speech.
+
+#### Speech Recognition consent prompt (listening mode)
+
+**Cause:** Apple Speech is used while the on-device Parakeet model warms. First use requires Speech Recognition permission.
+
+**Solutions:**
+1. Allow Speech Recognition when macOS prompts.
+2. Or open **System Settings → Privacy & Security → Speech Recognition** and enable SpeakEasy.
+3. `NSSpeechRecognitionUsageDescription` explains on-device transcription during cold start.
+
+#### Listening submits to the wrong task / cannot lock
+
+**Cause:** The Desktop task is not open, ownership handshake failed, or the private Desktop IPC protocol changed.
+
+**Solutions:**
+1. Open the exact task in Codex Desktop before locking.
+2. Re-select the task in SpeakEasy so the lock revalidates.
+3. If the protocol or socket is unsafe/mismatched, SpeakEasy fails closed — it will not invent another task or start `codex app-server`.
+4. See [Listening mode](./listening-mode) for product rules and non-goals.
+
+Listening mode is a technical preview in current app sources; it is not part of the public **0.2.17** DMG feature set.
+
+### 9. Performance Issues
 
 #### Slow speech generation
 

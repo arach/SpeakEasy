@@ -16,9 +16,8 @@ private struct SpeakEasyToolbarBackgroundVisibility: ViewModifier {
 
 enum SpeakEasySection: String, CaseIterable, Identifiable {
     case dashboard
-    case openai
-    case elevenlabs
-    case system
+    case providers
+    case pad
     case cache
     case hud
     case history
@@ -28,9 +27,8 @@ enum SpeakEasySection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .dashboard: return "Dashboard"
-        case .openai: return "OpenAI"
-        case .elevenlabs: return "ElevenLabs"
-        case .system: return "System"
+        case .providers: return "Providers"
+        case .pad: return "Pad"
         case .cache: return "Cache"
         case .hud: return "HUD"
         case .history: return "History"
@@ -40,9 +38,8 @@ enum SpeakEasySection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .dashboard: return "square.grid.2x2"
-        case .openai: return "brain.head.profile"
-        case .elevenlabs: return "waveform"
-        case .system: return "desktopcomputer"
+        case .providers: return "waveform.badge.plus"
+        case .pad: return "ipad.and.iphone"
         case .cache: return "externaldrive"
         case .hud: return "square.stack.3d.up"
         case .history: return "clock.arrow.circlepath"
@@ -56,9 +53,8 @@ enum SpeakEasySection: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .dashboard: return "Providers, defaults, and quick settings"
-        case .openai: return "API key, voice, and playground"
-        case .elevenlabs: return "Voices, models, and preview"
-        case .system: return "macOS built-in speech voices"
+        case .providers: return "Credentials, voices, models, and previews"
+        case .pad: return "Local iPad lane controls"
         case .cache: return "TTL, size limits, and cleanup"
         case .hud: return "Floating notification overlay"
         case .history: return "Recent spoken notifications"
@@ -71,16 +67,36 @@ struct ShellRootView: View {
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.hudTheme) private var hudTheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var padIntegration = SpeakEasyPadIntegration.shared
 
     @State private var section: SpeakEasySection = .dashboard
+    @State private var selectedProvider: SpeechProviderID = .openai
     @State private var railExpanded = true
+    @AppStorage("settingsSidebarLabelWidth") private var sidebarLabelWidth = 156.0
     @State private var inspectorCollapsed = true
+
+    init(initialSection: SpeakEasySection = .dashboard) {
+        let arguments = ProcessInfo.processInfo.arguments
+        var requestedSection = initialSection
+        if arguments.contains("--pad-settings") {
+            requestedSection = .pad
+        } else if arguments.contains("--provider-settings") {
+            requestedSection = .providers
+        }
+        _section = State(initialValue: requestedSection)
+        if let value = arguments
+            .first(where: { $0.hasPrefix("--provider=") })?
+            .dropFirst("--provider=".count),
+           let provider = SpeechProviderID(rawValue: String(value)) {
+            _selectedProvider = State(initialValue: provider)
+        }
+    }
 
     private var manifest: HudAppManifest {
         HudAppManifest(
             name: "SpeakEasy",
             version: Self.appVersion ?? "0.0.0",
-            tint: .violet,
+            tint: .green,
             targetLabel: "Companion"
         )
     }
@@ -95,20 +111,45 @@ struct ShellRootView: View {
 
     var body: some View {
         HudAppShell {
-            SpeakEasyNavigationRail(
+            HudNavigationSidebar(
                 selection: Binding(
-                    get: { section.rawValue },
+                    get: { Optional(section) },
                     set: { next in
-                        if let value = SpeakEasySection(rawValue: next) {
-                            section = value
+                        if let next {
+                            section = next
                         }
                     }
                 ),
-                items: SpeakEasySection.allCases.map(\.navItem),
-                isExpanded: $railExpanded
-            ) {
-                railFooter
-            }
+                entries: sidebarEntries,
+                isCompact: !railExpanded,
+                accent: manifest.accent,
+                onHeaderTap: toggleRail,
+                railHeader: {
+                    SpeakEasyBrandMark(size: HudIconSize.large)
+                },
+                labelHeader: {
+                    Text(manifest.name)
+                        .font(HudFont.ui(HudTextSize.base, weight: .semibold))
+                        .foregroundStyle(hudTheme.palette.ink)
+                        .lineLimit(1)
+                },
+                footer: {
+                    sidebarFooter
+                }
+            )
+            .resizable(
+                isCompact: Binding(
+                    get: { !railExpanded },
+                    set: { railExpanded = !$0 }
+                ),
+                labelWidth: Binding(
+                    get: { CGFloat(sidebarLabelWidth) },
+                    set: { sidebarLabelWidth = Double($0) }
+                ),
+                minLabelWidth: 120,
+                maxLabelWidth: 280,
+                collapseLabelWidth: 44
+            )
         } trailing: {
             HudInspector(isCollapsed: $inspectorCollapsed) {
                 HStack {
@@ -131,14 +172,23 @@ struct ShellRootView: View {
                     sectionContent
                         .environment(\.theme, Theme())
                         .padding(HudSpacing.xxl)
-                        .frame(maxWidth: HudLayout.readableWidth + HudSpacing.xxl * 2, alignment: .topLeading)
-                        .frame(maxWidth: .infinity, alignment: .top)
+                        .frame(
+                            maxWidth: section == .providers
+                                ? 1180
+                                : HudLayout.readableWidth + HudSpacing.xxl * 2,
+                            alignment: .topLeading
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: section == .providers ? .topLeading : .top
+                        )
                 }
             }
         } statusBar: {
             statusBar
         }
         .hudsonAppManifest(manifest)
+        .tint(manifest.accent)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: toggleRail) {
@@ -168,6 +218,11 @@ struct ShellRootView: View {
             }
         }
         .animation(.spring(duration: 0.35), value: config.showSaveConfirmation)
+        .onReceive(NotificationCenter.default.publisher(for: .speakEasySettingsSectionRequested)) { note in
+            guard let rawValue = note.object as? String,
+                  let requestedSection = SpeakEasySection(rawValue: rawValue) else { return }
+            section = requestedSection
+        }
         .frame(minWidth: 720, minHeight: 640)
     }
 
@@ -193,16 +248,40 @@ struct ShellRootView: View {
     }
 
     @ViewBuilder
+    private var sidebarFooter: some View {
+        if railExpanded {
+            railFooter
+                .padding(.horizontal, HudSpacing.xl)
+                .padding(.vertical, HudSpacing.md)
+        } else {
+            Image(systemName: "terminal")
+                .font(HudFont.ui(HudTextSize.sm, weight: .medium))
+                .foregroundStyle(hudTheme.palette.muted)
+                .frame(width: HudSidebarLayout.railWidth, height: HudIconSize.xLarge)
+        }
+    }
+
+    private var sidebarEntries: [HudSidebarEntry<SpeakEasySection>] {
+        SpeakEasySection.allCases.map { section in
+            .item(HudSidebarItem(
+                id: section,
+                title: section.title,
+                icon: section.icon,
+                selectedIcon: section.icon,
+                tooltipLabel: section.title
+            ))
+        }
+    }
+
+    @ViewBuilder
     private var sectionContent: some View {
         switch section {
         case .dashboard:
-            DashboardView(selectedSection: $section)
-        case .openai:
-            OpenAIPlaygroundView()
-        case .elevenlabs:
-            ElevenLabsPlaygroundView()
-        case .system:
-            SystemSettingsView()
+            DashboardView(selectedSection: $section, selectedProvider: $selectedProvider)
+        case .providers:
+            ProviderSettingsView(selection: $selectedProvider)
+        case .pad:
+            SpeakEasyPadSettingsView()
         case .cache:
             CacheManagementView()
         case .hud:
@@ -221,6 +300,13 @@ struct ShellRootView: View {
                     HudKVRow("HUD", value: config.hudEnabled ? "Enabled" : "Disabled",
                              valueColor: config.hudEnabled ? HudPalette.statusOk : HudPalette.muted)
                     HudKVRow("Provider", value: config.defaultProvider.capitalized)
+                    HudKVRow(
+                        "Pad",
+                        value: padStatusLabel,
+                        valueColor: padIntegration.snapshot.state == .connected
+                            ? HudPalette.statusOk
+                            : HudPalette.muted
+                    )
                     HudKVRow("Cache", value: config.cacheEnabled ? "On" : "Off",
                              valueColor: config.cacheEnabled ? HudPalette.statusOk : HudPalette.muted)
                 }
@@ -270,7 +356,7 @@ struct ShellRootView: View {
                 config.loadConfig()
             }
 
-            HudButton("Save", icon: "checkmark.circle.fill", style: .primary(.violet)) {
+            HudButton("Save", icon: "checkmark.circle.fill", style: .primary(.green)) {
                 config.saveConfig()
             }
             .disabled(config.isSaved)
@@ -283,6 +369,18 @@ struct ShellRootView: View {
 
     private static var appVersion: String? {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+    }
+
+    private var padStatusLabel: String {
+        switch padIntegration.snapshot.state {
+        case .stopped: return "Stopped"
+        case .starting: return "Starting"
+        case .ready: return "Ready"
+        case .pairing: return "Pairing"
+        case .connected: return "Connected"
+        case .unavailable: return "Unavailable"
+        case .failed: return "Error"
+        }
     }
 
     private func toggleRail() {

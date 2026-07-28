@@ -156,6 +156,31 @@ revalidates Desktop ownership, and begins listening in one action. The original
 - Every lane activation reopens and revalidates the exact task, including after
   app restarts or Codex task changes.
 
+## Dedicated microphone picker
+
+The menu-bar listening composer includes a dedicated microphone control next to
+the listen/stop button (merged in PR #10, `codex/dedicated-mic-picker`).
+
+Behavior grounded in `ListeningSessionController`, `ListeningPopoverSection`,
+and `VoxListeningService`:
+
+- Inputs are enumerated through `AudioInputDevices.available()`.
+- The user may follow **System Default** or pin a device by stable `id` plus
+  display `name` (`ListeningInputPreference`, UserDefaults key
+  `speakeasy.listening.input-device.v1`).
+- Every capture pass supplies `preferredInputDeviceID` /
+  `preferredInputDeviceName` to `startRecordingAndWarm`.
+- If a dedicated id is set but missing from the live device list, recording
+  throws a visible error and does **not** fall back to another mic.
+- Device selection is disabled while warming, recording, transcribing,
+  submitting, or preparing speech.
+- The popover menu exposes System Default, each available input (marking the
+  system default), unavailable pinned devices, and **Refresh Inputs**.
+- While recording, status text can show the active `inputDeviceName`.
+
+This keeps capture attached to a deliberate device when macOS changes its
+default input.
+
 ## Interruption and echo prevention
 
 The loop is half duplex. Starting a recording always stops current SpeakEasy
@@ -248,7 +273,8 @@ Included in this prototype:
 - explicit exact-ID Desktop-validated lock
 - `Control-Option-Space` toggle capture
 - persistent exact-task lanes on `Option-Command-1...9`
-- embedded Vox final transcription
+- dedicated microphone picker with persistent device preference
+- embedded Vox final transcription (Apple Speech cold-start while warming)
 - exact Desktop-owned submission and response correlation
 - explicit same-task steering when the locked task is already active
 - configured provider/voice narration with no implicit system fallback

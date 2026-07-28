@@ -1,4 +1,3 @@
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -10,14 +9,14 @@ export default function DownloadSection() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-20">
           <Badge variant="outline" className="mb-6 border-emerald-200 text-emerald-700 bg-white/70 rounded-xl">
-            Native macOS player
+            SpeakEasy for Mac
           </Badge>
           <h2 className="font-display text-5xl md:text-6xl font-extralight text-slate-900 mb-6 leading-tight">
-            A permanent place for every spoken update
+            Listen to your work while you keep moving
           </h2>
           <p className="font-text text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed mb-12">
-            SpeakEasy gives Codex and your command line one menu-bar player for autoplay, queues, scrubbing,
-            playback speed, volume, and a word-synced transcript HUD.
+            Turn output from agents, scripts, and tools into clear, controllable speech. Use it deeply with
+            Codex, or bring it into any workflow that can call the CLI.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
@@ -28,7 +27,7 @@ export default function DownloadSection() {
             >
               <a href="https://github.com/arach/SpeakEasy/releases/latest/download/SpeakEasy.dmg">
                 <Download className="mr-2 w-5 h-5" />
-                Download signed app
+                Download
               </a>
             </Button>
             <Button
@@ -45,19 +44,6 @@ export default function DownloadSection() {
           </div>
         </div>
 
-        <Card className="max-w-3xl mx-auto mb-10 overflow-hidden bg-white/70 backdrop-blur-xl border border-white shadow-2xl shadow-emerald-950/10 rounded-3xl">
-          <CardContent className="p-4 md:p-7">
-            <Image
-              src="/menu-bar-player.png"
-              alt="SpeakEasy menu-bar player showing its playback controls and live transcript"
-              width={525}
-              height={250}
-              priority
-              className="w-full rounded-2xl border border-slate-200/80"
-            />
-          </CardContent>
-        </Card>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           {[
             {
@@ -68,7 +54,7 @@ export default function DownloadSection() {
             {
               icon: MessageSquareText,
               title: "Stay in context",
-              description: "Follow every word in the live HUD, then jump back to the originating Codex task.",
+              description: "Follow every word in the live HUD. When a validated source task id is present, jump straight back to that Codex task.",
             },
             {
               icon: ShieldCheck,
@@ -100,11 +86,11 @@ export default function DownloadSection() {
                 </ul>
               </div>
               <div>
-                <h4 className="font-text font-medium text-slate-700 mb-3">Codex plugin</h4>
+                <h4 className="font-text font-medium text-slate-700 mb-3">Near-native agent integration</h4>
                 <ul className="font-text text-sm text-slate-600 space-y-1">
-                  <li>• Bundled SpeakEasy runtime</li>
-                  <li>• System voice works without an API key</li>
-                  <li>• OpenAI, ElevenLabs, Groq, and Gemini are optional</li>
+                  <li>• Agent responses arrive automatically in the Mac player</li>
+                  <li>• Originating task context is retained when the integration provides it</li>
+                  <li>• No separate app or integration flow to operate during a turn</li>
                 </ul>
               </div>
             </div>

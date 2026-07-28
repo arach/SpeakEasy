@@ -1,0 +1,175 @@
+---
+title: Listening mode
+description: Thread-locked voice conversations with Codex Desktop
+---
+
+# Listening mode
+
+Thread-locked listening mode lets the SpeakEasy menu-bar app talk to **one exact Codex Desktop task** at a time. You lock a task, speak a single utterance, and SpeakEasy submits the transcript only to that task, then narrates the real response with your configured voice.
+
+**Status:** technical preview in current `master` app sources (merged after the public **0.2.17** DMG). Treat Desktop IPC as private and version-sensitive.
+
+Design notes and validation history: [listening-mode-feasibility.md](./listening-mode-feasibility.md).
+
+## Product boundary
+
+SpeakEasy is a **conduit**. Codex Desktop owns the conversation.
+
+| Does | Does not |
+| --- | --- |
+| Lock an exact task ID after Desktop ownership checks | Ambient listening or wake words |
+| Record one explicit utterance per hotkey cycle | Infer which task is focused |
+| Transcribe locally (Vox / Parakeet; Apple Speech while warming) | Start a shadow `codex app-server` session |
+| Submit to the Desktop-owned task only | Silently switch tasks mid-utterance |
+| Narrate with the configured SpeakEasy provider | Fall back to system voice when a cloud provider fails |
+
+## Prerequisites
+
+- macOS 14+ SpeakEasy.app with listening mode present (build from current sources, or a post-0.2.17 signed release when published)
+- Codex Desktop running with the target task open
+- Microphone permission (and Speech Recognition when Apple Speech cold-start is used)
+- Optional: cloud TTS credentials if narration should use a non-system provider
+
+```bash
+speakeasy --app
+```
+
+## Lock a task
+
+1. Open the SpeakEasy menu-bar popover.
+2. Select the Codex task to lock. SpeakEasy opens the task deep link and accepts the lock only after the Desktop window that owns that task answers the follower handshake.
+3. Only the task **id** is routing authority. Title and directory are display metadata.
+
+Rules:
+
+- The lock is snapshotted before each utterance — later focus changes cannot redirect that turn.
+- Switching clears the prior lock before validation. A failed switch leaves the app unlocked rather than restoring the old task.
+- Restored locks are revalidated on launch before the hotkey is useful.
+- Unlock cancels capture; during narration it stops SpeakEasy-owned playback for that item.
+
+## Capture loop
+
+Default global shortcut: **⌃⌥Space** (Control-Option-Space).
+
+```text
+unlocked → validatingLock → ready
+  → (optional cueing)
+  → opening microphone + concurrent model warmup
+  → recording → transcribing → submitting
+  → preparingSpeech → speaking → ready
+```
+
+1. With a valid lock in **Ready**, press **⌃⌥Space**. SpeakEasy stops its own playback, opens the microphone, and warms recognition in parallel.
+2. Press **⌃⌥Space** again to end the utterance (toggle capture). A **120-second** ceiling ends capture if you forget.
+3. Empty transcripts do not submit. Temporary audio is deleted after transcription or cancel.
+4. Submission goes once through the owning Desktop task. An idle task starts a new turn; an active task uses Desktop’s same-task steer and stays on that turn.
+5. The assistant response is narrated with the configured provider, model, voice, and rate. Provider failure is shown and is **not** silently downgraded to macOS `say`.
+6. When playback finishes, the lock returns to **Ready**. There is no automatic re-arm.
+
+The loop is **half duplex**: starting record always stops SpeakEasy playback first so the app does not transcribe its own narration. During recording, cancel discards without transcription. During narration, the hotkey barges in (stops playback and starts a new utterance).
+
+## Dedicated microphone picker
+
+Listening mode includes a compact **listen + microphone** control in the menu-bar popover.
+
+### What it does
+
+- Lists available audio inputs and lets you pick:
+  - **System Default** — follow macOS’s current default input
+  - A **dedicated device** — fixed by stable device ID and display name
+- Persists the dedicated choice across launches (`UserDefaults` key `speakeasy.listening.input-device.v1`)
+- Routes every thread-locked capture through the selected preference
+- Shows the active device name while recording
+- Offers **Refresh Inputs** when you plug in hardware
+
+### What it will not do
+
+- Silently fall back if a dedicated mic is disconnected — capture fails with a clear message: reconnect the device or choose another input
+- Change devices mid-recording or while warming / transcribing / submitting / preparing speech
+- Guess a device when none are available
+
+### How to use it
+
+1. Lock a task so the listening composer is visible.
+2. Open the microphone menu on the right side of the listen control.
+3. Choose **System Default** or a named input. A checkmark marks the active preference.
+4. If a saved device shows as unavailable (label tint / warning), reconnect it, pick another input, or return to System Default.
+5. Use **Refresh Inputs** after connecting hardware.
+
+## Voice lanes
+
+Nine lanes map **⌘⌥1** through **⌘⌥9** to exact task locks. Activating a lane revalidates Desktop ownership and starts listening in one action. **⌃⌥Space** continues to toggle the current lock.
+
+| Shortcut | Action |
+| --- | --- |
+| ⌃⌥Space | Toggle listen on the current lock |
+| ⌘⌥1 … ⌘⌥9 | Select lane N and begin listening |
+| ⌘⌥X | Announce the active lane (no microphone) |
+
+- Unassigned lanes never guess a task — assign the current exact lock from the popover.
+- A lane cannot reroute audio already recording or a turn already submitting.
+- Assignment can cache a short task-name cue with the configured provider. Normal activation is silent; confirmation is on demand via **⌘⌥X**.
+- Provider failure for a cue is visible and does not invoke a fallback voice.
+
+### Declarative lane configuration
+
+Lane definitions live in a versioned, human-readable file:
+
+```text
+~/Library/Application Support/SpeakEasy/lanes.json
+```
+
+```json
+{
+  "activeLane": 1,
+  "lanes": [
+    {
+      "label": "Primary orchestrator",
+      "narrationCue": "Be concise and tell me when a decision is needed.",
+      "number": 1,
+      "task": {
+        "cwd": "/Users/you/dev/project",
+        "id": "019f...",
+        "title": "Coordinate the current launch"
+      },
+      "voiceOverride": {
+        "provider": "openai",
+        "voiceID": "coral"
+      }
+    }
+  ],
+  "schemaVersion": 1
+}
+```
+
+- `number` is the **⌘⌥1 … ⌘⌥9** slot.
+- `label` is an optional short name for the lane and its spoken confirmation.
+- `task.id` is routing authority; `title` and `cwd` are display metadata.
+- `voiceOverride` and `narrationCue` are optional per-lane speech settings.
+- `activeLane` must name an assigned slot or it is cleared during normalization.
+
+SpeakEasy writes changes atomically, sorts lanes by number, removes invalid slots, and migrates the former UserDefaults-backed assignments on first launch. Manual file edits are loaded on the next app launch; live editing belongs to the forthcoming lane editor.
+
+## Privacy
+
+- Microphone audio is stored only in a temporary file for the explicit utterance and deleted after transcription or cancel.
+- Raw input and transcripts are not written to SpeakEasy speech history.
+- Listening starts only from an explicit hotkey or control — never ambient, never auto-rearm.
+- Generated response audio uses mode `0600` and is removed after playback; provider cache settings still apply to synthesis.
+
+## Failure behavior
+
+| Condition | Behavior |
+| --- | --- |
+| Microphone denied | Keep lock; show macOS permission remedy |
+| Dedicated mic missing | Fail visibly; do not capture on another device |
+| Empty / failed transcript | Keep lock; show error; no submit |
+| Desktop unavailable / task closed / protocol mismatch | Fail closed; never use another task or host |
+| Narration provider error | Show failure; no implicit system-voice substitute |
+
+## Related docs
+
+- [Menu-bar player](./menu-bar-player) — playback, HUD, IPC
+- [Providers](./providers) — narration voices and API keys
+- [Troubleshooting](./troubleshooting) — permissions and recovery
+- [Architecture notes](./listening-mode-feasibility.md) — Desktop bridge, non-goals, validation record

@@ -11,6 +11,25 @@ installation.
 - Controls pause, resume, stop, skip, scrubbing, volume, and playback speed.
 - Shows a word-synced HUD and can return to the originating Codex task when a task identifier is
   available.
+- Lists and edits the native app's exact-task voice lanes through a validated, atomic local command.
+- Renders an MCP-backed exact-task lane mapper with deliberately styled, keyboard-accessible lane,
+  project, task, provider, and voice controls. Preview, save, and clear call local component tools
+  directly without adding chat turns.
+- Keeps a skill-rendered lane editor as a portable fallback for clients that do not render MCP UI.
+
+## Plugin architecture
+
+The plugin intentionally demonstrates three extension layers:
+
+1. The **skill** documents portable narration, player, and lane-management workflows.
+2. The bundled **MCP server** exposes `show_lane_editor` plus component-only `preview_voice`,
+   `save_lane`, and `clear_lane` actions.
+3. The **MCP UI resource** owns the richer visual treatment and calls those actions through the MCP
+   Apps tool bridge, so lane mapping and voice preview remain direct interactions rather than agent
+   follow-ups.
+
+The tools remain useful without custom UI, and credentials stay inside the existing SpeakEasy
+runtime rather than crossing the component boundary.
 
 ## Requirements
 

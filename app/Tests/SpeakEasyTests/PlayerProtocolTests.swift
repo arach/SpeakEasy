@@ -3,6 +3,23 @@ import VoxCore
 @testable import SpeakEasy
 
 final class PlayerProtocolTests: XCTestCase {
+    func testCodexTaskSearchMatchesAcrossTaskMetadata() {
+        let task = CodexTaskSummary(
+            id: "019fa197-2f03-7b50-973e-064e01f167e8",
+            title: "Delightful lane mapping",
+            preview: "Add a searchable lock picker",
+            cwd: "/Users/arach/dev/SpeakEasy",
+            updatedAt: .distantPast
+        )
+
+        XCTAssertTrue(task.matchesSearch("lane SpeakEasy"))
+        XCTAssertTrue(task.matchesSearch("SEARCHABLE lock"))
+        XCTAssertTrue(task.matchesSearch("019fa197"))
+        XCTAssertTrue(task.matchesSearch(""))
+        XCTAssertFalse(task.matchesSearch("lane calendar"))
+        XCTAssertEqual(task.projectName, "SpeakEasy")
+    }
+
     func testStatusRequestDecodesFromTypeScriptWireShape() throws {
         let json = #"{"protocolVersion":1,"requestId":"5f2ea40a-7471-4cd8-9ead-6549396fc564","command":"status"}"#
         let request = try JSONDecoder().decode(PlayerCommandRequest.self, from: Data(json.utf8))
@@ -21,7 +38,8 @@ final class PlayerProtocolTests: XCTestCase {
             provider: "elevenlabs",
             createdAt: "2026-07-24T19:45:00.123Z",
             synthesisRateWPM: 160,
-            sourceThreadId: "019f9573-3e55-7701-8968-09c12d4fafe5"
+            sourceThreadId: "019f9573-3e55-7701-8968-09c12d4fafe5",
+            playbackRate: 1.25
         )
         let request = PlayerCommandRequest(
             protocolVersion: playerProtocolVersion,
@@ -48,6 +66,7 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertEqual(decoded.arguments?.priority, .high)
         XCTAssertEqual(decoded.arguments?.interrupt, true)
         XCTAssertEqual(decoded.arguments?.item?.sourceThreadId, item.sourceThreadId)
+        XCTAssertEqual(decoded.arguments?.item?.playbackRate, 1.25)
         XCTAssertNil(decoded.arguments?.item?.cleanupAfterPlayback)
     }
 
@@ -55,6 +74,7 @@ final class PlayerProtocolTests: XCTestCase {
         let legacyJSON = #"{"id":"daffdeaf-0000-4000-8000-000000000001","audioPath":"/tmp/legacy.aiff","title":"Legacy","createdAt":"2026-07-25T00:00:00Z"}"#
         let legacy = try JSONDecoder().decode(PlaybackItem.self, from: Data(legacyJSON.utf8))
         XCTAssertNil(legacy.cleanupAfterPlayback)
+        XCTAssertNil(legacy.playbackRate)
 
         let temporary = PlaybackItem(
             id: UUID(),
@@ -105,10 +125,33 @@ final class PlayerProtocolTests: XCTestCase {
         )
 
         XCTAssertEqual(presentation.title, "Listening to you")
-        XCTAssertTrue(presentation.detail.contains("⌃⌥Space to send"))
+        XCTAssertTrue(presentation.detail.contains("⌘⌥2 to stop and send"))
+        XCTAssertFalse(presentation.detail.contains("⌃⌥Space"))
         XCTAssertTrue(presentation.detail.contains("MacBook Air Microphone"))
         XCTAssertEqual(presentation.taskTitle, "Prototype SpeakEasy listening mode")
         XCTAssertEqual(presentation.laneNumber, 2)
+    }
+
+    func testLaneShortcutStaysConsistentAcrossTheVoiceLoop() {
+        let phases: [(ListeningPhase, String)] = [
+            (.ready, "⌘⌥7 to listen"),
+            (.warmingUp, "⌘⌥7 again to stop and send"),
+            (.recording, "⌘⌥7 to stop and send"),
+            (.speaking, "⌘⌥7 interrupts and listens again"),
+        ]
+
+        for (phase, expectedDetail) in phases {
+            let presentation = HUDConversationPresentation(
+                phase: phase,
+                taskTitle: "Shortcut task",
+                taskID: "task-7",
+                laneNumber: 7,
+                transcript: "",
+                error: nil,
+                inputDeviceName: nil
+            )
+            XCTAssertEqual(presentation.detail, expectedDetail)
+        }
     }
 
     func testCueingHUDKeepsTaskInHeaderAndExplainsMicOffInBody() {
@@ -153,13 +196,15 @@ final class PlayerProtocolTests: XCTestCase {
     func testVoiceLanePersistsItsExactTaskIdentity() throws {
         let lane = VoiceLane(
             number: 4,
+            label: "  Primary orchestrator  ",
             task: ListeningTaskLock(
                 id: "019f99a4-7867-7c23-ac29-0c0eca7da603",
                 title: "Prototype SpeakEasy listening mode",
                 cwd: "/Users/arach/dev/SpeakEasy"
             ),
             voiceOverride: LaneVoiceOverride(provider: "ElevenLabs", voiceID: "  voice-42  "),
-            narrationCue: "  Warm, concise, and energized.  "
+            narrationCue: "  Warm, concise, and energized.  ",
+            playbackRate: 1.5
         )
 
         let decoded = try JSONDecoder().decode(
@@ -170,9 +215,12 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertEqual(decoded, lane)
         XCTAssertEqual(decoded.shortcutTitle, "⌘⌥4")
         XCTAssertEqual(decoded.task.id, lane.task.id)
+        XCTAssertEqual(decoded.label, "Primary orchestrator")
+        XCTAssertEqual(decoded.spokenTitle, "Primary orchestrator")
         XCTAssertEqual(decoded.voiceOverride?.provider, "elevenlabs")
         XCTAssertEqual(decoded.voiceOverride?.voiceID, "voice-42")
         XCTAssertEqual(decoded.narrationCue, "Warm, concise, and energized.")
+        XCTAssertEqual(decoded.effectivePlaybackRate, 1.5)
     }
 
     func testVoiceLaneDecodesLegacyAssignmentsWithoutVoiceOverride() throws {
@@ -181,7 +229,75 @@ final class PlayerProtocolTests: XCTestCase {
 
         XCTAssertEqual(lane.number, 3)
         XCTAssertEqual(lane.task.id, "task-3")
+        XCTAssertNil(lane.label)
         XCTAssertNil(lane.voiceOverride)
+        XCTAssertEqual(lane.effectivePlaybackRate, 1)
+    }
+
+    func testVoiceLaneConfigurationRoundTripsAsReadableVersionedJSON() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("speakeasy-lanes-\(UUID().uuidString)", isDirectory: true)
+        let url = directory.appendingPathComponent("lanes.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let configuration = VoiceLaneConfiguration(
+            activeLane: 2,
+            lanes: [
+                VoiceLane(
+                    number: 2,
+                    label: "Orchestrator",
+                    task: ListeningTaskLock(id: "task-2", title: "Coordinate launch", cwd: "/tmp/project"),
+                    voiceOverride: LaneVoiceOverride(provider: "openai", voiceID: "coral"),
+                    narrationCue: "Be concise.",
+                    playbackRate: 1.25
+                )
+            ]
+        )
+        let store = VoiceLaneConfigurationStore(fileURL: url)
+
+        try store.save(configuration, validNumbers: 1...9)
+        let restored = try XCTUnwrap(store.load(validNumbers: 1...9))
+        let source = try String(contentsOf: url, encoding: .utf8)
+
+        XCTAssertEqual(restored, configuration)
+        XCTAssertTrue(source.contains(#""schemaVersion" : 1"#))
+        XCTAssertTrue(source.contains(#""activeLane" : 2"#))
+        XCTAssertTrue(source.contains(#""label" : "Orchestrator""#))
+        XCTAssertTrue(source.contains(#""playbackRate" : 1.25"#))
+        XCTAssertTrue(source.hasSuffix("\n"))
+    }
+
+    func testVoiceLaneConfigurationNormalizesInvalidAndDuplicateAssignments() {
+        let oldTask = ListeningTaskLock(id: "old", title: "Old", cwd: "/tmp")
+        let newTask = ListeningTaskLock(id: "new", title: "New", cwd: "/tmp")
+        let invalidTask = ListeningTaskLock(id: "invalid", title: "Invalid", cwd: "/tmp")
+        let configuration = VoiceLaneConfiguration(
+            activeLane: 10,
+            lanes: [
+                VoiceLane(number: 2, task: oldTask),
+                VoiceLane(number: 10, task: invalidTask),
+                VoiceLane(number: 2, task: newTask)
+            ]
+        ).normalized(validNumbers: 1...9)
+
+        XCTAssertEqual(configuration.schemaVersion, 1)
+        XCTAssertNil(configuration.activeLane)
+        XCTAssertEqual(configuration.lanes.map(\.number), [2])
+        XCTAssertEqual(configuration.lanes.first?.task.id, "new")
+    }
+
+    func testVoiceLaneConfigurationRejectsNewerSchemas() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("speakeasy-lanes-\(UUID().uuidString)", isDirectory: true)
+        let url = directory.appendingPathComponent("lanes.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(#"{"schemaVersion":99,"lanes":[]}"#.utf8).write(to: url)
+
+        let store = VoiceLaneConfigurationStore(fileURL: url)
+        XCTAssertThrowsError(try store.load(validNumbers: 1...9)) { error in
+            XCTAssertEqual(error as? VoiceLaneConfigurationError, .unsupportedSchema(99))
+        }
     }
 
     func testLaneVoiceOverrideRejectsBlankProviderOrVoice() {
@@ -238,13 +354,15 @@ final class PlayerProtocolTests: XCTestCase {
             lock: lock,
             laneNumber: 7,
             narration: narration,
-            playbackVolume: 0.65
+            playbackVolume: 0.65,
+            playbackRate: 1.5
         )
 
         XCTAssertEqual(context.lock, lock)
         XCTAssertEqual(context.laneNumber, 7)
         XCTAssertEqual(context.narration, narration)
         XCTAssertEqual(context.playbackVolume, 0.65)
+        XCTAssertEqual(context.playbackRate, 1.5)
     }
 
     func testCodexDeliveryNamesNewTurnsAndActiveTurnSteers() {

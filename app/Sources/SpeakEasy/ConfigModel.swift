@@ -28,6 +28,7 @@ struct GlobalConfig: Codable {
         var voiceId: String?
         var modelId: String?
         var apiKey: String?
+        var savedVoices: [ElevenLabsVoice]?
     }
 
     struct SystemConfig: Codable {
@@ -44,6 +45,7 @@ struct GlobalConfig: Codable {
 
     struct GeminiConfig: Codable {
         var enabled: Bool?
+        var voice: String?
         var model: String?
         var apiKey: String?
     }
@@ -271,6 +273,28 @@ class ConfigManager: ObservableObject {
         config.providers?.elevenlabs?.modelId ?? "eleven_multilingual_v2"
     }
 
+    var elevenlabsSavedVoices: [ElevenLabsVoice] {
+        config.providers?.elevenlabs?.savedVoices ?? []
+    }
+
+    func saveElevenLabsVoice(_ voice: ElevenLabsVoice) {
+        ensureProviders()
+        ensureElevenLabs()
+        var savedVoices = config.providers?.elevenlabs?.savedVoices ?? []
+        savedVoices.removeAll { $0.voice_id == voice.voice_id }
+        savedVoices.append(voice)
+        savedVoices.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        config.providers?.elevenlabs?.savedVoices = savedVoices
+        markUnsaved()
+    }
+
+    func removeElevenLabsVoice(id: String) {
+        var savedVoices = config.providers?.elevenlabs?.savedVoices ?? []
+        savedVoices.removeAll { $0.voice_id == id }
+        config.providers?.elevenlabs?.savedVoices = savedVoices.isEmpty ? nil : savedVoices
+        markUnsaved()
+    }
+
     // Groq
     var groqApiKey: String {
         get { config.providers?.groq?.apiKey ?? "" }
@@ -283,11 +307,23 @@ class ConfigManager: ObservableObject {
     }
 
     var groqVoice: String {
-        config.providers?.groq?.voice ?? "tara"
+        get { config.providers?.groq?.voice ?? "tara" }
+        set {
+            ensureProviders()
+            ensureGroq()
+            config.providers?.groq?.voice = newValue
+            markUnsaved()
+        }
     }
 
     var groqModel: String {
-        config.providers?.groq?.model ?? "canopylabs/orpheus-v1-english"
+        get { config.providers?.groq?.model ?? "canopylabs/orpheus-v1-english" }
+        set {
+            ensureProviders()
+            ensureGroq()
+            config.providers?.groq?.model = newValue
+            markUnsaved()
+        }
     }
 
     // Gemini
@@ -307,6 +343,16 @@ class ConfigManager: ObservableObject {
             ensureProviders()
             ensureGemini()
             config.providers?.gemini?.model = newValue
+            markUnsaved()
+        }
+    }
+
+    var geminiVoice: String {
+        get { config.providers?.gemini?.voice ?? "Puck" }
+        set {
+            ensureProviders()
+            ensureGemini()
+            config.providers?.gemini?.voice = newValue
             markUnsaved()
         }
     }

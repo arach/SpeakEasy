@@ -1,5 +1,9 @@
 # Permanent menu-bar player
 
+> **Canonical user doc:** [menu-bar-player.mdx](./menu-bar-player.mdx) (published
+> via the docs site navigation). This file remains as an in-repo copy of the
+> original product note; prefer the `.mdx` page for updates.
+
 SpeakEasy uses one resident macOS application for playback, HUD presentation,
 settings, and history. The TypeScript package remains responsible for speech
 synthesis and caching. It hands generated audio files to the app instead of

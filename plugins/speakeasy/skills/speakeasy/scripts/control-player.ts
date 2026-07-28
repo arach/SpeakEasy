@@ -108,6 +108,7 @@ function selectedRequest(): Request {
         createdAt: new Date().toISOString(),
         synthesisRateWPM: numberFor("--synthesis-rate"),
         sourceThreadId: process.env.CODEX_THREAD_ID,
+        cleanupAfterPlayback: has("--cleanup-after-playback"),
       },
       priority: valueFor("--priority") ?? "normal",
       interrupt: has("--interrupt"),
@@ -198,6 +199,7 @@ async function sendWithLaunch(request: Request): Promise<Response> {
 if (has("--help")) {
   console.log(`Usage:
   control-player.ts --audio /absolute/file [--title title] [--text narration] [--no-autoplay]
+                    [--cleanup-after-playback]
   control-player.ts --pause|--resume|--toggle|--stop|--skip|--status
   control-player.ts --seek seconds|--volume 0...1|--playback-rate 0.5...2
   control-player.ts --remove UUID|--clear-queue`);

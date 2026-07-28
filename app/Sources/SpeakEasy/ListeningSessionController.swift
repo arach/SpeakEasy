@@ -48,6 +48,7 @@ struct ListeningTurnContext: Equatable, Sendable {
     let laneNumber: Int?
     let narration: SpeechNarrationConfiguration
     let playbackVolume: Double
+    let playbackRate: Float
 }
 
 struct ListeningInputPreference: Codable, Equatable, Sendable {
@@ -93,9 +94,10 @@ final class ListeningSessionController: ObservableObject {
     private let router = CodexThreadRouter()
     private let narrator = ConfiguredResponseNarrator()
     private let laneCueStore = LaneCueStore()
+    private let laneConfigurationStore = VoiceLaneConfigurationStore()
     private let lockDefaultsKey = "speakeasy.listening.task-lock.v1"
-    private let lanesDefaultsKey = "speakeasy.listening.voice-lanes.v1"
-    private let activeLaneDefaultsKey = "speakeasy.listening.active-lane.v1"
+    private let legacyLanesDefaultsKey = "speakeasy.listening.voice-lanes.v1"
+    private let legacyActiveLaneDefaultsKey = "speakeasy.listening.active-lane.v1"
     private let inputPreferenceDefaultsKey = "speakeasy.listening.input-device.v1"
     private var shortcut: GlobalListeningShortcut?
     private var maxRecordingTimer: Timer?
@@ -110,6 +112,7 @@ final class ListeningSessionController: ObservableObject {
     private var validationID: UUID?
     private var recordingStartID: UUID?
     private var recordingContext: ListeningTurnContext?
+    private var stopAfterWarmupRequested = false
 
     private init() {
         restoreState()
@@ -157,6 +160,7 @@ final class ListeningSessionController: ObservableObject {
         maxRecordingTimer = nil
         recordingStartID = nil
         recordingContext = nil
+        stopAfterWarmupRequested = false
         validationID = nil
         shortcut?.unregisterAll()
         shortcut = nil
@@ -208,22 +212,40 @@ final class ListeningSessionController: ObservableObject {
 
     func assignLockedTask(toLane number: Int) {
         guard Self.laneRange.contains(number), let lock = lockedTask else { return }
+        assign(lock, toLane: number, makeActive: true)
+    }
+
+    func assign(_ task: CodexTaskSummary, toLane number: Int) {
+        guard Self.laneRange.contains(number) else { return }
+        assign(
+            ListeningTaskLock(id: task.id, title: task.title, cwd: task.cwd),
+            toLane: number,
+            makeActive: false
+        )
+    }
+
+    private func assign(_ lock: ListeningTaskLock, toLane number: Int, makeActive: Bool) {
         let previous = lane(number)
         if let previous {
             Task { await laneCueStore.removeCue(for: previous) }
         }
         let assignment = VoiceLane(
             number: number,
+            label: previous?.label,
             task: lock,
             voiceOverride: previous?.voiceOverride,
-            narrationCue: previous?.narrationCue
+            narrationCue: previous?.narrationCue,
+            playbackRate: previous?.playbackRate
         )
         lanes.removeAll { $0.number == number }
         lanes.append(assignment)
         lanes.sort { $0.number < $1.number }
-        activeLaneNumber = number
-        UserDefaults.standard.set(number, forKey: activeLaneDefaultsKey)
-        persistLanes()
+        if makeActive {
+            activeLaneNumber = number
+        } else if activeLaneNumber == number, lockedTask?.id != lock.id {
+            activeLaneNumber = nil
+        }
+        persistLaneConfiguration()
         diagnostic("lane \(number) assigned to task \(lock.id)")
         prepareCue(for: assignment)
     }
@@ -233,9 +255,8 @@ final class ListeningSessionController: ObservableObject {
         lanes.removeAll { $0.number == number }
         if activeLaneNumber == number {
             activeLaneNumber = nil
-            UserDefaults.standard.removeObject(forKey: activeLaneDefaultsKey)
         }
-        persistLanes()
+        persistLaneConfiguration()
         Task { await laneCueStore.removeCue(for: assignment) }
         diagnostic("lane \(number) removed")
     }
@@ -248,12 +269,27 @@ final class ListeningSessionController: ObservableObject {
         lanes.removeAll { $0.number == number }
         lanes.append(assignment)
         lanes.sort { $0.number < $1.number }
-        persistLanes()
+        persistLaneConfiguration()
         if let voiceOverride {
             diagnostic("lane \(number) voice set for \(voiceOverride.provider)")
         } else {
             diagnostic("lane \(number) voice reset to the global provider default")
         }
+        prepareCue(for: assignment)
+    }
+
+    func setLaneLabel(_ label: String, forLane number: Int) {
+        guard var assignment = lane(number) else { return }
+        let normalizedLabel = VoiceLane.normalizedLabel(label)
+        guard assignment.label != normalizedLabel else { return }
+        assignment.label = normalizedLabel
+        lanes.removeAll { $0.number == number }
+        lanes.append(assignment)
+        lanes.sort { $0.number < $1.number }
+        persistLaneConfiguration()
+        diagnostic(normalizedLabel == nil
+            ? "lane \(number) label reset to the task title"
+            : "lane \(number) label updated")
         prepareCue(for: assignment)
     }
 
@@ -265,11 +301,26 @@ final class ListeningSessionController: ObservableObject {
         lanes.removeAll { $0.number == number }
         lanes.append(assignment)
         lanes.sort { $0.number < $1.number }
-        persistLanes()
+        persistLaneConfiguration()
         diagnostic(narrationCue == nil
             ? "lane \(number) narration cue cleared"
             : "lane \(number) narration cue updated")
         prepareCue(for: assignment)
+    }
+
+    func setPlaybackRate(_ rate: Float, forLane number: Int) {
+        guard var assignment = lane(number) else { return }
+        let normalizedRate = VoiceLane.normalizedPlaybackRate(rate)
+        guard assignment.playbackRate != normalizedRate else { return }
+        assignment.playbackRate = normalizedRate
+        lanes.removeAll { $0.number == number }
+        lanes.append(assignment)
+        lanes.sort { $0.number < $1.number }
+        persistLaneConfiguration()
+        if activeLaneNumber == number {
+            PlaybackEngine.shared.setPlaybackRate(assignment.effectivePlaybackRate)
+        }
+        diagnostic("lane \(number) playback speed set to \(assignment.effectivePlaybackRate)x")
     }
 
     func activateLane(_ number: Int, beginListening: Bool = false) {
@@ -284,7 +335,17 @@ final class ListeningSessionController: ObservableObject {
             NSSound.beep()
             return
         }
-        guard ![.validatingLock, .cueing, .warmingUp].contains(phase) else {
+        if phase == .warmingUp {
+            if activeLaneNumber == number {
+                stopAfterWarmupRequested = true
+                diagnostic("lane \(number) will stop and send when the microphone is ready")
+            } else {
+                lastError = "Finish or cancel this utterance before switching lanes."
+                NSSound.beep()
+            }
+            return
+        }
+        guard ![.validatingLock, .cueing].contains(phase) else {
             NSSound.beep()
             return
         }
@@ -298,7 +359,7 @@ final class ListeningSessionController: ObservableObject {
         }
         if phase == .speaking { PlaybackEngine.shared.stop() }
         activeLaneNumber = number
-        UserDefaults.standard.set(number, forKey: activeLaneDefaultsKey)
+        persistLaneConfiguration()
         // Keep the destination visible in the HUD while its exact Desktop
         // ownership is revalidated. No recording or submission is permitted
         // during this phase.
@@ -321,7 +382,7 @@ final class ListeningSessionController: ObservableObject {
         validationID = nil
         lockedTask = nil
         activeLaneNumber = nil
-        UserDefaults.standard.removeObject(forKey: activeLaneDefaultsKey)
+        persistLaneConfiguration()
         phase = .unlocked
         lastError = nil
         UserDefaults.standard.removeObject(forKey: lockDefaultsKey)
@@ -331,6 +392,9 @@ final class ListeningSessionController: ObservableObject {
         switch phase {
         case .recording:
             finishRecording()
+        case .warmingUp:
+            stopAfterWarmupRequested = true
+            diagnostic("current shortcut will stop and send when the microphone is ready")
         case .ready, .failed:
             beginRecording()
         case .speaking:
@@ -351,6 +415,7 @@ final class ListeningSessionController: ObservableObject {
         maxRecordingTimer = nil
         recordingStartID = nil
         recordingContext = nil
+        stopAfterWarmupRequested = false
         Task {
             await vox.cancelRecording()
             phase = lockedTask == nil ? .unlocked : .ready
@@ -410,7 +475,19 @@ final class ListeningSessionController: ObservableObject {
     }
 
     #if DEBUG
-    func installLaneSnapshotFixture() {
+    /// Which conversation-zone state a design snapshot should render.
+    enum SnapshotFixture: String, CaseIterable {
+        /// No task locked — the task picker, matching the redesign reference crop.
+        case unlocked
+        /// Task locked, lanes assigned, idle and ready for the hotkey.
+        case locked
+        /// Actively capturing microphone input.
+        case recording
+        /// Lock verification failed; recovery instruction visible.
+        case error
+    }
+
+    func installLaneSnapshotFixture(_ fixture: SnapshotFixture = .locked) {
         let task = ListeningTaskLock(
             id: "019f99a4-7867-7c23-ac29-0c0eca7da603",
             title: "Prototype SpeakEasy listening mode",
@@ -421,9 +498,7 @@ final class ListeningSessionController: ObservableObject {
             title: "Polish the Scout relay",
             cwd: "/Users/arach/dev/openscout"
         )
-        lockedTask = task
-        lanes = [VoiceLane(number: 2, task: task), VoiceLane(number: 5, task: secondTask)]
-        activeLaneNumber = 2
+
         shortcutAvailable = true
         laneShortcutAvailability = Dictionary(
             uniqueKeysWithValues: Self.laneRange.map { ($0, $0 != 4) }
@@ -433,8 +508,54 @@ final class ListeningSessionController: ObservableObject {
             AudioInputDeviceInfo(id: "studio-mic", name: "Studio USB Mic", isSystemDefault: false),
             AudioInputDeviceInfo(id: "system-mic", name: "MacBook Air Mic", isSystemDefault: true)
         ]
-        inputPreference = ListeningInputPreference(id: "studio-mic", name: "Studio USB Mic")
-        phase = .ready
+        // System default rather than a synthetic device id: `refreshInputDevices()`
+        // replaces the fixture list with real hardware on appear, which would
+        // otherwise render every snapshot in the "input unavailable" state.
+        inputPreference = nil
+
+        switch fixture {
+        case .unlocked, .error:
+            lockedTask = nil
+            lanes = []
+            activeLaneNumber = nil
+            tasks = [
+                CodexTaskSummary(
+                    id: "019f99a4-7867-7c23-ac29-0c0eca7da603",
+                    title: "hey so what's up with codex cli / tui ?",
+                    preview: "hey so what's up with codex cli / tui ?",
+                    cwd: "/Users/arach/dev/SpeakEasy",
+                    updatedAt: Date(timeIntervalSince1970: 1_785_000_000)
+                ),
+                CodexTaskSummary(
+                    id: "019f9573-3e55-7701-8968-09c12d4fafe5",
+                    title: "Polish the Scout relay",
+                    preview: "Polish the Scout relay",
+                    cwd: "/Users/arach/dev/openscout",
+                    updatedAt: Date(timeIntervalSince1970: 1_784_900_000)
+                )
+            ]
+            selectedTaskID = tasks.first?.id ?? ""
+            if fixture == .error {
+                phase = .failed
+                lastError = "Open the locked task in Codex Desktop, then try the hotkey again."
+            } else {
+                phase = .unlocked
+                lastError = nil
+            }
+        case .locked, .recording:
+            lockedTask = task
+            lanes = [VoiceLane(number: 2, task: task), VoiceLane(number: 5, task: secondTask)]
+            activeLaneNumber = 2
+            lastError = nil
+            if fixture == .recording {
+                phase = .recording
+                inputDeviceName = "Studio USB Mic"
+            } else {
+                phase = .ready
+                lastTranscript = "Summarise what changed in the popover pass."
+                lastDelivery = .steeredActiveTurn
+            }
+        }
     }
     #endif
 
@@ -491,25 +612,22 @@ final class ListeningSessionController: ObservableObject {
                 lockedTask = lock
                 if let expectedLane {
                     activeLaneNumber = expectedLane
-                    UserDefaults.standard.set(expectedLane, forKey: activeLaneDefaultsKey)
                     let refreshed = VoiceLane(
                         number: expectedLane,
+                        label: lane(expectedLane)?.label,
                         task: lock,
                         voiceOverride: lane(expectedLane)?.voiceOverride,
-                        narrationCue: lane(expectedLane)?.narrationCue
+                        narrationCue: lane(expectedLane)?.narrationCue,
+                        playbackRate: lane(expectedLane)?.playbackRate
                     )
                     lanes.removeAll { $0.number == expectedLane }
                     lanes.append(refreshed)
                     lanes.sort { $0.number < $1.number }
-                    persistLanes()
+                    persistLaneConfiguration()
                 }
                 else {
                     activeLaneNumber = lanes.first(where: { $0.task.id == lock.id })?.number
-                    if let activeLaneNumber {
-                        UserDefaults.standard.set(activeLaneNumber, forKey: activeLaneDefaultsKey)
-                    } else {
-                        UserDefaults.standard.removeObject(forKey: activeLaneDefaultsKey)
-                    }
+                    persistLaneConfiguration()
                 }
                 persistLock(lock)
                 phase = .ready
@@ -546,6 +664,7 @@ final class ListeningSessionController: ObservableObject {
         let startID = UUID()
         recordingStartID = startID
         recordingContext = turnContext(for: lock)
+        stopAfterWarmupRequested = false
 
         Task {
             guard recordingStartID == startID, lockedTask?.id == lock.id else { return }
@@ -564,6 +683,11 @@ final class ListeningSessionController: ObservableObject {
                 inputDeviceName = device.name
                 phase = .recording
                 diagnostic("microphone active (\(device.name)); Vox warming concurrently")
+                if stopAfterWarmupRequested {
+                    stopAfterWarmupRequested = false
+                    finishRecording()
+                    return
+                }
                 maxRecordingTimer?.invalidate()
                 maxRecordingTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: false) { [weak self] _ in
                     Task { @MainActor in self?.finishRecording() }
@@ -631,6 +755,7 @@ final class ListeningSessionController: ObservableObject {
         maxRecordingTimer = nil
         recordingStartID = nil
         recordingContext = nil
+        stopAfterWarmupRequested = false
         phase = .transcribing
         Task {
             do {
@@ -675,9 +800,11 @@ final class ListeningSessionController: ObservableObject {
             createdAt: ISO8601DateFormatter().string(from: Date()),
             synthesisRateWPM: narration.rate,
             sourceThreadId: lock.id,
-            cleanupAfterPlayback: true
+            cleanupAfterPlayback: true,
+            playbackRate: context.playbackRate
         )
         PlaybackEngine.shared.setVolume(Float(context.playbackVolume))
+        PlaybackEngine.shared.setPlaybackRate(context.playbackRate)
         pendingNarrationItemID = itemID
         narrationDidStart = false
         phase = .speaking
@@ -690,19 +817,45 @@ final class ListeningSessionController: ObservableObject {
            let preference = try? JSONDecoder().decode(ListeningInputPreference.self, from: data) {
             inputPreference = preference
         }
-        if let data = UserDefaults.standard.data(forKey: lanesDefaultsKey),
-           let restored = try? JSONDecoder().decode([VoiceLane].self, from: data) {
-            lanes = restored
-                .filter { Self.laneRange.contains($0.number) }
-                .sorted { $0.number < $1.number }
+
+        var configuredActiveLane: Int?
+        do {
+            if let configuration = try laneConfigurationStore.load(validNumbers: Self.laneRange) {
+                lanes = configuration.lanes
+                configuredActiveLane = configuration.activeLane
+            } else {
+                let defaults = UserDefaults.standard
+                let legacyLanes = defaults.data(forKey: legacyLanesDefaultsKey)
+                    .flatMap { try? JSONDecoder().decode([VoiceLane].self, from: $0) } ?? []
+                let legacyActiveLane = defaults.object(forKey: legacyActiveLaneDefaultsKey) as? Int
+                let migrated = VoiceLaneConfiguration(
+                    activeLane: legacyActiveLane,
+                    lanes: legacyLanes
+                ).normalized(validNumbers: Self.laneRange)
+                lanes = migrated.lanes
+                configuredActiveLane = migrated.activeLane
+                if !legacyLanes.isEmpty || legacyActiveLane != nil {
+                    try laneConfigurationStore.save(migrated, validNumbers: Self.laneRange)
+                    defaults.removeObject(forKey: legacyLanesDefaultsKey)
+                    defaults.removeObject(forKey: legacyActiveLaneDefaultsKey)
+                    diagnostic("migrated voice lanes to \(laneConfigurationStore.fileURL.path)")
+                }
+            }
+        } catch {
+            lanes = []
+            configuredActiveLane = nil
+            lastError = "SpeakEasy could not read lanes.json: \(error.localizedDescription)"
         }
-        guard let data = UserDefaults.standard.data(forKey: lockDefaultsKey),
-              let lock = try? JSONDecoder().decode(ListeningTaskLock.self, from: data)
-        else { return }
+
+        let persistedLock = UserDefaults.standard.data(forKey: lockDefaultsKey)
+            .flatMap { try? JSONDecoder().decode(ListeningTaskLock.self, from: $0) }
+        let configuredLane = configuredActiveLane.flatMap { number in
+            lanes.first(where: { $0.number == number })
+        }
+        guard let lock = persistedLock ?? configuredLane?.task else { return }
         restoredLockCandidate = lock
         selectedTaskID = lock.id
-        let persistedLane = UserDefaults.standard.object(forKey: activeLaneDefaultsKey) as? Int
-        activeLaneNumber = persistedLane.flatMap { number in
+        activeLaneNumber = configuredActiveLane.flatMap { number in
             lanes.first(where: { $0.number == number && $0.task.id == lock.id })?.number
         } ?? lanes.first(where: { $0.task.id == lock.id })?.number
         phase = .validatingLock
@@ -714,9 +867,15 @@ final class ListeningSessionController: ObservableObject {
         }
     }
 
-    private func persistLanes() {
-        if let data = try? JSONEncoder().encode(lanes) {
-            UserDefaults.standard.set(data, forKey: lanesDefaultsKey)
+    private func persistLaneConfiguration() {
+        do {
+            try laneConfigurationStore.save(
+                VoiceLaneConfiguration(activeLane: activeLaneNumber, lanes: lanes),
+                validNumbers: Self.laneRange
+            )
+        } catch {
+            lastError = "SpeakEasy could not save lanes.json: \(error.localizedDescription)"
+            diagnostic("lane configuration save failed: \(error.localizedDescription)")
         }
     }
 
@@ -757,7 +916,7 @@ final class ListeningSessionController: ObservableObject {
             selectedTaskID = recent.first?.id ?? ""
             lockedTask = nil
             activeLaneNumber = nil
-            UserDefaults.standard.removeObject(forKey: activeLaneDefaultsKey)
+            persistLaneConfiguration()
             phase = .unlocked
             lastError = "The previously locked Codex task is no longer available. Choose a task to lock again."
         }
@@ -852,7 +1011,7 @@ final class ListeningSessionController: ObservableObject {
             )
         case "gemini":
             configuration = SpeechNarrationConfiguration(
-                provider: "gemini", voice: "Puck", model: config.geminiModel,
+                provider: "gemini", voice: config.geminiVoice, model: config.geminiModel,
                 apiKey: config.geminiApiKey, instructions: nil, rate: config.defaultRate
             )
         case "system":
@@ -878,7 +1037,8 @@ final class ListeningSessionController: ObservableObject {
             lock: lock,
             laneNumber: lane?.number,
             narration: narrationConfiguration(from: config, lane: lane),
-            playbackVolume: config.defaultVolume
+            playbackVolume: config.defaultVolume,
+            playbackRate: lane?.effectivePlaybackRate ?? 1
         )
     }
 
@@ -892,6 +1052,7 @@ final class ListeningSessionController: ObservableObject {
         maxRecordingTimer = nil
         recordingStartID = nil
         recordingContext = nil
+        stopAfterWarmupRequested = false
         pendingNarrationItemID = nil
         narrationDidStart = false
         lastError = error.localizedDescription

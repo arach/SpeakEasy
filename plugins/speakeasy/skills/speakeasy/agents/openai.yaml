@@ -1,4 +1,4 @@
 interface:
   display_name: "SpeakEasy"
-  short_description: "Narrate through the native menu-bar player"
-  default_prompt: "Use $speakeasy to read this summary aloud."
+  short_description: "Narrate and manage exact-task voice lanes"
+  default_prompt: "Use $speakeasy to show and edit my voice lanes."

@@ -27,11 +27,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         observeActivityState()
         startIPCServer()
         ListeningSessionController.shared.start()
+        SpeakEasyPadIntegration.shared.start()
     }
 
     func stop() {
         closePopover()
         removeEventMonitor()
+        SpeakEasyPadIntegration.shared.stop()
         ListeningSessionController.shared.stop()
         PlayerIPCServer.shared.stop()
 
@@ -138,6 +140,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
         let menu = NSMenu()
         menu.addItem(NSMenuItem(
+            title: SpeakEasyPadIntegration.shared.menuTitle,
+            action: #selector(openPadSettingsAction),
+            keyEquivalent: ""
+        ))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(
             title: "Settings…",
             action: #selector(openSettingsAction),
             keyEquivalent: ","
@@ -160,6 +168,10 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     @objc private func openSettingsAction() {
         openSettings()
+    }
+
+    @objc private func openPadSettingsAction() {
+        openSettings(initialSection: .pad)
     }
 
     @objc private func quitAction() {
@@ -250,16 +262,20 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     /// Opens the existing settings UI as a secondary window without relying on
     /// a launch-time `WindowGroup`. Safe to call repeatedly.
-    func openSettings() {
+    func openSettings(initialSection: SpeakEasySection = .dashboard) {
         closePopover()
 
         if let settingsWindow, settingsWindow.isVisible {
+            NotificationCenter.default.post(
+                name: .speakEasySettingsSectionRequested,
+                object: initialSection.rawValue
+            )
             settingsWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
 
-        let rootView = ShellRootView()
+        let rootView = ShellRootView(initialSection: initialSection)
             .environmentObject(ConfigManager.shared)
 
         let hosting = NSHostingController(rootView: rootView)

@@ -1,7 +1,7 @@
 {
   "name": "speakeasy",
-  "version": "0.1.0+codex.20260725021545",
-  "description": "Give Codex and ChatGPT Work a controllable voice through the native SpeakEasy menu-bar player.",
+  "version": "0.1.0+codex.20260726170732",
+  "description": "Give Codex a controllable voice and agent-managed thread lanes through the native SpeakEasy menu-bar player.",
   "author": {
     "name": "Arach",
     "url": "https://arach.dev"
@@ -17,14 +17,16 @@
     "voice"
   ],
   "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "SpeakEasy",
     "shortDescription": "A controllable voice for your agents",
-    "longDescription": "Generate narration with local or configured speech providers, then listen through a permanent native macOS player with autoplay, queueing, transport controls, playback speed, volume, a word-synced HUD, and one-click return to the originating Codex task.",
+    "longDescription": "Generate narration with local or configured speech providers, manage exact-task voice lanes through Codex, and listen through a permanent native macOS player with autoplay, transport controls, a word-synced HUD, and one-click return to the originating task.",
     "developerName": "Arach",
     "category": "Productivity",
     "capabilities": [
       "Audio",
+      "Interactive",
       "Local",
       "macOS"
     ],
@@ -33,8 +35,8 @@
     "termsOfServiceURL": "https://speakeasy.arach.dev/terms/",
     "defaultPrompt": [
       "Read this summary aloud in SpeakEasy.",
-      "Queue a spoken update and autoplay it.",
-      "Show the current SpeakEasy player status."
+      "Show and edit my SpeakEasy voice lanes.",
+      "Assign this task to my primary voice lane."
     ],
     "brandColor": "#34D399",
     "composerIcon": "./assets/icon.png",

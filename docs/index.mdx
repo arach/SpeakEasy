@@ -3,12 +3,12 @@ title: SpeakEasy
 description: Unified text-to-speech library with multi-provider support
 ---
 
-A unified speech library for all your projects with support for multiple TTS providers and clean configuration structure.
+A unified speech library for Mac apps and agents: multi-provider TTS, SQLite cache, a permanent menu-bar player, and optional thread-locked voice conversations with Codex Desktop.
 
 ## Requirements
 
-- **Node.js >= 22.5** or **Bun >= 1.0** (built-in SQLite cache)
-- **macOS** for system voice and audio playback
+- **Node.js >= 22.12** or **Bun >= 1.0** (built-in SQLite cache)
+- **macOS** for system voice, native player, and listening mode
 
 ## Key Features
 
@@ -25,11 +25,15 @@ A unified speech library for all your projects with support for multiple TTS pro
 - Environment variable integration
 
 ### Core Capabilities
-- **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq
+- **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq, Gemini
 - **Smart Fallbacks**: Automatic provider switching on failure
 - **Volume Control**: Precise control without affecting system volume
 - **Queue Management**: Priority-based speech queue with interruption
 - **TypeScript**: Full type safety and IntelliSense support
+
+### macOS app
+- **[Menu-bar player](./menu-bar-player)** — resident player, queue, HUD, Codex deep links (GitHub release 0.2.17)
+- **[Listening mode](./listening-mode)** — exact-task Codex voice turns, voice lanes, dedicated microphone picker (technical preview in current sources)
 
 ## Installation
 
@@ -69,6 +73,10 @@ await say('Hello!', 'groq');                  // Groq TTS
 - **[Providers Guide](providers.mdx)** - Provider-specific setup and features
 - **[Custom Providers](custom-providers.md)** - Add bespoke TTS backends via TTSAdapter
 - **[Cache System](cache.mdx)** - Cache management and optimization
+
+### macOS app
+- **[Menu-bar player](menu-bar-player.mdx)** - Permanent player, HUD, and IPC
+- **[Listening mode](listening-mode.mdx)** - Thread-locked Codex voice + mic picker
 
 ### Support
 - **[Troubleshooting](troubleshooting.mdx)** - Common issues and solutions

@@ -32,8 +32,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 #endif
 
+        // Install the local Pad host behind the native integration seam before
+        // the menu-bar lifecycle starts it.
+        SpeakEasyPadHostBootstrap.install()
+
         // Resident menu-bar shell + player IPC (no Dock icon via LSUIElement).
         MenuBarController.shared.start()
+        if ProcessInfo.processInfo.arguments.contains("--settings") {
+            DispatchQueue.main.async {
+                MenuBarController.shared.openSettings()
+            }
+        }
+        if ProcessInfo.processInfo.arguments.contains("--pad-pairing") {
+            Task { @MainActor in
+                // Snapshot/QA harness: give the listener one event-loop turn
+                // to publish its ready state, then create the normal one-use
+                // invitation through the same UI integration path.
+                try? await Task.sleep(for: .milliseconds(500))
+                await SpeakEasyPadIntegration.shared.beginPairing()
+            }
+        }
         checkAndStartHUD()
 
         // Observe config changes
@@ -170,6 +188,7 @@ struct DashboardView: View {
     @EnvironmentObject var config: ConfigManager
     @Environment(\.theme) var theme
     @Binding var selectedSection: SpeakEasySection
+    @Binding var selectedProvider: SpeechProviderID
 
     private let providerColumns = [
         GridItem(.adaptive(minimum: 300), spacing: HudSpacing.lg)
@@ -185,70 +204,46 @@ struct DashboardView: View {
 
     private var providersSection: some View {
         VStack(alignment: .leading, spacing: HudSpacing.lg) {
-            HudSectionLabel("Configured Providers")
+            HudSectionLabel("Providers")
 
             LazyVGrid(columns: providerColumns, spacing: HudSpacing.lg) {
-                ProviderCard(
-                    name: "OpenAI",
-                    icon: "brain.head.profile",
-                    isConfigured: !config.openaiApiKey.isEmpty,
-                    isDefault: config.defaultProvider == "openai",
-                    detail: config.openaiApiKey.isEmpty ? "Not configured" : "Voice: \(config.openaiVoice.capitalized)",
-                    accentColor: .green
-                ) {
-                    withAnimation(.spring(duration: 0.3)) {
-                        selectedSection = .openai
-                    }
-                }
-
-                ProviderCard(
-                    name: "ElevenLabs",
-                    icon: "waveform",
-                    isConfigured: !config.elevenlabsApiKey.isEmpty,
-                    isDefault: config.defaultProvider == "elevenlabs",
-                    detail: config.elevenlabsApiKey.isEmpty ? "Not configured" : "Voice ID: \(String(config.elevenlabsVoiceId.prefix(8)))...",
-                    accentColor: .purple
-                ) {
-                    withAnimation(.spring(duration: 0.3)) {
-                        selectedSection = .elevenlabs
-                    }
-                }
-
-                ProviderCard(
-                    name: "System (macOS)",
-                    icon: "desktopcomputer",
-                    isConfigured: true,
-                    isDefault: config.defaultProvider == "system",
-                    detail: "Voice: \(config.systemVoice)",
-                    accentColor: .blue
-                ) {
-                    withAnimation(.spring(duration: 0.3)) {
-                        selectedSection = .system
-                    }
-                }
-
-                if !config.groqApiKey.isEmpty {
+                ForEach(SpeechProviderCatalog.all) { provider in
                     ProviderCard(
-                        name: "Groq",
-                        icon: "bolt.fill",
-                        isConfigured: true,
-                        isDefault: config.defaultProvider == "groq",
-                        detail: "Voice: Celeste-PlayAI",
-                        accentColor: .orange
-                    ) {}
-                }
-
-                if !config.geminiApiKey.isEmpty {
-                    ProviderCard(
-                        name: "Gemini",
-                        icon: "sparkles",
-                        isConfigured: true,
-                        isDefault: config.defaultProvider == "gemini",
-                        detail: "Model: \(config.geminiModel)",
-                        accentColor: .cyan
-                    ) {}
+                        name: provider.name,
+                        icon: provider.icon,
+                        isConfigured: isConfigured(provider.id),
+                        isDefault: config.defaultProvider == provider.id.rawValue,
+                        detail: providerDetail(provider.id),
+                        accentColor: HudTint.green.color
+                    ) {
+                        selectedProvider = provider.id
+                        withAnimation(.spring(duration: 0.3)) {
+                            selectedSection = .providers
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    private func isConfigured(_ provider: SpeechProviderID) -> Bool {
+        switch provider {
+        case .openai: return !config.openaiApiKey.isEmpty
+        case .elevenlabs: return !config.elevenlabsApiKey.isEmpty
+        case .groq: return !config.groqApiKey.isEmpty
+        case .gemini: return !config.geminiApiKey.isEmpty
+        case .system: return true
+        }
+    }
+
+    private func providerDetail(_ provider: SpeechProviderID) -> String {
+        guard isConfigured(provider) else { return "Not configured" }
+        switch provider {
+        case .openai: return "Voice: \(config.openaiVoice.capitalized)"
+        case .elevenlabs: return "Voice: \(String(config.elevenlabsVoiceId.prefix(12)))"
+        case .groq: return "Voice: \(config.groqVoice)"
+        case .gemini: return "Voice: \(config.geminiVoice)"
+        case .system: return "Voice: \(config.systemVoice)"
         }
     }
 
@@ -417,8 +412,6 @@ struct ProviderCard: View {
 struct OpenAIPlaygroundView: View {
     @EnvironmentObject var config: ConfigManager
     @Environment(\.theme) var theme
-    @State private var showApiKey = false
-    @State private var showApiKeySection = false
     @State private var testText = "Hello! This is a test of the OpenAI text-to-speech voice."
     @State private var selectedVoice = "nova"
     @State private var isTesting = false
@@ -437,8 +430,16 @@ struct OpenAIPlaygroundView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
+            ProviderAPIKeySection(
+                provider: SpeechProviderCatalog.descriptor(for: .openai),
+                apiKey: Binding(
+                    get: { config.openaiApiKey },
+                    set: { config.openaiApiKey = $0 }
+                )
+            )
+
             // Voice Picker
-            GlassSection(title: "Voice Selection", icon: "person.wave.2.fill", color: .clear) {
+            GlassSection(title: "Voice Selection", icon: "person.wave.2.fill", color: HudTint.green.color) {
                 VStack(spacing: 8) {
                     ForEach(voices, id: \.id) { voice in
                         VoiceRow(
@@ -460,7 +461,7 @@ struct OpenAIPlaygroundView: View {
             }
 
             // Playground
-            GlassSection(title: "Playground", icon: "play.circle.fill", color: .clear) {
+            GlassSection(title: "Playground", icon: "play.circle.fill", color: HudTint.green.color) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Test Text")
                         .font(.caption)
@@ -503,7 +504,7 @@ struct OpenAIPlaygroundView: View {
             }
 
             // Instructions
-            GlassSection(title: "Voice Instructions", icon: "text.quote", color: .clear) {
+            GlassSection(title: "Voice Instructions", icon: "text.quote", color: HudTint.green.color) {
                 VStack(alignment: .leading, spacing: 8) {
                     TextEditor(text: Binding(
                         get: { config.openaiInstructions },
@@ -519,67 +520,6 @@ struct OpenAIPlaygroundView: View {
                         .foregroundColor(theme.textTertiary)
                 }
             }
-
-            // API Configuration (Collapsible)
-            DisclosureGroup(
-                isExpanded: $showApiKeySection,
-                content: {
-                    HudCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                if showApiKey {
-                                    TextField("sk-...", text: Binding(
-                                        get: { config.openaiApiKey },
-                                        set: { config.openaiApiKey = $0 }
-                                    ))
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(.body, design: .monospaced))
-                                } else {
-                                    SecureField("sk-...", text: Binding(
-                                        get: { config.openaiApiKey },
-                                        set: { config.openaiApiKey = $0 }
-                                    ))
-                                    .textFieldStyle(.roundedBorder)
-                                }
-                                Button(action: { showApiKey.toggle() }) {
-                                    Image(systemName: showApiKey ? "eye.slash" : "eye")
-                                }
-                                .buttonStyle(.glassCompat)
-                            }
-                            HStack {
-                                Circle()
-                                    .fill(config.openaiApiKey.isEmpty ? theme.textTertiary : theme.text)
-                                    .frame(width: 5, height: 5)
-                                Text(config.openaiApiKey.isEmpty ? "Not configured" : "Configured")
-                                    .font(.caption)
-                                    .foregroundColor(theme.textTertiary)
-                                Spacer()
-                                Link("Get API Key", destination: URL(string: "https://platform.openai.com/api-keys")!)
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                    .padding(.top, HudSpacing.sm)
-                },
-                label: {
-                    HStack {
-                        Image(systemName: "key.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(theme.textTertiary)
-                        Text("API Configuration")
-                            .font(.subheadline)
-                            .foregroundColor(theme.textSecondary)
-                        Spacer()
-                        if !config.openaiApiKey.isEmpty {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(theme.textSecondary)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                }
-            )
-            .padding(.horizontal, 4)
 
             Spacer()
         }
@@ -690,7 +630,7 @@ struct VoiceRow: View {
             Button(action: onSelect) {
                 HStack(spacing: 10) {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(isSelected ? theme.text : theme.textTertiary)
+                        .foregroundColor(isSelected ? HudTint.green.color : theme.textTertiary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(name)
                             .fontWeight(isSelected ? .semibold : .regular)
@@ -711,15 +651,22 @@ struct VoiceRow: View {
                         .scaleEffect(0.6)
                 } else {
                     Image(systemName: "play.circle.fill")
-                        .foregroundColor(theme.textSecondary)
+                        .foregroundColor(isSelected ? HudTint.green.color : theme.textSecondary)
                 }
             }
             .buttonStyle(.flat)
             .disabled(isDisabled || isPlaying)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .padding(.horizontal, 12)
-        .glassBackground(cornerRadius: 12, intensity: isSelected ? .regular : .subtle)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(isSelected ? HudSurface.tintGhost(HudTint.green.color) : HudPalette.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(isSelected ? HudSurface.tintBorder(HudTint.green.color) : HudPalette.border, lineWidth: 0.5)
+        )
     }
 }
 
@@ -728,7 +675,6 @@ struct VoiceRow: View {
 struct ElevenLabsPlaygroundView: View {
     @EnvironmentObject var config: ConfigManager
     @Environment(\.theme) var theme
-    @State private var showApiKey = false
     @State private var testText = "Hello! This is a test of the ElevenLabs text-to-speech voice."
     @State private var isTesting = false
     @State private var voices: [ElevenLabsVoice] = []
@@ -736,129 +682,25 @@ struct ElevenLabsPlaygroundView: View {
     @State private var voicesError: String?
     @State private var currentlyPlayingVoice: String?
     @State private var audioPlayer: AVAudioPlayer?
-
-    struct ElevenLabsVoice: Identifiable, Codable, Hashable {
-        let voice_id: String
-        let name: String
-        let category: String?
-        let description: String?
-        var id: String { voice_id }
-
-        init(voice_id: String, name: String, category: String? = nil, description: String? = nil) {
-            self.voice_id = voice_id
-            self.name = name
-            self.category = category
-            self.description = description
-        }
-
-        enum CodingKeys: String, CodingKey {
-            case voice_id, name, category, description
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            voice_id = try container.decode(String.self, forKey: .voice_id)
-            name = try container.decode(String.self, forKey: .name)
-            category = try container.decodeIfPresent(String.self, forKey: .category)
-            description = try container.decodeIfPresent(String.self, forKey: .description)
-        }
-    }
-
-    struct VoicesResponse: Codable {
-        let voices: [ElevenLabsVoice]
-    }
-
-    // Default ElevenLabs voices that are always available
-    static let defaultVoices: [ElevenLabsVoice] = [
-        ElevenLabsVoice(voice_id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel", category: "premade", description: "Calm, young American female"),
-        ElevenLabsVoice(voice_id: "29vD33N1CtxCmqQRPOHJ", name: "Drew", category: "premade", description: "Well-rounded American male"),
-        ElevenLabsVoice(voice_id: "2EiwWnXFnvU5JabPnv8n", name: "Clyde", category: "premade", description: "War veteran, middle-aged American male"),
-        ElevenLabsVoice(voice_id: "5Q0t7uMcjvnagumLfvZi", name: "Paul", category: "premade", description: "News reporter, middle-aged American male"),
-        ElevenLabsVoice(voice_id: "AZnzlk1XvdvUeBnXmlld", name: "Domi", category: "premade", description: "Strong, young American female"),
-        ElevenLabsVoice(voice_id: "CYw3kZ02Hs0563khs1Fj", name: "Dave", category: "premade", description: "Conversational British-Essex male"),
-        ElevenLabsVoice(voice_id: "D38z5RcWu1voky8WS1ja", name: "Fin", category: "premade", description: "Sailor, older Irish male"),
-        ElevenLabsVoice(voice_id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", category: "premade", description: "Soft, young American female"),
-        ElevenLabsVoice(voice_id: "ErXwobaYiN019PkySvjV", name: "Antoni", category: "premade", description: "Well-rounded, young American male"),
-        ElevenLabsVoice(voice_id: "GBv7mTt0atIp3Br8iCZE", name: "Thomas", category: "premade", description: "Calm, young American male"),
-        ElevenLabsVoice(voice_id: "IKne3meq5aSn9XLyUdCD", name: "Charlie", category: "premade", description: "Casual Australian male"),
-        ElevenLabsVoice(voice_id: "JBFqnCBsd6RMkjVDRZzb", name: "George", category: "premade", description: "Warm British male"),
-        ElevenLabsVoice(voice_id: "LcfcDJNUP1GQjkzn1xUU", name: "Emily", category: "premade", description: "Calm American female"),
-        ElevenLabsVoice(voice_id: "MF3mGyEYCl7XYWbV9V6O", name: "Elli", category: "premade", description: "Emotional, young American female"),
-        ElevenLabsVoice(voice_id: "N2lVS1w4EtoT3dr4eOWO", name: "Callum", category: "premade", description: "Hoarse, middle-aged American male"),
-        ElevenLabsVoice(voice_id: "ODq5zmih8GrVes37Dizd", name: "Patrick", category: "premade", description: "Shouty, middle-aged American male"),
-        ElevenLabsVoice(voice_id: "SOYHLrjzK2X1ezoPC6cr", name: "Harry", category: "premade", description: "Anxious, young American male"),
-        ElevenLabsVoice(voice_id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam", category: "premade", description: "Articulate, young American male"),
-        ElevenLabsVoice(voice_id: "ThT5KcBeYPX3keUQqHPh", name: "Dorothy", category: "premade", description: "Pleasant British female"),
-        ElevenLabsVoice(voice_id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh", category: "premade", description: "Deep, young American male"),
-        ElevenLabsVoice(voice_id: "VR6AewLTigWG4xSOukaG", name: "Arnold", category: "premade", description: "Crisp, middle-aged American male"),
-        ElevenLabsVoice(voice_id: "XB0fDUnXU5powFXDhCwa", name: "Charlotte", category: "premade", description: "Seductive Swedish female"),
-        ElevenLabsVoice(voice_id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda", category: "premade", description: "Warm, young American female"),
-        ElevenLabsVoice(voice_id: "Yko7PKHZNXotIFUBG7I9", name: "Matthew", category: "premade", description: "Audiobook, middle-aged British male"),
-        ElevenLabsVoice(voice_id: "ZQe5CZNOzWyzPSCn5a3c", name: "James", category: "premade", description: "Calm Australian male"),
-        ElevenLabsVoice(voice_id: "Zlb1dXrM653N07WRdFW3", name: "Joseph", category: "premade", description: "Articulate British male"),
-        ElevenLabsVoice(voice_id: "bVMeCyTHy58xNoL34h3p", name: "Jeremy", category: "premade", description: "Irish male"),
-        ElevenLabsVoice(voice_id: "cgSgspJ2msm6clMCkdW9", name: "Jessica", category: "premade", description: "Expressive American female"),
-        ElevenLabsVoice(voice_id: "cjVigY5qzO86Huf0OWal", name: "Eric", category: "premade", description: "Friendly American male"),
-        ElevenLabsVoice(voice_id: "flq6f7yk4E4fJM5XTYuZ", name: "Michael", category: "premade", description: "Old American male"),
-        ElevenLabsVoice(voice_id: "g5CIjZEefAph4nQFvHAz", name: "Ethan", category: "premade", description: "Young American male"),
-        ElevenLabsVoice(voice_id: "iP95p4xoKVk53GoZ742B", name: "Chris", category: "premade", description: "Casual American male"),
-        ElevenLabsVoice(voice_id: "jBpfuIE2acCO8z3wKNLl", name: "Gigi", category: "premade", description: "Childlish American female"),
-        ElevenLabsVoice(voice_id: "jsCqWAovK2LkecY7zXl4", name: "Freya", category: "premade", description: "Overhyped American female"),
-        ElevenLabsVoice(voice_id: "nPczCjzI2devNBz1zQrb", name: "Brian", category: "premade", description: "Deep narrator, American male"),
-        ElevenLabsVoice(voice_id: "oWAxZDx7w5VEj9dCyTzz", name: "Grace", category: "premade", description: "Southern American female"),
-        ElevenLabsVoice(voice_id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel", category: "premade", description: "Deep authoritative British male"),
-        ElevenLabsVoice(voice_id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily", category: "premade", description: "Warm British female"),
-        ElevenLabsVoice(voice_id: "pMsXgVXv3BLzUgSXRplE", name: "Serena", category: "premade", description: "Pleasant American female"),
-        ElevenLabsVoice(voice_id: "pNInz6obpgDQGcFmaJgB", name: "Adam", category: "premade", description: "Deep narrator, American male"),
-        ElevenLabsVoice(voice_id: "piTKgcLEGmPE4e6mEKli", name: "Nicole", category: "premade", description: "Soft American female"),
-        ElevenLabsVoice(voice_id: "pqHfZKP75CvOlQylNhV4", name: "Bill", category: "premade", description: "Trustworthy American male"),
-        ElevenLabsVoice(voice_id: "t0jbNlBVZ17f02VDIeMI", name: "Jessie", category: "premade", description: "Raspy American male"),
-        ElevenLabsVoice(voice_id: "yoZ06aMxZJJ28mfd3POQ", name: "Sam", category: "premade", description: "Raspy American male"),
-        ElevenLabsVoice(voice_id: "z9fAnlkpzviPz146aGWa", name: "Glinda", category: "premade", description: "Witch-like American female"),
-        ElevenLabsVoice(voice_id: "zrHiDhphv9ZnVXBqCLjz", name: "Mimi", category: "premade", description: "Childish Swedish female")
-    ]
+    @State private var showAddVoice = false
+    @State private var newVoiceId = ""
+    @State private var newVoiceName = ""
+    @State private var newVoiceDescription = ""
+    @State private var isRecognizingVoice = false
+    @State private var addVoiceError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            // API Key Section
-            GlassSection(title: "API Key", icon: "key.fill", color: .purple) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        if showApiKey {
-                            TextField("API Key", text: Binding(
-                                get: { config.elevenlabsApiKey },
-                                set: { config.elevenlabsApiKey = $0 }
-                            ))
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
-                        } else {
-                            SecureField("API Key", text: Binding(
-                                get: { config.elevenlabsApiKey },
-                                set: { config.elevenlabsApiKey = $0 }
-                            ))
-                            .textFieldStyle(.roundedBorder)
-                        }
-                        Button(action: { showApiKey.toggle() }) {
-                            Image(systemName: showApiKey ? "eye.slash" : "eye")
-                        }
-                        .buttonStyle(.glassCompat)
-                    }
-                    HStack {
-                        Circle()
-                            .fill(theme.text.opacity(config.elevenlabsApiKey.isEmpty ? 0.3 : 0.8))
-                            .frame(width: 6, height: 6)
-                        Text(config.elevenlabsApiKey.isEmpty ? "Not configured" : "Configured")
-                            .font(.caption)
-                            .foregroundColor(theme.textSecondary)
-                        Spacer()
-                        Link("Get API Key", destination: URL(string: "https://elevenlabs.io/app/settings/api-keys")!)
-                            .font(.caption)
-                    }
-                }
-            }
+            ProviderAPIKeySection(
+                provider: SpeechProviderCatalog.descriptor(for: .elevenlabs),
+                apiKey: Binding(
+                    get: { config.elevenlabsApiKey },
+                    set: { config.elevenlabsApiKey = $0 }
+                )
+            )
 
             // Voice Selection
-            GlassSection(title: "Voice Selection", icon: "waveform", color: .purple) {
+            GlassSection(title: "Voice Selection", icon: "waveform", color: .green) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         TextField("Voice ID", text: Binding(
@@ -878,6 +720,63 @@ struct ElevenLabsPlaygroundView: View {
                         }
                         .buttonStyle(.glassCompat)
                         .disabled(config.elevenlabsApiKey.isEmpty || isLoadingVoices)
+
+                        Button {
+                            withAnimation(.spring(duration: 0.2)) {
+                                showAddVoice.toggle()
+                                addVoiceError = nil
+                            }
+                        } label: {
+                            Label("Add Voice", systemImage: "plus")
+                        }
+                        .buttonStyle(.glassCompat)
+                    }
+
+                    if showAddVoice {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("ElevenLabs Voice ID", text: $newVoiceId)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(.body, design: .monospaced))
+
+                            TextField("Name (optional with an API key)", text: $newVoiceName)
+                                .textFieldStyle(.roundedBorder)
+
+                            TextField("Description (optional)", text: $newVoiceDescription)
+                                .textFieldStyle(.roundedBorder)
+
+                            HStack {
+                                Text(config.elevenlabsApiKey.isEmpty
+                                     ? "Name the voice, or configure your API key so SpeakEasy can recognize it."
+                                     : "SpeakEasy will verify the ID and save the voice's real name locally.")
+                                    .font(.caption)
+                                    .foregroundColor(theme.textTertiary)
+
+                                Spacer()
+
+                                Button(action: addCustomVoice) {
+                                    if isRecognizingVoice {
+                                        ProgressView()
+                                            .scaleEffect(0.7)
+                                    } else {
+                                        Text(config.elevenlabsApiKey.isEmpty ? "Save Voice" : "Recognize & Save")
+                                    }
+                                }
+                                .buttonStyle(.flatProminent)
+                                .disabled(
+                                    isRecognizingVoice ||
+                                    newVoiceId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                                    (config.elevenlabsApiKey.isEmpty && newVoiceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                )
+                            }
+
+                            if let error = addVoiceError {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(theme.textSecondary)
+                            }
+                        }
+                        .padding(12)
+                        .glassBackground(cornerRadius: 12, intensity: .subtle)
                     }
 
                     // Show current voice name if found
@@ -896,9 +795,42 @@ struct ElevenLabsPlaygroundView: View {
                         }
                     }
 
-                    // User's custom voices
+                    if !config.elevenlabsSavedVoices.isEmpty {
+                        Text("Saved in SpeakEasy")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(theme.textSecondary)
+                            .padding(.top, 4)
+
+                        VStack(spacing: 6) {
+                            ForEach(config.elevenlabsSavedVoices) { voice in
+                                HStack(spacing: 8) {
+                                    ElevenLabsVoiceRow(
+                                        voice: voice,
+                                        isSelected: config.elevenlabsVoiceId == voice.voice_id,
+                                        isPlaying: currentlyPlayingVoice == voice.voice_id,
+                                        isDisabled: currentlyPlayingVoice != nil || config.elevenlabsApiKey.isEmpty
+                                    ) {
+                                        config.elevenlabsVoiceId = voice.voice_id
+                                    } onPreview: {
+                                        previewVoice(voice)
+                                    }
+
+                                    Button {
+                                        removeSavedVoice(voice)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .buttonStyle(.flat)
+                                    .help("Remove from SpeakEasy")
+                                }
+                            }
+                        }
+                    }
+
+                    // Voices returned by the user's ElevenLabs account.
                     if !voices.isEmpty {
-                        Text("Your Voices")
+                        Text("My Voices")
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundColor(theme.textSecondary)
@@ -923,8 +855,7 @@ struct ElevenLabsPlaygroundView: View {
                         .frame(maxHeight: 120)
                     }
 
-                    // Default voices section
-                    Text("Popular Voices (\(Self.defaultVoices.count) available)")
+                    Text("Curated Included Voices")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(theme.textSecondary)
@@ -932,7 +863,7 @@ struct ElevenLabsPlaygroundView: View {
 
                     ScrollView {
                         VStack(spacing: 6) {
-                            ForEach(Self.defaultVoices) { voice in
+                            ForEach(ElevenLabsVoiceCatalog.curated) { voice in
                                 ElevenLabsVoiceRow(
                                     voice: voice,
                                     isSelected: config.elevenlabsVoiceId == voice.voice_id,
@@ -954,13 +885,13 @@ struct ElevenLabsPlaygroundView: View {
                             .foregroundColor(theme.textSecondary)
                     }
 
-                    Link("Browse Voice Library", destination: URL(string: "https://elevenlabs.io/voice-library")!)
+                    Link("Browse ElevenLabs Voice Library", destination: URL(string: "https://elevenlabs.io/app/voice-library")!)
                         .font(.caption)
                 }
             }
 
             // Playground
-            GlassSection(title: "Playground", icon: "play.circle.fill", color: .purple) {
+            GlassSection(title: "Playground", icon: "play.circle.fill", color: .green) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Test Text")
                         .font(.caption)
@@ -1001,15 +932,12 @@ struct ElevenLabsPlaygroundView: View {
         }
     }
 
-    // Computed property to combine user voices and default voices
     var allVoices: [ElevenLabsVoice] {
-        var combined = voices
-        for defaultVoice in Self.defaultVoices {
-            if !combined.contains(where: { $0.voice_id == defaultVoice.voice_id }) {
-                combined.append(defaultVoice)
-            }
-        }
-        return combined
+        ElevenLabsVoiceCatalog.merged(
+            config.elevenlabsSavedVoices,
+            voices,
+            ElevenLabsVoiceCatalog.curated
+        )
     }
 
     struct ElevenLabsVoiceRow: View {
@@ -1061,6 +989,74 @@ struct ElevenLabsPlaygroundView: View {
         }
     }
 
+    func addCustomVoice() {
+        let voiceId = newVoiceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let suppliedName = newVoiceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let suppliedDescription = newVoiceDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !voiceId.isEmpty else { return }
+        addVoiceError = nil
+        isRecognizingVoice = true
+
+        Task {
+            do {
+                let recognizedVoice: ElevenLabsVoice
+
+                if config.elevenlabsApiKey.isEmpty {
+                    recognizedVoice = ElevenLabsVoice(
+                        voice_id: voiceId,
+                        name: suppliedName,
+                        category: "saved",
+                        description: suppliedDescription.isEmpty ? nil : suppliedDescription
+                    )
+                } else {
+                    var request = URLRequest(url: URL(string: "https://api.elevenlabs.io/v1/voices/\(voiceId)")!)
+                    request.setValue(config.elevenlabsApiKey, forHTTPHeaderField: "xi-api-key")
+
+                    let (data, response) = try await URLSession.shared.data(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse,
+                          httpResponse.statusCode == 200 else {
+                        throw NSError(
+                            domain: "ElevenLabs",
+                            code: (response as? HTTPURLResponse)?.statusCode ?? 0,
+                            userInfo: [NSLocalizedDescriptionKey: "ElevenLabs could not find that voice ID in My Voices."]
+                        )
+                    }
+
+                    let fetchedVoice = try JSONDecoder().decode(ElevenLabsVoice.self, from: data)
+                    recognizedVoice = ElevenLabsVoice(
+                        voice_id: fetchedVoice.voice_id,
+                        name: suppliedName.isEmpty ? fetchedVoice.name : suppliedName,
+                        category: fetchedVoice.category,
+                        description: suppliedDescription.isEmpty ? fetchedVoice.description : suppliedDescription
+                    )
+                }
+
+                await MainActor.run {
+                    config.saveElevenLabsVoice(recognizedVoice)
+                    config.elevenlabsVoiceId = recognizedVoice.voice_id
+                    newVoiceId = ""
+                    newVoiceName = ""
+                    newVoiceDescription = ""
+                    isRecognizingVoice = false
+                    showAddVoice = false
+                }
+            } catch {
+                await MainActor.run {
+                    addVoiceError = error.localizedDescription
+                    isRecognizingVoice = false
+                }
+            }
+        }
+    }
+
+    func removeSavedVoice(_ voice: ElevenLabsVoice) {
+        config.removeElevenLabsVoice(id: voice.voice_id)
+        if config.elevenlabsVoiceId == voice.voice_id {
+            config.elevenlabsVoiceId = ElevenLabsVoiceCatalog.curated[0].voice_id
+        }
+    }
+
     func loadVoices() {
         isLoadingVoices = true
         voicesError = nil
@@ -1076,7 +1072,7 @@ struct ElevenLabsPlaygroundView: View {
                     throw NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to fetch voices"])
                 }
 
-                let decoded = try JSONDecoder().decode(VoicesResponse.self, from: data)
+                let decoded = try JSONDecoder().decode(ElevenLabsVoicesResponse.self, from: data)
                 await MainActor.run {
                     voices = decoded.voices
                     isLoadingVoices = false
@@ -1190,7 +1186,7 @@ struct SystemSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            GlassSection(title: "Voice Selection", icon: "desktopcomputer", color: .blue) {
+            GlassSection(title: "Voice Selection", icon: "desktopcomputer", color: HudTint.green.color) {
                 VStack(alignment: .leading, spacing: 12) {
                     if availableVoices.isEmpty {
                         HStack {
@@ -1223,7 +1219,7 @@ struct SystemSettingsView: View {
                 }
             }
 
-            GlassSection(title: "Playground", icon: "play.circle.fill", color: .blue) {
+            GlassSection(title: "Playground", icon: "play.circle.fill", color: HudTint.green.color) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Test Text")
                         .font(.caption)

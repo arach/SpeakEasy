@@ -1,0 +1,327 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		05697FC2FDA2BDD3F72B74EF /* PairingScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08308BD6F2D31B244C3CFFF9 /* PairingScannerView.swift */; };
+		1A87FE58969A875052A0C269 /* PadShellModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F49958C9EE1C775EBE1260D /* PadShellModel.swift */; };
+		A6FD97EA97CD6653A2AE5076 /* PadShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3FE765B6ED5005F8DEEBBA /* PadShellView.swift */; };
+		AD1A532A9669C3E8F76E8A1D /* PairingLinkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D0705F5D9DAF00E4843D47 /* PairingLinkStore.swift */; };
+		BCDB99FA5DB71C6AEBB5EA60 /* PairingLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D01D51D450710E96E778239 /* PairingLink.swift */; };
+		CC8F1EB7248A6A4E8F2EBD3F /* SpeakEasyPadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57DD90AE481EF3D58011B1DE /* SpeakEasyPadApp.swift */; };
+		D56E31918E8F02A6B0EC6EB8 /* PadWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5198B5006FE01E431E4BE86C /* PadWebView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		08308BD6F2D31B244C3CFFF9 /* PairingScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingScannerView.swift; sourceTree = "<group>"; };
+		2F49958C9EE1C775EBE1260D /* PadShellModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadShellModel.swift; sourceTree = "<group>"; };
+		5198B5006FE01E431E4BE86C /* PadWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadWebView.swift; sourceTree = "<group>"; };
+		57DD90AE481EF3D58011B1DE /* SpeakEasyPadApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakEasyPadApp.swift; sourceTree = "<group>"; };
+		5DEB77454A86B2DC62CBF64B /* SpeakEasyPad.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SpeakEasyPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F3FE765B6ED5005F8DEEBBA /* PadShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadShellView.swift; sourceTree = "<group>"; };
+		9D01D51D450710E96E778239 /* PairingLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingLink.swift; sourceTree = "<group>"; };
+		E8D0705F5D9DAF00E4843D47 /* PairingLinkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingLinkStore.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		612F38125496D041E787FD83 /* SpeakEasyPad */ = {
+			isa = PBXGroup;
+			children = (
+				7D9126DD8725A9C2EA79E2C5 /* Sources */,
+			);
+			path = SpeakEasyPad;
+			sourceTree = "<group>";
+		};
+		7D9126DD8725A9C2EA79E2C5 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				2F49958C9EE1C775EBE1260D /* PadShellModel.swift */,
+				5F3FE765B6ED5005F8DEEBBA /* PadShellView.swift */,
+				5198B5006FE01E431E4BE86C /* PadWebView.swift */,
+				9D01D51D450710E96E778239 /* PairingLink.swift */,
+				E8D0705F5D9DAF00E4843D47 /* PairingLinkStore.swift */,
+				08308BD6F2D31B244C3CFFF9 /* PairingScannerView.swift */,
+				57DD90AE481EF3D58011B1DE /* SpeakEasyPadApp.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		B168F39EFE0D8C871A396DFD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5DEB77454A86B2DC62CBF64B /* SpeakEasyPad.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F15E5BD1EF1BA3BA27EE1EA5 = {
+			isa = PBXGroup;
+			children = (
+				612F38125496D041E787FD83 /* SpeakEasyPad */,
+				B168F39EFE0D8C871A396DFD /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		40630FE6DD5D9C25B5EC7A2D /* SpeakEasyPad */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 939715D40D5610CB7A82EC12 /* Build configuration list for PBXNativeTarget "SpeakEasyPad" */;
+			buildPhases = (
+				D9B67879D6ACE8BA7E7F1F11 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SpeakEasyPad;
+			packageProductDependencies = (
+			);
+			productName = SpeakEasyPad;
+			productReference = 5DEB77454A86B2DC62CBF64B /* SpeakEasyPad.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E39EB25F97A21B3153E2C991 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					40630FE6DD5D9C25B5EC7A2D = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = B45024E3BBC77F680C27459D /* Build configuration list for PBXProject "SpeakEasyPad" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = F15E5BD1EF1BA3BA27EE1EA5;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				40630FE6DD5D9C25B5EC7A2D /* SpeakEasyPad */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D9B67879D6ACE8BA7E7F1F11 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A87FE58969A875052A0C269 /* PadShellModel.swift in Sources */,
+				A6FD97EA97CD6653A2AE5076 /* PadShellView.swift in Sources */,
+				D56E31918E8F02A6B0EC6EB8 /* PadWebView.swift in Sources */,
+				BCDB99FA5DB71C6AEBB5EA60 /* PairingLink.swift in Sources */,
+				AD1A532A9669C3E8F76E8A1D /* PairingLinkStore.swift in Sources */,
+				05697FC2FDA2BDD3F72B74EF /* PairingScannerView.swift in Sources */,
+				CC8F1EB7248A6A4E8F2EBD3F /* SpeakEasyPadApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		74ABA3B22C3FCE2B56808FD8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SpeakEasyPad/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.speakeasy.pad;
+				PRODUCT_NAME = "SpeakEasy Pad";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8A7CA5AA05EF5D448F6BD849 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SpeakEasyPad/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.speakeasy.pad;
+				PRODUCT_NAME = "SpeakEasy Pad";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D88F38BC3D746D1A2C75BBCA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		FCB4D284074029F97402AC1C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		939715D40D5610CB7A82EC12 /* Build configuration list for PBXNativeTarget "SpeakEasyPad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A7CA5AA05EF5D448F6BD849 /* Debug */,
+				74ABA3B22C3FCE2B56808FD8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B45024E3BBC77F680C27459D /* Build configuration list for PBXProject "SpeakEasyPad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D88F38BC3D746D1A2C75BBCA /* Debug */,
+				FCB4D284074029F97402AC1C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E39EB25F97A21B3153E2C991 /* Project object */;
+}

@@ -18,7 +18,7 @@ var __export = (target, all) => {
 var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 var __require = import.meta.require;
 
-// node_modules/uuid/dist-node/rng.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/rng.js
 function rng() {
   return crypto.getRandomValues(rnds8);
 }
@@ -27,13 +27,13 @@ var init_rng = __esm(() => {
   rnds8 = new Uint8Array(16);
 });
 
-// node_modules/uuid/dist-node/regex.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/regex.js
 var regex_default;
 var init_regex = __esm(() => {
   regex_default = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/i;
 });
 
-// node_modules/uuid/dist-node/validate.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/validate.js
 function validate(uuid) {
   return typeof uuid === "string" && regex_default.test(uuid);
 }
@@ -43,7 +43,7 @@ var init_validate = __esm(() => {
   validate_default = validate;
 });
 
-// node_modules/uuid/dist-node/stringify.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/stringify.js
 function unsafeStringify(arr, offset = 0) {
   return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
 }
@@ -55,7 +55,7 @@ var init_stringify = __esm(() => {
   }
 });
 
-// node_modules/uuid/dist-node/v4.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/v4.js
 function v4(options, buf, offset) {
   if (!buf && !options && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -89,7 +89,7 @@ var init_v4 = __esm(() => {
   v4_default = v4;
 });
 
-// node_modules/uuid/dist-node/sha1.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/sha1.js
 import { createHash } from "crypto";
 function sha1(bytes) {
   if (Array.isArray(bytes)) {
@@ -104,7 +104,7 @@ var init_sha1 = __esm(() => {
   sha1_default = sha1;
 });
 
-// node_modules/uuid/dist-node/parse.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/parse.js
 function parse(uuid) {
   if (!validate_default(uuid)) {
     throw TypeError("Invalid UUID");
@@ -118,7 +118,7 @@ var init_parse = __esm(() => {
   parse_default = parse;
 });
 
-// node_modules/uuid/dist-node/v35.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/v35.js
 function stringToBytes(str) {
   str = unescape(encodeURIComponent(str));
   const bytes = new Uint8Array(str.length);
@@ -160,7 +160,7 @@ var init_v35 = __esm(() => {
   init_stringify();
 });
 
-// node_modules/uuid/dist-node/v5.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/v5.js
 function v5(value, namespace, buf, offset) {
   return v35(80, sha1_default, value, namespace, buf, offset);
 }
@@ -173,7 +173,7 @@ var init_v5 = __esm(() => {
   v5_default = v5;
 });
 
-// node_modules/uuid/dist-node/index.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/index.js
 var init_dist_node = __esm(() => {
   init_v4();
   init_v5();
@@ -2340,7 +2340,7 @@ var getPackageVersion = () => {
   }
 };
 
-// node_modules/chalk/source/vendor/ansi-styles/index.js
+// node_modules/.pnpm/chalk@5.6.2/node_modules/chalk/source/vendor/ansi-styles/index.js
 var ANSI_BACKGROUND_OFFSET = 10;
 var wrapAnsi16 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi256 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
@@ -2517,7 +2517,7 @@ function assembleStyles() {
 var ansiStyles = assembleStyles();
 var ansi_styles_default = ansiStyles;
 
-// node_modules/chalk/source/vendor/supports-color/index.js
+// node_modules/.pnpm/chalk@5.6.2/node_modules/chalk/source/vendor/supports-color/index.js
 import process2 from "process";
 import os from "os";
 import tty from "tty";
@@ -2649,7 +2649,7 @@ var supportsColor = {
 };
 var supports_color_default = supportsColor;
 
-// node_modules/chalk/source/utilities.js
+// node_modules/.pnpm/chalk@5.6.2/node_modules/chalk/source/utilities.js
 function stringReplaceAll(string, substring, replacer) {
   let index = string.indexOf(substring);
   if (index === -1) {
@@ -2682,7 +2682,7 @@ function stringEncaseCRLFWithFirstIndex(string, prefix, postfix, index) {
   return returnValue;
 }
 
-// node_modules/chalk/source/index.js
+// node_modules/.pnpm/chalk@5.6.2/node_modules/chalk/source/index.js
 var { stdout: stdoutColor, stderr: stderrColor } = supports_color_default;
 var GENERATOR = Symbol("GENERATOR");
 var STYLER = Symbol("STYLER");
@@ -3745,7 +3745,7 @@ async function updateApp(onProgress) {
   return await downloadAndInstallApp(onProgress);
 }
 
-// node_modules/commander/lib/error.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/error.js
 class CommanderError extends Error {
   constructor(exitCode, code, message) {
     super(message);
@@ -3765,7 +3765,7 @@ class InvalidArgumentError extends CommanderError {
   }
 }
 
-// node_modules/commander/lib/argument.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/argument.js
 class Argument {
   constructor(name, description) {
     this.description = description || "";
@@ -3839,7 +3839,7 @@ function humanReadableArgName(arg) {
   return arg.required ? "<" + nameOutput + ">" : "[" + nameOutput + "]";
 }
 
-// node_modules/commander/lib/command.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/command.js
 import { EventEmitter } from "events";
 import childProcess from "child_process";
 import path10 from "path";
@@ -3847,7 +3847,7 @@ import fs10 from "fs";
 import process3 from "process";
 import { stripVTControlCharacters as stripVTControlCharacters2 } from "util";
 
-// node_modules/commander/lib/help.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/help.js
 import { stripVTControlCharacters } from "util";
 
 class Help {
@@ -4196,7 +4196,7 @@ ${itemIndentStr}`);
   }
 }
 
-// node_modules/commander/lib/option.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/option.js
 class Option {
   constructor(flags, description) {
     this.flags = flags;
@@ -4374,7 +4374,7 @@ function splitOptionFlags(flags) {
   return { shortFlag, longFlag };
 }
 
-// node_modules/commander/lib/suggestSimilar.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/suggestSimilar.js
 var maxDistance = 3;
 function editDistance(a, b) {
   if (Math.abs(a.length - b.length) > maxDistance)
@@ -4444,7 +4444,7 @@ function suggestSimilar(word, candidates) {
   return "";
 }
 
-// node_modules/commander/lib/command.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/command.js
 class Command extends EventEmitter {
   constructor(name) {
     super();
@@ -5786,10 +5786,10 @@ function useColor() {
   return;
 }
 
-// node_modules/commander/index.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/index.js
 var program = new Command;
 
-// node_modules/zod/v3/external.js
+// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
 var exports_external = {};
 __export(exports_external, {
   void: () => voidType,
@@ -5901,7 +5901,7 @@ __export(exports_external, {
   BRAND: () => BRAND
 });
 
-// node_modules/zod/v3/helpers/util.js
+// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/util.js
 var util;
 (function(util2) {
   util2.assertEqual = (_) => {};
@@ -6032,7 +6032,7 @@ var getParsedType = (data) => {
   }
 };
 
-// node_modules/zod/v3/ZodError.js
+// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/ZodError.js
 var ZodIssueCode = util.arrayToEnum([
   "invalid_type",
   "invalid_literal",
@@ -6151,7 +6151,7 @@ ZodError.create = (issues) => {
   return error;
 };
 
-// node_modules/zod/v3/locales/en.js
+// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/locales/en.js
 var errorMap = (issue, _ctx) => {
   let message;
   switch (issue.code) {
@@ -6254,7 +6254,7 @@ var errorMap = (issue, _ctx) => {
 };
 var en_default = errorMap;
 
-// node_modules/zod/v3/errors.js
+// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/errors.js
 var overrideErrorMap = en_default;
 function setErrorMap(map) {
   overrideErrorMap = map;
@@ -6262,7 +6262,7 @@ function setErrorMap(map) {
 function getErrorMap() {
   return overrideErrorMap;
 }
-// node_modules/zod/v3/helpers/parseUtil.js
+// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
   const { data, path: path11, errorMaps, issueData } = params;
   const fullPath = [...path11, ...issueData.path || []];
@@ -6368,14 +6368,14 @@ var isAborted = (x) => x.status === "aborted";
 var isDirty = (x) => x.status === "dirty";
 var isValid = (x) => x.status === "valid";
 var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
-// node_modules/zod/v3/helpers/errorUtil.js
+// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 
-// node_modules/zod/v3/types.js
+// node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 class ParseInputLazyPath {
   constructor(parent, value, path11, key) {
     this._cachedPath = [];
