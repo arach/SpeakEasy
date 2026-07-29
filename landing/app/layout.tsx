@@ -32,14 +32,14 @@ const silkscreen = Silkscreen({
 })
 
 export const metadata: Metadata = {
-  title: "SpeakEasy — Unified Text-to-Speech Library",
-  description: "Simple, unified text-to-speech for all your projects. Multiple providers, smart caching, volume control.",
-  keywords: "text-to-speech, tts, npm, library, openai, elevenlabs, typescript, speech synthesis",
+  title: "SpeakEasy — Speak to Codex. Hear it answer.",
+  description: "A two-way voice layer for Codex on macOS: local speech recognition in, controllable narration out, locked to the task you choose.",
+  keywords: "Codex voice, speech recognition, ASR, text-to-speech, TTS, macOS, coding agent, voice lanes",
   authors: [{ name: "SpeakEasy" }],
   metadataBase: new URL("https://speakeasy.arach.dev"),
   openGraph: {
-    title: "SpeakEasy — Unified Text-to-Speech Library",
-    description: "Simple, unified text-to-speech for all your projects. Multiple providers, smart caching, volume control.",
+    title: "SpeakEasy — Speak to Codex. Hear it answer.",
+    description: "A two-way voice layer for Codex on macOS: local speech recognition in, controllable narration out.",
     type: "website",
     url: "https://speakeasy.arach.dev",
     siteName: "SpeakEasy",
@@ -48,14 +48,14 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "SpeakEasy - Unified TTS for all your projects",
+        alt: "SpeakEasy — two-way voice for Codex",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SpeakEasy — Unified Text-to-Speech Library",
-    description: "Simple, unified text-to-speech for all your projects. Multiple providers, smart caching, volume control.",
+    title: "SpeakEasy — Speak to Codex. Hear it answer.",
+    description: "A two-way voice layer for Codex on macOS: local speech recognition in, controllable narration out.",
     images: ["/og-image.png"],
   },
   generator: 'SpeakEasy'

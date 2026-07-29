@@ -34,6 +34,9 @@ const config: Config = {
         bold: "700",
       },
       colors: {
+        canvas: "#080a09",
+        mint: "#4fdeb0",
+        "ink-inverse": "#04120e",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
