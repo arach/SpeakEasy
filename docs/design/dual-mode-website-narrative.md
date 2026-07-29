@@ -127,17 +127,18 @@ controllable narration out, locked to the Codex task you choose.
 Explain the complete loop, show why exact-task routing matters, separate stable
 and preview readiness, and route people to installation.
 
-### Install
+### Codex
 
-Offer three explicit paths:
+Explain exact-task mapping first, then offer the relevant paths:
 
 1. signed Mac app for stable TTS/player use;
 2. CLI/SDK for scripts and integrations;
 3. source build for the Codex listening technical preview until it is included
    in a signed release.
 
-Show the packaged Codex plugin as "directory listing in progress," not as an
-available install command.
+Installation is the last step of the Codex story, not the page identity. Show
+the stable signed player and source-built listening preview without inventing a
+public plugin install command.
 
 ### Documentation
 
