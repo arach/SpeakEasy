@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import CodexImplementationProof from "@/components/codex-implementation-proof"
 import {
   ArrowLeft,
   ArrowRight,
@@ -907,6 +908,8 @@ export default function GrokConceptStudy() {
           </div>
         </div>
       </div>
+
+      <CodexImplementationProof tone="blue" />
 
       <VariationLanes />
       <VariationSeal />

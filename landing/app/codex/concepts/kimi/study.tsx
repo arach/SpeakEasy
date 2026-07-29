@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, ArrowRight } from "lucide-react"
+import CodexImplementationProof from "@/components/codex-implementation-proof"
 import ReadinessStrip from "./components/readiness-strip"
 import VariationWave from "./components/variation-wave"
 import VariationHinge from "./components/variation-hinge"
@@ -156,6 +157,8 @@ export default function KimiConceptStudy() {
           </div>
         </div>
       </div>
+
+      <CodexImplementationProof tone="emerald" />
 
       <VariationWave />
       <VariationHinge />

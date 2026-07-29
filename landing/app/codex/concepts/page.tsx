@@ -54,13 +54,13 @@ export default function CodexConceptsPage() {
               </h1>
             </div>
             <p className="max-w-xl font-text text-base font-light leading-7 text-slate-600 lg:pb-1">
-              Kimi and Grok received the same product truth and worked independently. Each study contains three rendered variations—not mood boards—so the interaction can be compared in the browser.
+              Kimi and Grok received the same product truth and worked independently. Each study now opens with source-rendered captures of the real native app, then applies a different visual point of view across three directions.
             </p>
           </div>
 
           <div className="mt-14 grid gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-lg shadow-slate-900/5 backdrop-blur-xl sm:grid-cols-3 sm:p-5">
             {[
-              [MessageCircleMore, "Two-way voice", "Local speech in · native playback out"],
+              [MessageCircleMore, "Real app first", "Source-rendered player, lanes, and HUD"],
               [Route, "Exact-task routing", "The chosen task ID stays attached"],
               [Layers3, "Three variations each", "Six complete directions to compare"],
             ].map(([Icon, title, body]) => {
