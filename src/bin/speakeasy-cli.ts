@@ -47,6 +47,20 @@ async function run(): Promise<void> {
     return;
   }
 
+  // `speakeasy deck` — serve the deck control surface on the local network.
+  if (process.argv[2] === 'deck') {
+    const { runDeck } = await import('../cli/deck');
+    await runDeck(process.argv.slice(3));
+    return;
+  }
+
+  // `speakeasy plugin <host>` — install the SpeakEasy skill into an agent host.
+  if (process.argv[2] === 'plugin') {
+    const { runPlugin } = await import('../cli/plugin');
+    await runPlugin(process.argv.slice(3));
+    return;
+  }
+
   const program = new Command();
   program
     .name('speakeasy')

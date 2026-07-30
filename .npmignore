@@ -75,3 +75,9 @@ node_modules/
 # OS generated files
 Thumbs.db
 .DS_Store
+
+# Design studio is a dev tool, not shipped
+design/
+
+# But the deck surface ships with the CLI
+!deck/**
