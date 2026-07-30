@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="en" data-hudson-template="speakeasy-deck" data-hudson-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Speakeasy · Micro Deck</title>
+
+<!-- The file's only external request. Remove it for a hermetic bundle — both families
+     have local fallbacks in the type tokens below. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   THEME — the whole look lives in this block, and nothing below it hardcodes a
+   color. Replacing these values re-skins the deck: no markup, no JS changes.
+
+   When the Hudson theme format is final this becomes a
+   [data-hudson-template="speakeasy-deck"] block and the tokens alias across to
+   the semantic surface — --se-panel: var(--card), --se-ink: var(--foreground),
+   --se-line: var(--border), --se-accent: var(--accent), and so on.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root{
+  /* surfaces */
+  --se-page-bg:#e4ddd0;
+  --se-panel:#f5f1ea;
+  --se-panel-head:#faf6ee;
+  --se-cell:#fffdf8;
+  --se-trace-bg:#f4eee2;
+
+  /* rules */
+  --se-line:#d9cfb9;
+  --se-line-soft:#e2dac7;
+
+  /* ink, four steps — the whole hierarchy */
+  --se-ink:#1a1612;
+  --se-ink-2:#3b342b;
+  --se-ink-3:#6b6356;
+  --se-ink-4:#968b79;
+
+  /* accent */
+  --se-accent:#b5421c;
+  --se-accent-dim:#c9764f;
+  --se-accent-ink:#8f3a1c;
+  --se-accent-edge:#e8d2b1;
+  --se-accent-ring:rgba(181,66,28,0.16);
+  --se-accent-contrast:#f7e9d6;
+  --se-chip-bg:#f7e9d6;
+  --se-chip-ink:#8f3a1c;
+  --se-caption-ink:#3b342b;
+
+  /* conversation */
+  --se-you-bg:#1a1612;
+  --se-you-edge:#1a1612;
+  --se-you-ink:#f2eee6;
+
+  /* player */
+  --se-player-bg:#ede7db;
+  --se-player-edge:#d9cfb9;
+  --se-player-ink:#f7e9d6;
+  --se-player-text:#8f3a1c;
+  --se-wave-on:#b5421c;
+  --se-wave-off:#c8bea4;
+
+  /* hardware plate — the pad surface is always paper, whatever the console does */
+  --se-plate-bg:oklch(0.94 0.003 240);
+  --se-plate-wash:linear-gradient(168deg,oklch(0.97 0.002 240),oklch(0.91 0.004 240));
+  --se-plate-edge:oklch(0.78 0.005 240);
+  --se-plate-rule:oklch(0.86 0.004 240);
+  --se-plate-ink:oklch(0.26 0.004 240);
+  --se-plate-ink-2:oklch(0.45 0.004 240);
+  --se-plate-ink-3:oklch(0.58 0.004 240);
+  --se-plate-track:oklch(0.88 0.004 240);
+  --se-pad-face:linear-gradient(160deg,oklch(0.99 0.001 240),oklch(0.94 0.003 240));
+  --se-pad-face-on:linear-gradient(160deg,#fffdf8,#f7e9d6);
+  --se-pad-face-empty:linear-gradient(160deg,oklch(0.95 0.002 240),oklch(0.90 0.003 240));
+  --se-pad-edge:oklch(0.84 0.004 240);
+  --se-pad-accent:#b5421c;
+  --se-pad-ring:rgba(181,66,28,0.16);
+  --se-pad-num:oklch(0.28 0.004 240);
+  --se-pad-num-empty:oklch(0.75 0.004 240);
+  --se-pad-ink-idle:oklch(0.60 0.004 240);
+  --se-pad-snippet:oklch(0.58 0.004 240);
+  --se-pad-snippet-on:oklch(0.45 0.02 240);
+  --se-pad-spark-idle:oklch(0.80 0.004 240);
+
+  /* mic */
+  --se-mic-a:#b5421c;
+  --se-mic-b:#8f3a1c;
+  --se-mic-edge:#d4663c;
+  --se-mic-ink:#fff6ec;
+  --se-mic-sub-ink:#f0c7ac;
+  --se-mic-sheen:inset 0 1px 0 rgba(255,255,255,0.18);
+
+  /* physical buttons on the plate */
+  --se-btn-face:linear-gradient(180deg,oklch(0.98 0.002 240),oklch(0.93 0.003 240));
+  --se-btn-edge:oklch(0.82 0.005 240);
+  --se-btn-ink:oklch(0.42 0.005 240);
+  --se-btn-sheen:inset 0 1px 0 #fff;
+
+  /* status — the only chromatic channel besides accent */
+  --se-led-idle:oklch(0.80 0.004 240);
+  --se-led-empty:oklch(0.85 0.004 240);
+  --se-ink-empty:oklch(0.72 0.004 240);
+  --se-status-working:oklch(0.72 0.14 75);
+  --se-status-working-ink:oklch(0.50 0.10 75);
+  --se-status-working-glow:0 0 5px oklch(0.72 0.14 75 / 0.7);
+
+  /* type */
+  --se-title:'Spectral',Georgia,serif;
+  --se-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace;
+  --se-sans:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace;
+
+  /* geometry */
+  --se-radius:8px;
+  --se-radius-sm:6px;
+  --se-bubble-a:9px 9px 9px 3px;
+  --se-bubble-b:9px 9px 3px 9px;
+
+  /* light — a matte plate: hairline inset, shallow depth, no sheen */
+  --se-panel-shadow:inset 0 0 0 1px rgba(255,255,255,0.45), 0 8px 22px -18px rgba(0,0,0,0.35);
+  --se-card-shadow:0 1px 2px rgba(0,0,0,0.09);
+}
+
+/* ═════════════════════════════ surface ═════════════════════════════ */
+
+:root[data-hudson-theme="dark"]{color-scheme:dark}
+
+*{box-sizing:border-box}
+
+/* The host web view runs non-opaque (isOpaque=false / drawsBackground=false), so
+   the page must not paint an opaque plate — the deck shell owns its background. */
+html,body{margin:0;padding:0;height:100%;background:transparent;overflow:hidden}
+/* The shell sizes to 100% of this, so the chain needs a definite height the whole
+   way down — otherwise the pad plate resolves to content height and clips. */
+#deck{height:100%}
+
+body{
+  font-family:var(--se-sans);
+  -webkit-font-smoothing:antialiased;
+  overscroll-behavior:none;                 /* no rubber-band past the surface */
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;               /* no long-press callout on touch hosts */
+  touch-action:manipulation;                /* no double-tap zoom delay on controls */
+  user-select:none;-webkit-user-select:none;
+}
+
+/* Every control is a real <button> — the delegated click handler sees keyboard
+   activation for free, and focus stays visible on the accent channel. */
+#deck button{font:inherit;color:inherit;margin:0;padding:0}
+#deck button:focus-visible{outline:2px solid var(--se-accent);outline-offset:2px}
+#deck button::-moz-focus-inner{border:0}
+
+/* Transcript copy stays selectable; chrome does not. */
+.se-sel{user-select:text;-webkit-user-select:text}
+
+@keyframes se-breathe{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes se-listen{0%{transform:scaleY(.35)}50%{transform:scaleY(1)}100%{transform:scaleY(.35)}}
+
+.se-scroll{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.se-scroll::-webkit-scrollbar{width:8px;height:8px}
+.se-scroll::-webkit-scrollbar-track{background:transparent}
+.se-scroll::-webkit-scrollbar-thumb{background:currentColor;opacity:.25;border-radius:4px}
+
+.se-hoverink:hover{color:var(--se-accent-ink)!important}
+.se-press{transition:transform .09s ease,filter .09s ease}
+.se-press:active{transform:scale(.97);filter:brightness(1.04)}
+
+/* Design is authored at desk width. Below that the two plates stack rather than
+   forcing a horizontal scrollbar inside a panel-sized web view — and the surface
+   switches from viewport-clamped to naturally tall, so neither plate crushes the
+   other. Scroll moves to the page; the inner scrollers stand down. */
+@media (max-width:1000px){
+  html,body{overflow:auto}
+  #deck{height:auto}
+  .se-shell{height:auto!important;min-height:100%!important;overflow:visible!important}
+  .se-decks{flex-direction:column!important}
+  .se-decks>*{flex:0 0 auto!important;min-width:0!important}
+  .se-pads{overflow:visible!important;flex:0 0 auto!important}
+  .se-conv{max-height:none!important}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="deck"></div>
+
+<script>
+"use strict";
+(function () {
+
+// ────────────────────────────────────────────────────────────────────────────
+// Content
+// ────────────────────────────────────────────────────────────────────────────
+
+// One-line gists: with audio, the transcript doesn't need to shout the whole blob.
+const GISTS = {
+  '0:1': 'Pad 7 bound to the site lane · LED rules updated',
+  '1:1': 'Rerouted via relay-01 · locked at rev 4172 · 2 checks pending',
+  '1:3': 'Manifest signature blocks the merge · key rotation optional',
+  '2:1': 'Scanning 11 routes · 2 writing outside the vault',
+  '3:1': '2 voices warm, 4 released · cold start ~300ms',
+  '4:1': '0.9.4 tagged + notarized · upload staged, waiting on you',
+  '5:1': 'Median first-audio 240ms · best prosody is the slowest',
+  '6:1': 'Hero leads with the deck · one install action, one line of copy',
+  '7:1': '3 of 14 need you today'
+};
+
+const LANES = [
+  { num: '01', name: 'SPEAKEASY', title: 'Speakeasy', state: 'idle',
+    task: 'Deck firmware · key remap', rev: 'REV 0912', voice: 'Narrator Voice',
+    thread: [
+      { role: 'you', text: 'Remap pad 7 to the site lane and keep the LED green.' },
+      { role: 'agent', text: 'Pad 7 now targets the site lane. LED stays green while the lane is idle and turns amber while a build runs.', dur: 41 }
+    ] },
+  { num: '02', name: 'HUDSON', title: 'Hudson', state: 'speaking',
+    task: 'Secure companion transport', rev: 'REV 4172', voice: 'Hudson Voice',
+    thread: [
+      { role: 'you', text: 'Hudson, reroute the companion transport through the relay and lock the task.' },
+      { role: 'agent', text: 'Rerouted through relay-01 and the task is locked at rev 4172. Two checks are still pending on the manifest — signature and a stale bridge key.', dur: 91 },
+      { role: 'you', text: 'Read me the pending checks and tell me which one blocks the merge.' },
+      { role: 'agent', text: 'The manifest signature blocks the merge; the stale bridge key only affects cross-host replay. I can rotate the key in the same pass if you want to clear both.', dur: 44 }
+    ] },
+  { num: '03', name: 'TALKIE', title: 'Talkie', state: 'working',
+    task: 'Capture route audit', rev: 'REV 2210', voice: 'Talkie Voice',
+    thread: [
+      { role: 'you', text: 'Audit every capture route and flag the ones writing outside the vault.' },
+      { role: 'agent', text: 'Scanning eleven routes. Two write outside the vault — journal-b and the scratch inbox. Still walking the remaining nine.', dur: 33 }
+    ] },
+  { num: '04', name: 'VOX', title: 'Vox', state: 'idle',
+    task: 'Voice model warm pool', rev: 'REV 0341', voice: 'Vox Voice',
+    thread: [
+      { role: 'you', text: 'Keep two voices warm and drop the rest.' },
+      { role: 'agent', text: 'Two voices held warm, four released. Cold start is back down to about 300 milliseconds.', dur: 28 }
+    ] },
+  { num: '05', name: 'RELEASE', title: 'Release', state: 'idle',
+    task: 'Tag 0.9.4 · notarize', rev: 'REV 0940', voice: 'Release Voice',
+    thread: [
+      { role: 'you', text: 'Cut 0.9.4 but hold the upload until I say go.' },
+      { role: 'agent', text: 'Tagged and notarized 0.9.4. The upload is staged and waiting on your word.', dur: 25 }
+    ] },
+  { num: '06', name: 'RESEARCH', title: 'Research', state: 'idle',
+    task: 'Latency survey · TTS vendors', rev: 'REV 0118', voice: 'Research Voice',
+    thread: [
+      { role: 'you', text: 'Summarize the latency survey in two sentences.' },
+      { role: 'agent', text: 'Median first-audio is 240 milliseconds across the three vendors we test; the slowest is consistently the one with the best prosody. Trade-off holds under load.', dur: 37 }
+    ] },
+  { num: '07', name: 'SITE', title: 'Site', state: 'idle',
+    task: 'Landing rebuild · hero', rev: 'REV 0077', voice: 'Site Voice',
+    thread: [
+      { role: 'you', text: 'Rebuild the hero around the deck itself.' },
+      { role: 'agent', text: 'Hero now leads with the deck render and a single install action. Copy is down to one line above the fold.', dur: 30 }
+    ] },
+  { num: '08', name: 'INBOX', title: 'Inbox', state: 'idle',
+    task: 'Triage · 14 threads', rev: 'REV 0006', voice: 'Inbox Voice',
+    thread: [
+      { role: 'you', text: 'Anything in the inbox that needs me today?' },
+      { role: 'agent', text: 'Three of fourteen need you: the notarization ticket, a beta tester with a crash log, and the vendor invoice.', dur: 26 }
+    ] },
+  { num: '09', name: 'EMPTY', title: 'Unassigned', state: 'empty',
+    task: 'No agent bound to this lane', rev: 'REV ——', voice: 'No Voice',
+    thread: [] }
+];
+
+const SPEEDS = [1, 1.25, 1.5, 0.75];
+
+// ────────────────────────────────────────────────────────────────────────────
+// Seed themes. `paper` is the CSS :root default and needs no overrides; the
+// others replace the token values inline on <html> at boot. `ember` keeps the
+// paper pad plate — the pad surface is always paper, whatever the console
+// does. Selected with ?theme=paper|ember|flight or speakeasyDeck.setTheme().
+// ────────────────────────────────────────────────────────────────────────────
+
+const SEEDS = {
+  paper: { scheme: 'light', vars: null },
+  ember: { scheme: 'dark', vars: {
+    'page-bg': '#171209', 'panel': '#211a12', 'panel-head': '#282017', 'cell': '#2b2218', 'trace-bg': '#1e1710',
+    'line': '#3d3122', 'line-soft': '#332a1e',
+    'ink': '#f3ead9', 'ink-2': '#d9c9b0', 'ink-3': '#a1937a', 'ink-4': '#776c5b',
+    'accent': '#e0673a', 'accent-dim': '#b25a3a', 'accent-ink': '#f4a983', 'accent-edge': '#54331f',
+    'accent-ring': 'rgba(224,103,58,0.18)', 'accent-contrast': '#fff3e6', 'chip-bg': '#35220f', 'chip-ink': '#f4a983', 'caption-ink': '#d9c9b0',
+    'you-bg': '#0f0b07', 'you-edge': '#3d3122', 'you-ink': '#f3ead9',
+    'player-bg': '#271e14', 'player-edge': '#463723', 'player-ink': '#f7e9d6', 'player-text': '#eda57e',
+    'wave-on': '#e0673a', 'wave-off': '#57452c',
+    'mic-a': '#c2521f', 'mic-b': '#93391a', 'mic-edge': '#e0673a', 'mic-ink': '#fff3e6', 'mic-sub-ink': '#eebfa0',
+    'btn-face': 'linear-gradient(180deg,#2e2417,#251c12)', 'btn-edge': '#44351f', 'btn-ink': '#cbb897',
+    'btn-sheen': 'inset 0 1px 0 rgba(255,255,255,0.07)',
+    'panel-shadow': 'inset 0 0 0 1px rgba(255,255,255,0.06), 0 14px 30px -16px rgba(0,0,0,0.65)',
+    'card-shadow': '0 1px 2px rgba(0,0,0,0.4)'
+  } },
+  flight: { scheme: 'dark', vars: {
+    'page-bg': '#05090b', 'panel': '#0c161a', 'panel-head': '#0f1c21', 'cell': '#122228', 'trace-bg': '#0a1316',
+    'line': '#1f333a', 'line-soft': '#1a2b31',
+    'ink': '#e8f0ee', 'ink-2': '#a9bcb8', 'ink-3': '#6c7f7b', 'ink-4': '#4d605c',
+    'accent': '#74f2ce', 'accent-dim': '#49a88c', 'accent-ink': '#8fe8cd', 'accent-edge': '#1e4a3f',
+    'accent-ring': 'rgba(116,242,206,0.16)', 'accent-contrast': '#06231b', 'chip-bg': '#0e2b25', 'chip-ink': '#74f2ce', 'caption-ink': '#a9bcb8',
+    'you-bg': '#0a1418', 'you-edge': '#1f333a', 'you-ink': '#e8f0ee',
+    'player-bg': '#0f1e25', 'player-edge': '#1f333a', 'player-ink': '#dcf6ec', 'player-text': '#74f2ce',
+    'wave-on': '#74f2ce', 'wave-off': '#2a4750',
+    'plate-bg': '#0a1316', 'plate-wash': 'linear-gradient(168deg,#0e191d,#080f12)', 'plate-edge': '#1d2e34',
+    'plate-rule': '#162529', 'plate-ink': '#dfeae6', 'plate-ink-2': '#9fb3ae', 'plate-ink-3': '#677a75',
+    'plate-track': '#142428',
+    'pad-face': 'linear-gradient(160deg,#142328,#0d171b)', 'pad-face-on': 'linear-gradient(160deg,#14332b,#0e1f1a)',
+    'pad-face-empty': 'linear-gradient(160deg,#0e181c,#0a1216)', 'pad-edge': '#22363d', 'pad-accent': '#74f2ce',
+    'pad-ring': 'rgba(116,242,206,0.16)', 'pad-num': '#cfe0da', 'pad-num-empty': '#3a4c48',
+    'pad-ink-idle': '#7b8f8a', 'pad-snippet': '#7b8f8a', 'pad-snippet-on': '#b9dcd0', 'pad-spark-idle': '#264249',
+    'mic-a': '#0e8a6c', 'mic-b': '#0a5f4b', 'mic-edge': '#35c79c', 'mic-ink': '#eafff7', 'mic-sub-ink': '#9fdcc8',
+    'btn-face': 'linear-gradient(180deg,#16272d,#101c21)', 'btn-edge': '#22363d', 'btn-ink': '#9fb3ae',
+    'btn-sheen': 'inset 0 1px 0 rgba(255,255,255,0.05)',
+    'led-idle': '#2c3f3a', 'led-empty': '#223330', 'ink-empty': '#43564f',
+    'status-working': '#e0a83f', 'status-working-ink': '#e0a83f', 'status-working-glow': '0 0 5px rgba(224,168,63,0.6)',
+    'panel-shadow': 'inset 0 0 0 1px rgba(255,255,255,0.05), 0 14px 30px -16px rgba(0,0,0,0.7)',
+    'card-shadow': '0 1px 2px rgba(0,0,0,0.45)'
+  } }
+};
+
+let appliedSeedKeys = [];
+function applySeed(name) {
+  const seed = SEEDS[name] || SEEDS.paper;
+  const style = document.documentElement.style;
+  appliedSeedKeys.forEach(k => style.removeProperty(k));
+  appliedSeedKeys = [];
+  if (seed.vars) {
+    for (const key of Object.keys(seed.vars)) {
+      style.setProperty('--se-' + key, seed.vars[key]);
+      appliedSeedKeys.push('--se-' + key);
+    }
+  }
+  document.documentElement.dataset.hudsonTheme = seed.scheme;
+  const meta = document.querySelector('meta[name="color-scheme"]');
+  if (meta) meta.setAttribute('content', seed.scheme);
+  return SEEDS[name] ? name : 'paper';
+}
+
+// Overrides — the smallest possible custom design: a base seed plus any
+// --se-* token replaced, straight from the query string
+// (?theme=flight&se-accent=%23ff5c47&se-page-bg=%2302080a) or from a host
+// via speakeasyDeck.setTheme(name, overrides). No storage, no new format.
+let appliedOverrideKeys = [];
+let seedOverrides = {};
+function applyOverrides(overrides) {
+  const style = document.documentElement.style;
+  appliedOverrideKeys.forEach(k => style.removeProperty(k));
+  appliedOverrideKeys = [];
+  seedOverrides = overrides || {};
+  for (const key of Object.keys(seedOverrides)) {
+    if (!/^[a-z0-9-]+$/.test(key)) continue;
+    const prop = '--se-' + key;
+    style.setProperty(prop, seedOverrides[key]);
+    appliedOverrideKeys.push(prop);
+  }
+}
+function overridesFromQuery(q) {
+  const out = {};
+  for (const [key, value] of q) {
+    if (key.startsWith('se-') && value) out[key.slice(3)] = value;
+  }
+  return out;
+}
+
+// Variants — file-based design layers in deck/variants/<name>/:
+//   variant.json   { id, title, base, overrides }   (required)
+//   style.css      arbitrary CSS layered over the base  (optional)
+//   chrome.html    HTML fragment mounted at #se-chrome   (optional)
+// Boot with ?variant=<name>; ?se-* params still stack on top. Variant files
+// are device-owner content, loaded same-origin — no sanitization.
+async function bootVariant() {
+  const name = (Q.get('variant') || '').toLowerCase();
+  if (!/^[a-z0-9-]+$/.test(name)) return;
+  const base = 'variants/' + name;
+  try {
+    const meta = await fetch(base + '/variant.json').then(r => (r.ok ? r.json() : null));
+    if (!meta) return;
+    seedName = applySeed(String(meta.base || seedName).toLowerCase());
+    applyOverrides(Object.assign({}, meta.overrides || {}, overridesFromQuery(Q)));
+    const css = await fetch(base + '/style.css').then(r => (r.ok ? r.text() : ''));
+    if (css) {
+      const el = document.createElement('style');
+      el.dataset.variant = name;
+      el.textContent = css;
+      document.head.append(el);
+    }
+    const html = await fetch(base + '/chrome.html').then(r => (r.ok ? r.text() : ''));
+    if (html) {
+      const mount = document.createElement('div');
+      mount.id = 'se-chrome';
+      mount.innerHTML = html;
+      document.body.prepend(mount);
+    }
+  } catch (_) { /* every variant layer is optional */ }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Host bridge — every call is optional and no-ops in a plain browser.
+// HudsonKit's HudWebView KVO-observes `title` into HudWebViewState.title, so the
+// document title is a zero-setup channel for pushing deck state to native chrome.
+// ────────────────────────────────────────────────────────────────────────────
+
+const host = {
+  post(type, payload) {
+    try {
+      const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.speakeasyDeck;
+      if (mh) mh.postMessage(Object.assign({ type: type }, payload || {}));
+    } catch (_) { /* not embedded */ }
+  },
+  publish(title) {
+    if (document.title !== title) document.title = title;
+  }
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// State
+// ────────────────────────────────────────────────────────────────────────────
+
+// The host may use a non-persistent data store, so nothing here reads or writes
+// localStorage. Boot config comes from the query string instead.
+const Q = new URLSearchParams(location.search);
+const flag = (k, d) => (Q.has(k) ? !/^(0|false|off|no)$/i.test(Q.get(k) || '') : d);
+
+const PROPS = {
+  showTrace: flag('trace', true),
+  showPadSnippets: flag('snippets', true)
+};
+
+let seedName = applySeed((Q.get('theme') || 'paper').toLowerCase());
+applyOverrides(overridesFromQuery(Q));
+
+const S = {
+  lane: 1,
+  threads: LANES.map(l => l.thread.map(m => Object.assign({}, m))),
+  playing: null,
+  pos: 0,
+  speedIx: 0,
+  vol: 0.8,
+  autoplay: true,
+  listening: false,
+  expanded: {},
+  confirm: 'READY · LANE 02',
+  trace: [
+    { at: '19:49:40', kind: 'TASK CONTEXT', detail: 'Secure companion transport' },
+    { at: '19:49:06', kind: 'LANE SELECTED', detail: '02 · Hudson' },
+    { at: '19:49:06', kind: 'ROUTE CHANGE', detail: 'link ok · mac state simulated' },
+    { at: '19:49:06', kind: 'SESSION OPENED', detail: 'local deck · simulated route' }
+  ]
+};
+
+const lane = () => LANES[S.lane];
+const thread = () => S.threads[S.lane];
+
+function dur(id) {
+  const p = id.split(':').map(Number);
+  const m = S.threads[p[0]][p[1]];
+  return m ? m.dur : 30;
+}
+function clock() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+function logEvent(kind, detail) {
+  S.trace = [{ at: clock(), kind: kind, detail: detail }].concat(S.trace).slice(0, 7);
+  host.post('trace', { kind: kind, detail: detail });
+}
+function mmss(t) {
+  const s = Math.max(0, Math.floor(t));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function sentences(text) {
+  return (text.match(/[^.;]+[.;]?/g) || [text]).map(t => t.trim()).filter(Boolean);
+}
+
+// Deterministic pseudo-random, so a waveform is stable across renders.
+function barHeights(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 99991;
+  const out = [];
+  for (let i = 0; i < 46; i++) {
+    h = (h * 1103515245 + 12345) % 2147483648;
+    const r = h / 2147483648;
+    const env = 0.45 + 0.55 * Math.sin((i / 45) * Math.PI);
+    out.push(2.5 + r * 9 * env);
+  }
+  return out;
+}
+function wavePaths(id, frac) {
+  const bars = barHeights(id);
+  const step = 300 / bars.length;
+  let on = '', off = '';
+  bars.forEach((h, i) => {
+    const x = (i * step + step / 2).toFixed(1);
+    const seg = 'M' + x + ' ' + (12 - h).toFixed(1) + 'V' + (12 + h).toFixed(1) + ' ';
+    if (i / bars.length < frac) on += seg; else off += seg;
+  });
+  return { on: on || 'M0 12', off: off || 'M0 12' };
+}
+function spark(seed, active) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 37 + seed.charCodeAt(i)) % 99991;
+  let d = 'M0 8';
+  for (let i = 1; i <= 10; i++) {
+    h = (h * 1103515245 + 12345) % 2147483648;
+    const r = h / 2147483648;
+    const y = active ? 8 + (r - 0.5) * 13 : 8 + (r - 0.5) * 3.2;
+    d += ' L' + (i * 10) + ' ' + y.toFixed(1);
+  }
+  return d;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Actions
+// ────────────────────────────────────────────────────────────────────────────
+
+function selectLane(i) {
+  const l = LANES[i];
+  S.lane = i; S.playing = null; S.pos = 0;
+  S.confirm = l.state === 'empty' ? 'LANE 09 UNASSIGNED' : 'READY · LANE ' + l.num;
+  logEvent('LANE SELECTED', l.num + ' · ' + l.title);
+  host.post('lane', { index: i, num: l.num, title: l.title });
+}
+function togglePlay(id) {
+  if (S.playing === id) {
+    S.playing = null;
+    logEvent('PLAYBACK PAUSED', mmss(S.pos) + ' elapsed');
+  } else {
+    S.pos = S.playing === id ? S.pos : 0;
+    S.playing = id;
+    logEvent('PLAYBACK STARTED', lane().voice + ' · ' + SPEEDS[S.speedIx].toFixed(2) + 'x');
+  }
+  host.post('playback', { id: id, playing: S.playing === id });
+}
+function toggleExpand(id) { S.expanded[id] = !S.expanded[id]; }
+
+function scrub(id, clientX, rect) {
+  const f = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  S.playing = id;
+  S.pos = f * dur(id);
+}
+function setVol(clientX, rect) {
+  S.vol = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  logEvent('NARRATION VOLUME', Math.round(S.vol * 100) + '%');
+}
+
+function holdStart() {
+  if (lane().state === 'empty') return;
+  S.listening = true; S.playing = null; S.confirm = 'LISTENING';
+  host.post('capture', { phase: 'start', lane: lane().num });
+}
+function holdCancel() {
+  if (!S.listening) return;
+  S.listening = false; S.confirm = 'READY · LANE ' + lane().num;
+  host.post('capture', { phase: 'cancel', lane: lane().num });
+}
+function holdEnd() {
+  if (!S.listening) return;
+  const li = S.lane;
+  const l = LANES[li];
+  const you = { role: 'you', text: 'Walk me through what is still blocking, then keep going.' };
+  const reply = { role: 'agent', dur: 36, text: 'On ' + l.title + ': the blocking item is the manifest signature. I am rotating the stale key in the same pass and will read back the result when it lands.' };
+  S.threads[li] = S.threads[li].concat([you, reply]);
+  const id = li + ':' + (S.threads[li].length - 1);
+  S.listening = false;
+  S.playing = S.autoplay ? id : null;
+  S.pos = 0;
+  S.confirm = 'SENT · LANE ' + l.num;
+  logEvent('VOICE COMMAND', 'lane ' + l.num + ' · 4.1s captured');
+  logEvent('AGENT REPLY', l.voice + ' · 0:36 queued');
+  host.post('capture', { phase: 'end', lane: l.num });
+}
+
+function cycleSpeed() {
+  S.speedIx = (S.speedIx + 1) % SPEEDS.length;
+  logEvent('SPEED CHANGE', SPEEDS[S.speedIx].toFixed(2) + 'x');
+}
+function toggleAutoplay() {
+  S.autoplay = !S.autoplay;
+  logEvent('AUTOPLAY', S.autoplay ? 'on' : 'off');
+}
+function stopAll() {
+  S.playing = null; S.pos = 0; S.listening = false; S.confirm = 'CANCELLED';
+  logEvent('PLAYBACK STOPPED', 'buffer cleared');
+}
+function replayLast() {
+  const t = thread();
+  for (let i = t.length - 1; i >= 0; i--) {
+    if (t[i].role === 'agent') {
+      S.playing = S.lane + ':' + i; S.pos = 0; S.confirm = 'REPLAYING LAST REPLY';
+      logEvent('REPLAY', 'lane ' + lane().num + ' · last reply');
+      return;
+    }
+  }
+}
+function announce() { S.confirm = 'ANNOUNCED ON THIS DEVICE'; logEvent('ANNOUNCE', lane().voice + ' · broadcast'); }
+function pingMac() { S.confirm = 'PING SIMULATED'; logEvent('PING MAC', 'simulated · no link'); }
+function openMac() { S.confirm = 'OPEN ON MAC SIMULATED'; logEvent('OPEN ON MAC', 'simulated · no link'); }
+
+// ────────────────────────────────────────────────────────────────────────────
+// View model — colors are token references, resolved by CSS, never by JS.
+// ────────────────────────────────────────────────────────────────────────────
+
+const T = k => 'var(--se-' + k + ')';
+
+function view() {
+  const l = lane();
+  const speed = SPEEDS[S.speedIx];
+
+  const stateInk = {
+    speaking: { led: T('pad-accent'), glow: '0 0 6px ' + T('pad-accent'), ink: T('pad-accent'), label: 'SPEAKING' },
+    working:  { led: T('status-working'), glow: T('status-working-glow'), ink: T('status-working-ink'), label: 'WORKING' },
+    idle:     { led: T('led-idle'), glow: 'none', ink: T('pad-ink-idle'), label: 'IDLE' },
+    empty:    { led: T('led-empty'), glow: 'none', ink: T('ink-empty'), label: 'UNASSIGNED' }
+  };
+
+  const pads = LANES.map((ln, i) => {
+    const sel = i === S.lane;
+    const live = ln.state === 'speaking' || ln.state === 'working';
+    const ink = stateInk[ln.state];
+    const isEmpty = ln.state === 'empty';
+    const last = (S.threads[i] || []).filter(m => m.role === 'agent').slice(-1)[0];
+    return {
+      i: i,
+      num: String(i + 1),
+      name: ln.name,
+      status: sel && S.playing ? 'PLAYING' : ink.label,
+      statusColor: sel ? T('pad-accent') : ink.ink,
+      snippet: last ? '“' + last.text.slice(0, 58) + '…”' : 'No exchanges yet',
+      hasSnippet: PROPS.showPadSnippets && !isEmpty,
+      snipColor: sel ? T('pad-snippet-on') : T('pad-snippet'),
+      nameColor: sel ? T('pad-accent') : T('plate-ink-2'),
+      numColor: isEmpty ? T('pad-num-empty') : sel ? T('pad-accent') : T('pad-num'),
+      face: isEmpty ? T('pad-face-empty') : sel ? T('pad-face-on') : T('pad-face'),
+      edge: sel ? T('pad-accent') : T('pad-edge'),
+      shadow: sel ? '0 0 0 3px ' + T('pad-ring') + ', ' + T('card-shadow') : T('card-shadow'),
+      led: ink.led,
+      ledGlow: ink.glow,
+      ledAnim: ln.state === 'speaking' || ln.state === 'working' ? 'se-breathe 1.6s ease-in-out infinite' : 'none',
+      spark: spark(ln.name, live || (sel && !!S.playing)),
+      sparkColor: sel ? T('pad-accent') : live ? ink.led : T('pad-spark-idle')
+    };
+  });
+
+  const messages = thread().map((m, i) => {
+    const id = S.lane + ':' + i;
+    const isPlaying = S.playing === id;
+    const frac = isPlaying ? Math.min(1, S.pos / m.dur) : 0;
+    const w = m.role === 'agent' ? wavePaths(id, frac) : null;
+    const sents = m.role === 'agent' ? sentences(m.text) : [];
+    const active = Math.min(sents.length - 1, Math.floor(frac * sents.length));
+    const open = !!S.expanded[id];
+    let gist = GISTS[id];
+    if (!gist) {
+      gist = sents[0] || m.text;
+      if (gist.length > 78) gist = gist.slice(0, 76).replace(/\s+\S*$/, '') + '…';
+    }
+    return {
+      id: id,
+      who: m.role === 'you' ? 'YOU' : l.name,
+      gist: gist,
+      expanded: open,
+      expandLabel: open ? 'HIDE TRANSCRIPT' : 'READ TRANSCRIPT',
+      showCaption: isPlaying && !open,
+      caption: sents[Math.max(0, active)] || m.text,
+      // Leading-edge emphasis: the sentence being spoken sits at full ink, spoken
+      // ones decay back, unspoken ones wait at mid.
+      lines: sents.map((x, si) => ({
+        text: x,
+        color: isPlaying && si === active ? T('ink') : isPlaying && si < active ? T('ink-4') : T('ink-2'),
+        tick: isPlaying && si === active ? T('accent') : T('line-soft')
+      })),
+      align: m.role === 'you' ? 'flex-end' : 'flex-start',
+      isYou: m.role === 'you',
+      isAgent: m.role === 'agent',
+      text: m.text,
+      playing: isPlaying,
+      edge: isPlaying ? T('accent') : T('line'),
+      ring: isPlaying ? '0 0 0 3px ' + T('accent-ring') : 'none',
+      playerEdge: isPlaying ? T('accent-edge') : T('player-edge'),
+      btnBg: isPlaying ? T('accent') : T('accent-dim'),
+      btnGlow: isPlaying ? '0 0 10px ' + T('accent-ring') : 'none',
+      wavePlayed: w ? w.on : 'M0 12',
+      waveRest: w ? w.off : 'M0 12',
+      time: isPlaying ? mmss(S.pos) + ' / ' + mmss(m.dur) : mmss(m.dur)
+    };
+  });
+
+  const chip = stateInk[S.playing ? 'speaking' : l.state];
+  const hot = S.playing || l.state === 'speaking';
+
+  return {
+    pads: pads, messages: messages, traceOn: PROPS.showTrace,
+    trace: S.trace.slice(0, 4).map(x => ({
+      at: x.at, kind: x.kind, detail: x.detail,
+      kindColor: /VOICE|AGENT|PLAYBACK|LANE/.test(x.kind) ? T('accent-ink') : T('ink-2')
+    })),
+    boundLabel: LANES.filter(x => x.state !== 'empty').length + ' / ' + LANES.length + ' BOUND',
+    laneNum: l.num,
+    laneNumColor: l.state === 'empty' ? T('ink-4') : T('accent'),
+    laneTitle: l.title,
+    laneTask: l.task,
+    laneRev: l.rev,
+    laneStatus: S.playing ? 'SPEAKING' : chip.label,
+    laneChipBg: hot ? T('chip-bg') : T('cell'),
+    laneChipEdge: hot ? T('accent-edge') : T('line'),
+    laneChipDot: hot ? T('accent') : chip.led,
+    laneChipInk: hot ? T('chip-ink') : T('ink-2'),
+    voiceName: l.voice,
+    volPct: Math.round(S.vol * 100) + '%',
+    volLabel: Math.round(S.vol * 100) + '%',
+    speedLabel: speed.toFixed(2) + '×',
+    autoplayLabel: S.autoplay ? 'ON' : 'OFF',
+    autoplayColor: S.autoplay ? T('accent-ink') : T('ink-3'),
+    queueLabel: S.playing ? '01' : '00',
+    turnCount: thread().length + ' TURNS',
+    listening: S.listening,
+    micTitle: S.listening ? 'LISTENING…' : 'HOLD TO SPEAK',
+    micSub: S.listening ? 'Release to send' : 'Hold · lane ' + l.num,
+    micBg: 'linear-gradient(180deg,' + (S.listening ? T('mic-edge') : T('mic-a')) + ',' + (S.listening ? T('mic-a') : T('mic-b')) + ')',
+    micEdge: S.listening ? T('mic-edge') : T('mic-a'),
+    confirmLine: S.confirm,
+    footNote: 'Replay plays on this device'
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Template
+// ────────────────────────────────────────────────────────────────────────────
+
+const esc = s => String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function barsHtml(n, color, live) {
+  let out = '<div style="display:flex;align-items:center;gap:2.5px;">';
+  for (let i = 0; i < n; i++) {
+    const h = live ? (5 + ((i * 7) % 4) * 3.5) : 4;
+    const anim = live ? 'se-listen ' + (0.5 + (i % 5) * 0.11) + 's ease-in-out ' + ((i % 7) * 0.05) + 's infinite' : 'none';
+    out += '<span style="width:2.5px;border-radius:2px;background:' + color + ';display:block;height:' + h + 'px;transform-origin:center;animation:' + anim + ';"></span>';
+  }
+  return out + '</div>';
+}
+
+function playIcon(playing) {
+  const ink = T('accent-contrast');
+  return playing
+    ? '<span style="display:flex;gap:3px;"><span style="width:2.5px;height:10px;background:' + ink + ';border-radius:1px;"></span><span style="width:2.5px;height:10px;background:' + ink + ';border-radius:1px;"></span></span>'
+    : '<span style="width:0;height:0;border-left:8px solid ' + ink + ';border-top:5px solid transparent;border-bottom:5px solid transparent;margin-left:3px;"></span>';
+}
+
+function tpl(v) {
+  const plainBtn = 'border:1px solid var(--se-btn-edge);border-radius:8px;background:var(--se-btn-face);padding:12px 8px;text-align:center;font:600 9.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-btn-ink);cursor:pointer;box-shadow:var(--se-btn-sheen);';
+
+  return '' +
+  '<div class="se-shell" style="height:100%;min-height:0;overflow:hidden;background:var(--se-page-bg);padding:14px 16px 0;display:flex;flex-direction:column;gap:12px;">' +
+
+    // ─────────── top bar ───────────
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 4px;flex:none;">' +
+      '<div style="display:flex;align-items:center;gap:12px;">' +
+        '<div style="width:30px;height:30px;border-radius:7px;background:var(--se-chip-bg);border:1px solid var(--se-accent-edge);color:var(--se-accent-ink);font:600 11px var(--se-mono);display:flex;align-items:center;justify-content:center;">SE</div>' +
+        '<div>' +
+          '<div style="font:600 11.5px var(--se-mono);letter-spacing:0.22em;color:var(--se-ink);">SPEAKEASY</div>' +
+          '<div style="font:400 9px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);margin-top:2px;">CONTROL SURFACE</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<div style="display:flex;align-items:center;padding:8px 2px;font:500 9.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-3);">MICRO DECK</div>' +
+        '<div style="display:flex;align-items:center;padding:8px 2px;font:500 9.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-3);">INSTALL</div>' +
+        '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border:1px solid var(--se-accent-edge);border-radius:6px;background:var(--se-chip-bg);">' +
+          '<span style="width:6px;height:6px;border-radius:50%;background:var(--se-accent);box-shadow:0 0 0 3px var(--se-accent-ring);animation:se-breathe 2.6s ease-in-out infinite;"></span>' +
+          '<div><div style="font:600 9.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-accent-ink);">LOCAL DEMO</div></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ─────────── two plates ───────────
+    '<div class="se-decks" style="display:flex;gap:14px;align-items:stretch;flex:1;min-height:0;">' +
+
+      // ═══════ LEFT · pad surface, always paper ═══════
+      '<div style="flex:0 1 600px;min-width:380px;min-height:0;background-color:var(--se-plate-bg);background-image:var(--se-plate-wash);border:1px solid var(--se-plate-edge);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--se-panel-shadow);position:relative;">' +
+        '<span style="position:absolute;top:7px;left:7px;width:4px;height:4px;border-radius:50%;background:var(--se-plate-edge);"></span>' +
+        '<span style="position:absolute;top:7px;right:7px;width:4px;height:4px;border-radius:50%;background:var(--se-plate-edge);"></span>' +
+        '<span style="position:absolute;bottom:7px;left:7px;width:4px;height:4px;border-radius:50%;background:var(--se-plate-edge);"></span>' +
+        '<span style="position:absolute;bottom:7px;right:7px;width:4px;height:4px;border-radius:50%;background:var(--se-plate-edge);"></span>' +
+
+        // plate masthead · mirrors the console header
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:2px 6px 12px;border-bottom:1px solid var(--se-plate-rule);flex:none;">' +
+          '<div style="display:flex;align-items:baseline;gap:14px;">' +
+            '<span style="font:600 26px var(--se-sans);line-height:0.9;letter-spacing:-0.02em;color:var(--se-pad-accent);">01</span>' +
+            '<div>' +
+              '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.2em;color:var(--se-plate-ink-3);">PAD SURFACE</div>' +
+              '<div style="font-weight:600;font-size:19px;font-family:var(--se-title);line-height:1.1;letter-spacing:-0.015em;color:var(--se-plate-ink);margin-top:3px;">Micro Deck</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-pad-accent);">' + esc(v.boundLabel) + '</div>' +
+            '<div style="font:400 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-plate-ink-3);margin-top:4px;">9 KEYS · USB-C</div>' +
+          '</div>' +
+        '</div>' +
+
+        // encoder strip
+        '<div style="display:flex;align-items:center;gap:16px;padding:4px 6px;flex:none;">' +
+          '<div style="width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#fff,oklch(0.86 0.003 240) 58%,oklch(0.70 0.005 240));box-shadow:0 3px 7px rgba(0,0,0,0.28),inset 0 0 0 1px oklch(0.80 0.005 240);flex:none;position:relative;">' +
+            '<span style="position:absolute;top:5px;left:50%;width:2px;height:9px;border-radius:1px;background:var(--se-ink-3);transform:translateX(-50%);"></span>' +
+          '</div>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;">' +
+              '<span style="font:500 8.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-plate-ink-2);">NARRATION</span>' +
+              '<span style="font:600 8.5px var(--se-mono);letter-spacing:0.12em;color:var(--se-pad-accent);">' + esc(v.volLabel) + '</span>' +
+            '</div>' +
+            '<button type="button" data-act="vol" aria-label="Narration volume, ' + esc(v.volLabel) + '" style="display:block;width:100%;margin-top:7px;height:12px;border-radius:6px;border:0;background:var(--se-plate-track);box-shadow:inset 0 1px 3px rgba(0,0,0,0.22);cursor:pointer;position:relative;overflow:hidden;">' +
+              '<div style="position:absolute;inset:0 auto 0 0;width:' + v.volPct + ';background:var(--se-pad-accent);border-radius:6px;"></div>' +
+            '</button>' +
+            '<div style="font:500 8px var(--se-mono);letter-spacing:0.18em;color:var(--se-plate-ink-3);margin-top:6px;">ENCODER</div>' +
+          '</div>' +
+          '<div style="width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 40% 32%,oklch(0.32 0.01 240),oklch(0.16 0.01 240));box-shadow:inset 0 0 0 1px oklch(0.45 0.01 240),0 2px 5px rgba(0,0,0,0.3);flex:none;position:relative;overflow:hidden;">' +
+            '<span style="position:absolute;inset:6px;border-radius:50%;background:radial-gradient(oklch(0.42 0.01 240) 0.8px,transparent 0.9px) 0 0/4px 4px;"></span>' +
+          '</div>' +
+        '</div>' +
+
+        // pads
+        '<div class="se-scroll se-pads" style="display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:minmax(136px,1fr);gap:9px;flex:1;min-height:0;overflow-y:auto;padding-right:2px;color:var(--se-plate-ink-3);">' +
+          v.pads.map(p =>
+            '<button type="button" class="se-press" data-act="lane" data-arg="' + p.i + '" aria-pressed="' + (p.i === S.lane) + '" aria-label="Lane ' + p.num + ', ' + esc(p.name) + ', ' + esc(p.status) + '" style="text-align:left;border-radius:9px;padding:11px 12px;display:flex;flex-direction:column;min-height:0;overflow:hidden;cursor:pointer;background:' + p.face + ';border:1.5px solid ' + p.edge + ';box-shadow:' + p.shadow + ';">' +
+              '<div style="display:flex;align-items:flex-start;justify-content:space-between;">' +
+                '<span style="font:600 17px var(--se-sans);line-height:1;color:' + p.numColor + ';">' + p.num + '</span>' +
+                '<span style="width:6px;height:6px;border-radius:50%;margin-top:4px;background:' + p.led + ';box-shadow:' + p.ledGlow + ';animation:' + p.ledAnim + ';"></span>' +
+              '</div>' +
+              (p.hasSnippet ? '<div style="font:400 9px/1.5 var(--se-sans);color:' + p.snipColor + ';margin-top:8px;">' + esc(p.snippet) + '</div>' : '') +
+              '<div style="margin-top:auto;">' +
+                '<svg width="100%" height="16" viewBox="0 0 100 16" preserveAspectRatio="none" style="display:block;margin-bottom:8px;overflow:visible;">' +
+                  '<path d="' + p.spark + '" stroke="' + p.sparkColor + '" stroke-width="1.3" fill="none" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' +
+                '</svg>' +
+                '<div style="font:600 9px var(--se-mono);letter-spacing:0.16em;color:' + p.nameColor + ';">' + esc(p.name) + '</div>' +
+                '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.1em;color:' + p.statusColor + ';margin-top:3px;">' + esc(p.status) + '</div>' +
+              '</div>' +
+            '</button>').join('') +
+        '</div>' +
+
+        // hold to speak
+        '<div style="display:flex;gap:12px;align-items:stretch;flex:none;">' +
+          '<div style="width:50px;height:50px;border-radius:50%;background:radial-gradient(circle at 36% 30%,oklch(0.34 0.01 240),oklch(0.14 0.01 240));box-shadow:0 4px 10px rgba(0,0,0,0.45),inset 0 0 0 1px oklch(0.40 0.01 240);flex:none;align-self:center;"></div>' +
+          '<button type="button" data-hold="1" aria-label="' + esc(v.micTitle) + '. ' + esc(v.micSub) + '" style="text-align:left;flex:1;min-width:0;background:' + v.micBg + ';border:1.5px solid ' + v.micEdge + ';border-radius:10px;padding:13px 17px;display:flex;align-items:center;gap:14px;cursor:pointer;box-shadow:var(--se-mic-sheen),0 4px 16px -6px var(--se-accent-ring);">' +
+            '<span style="width:32px;height:32px;border-radius:50%;background:var(--se-player-ink);border:1.5px solid var(--se-mic-edge);display:inline-flex;align-items:center;justify-content:center;flex:none;">' +
+              '<span style="width:8px;height:13px;border-radius:4px;background:var(--se-mic-b);"></span>' +
+            '</span>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font:600 12.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-mic-ink);">' + esc(v.micTitle) + '</div>' +
+              '<div style="font:400 9.5px var(--se-mono);letter-spacing:0.06em;color:var(--se-mic-sub-ink);margin-top:3px;">' + esc(v.micSub) + '</div>' +
+            '</div>' +
+            '<div style="display:flex;align-items:flex-end;gap:3px;height:28px;">' + barsHtml(12, v.listening ? T('mic-ink') : T('mic-sub-ink'), v.listening) + '</div>' +
+          '</button>' +
+          '<div style="display:flex;flex-direction:column;gap:6px;width:80px;flex:none;">' +
+            '<button type="button" class="se-press" data-act="ping" style="flex:1;border:1px solid var(--se-btn-edge);border-radius:8px;background:var(--se-btn-face);display:flex;align-items:center;justify-content:center;font:600 9.5px var(--se-mono);letter-spacing:0.12em;color:var(--se-btn-ink);cursor:pointer;box-shadow:var(--se-btn-sheen);">LINK</button>' +
+            '<button type="button" class="se-press" data-act="stop" style="flex:1;border:1px solid var(--se-btn-edge);border-radius:8px;background:var(--se-btn-face);display:flex;align-items:center;justify-content:center;font:600 9.5px var(--se-mono);letter-spacing:0.12em;color:var(--se-btn-ink);cursor:pointer;box-shadow:var(--se-btn-sheen);">STOP</button>' +
+          '</div>' +
+        '</div>' +
+
+        // action row
+        '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px;flex:none;">' +
+          '<button type="button" class="se-press" data-act="ping" style="' + plainBtn + '">PING MAC</button>' +
+          '<button type="button" class="se-press" data-act="stop" style="' + plainBtn + '">CANCEL</button>' +
+          '<button type="button" class="se-press" data-act="replay" style="' + plainBtn + '">REPLAY</button>' +
+          '<button type="button" class="se-press" data-act="announce" style="' + plainBtn + '">ANNOUNCE</button>' +
+          '<button type="button" class="se-press" data-act="openmac" style="' + plainBtn + '">OPEN ON MAC</button>' +
+        '</div>' +
+      '</div>' +
+
+      // ═══════ RIGHT · lane console ═══════
+      '<div style="flex:1;min-width:0;min-height:0;background:var(--se-panel);border:1px solid var(--se-line);border-radius:var(--se-radius);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--se-panel-shadow);">' +
+
+        // lane header
+        '<div style="flex:none;padding:16px 20px 14px;border-bottom:1px solid var(--se-line-soft);display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px 20px;background:var(--se-panel-head);">' +
+          '<div style="display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 14px;min-width:0;flex:1 1 260px;">' +
+            '<span style="font:600 26px var(--se-sans);line-height:0.9;letter-spacing:-0.02em;color:' + v.laneNumColor + ';">' + esc(v.laneNum) + '</span>' +
+            '<div>' +
+              '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.2em;color:var(--se-ink-3);">ACTIVE LANE</div>' +
+              '<div style="font-weight:600;font-size:19px;font-family:var(--se-title);line-height:1.1;letter-spacing:-0.015em;color:var(--se-ink);margin-top:3px;">' + esc(v.laneTitle) + '</div>' +
+            '</div>' +
+            '<span style="display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:999px;border:1px solid ' + v.laneChipEdge + ';background:' + v.laneChipBg + ';align-self:center;">' +
+              '<span style="width:5px;height:5px;border-radius:50%;background:' + v.laneChipDot + ';"></span>' +
+              '<span style="font:600 8.5px var(--se-mono);letter-spacing:0.16em;color:' + v.laneChipInk + ';">' + esc(v.laneStatus) + '</span>' +
+            '</span>' +
+          '</div>' +
+          '<div style="text-align:right;flex:0 1 auto;min-width:0;">' +
+            '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-accent-ink);">' + esc(v.voiceName) + '</div>' +
+            '<div style="font:400 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);margin-top:4px;">NO MAC LINK</div>' +
+          '</div>' +
+        '</div>' +
+
+        // task lock + audio settings
+        '<div style="flex:none;padding:12px 20px;display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;border-bottom:1px solid var(--se-line-soft);">' +
+          '<div style="flex:1 1 260px;min-width:0;border:1px solid var(--se-line);border-radius:8px;background:var(--se-cell);padding:10px 14px;">' +
+            '<div style="display:flex;justify-content:space-between;">' +
+              '<span style="font:500 8px var(--se-mono);letter-spacing:0.2em;color:var(--se-ink-3);">TASK LOCK</span>' +
+              '<span style="font:500 8px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-3);">' + esc(v.laneRev) + '</span>' +
+            '</div>' +
+            '<div style="font:500 12.5px var(--se-sans);color:var(--se-ink);margin-top:4px;">' + esc(v.laneTask) + '</div>' +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:1px;border:1px solid var(--se-line);border-radius:8px;overflow:hidden;background:var(--se-line);flex:1 1 320px;">' +
+            '<div style="background:var(--se-cell);padding:10px 12px;">' +
+              '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);">VOLUME</div>' +
+              '<div style="font:500 11.5px var(--se-mono);color:var(--se-ink-2);margin-top:3px;">' + esc(v.volLabel) + '</div>' +
+            '</div>' +
+            '<button type="button" data-act="speed" aria-label="Playback speed" style="text-align:left;background:var(--se-cell);padding:10px 12px;cursor:pointer;border:0;">' +
+              '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);">SPEED</div>' +
+              '<div style="font:500 11.5px var(--se-mono);color:var(--se-ink-2);margin-top:3px;">' + esc(v.speedLabel) + '</div>' +
+            '</button>' +
+            '<button type="button" data-act="autoplay" aria-label="Toggle autoplay" aria-pressed="' + S.autoplay + '" style="text-align:left;background:var(--se-cell);padding:10px 12px;cursor:pointer;border:0;">' +
+              '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);">AUTOPLAY</div>' +
+              '<div style="font:500 11.5px var(--se-mono);color:' + v.autoplayColor + ';margin-top:3px;">' + esc(v.autoplayLabel) + '</div>' +
+            '</button>' +
+            '<div style="background:var(--se-cell);padding:10px 12px;">' +
+              '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);">QUEUE</div>' +
+              '<div style="font:500 11.5px var(--se-mono);color:var(--se-ink-2);margin-top:3px;">' + esc(v.queueLabel) + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // conversation
+        '<div class="se-scroll se-sel se-conv" style="flex:1 1 auto;min-height:120px;overflow-y:auto;padding:20px 20px 8px;display:flex;flex-direction:column;gap:16px;color:var(--se-ink-4);">' +
+          '<div style="display:flex;align-items:center;gap:12px;">' +
+            '<span style="font:500 8px var(--se-mono);letter-spacing:0.2em;color:var(--se-ink-4);">CONVERSATION</span>' +
+            '<span style="flex:1;height:1px;background:var(--se-line-soft);"></span>' +
+            '<span style="font:400 8px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink-4);">' + esc(v.turnCount) + '</span>' +
+          '</div>' +
+
+          v.messages.map(m =>
+            '<div style="display:flex;flex-direction:column;align-items:' + m.align + ';gap:5px;">' +
+              '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-4);">' + esc(m.who) + '</div>' +
+
+              (m.isYou
+                ? '<div style="max-width:62%;background:var(--se-you-bg);border:1px solid var(--se-you-edge);border-radius:var(--se-bubble-b);padding:10px 14px;font:400 12px/1.6 var(--se-sans);color:var(--se-you-ink);">' + esc(m.text) + '</div>'
+                : '') +
+
+              (m.isAgent
+                ? '<div style="max-width:82%;min-width:min(420px,100%);background:var(--se-cell);border:1px solid ' + m.edge + ';border-radius:var(--se-bubble-a);padding:12px 14px;box-shadow:' + m.ring + ';">' +
+                    '<div style="font:500 12.5px/1.5 var(--se-sans);color:var(--se-ink);letter-spacing:-0.005em;">' + esc(m.gist) + '</div>' +
+
+                    // audio player
+                    '<div style="margin-top:11px;background:var(--se-player-bg);border:1px solid ' + m.playerEdge + ';border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:12px;">' +
+                      '<button type="button" class="se-press" data-act="play" data-arg="' + m.id + '" aria-label="' + (m.playing ? 'Pause reply' : 'Play reply') + '" style="width:28px;height:28px;flex:none;border-radius:50%;border:0;background:' + m.btnBg + ';display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:' + m.btnGlow + ';">' + playIcon(m.playing) + '</button>' +
+                      '<button type="button" data-act="scrub" data-arg="' + m.id + '" aria-label="Seek reply audio" style="display:block;flex:1;min-width:0;cursor:pointer;border:0;background:none;padding:0;">' +
+                        '<svg width="100%" height="26" viewBox="0 0 300 24" preserveAspectRatio="none" style="display:block;">' +
+                          '<path d="' + m.wavePlayed + '" stroke="var(--se-wave-on)" stroke-width="2.6" stroke-linecap="round"></path>' +
+                          '<path d="' + m.waveRest + '" stroke="var(--se-wave-off)" stroke-width="2.6" stroke-linecap="round"></path>' +
+                        '</svg>' +
+                      '</button>' +
+                      '<span style="font:400 10px var(--se-mono);letter-spacing:0.04em;color:var(--se-player-text);flex:none;font-variant-numeric:tabular-nums;">' + esc(m.time) + '</span>' +
+                      '<button type="button" data-act="speed" aria-label="Playback speed" style="font:500 9px var(--se-mono);letter-spacing:0.06em;color:var(--se-player-text);border:1px solid var(--se-player-edge);border-radius:4px;padding:3px 6px;cursor:pointer;flex:none;background:none;">' + esc(v.speedLabel) + '</button>' +
+                    '</div>' +
+
+                    (m.showCaption
+                      ? '<div style="margin-top:9px;display:flex;gap:9px;align-items:flex-start;">' +
+                          '<span style="flex:none;width:2px;align-self:stretch;border-radius:1px;background:var(--se-accent);"></span>' +
+                          '<span style="font:400 11px/1.6 var(--se-sans);color:var(--se-caption-ink);">' + esc(m.caption) + '</span>' +
+                        '</div>'
+                      : '') +
+
+                    (m.expanded
+                      ? '<div style="margin-top:11px;padding-top:10px;border-top:1px solid var(--se-line-soft);display:flex;flex-direction:column;gap:6px;">' +
+                          m.lines.map(ln =>
+                            '<div style="display:flex;gap:9px;align-items:flex-start;">' +
+                              '<span style="flex:none;width:2px;align-self:stretch;border-radius:1px;background:' + ln.tick + ';"></span>' +
+                              '<span style="font:400 11.5px/1.65 var(--se-sans);color:' + ln.color + ';">' + esc(ln.text) + '</span>' +
+                            '</div>').join('') +
+                        '</div>'
+                      : '') +
+
+                    '<button type="button" class="se-hoverink" data-act="expand" data-arg="' + m.id + '" aria-expanded="' + m.expanded + '" style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;font:500 8.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);border:0;background:none;padding:0;">' +
+                      '<span style="width:14px;height:1px;background:var(--se-line);"></span>' + esc(m.expandLabel) +
+                    '</button>' +
+                  '</div>'
+                : '') +
+            '</div>').join('') +
+
+          (v.listening
+            ? '<div style="align-self:flex-end;display:flex;align-items:center;gap:10px;border:1px dashed var(--se-accent-edge);border-radius:10px;padding:9px 14px;background:var(--se-chip-bg);">' +
+                '<span style="font:500 9px var(--se-mono);letter-spacing:0.18em;color:var(--se-accent-ink);">LISTENING</span>' +
+                '<div style="display:flex;align-items:center;gap:2.5px;height:16px;">' + barsHtml(14, T('accent-ink'), true) + '</div>' +
+              '</div>'
+            : '') +
+        '</div>' +
+
+        // trace
+        (v.traceOn
+          ? '<div class="se-scroll" style="border-top:1px solid var(--se-line-soft);background:var(--se-trace-bg);padding:11px 20px 12px;flex:0 1 auto;min-height:0;max-height:180px;overflow-y:auto;color:var(--se-ink-4);">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+                '<span style="font:600 8px var(--se-mono);letter-spacing:0.2em;color:var(--se-accent-ink);">TRACE</span>' +
+              '</div>' +
+              '<div style="margin-top:8px;display:flex;flex-direction:column;gap:1px;">' +
+                v.trace.map(ev =>
+                  '<div style="display:flex;align-items:baseline;gap:10px;padding:4px 0;border-bottom:1px solid var(--se-line-soft);min-width:0;">' +
+                    '<span style="font:400 9px var(--se-mono);color:var(--se-ink-4);flex:none;">' + esc(ev.at) + '</span>' +
+                    '<span style="font:600 9px var(--se-mono);letter-spacing:0.1em;color:' + ev.kindColor + ';flex:none;">' + esc(ev.kind) + '</span>' +
+                    '<span style="font:400 9px var(--se-mono);color:var(--se-ink-3);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.detail) + '</span>' +
+                  '</div>').join('') +
+              '</div>' +
+            '</div>'
+          : '') +
+
+        // confirmation footer
+        '<div style="flex:none;border-top:1px solid var(--se-line-soft);background:var(--se-panel-head);padding:11px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 20px;">' +
+          '<div><div style="font:600 11px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink);">' + esc(v.confirmLine) + '</div></div>' +
+          '<div style="font:400 9.5px var(--se-mono);letter-spacing:0.06em;color:var(--se-ink-3);text-align:right;">' + esc(v.footNote) + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ─────────── status rail ───────────
+    '<div style="display:flex;justify-content:space-between;gap:20px;padding:6px 6px 12px;flex:none;font:400 8.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-4);">' +
+      '<span>INTERACTIVE DEMO</span>' +
+      '<span>MAC COMMANDS SIMULATED</span>' +
+      '<span>BUILD 4726.2</span>' +
+    '</div>' +
+  '</div>';
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Patch, don't replace.
+//
+// A full innerHTML swap at playback tempo would reset scroll offsets and restart
+// every CSS animation 8× a second. This walks the new tree against the live one
+// and touches only what actually differs, so nodes — and therefore scroll
+// position and running animations — survive a render.
+// ────────────────────────────────────────────────────────────────────────────
+
+function morph(live, next) {
+  if (live.nodeType !== next.nodeType || live.nodeName !== next.nodeName) {
+    live.replaceWith(next);
+    return;
+  }
+  if (live.nodeType === Node.TEXT_NODE) {
+    if (live.nodeValue !== next.nodeValue) live.nodeValue = next.nodeValue;
+    return;
+  }
+  if (live.nodeType !== Node.ELEMENT_NODE) return;
+
+  const liveAttrs = live.attributes;
+  for (let i = liveAttrs.length - 1; i >= 0; i--) {
+    const name = liveAttrs[i].name;
+    if (!next.hasAttribute(name)) live.removeAttribute(name);
+  }
+  const nextAttrs = next.attributes;
+  for (let i = 0; i < nextAttrs.length; i++) {
+    const a = nextAttrs[i];
+    if (live.getAttribute(a.name) !== a.value) live.setAttribute(a.name, a.value);
+  }
+
+  const liveKids = Array.prototype.slice.call(live.childNodes);
+  const nextKids = Array.prototype.slice.call(next.childNodes);
+  for (let i = liveKids.length - 1; i >= nextKids.length; i--) liveKids[i].remove();
+  for (let i = 0; i < nextKids.length; i++) {
+    if (i < liveKids.length) morph(liveKids[i], nextKids[i]);
+    else live.appendChild(nextKids[i]);
+  }
+}
+
+const root = document.getElementById('deck');
+const stage = document.createElement('div');
+
+let queued = false;
+function paint() {
+  if (queued) return;
+  queued = true;
+  requestAnimationFrame(() => {
+    queued = false;
+    const v = view();
+    stage.innerHTML = tpl(v);
+    if (!root.firstChild) root.appendChild(stage.firstChild);
+    else morph(root.firstChild, stage.firstChild);
+    host.publish('Speakeasy · ' + v.laneNum + ' ' + v.laneTitle + ' · ' + v.confirmLine);
+    clockCheck();
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Transport clock.
+//
+// The surface can be held warm off-screen (HudWebSurfaceLifecycle.keepWarm), so
+// the interval only exists while something is actually moving, and is dropped
+// entirely whenever the web view is hidden.
+// ────────────────────────────────────────────────────────────────────────────
+
+let timer = null;
+const needsClock = () => !document.hidden && (S.listening || !!S.playing);
+
+function clockCheck() {
+  if (needsClock() && timer === null) timer = setInterval(tick, 120);
+  else if (!needsClock() && timer !== null) { clearInterval(timer); timer = null; }
+}
+function tick() {
+  if (S.listening) { paint(); return; }
+  if (!S.playing) { clockCheck(); return; }
+  const next = S.pos + 0.12 * SPEEDS[S.speedIx];
+  if (next >= dur(S.playing)) { S.playing = null; S.pos = 0; }
+  else S.pos = next;
+  paint();
+}
+
+document.addEventListener('visibilitychange', () => {
+  clockCheck();
+  if (!document.hidden) paint();
+  host.post('visibility', { hidden: document.hidden });
+});
+window.addEventListener('pagehide', () => { if (timer !== null) { clearInterval(timer); timer = null; } });
+
+// ────────────────────────────────────────────────────────────────────────────
+// Input — delegated, so the morph never has to preserve listeners.
+// ────────────────────────────────────────────────────────────────────────────
+
+const ACTIONS = {
+  lane: a => selectLane(Number(a)),
+  play: a => togglePlay(a),
+  expand: a => toggleExpand(a),
+  speed: () => cycleSpeed(),
+  autoplay: () => toggleAutoplay(),
+  stop: () => stopAll(),
+  replay: () => replayLast(),
+  announce: () => announce(),
+  ping: () => pingMac(),
+  openmac: () => openMac()
+};
+
+root.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act;
+  const arg = el.dataset.arg;
+  const keyboard = e.detail === 0; // keyboard activation carries no pointer coordinates
+  if (act === 'scrub') {
+    if (keyboard) { S.pos = 0; S.playing = arg; }
+    else scrub(arg, e.clientX, el.getBoundingClientRect());
+  }
+  else if (act === 'vol') {
+    if (keyboard) {
+      S.vol = (Math.round(S.vol * 10) + 1) % 11 / 10;
+      logEvent('NARRATION VOLUME', Math.round(S.vol * 100) + '%');
+    } else setVol(e.clientX, el.getBoundingClientRect());
+  }
+  else if (ACTIONS[act]) ACTIONS[act](arg);
+  else return;
+  paint();
+});
+
+// Pointer events rather than mouse events: the same code drives trackpad, mouse
+// and touch, which matters on an iPad-hosted surface.
+//
+// Hold-to-speak takes an explicit pointer capture. Without it, the repaint on
+// press re-runs hit-testing and the browser emits pointerout/pointerleave on the
+// pad — which would cancel the hold on the very frame it started. Capture also
+// guarantees the matching pointerup lands here even if the finger drifts off.
+root.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-hold]');
+  if (!el) return;
+  e.preventDefault();
+  try { el.setPointerCapture(e.pointerId); } catch (_) {}
+  holdStart();
+  paint();
+});
+root.addEventListener('pointerup', e => {
+  const el = e.target.closest('[data-hold]');
+  if (!el || !S.listening) return;
+  try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+  // Released off the pad still means cancel — the design's drag-away-to-abort.
+  const r = el.getBoundingClientRect();
+  const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+  if (inside) holdEnd(); else holdCancel();
+  paint();
+});
+// System interruption (call, gesture takeover) must not leave the deck listening.
+window.addEventListener('pointercancel', () => { if (S.listening) { holdCancel(); paint(); } });
+
+// Keyboard hold-to-speak: Space/Enter on the focused pad behaves like the
+// pointer hold; ESC aborts from anywhere.
+root.addEventListener('keydown', e => {
+  if ((e.code !== 'Space' && e.code !== 'Enter') || e.repeat) return;
+  if (!e.target.closest('[data-hold]')) return;
+  e.preventDefault();
+  holdStart();
+  paint();
+});
+root.addEventListener('keyup', e => {
+  if (e.code !== 'Space' && e.code !== 'Enter') return;
+  if (!e.target.closest('[data-hold]')) return;
+  e.preventDefault();
+  holdEnd();
+  paint();
+});
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && S.listening) { holdCancel(); paint(); }
+});
+
+// Back/forward navigation gestures are on by default in HudWebView; nothing in
+// this surface should ever navigate away from it.
+document.addEventListener('dragstart', e => e.preventDefault());
+document.addEventListener('contextmenu', e => { if (!e.target.closest('.se-sel')) e.preventDefault(); });
+
+// Host handshake — a native shell can call window.speakeasyDeck.* directly.
+window.speakeasyDeck = {
+  selectLane: i => { selectLane(Number(i)); paint(); },
+  stop: () => { stopAll(); paint(); },
+  setTheme: (name, overrides) => { seedName = applySeed(String(name).toLowerCase()); applyOverrides(overrides); paint(); },
+  state: () => ({ lane: S.lane, playing: S.playing, confirm: S.confirm, theme: seedName, overrides: seedOverrides })
+};
+host.post('ready', { lanes: LANES.length });
+
+// First paint waits on the variant layer, so a boot variant never flashes the base.
+bootVariant().then(() => paint());
+
+})();
+</script>
+</body>
+</html>

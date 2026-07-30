@@ -1,0 +1,25 @@
+{
+  "id": "oxide",
+  "title": "Oxide",
+  "base": "flight",
+  "description": "Rusted flight: ember-orange accent family over the dark teal base, squared geometry.",
+  "overrides": {
+    "accent": "#ff7a45",
+    "accent-dim": "#c25a33",
+    "accent-ink": "#ffc9a8",
+    "accent-edge": "#54301f",
+    "accent-ring": "rgba(255,122,69,0.18)",
+    "accent-contrast": "#2a120a",
+    "chip-bg": "#2a160c",
+    "chip-ink": "#ff9c66",
+    "pad-accent": "#ff7a45",
+    "pad-ring": "rgba(255,122,69,0.18)",
+    "wave-on": "#ff7a45",
+    "mic-a": "#c2512a",
+    "mic-b": "#8f3418",
+    "mic-edge": "#ff7a45",
+    "mic-sub-ink": "#f0b79b",
+    "radius": "3px",
+    "radius-sm": "2px"
+  }
+}

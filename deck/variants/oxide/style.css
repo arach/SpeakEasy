@@ -1,0 +1,24 @@
+/* Oxide — variant CSS layered over the flight base. */
+
+/* Squared instrument chrome. */
+.se-shell .se-decks > div { border-radius: 5px !important; }
+
+/* Faint scanline wash over the whole surface. */
+#se-chrome {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255,122,69,0.016) 0 1px, transparent 1px 3px);
+}
+
+/* Top edge stripe from chrome.html. */
+#se-chrome .oxide-edge {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ff7a45 30%, #ff7a45 70%, transparent);
+  opacity: 0.65;
+}

@@ -1,0 +1,20 @@
+# SpeakEasy Deck — serve the control surface on your LAN.
+# Run from this directory:  caddy run
+# or anywhere:              caddy run --config /path/to/deck/Caddyfile
+# The CLI (`speakeasy deck`) generates an equivalent config automatically.
+
+{
+	admin off
+	auto_https off
+}
+
+http://:43211 {
+	root * .
+	file_server
+
+	@healthz path /healthz
+	handle @healthz {
+		header Content-Type application/json
+		respond `{"ok":true,"service":"speakeasy-deck","port":43211}` 200
+	}
+}
