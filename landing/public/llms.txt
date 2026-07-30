@@ -1,0 +1,21 @@
+# SpeakEasy
+
+> SpeakEasy is a text-to-speech CLI and SDK for macOS that gives coding agents a
+> voice: spoken task summaries, a word-synced HUD, and an iPad control deck. Works
+> with zero API keys via the macOS system voice; OpenAI, ElevenLabs, Groq, and
+> Gemini voices are optional.
+
+## Agent instructions
+
+- [agent.md](https://speakeasy.arach.dev/agent.md): runbook a coding agent can follow to install, verify, and speak for its user
+
+## Docs
+
+- [Docs](https://speakeasy.arach.dev/docs): full CLI reference and configuration
+- [npm package](https://www.npmjs.com/package/@arach/speakeasy): install, versions
+- [GitHub](https://github.com/arach/SpeakEasy): source code and issues
+- [Codex plugin](https://github.com/arach/SpeakEasy/tree/master/plugins/speakeasy): native macOS skill with menu-bar player and word-synced HUD
+
+## Optional
+
+- [Landing page](https://speakeasy.arach.dev): human-facing quickstart and demos

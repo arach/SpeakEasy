@@ -97,6 +97,33 @@ Listen to SpeakEasy in action: [welcome-demo.mp3](examples/welcome-demo.mp3)
 
 *Generated with: `speakeasy "Welcome to SpeakEasy! This unified text-to-speech service makes it easy to add voice to your applications" --provider openai --voice nova --rate 185 --out welcome-demo.mp3`*
 
+## 🤖 Give your coding agent a voice
+
+SpeakEasy is built for agent workflows. You don't wire anything up yourself — you tell your
+coding agent (Codex, Claude Code, Cursor, …) to do it. One sentence:
+
+> **Read https://speakeasy.arach.dev/agent.md and follow it.**
+
+The agent installs the package, speaks short summaries after each task (system voice, no
+API key), and opens the deck when you ask. If you'd rather write the instructions yourself:
+
+> Install `@arach/speakeasy` in this project and use it to speak. After finishing a
+> task, use `npx @arach/speakeasy "<one-sentence summary of what you did>"` so I can
+> hear it — the system provider works with no API key. When I ask you to "open the
+> deck", run `npx @arach/speakeasy deck` and leave it running.
+
+Then run the deck once:
+
+```bash
+npx @arach/speakeasy deck
+```
+
+Scan the QR code with an iPad on the same Wi-Fi, tap **Share → Add to Home Screen**, and
+your agent's work becomes something you can hear from anywhere in the room — the agent
+speaks its summaries through SpeakEasy, and the deck is the control surface (lane
+controls, hold-to-speak, narration playback, themes) that drives it as the Mac link
+comes online.
+
 ## Installation
 
 ```bash

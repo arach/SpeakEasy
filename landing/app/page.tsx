@@ -3,6 +3,7 @@ import HeroSection from "@/components/hero-section"
 import FeaturesSection from "@/components/features-section"
 import CodeExamples from "@/components/code-examples"
 import ClaudeIntegrationSection from "@/components/claude-integration-section"
+import AgentVoiceSection from "@/components/agent-voice-section"
 import QuickStartSection from "@/components/quick-start-section"
 
 export default function Home() {
@@ -13,6 +14,7 @@ export default function Home() {
         <CodeExamples />
       </Suspense>
       <QuickStartSection />
+      <AgentVoiceSection />
       <ClaudeIntegrationSection />
       <FeaturesSection />
       
@@ -21,6 +23,9 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col items-center gap-4">
             <div className="flex items-center gap-6 text-sm">
+              <a href="/features" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
+                Features
+              </a>
               <a href="/docs/overview" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
                 Documentation
               </a>
