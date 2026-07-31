@@ -16,16 +16,17 @@ npx @arach/speakeasy deck
 ```
 
 That serves the deck on the local network (via Caddy when installed, built-in server otherwise),
-advertises **speakeasy.local** over Bonjour, and prints a QR code. On the iPad (same Wi-Fi):
+advertises **speak.\<your-mac\>.local** over Bonjour, and prints a QR code. When port 80 is free it
+claims it for a port-free URL; otherwise it uses 43211. On the iPad (same Wi-Fi):
 
-1. Scan the code or open `http://speakeasy.local:43211` in Safari.
+1. Scan the code or open the printed URL (e.g. `http://speak.air.local`) in Safari.
 2. Share → **Add to Home Screen** for the full-screen deck.
 3. Pick a look: `?theme=paper|ember|flight`, or a variant like `?variant=oxide`.
 
-Options: `--port <n>` (default 43211), `--no-qr`, `--no-caddy`, `--no-mdns`. The deck runs its
-built-in demo state — no Mac link is required, and Ctrl+C stops the server. Is it running?
-`curl http://localhost:43211/healthz`. Prefer your own server? `caddy run` in this directory
-uses the shipped `Caddyfile`.
+Options: `--port <n>`, `--host <name>` (default `speak.<device>.local`), `--no-qr`, `--no-caddy`,
+`--no-mdns`. The deck runs its built-in demo state — no Mac link is required, and Ctrl+C stops
+the server. Is it running? `curl http://localhost:<port>/healthz` on the printed port. Prefer
+your own server? `caddy run` in this directory uses the shipped `Caddyfile`.
 
 ## Boot options
 

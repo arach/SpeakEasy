@@ -17,7 +17,6 @@ const TYPES: Record<string, string> = {
 };
 
 const DEFAULT_PORT = 43211;
-const VANITY_HOST = 'speakeasy.local';
 
 /** The built CLI lives at dist/bin/speakeasy-cli.js; deck assets ship at the package root. */
 function deckRoot(): string {
@@ -33,26 +32,47 @@ function lanAddress(): string | undefined {
   return undefined;
 }
 
-/** This Mac's mDNS name (e.g. "air.local") — every Mac already answers to it. */
-function macBonjourName(): string | undefined {
+/** The device's slugified name (e.g. "air") — the {host} in speak.{host}.local. */
+function deviceSlug(): string {
+  let name = '';
   if (process.platform === 'darwin') {
     try {
-      const name = execFileSync('scutil', ['--get', 'LocalHostName'], { encoding: 'utf8' }).trim();
-      if (name) return `${name}.local`;
+      name = execFileSync('scutil', ['--get', 'LocalHostName'], { encoding: 'utf8' }).trim();
     } catch {
       // fall through to os.hostname()
     }
   }
-  const host = os.hostname().replace(/\.local$/, '');
-  return host ? `${host}.local` : undefined;
+  if (!name) name = os.hostname().replace(/\.local$/, '');
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'mac';
 }
 
-/** Advertise VANITY_HOST via Bonjour so the iPad can type a name, not an IP. */
-async function advertiseVanity(port: number): Promise<(() => void) | null> {
+/** This Mac's mDNS name (e.g. "air.local") — every Mac already answers to it. */
+function macBonjourName(): string | undefined {
+  const slug = deviceSlug();
+  return slug ? `${slug}.local` : undefined;
+}
+
+/** Format a URL, omitting the port when it is the default HTTP port. */
+function hostUrl(host: string, port: number): string {
+  return `http://${host}${port === 80 ? '' : `:${port}`}`;
+}
+
+/** True when we can bind the port (macOS allows unprivileged low ports). */
+async function portAvailable(port: number): Promise<boolean> {
+  const { createServer } = await import('node:net');
+  return new Promise((resolve) => {
+    const probe = createServer();
+    probe.once('error', () => resolve(false));
+    probe.listen(port, '0.0.0.0', () => probe.close(() => resolve(true)));
+  });
+}
+
+/** Advertise the vanity host via Bonjour so the iPad can type a name, not an IP. */
+async function advertiseVanity(host: string, port: number): Promise<(() => void) | null> {
   try {
     const { default: Bonjour } = await import('bonjour-service');
     const bonjour = new Bonjour();
-    const service = bonjour.publish({ name: 'SpeakEasy Deck', type: 'http', port, host: VANITY_HOST });
+    const service = bonjour.publish({ name: 'SpeakEasy Deck', type: 'http', port, host });
     const up = await new Promise<boolean>((resolve) => {
       service.on('up', () => resolve(true));
       setTimeout(() => resolve(false), 2000).unref();
@@ -213,8 +233,9 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
   };
 }
 
-function parseDeckArgs(argv: string[]): { port: number; qr: boolean; caddy: boolean; mdns: boolean } {
-  let port = DEFAULT_PORT;
+function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr: boolean; caddy: boolean; mdns: boolean } {
+  let port: number | null = null; // null = auto: 80 if free (port-free URL), else 43211
+  let host = `speak.${deviceSlug()}.local`;
   let qr = true;
   let caddy = true;
   let mdns = true;
@@ -227,6 +248,17 @@ function parseDeckArgs(argv: string[]): { port: number; qr: boolean; caddy: bool
         process.exit(1);
       }
       port = Number(value);
+      if (port <= 0 || port > 65535) {
+        console.error(`❌ Invalid port: ${port}`);
+        process.exit(1);
+      }
+    } else if (arg === '--host') {
+      const value = argv[++i];
+      if (!value || value.startsWith('-') || !/^[a-z0-9.-]+$/.test(value)) {
+        console.error('❌ --host requires a name like speak.air.local (lowercase letters, digits, dots, dashes)');
+        process.exit(1);
+      }
+      host = value.endsWith('.local') ? value : `${value}.local`;
     } else if (arg === '--no-qr') {
       qr = false;
     } else if (arg === '--no-caddy') {
@@ -235,19 +267,15 @@ function parseDeckArgs(argv: string[]): { port: number; qr: boolean; caddy: bool
       mdns = false;
     } else {
       console.error(`❌ Unknown argument: ${arg}`);
-      console.error('   Usage: speakeasy deck [--port <n>] [--no-qr] [--no-caddy] [--no-mdns]');
+      console.error('   Usage: speakeasy deck [--port <n>] [--host <name>] [--no-qr] [--no-caddy] [--no-mdns]');
       process.exit(1);
     }
   }
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    console.error(`❌ Invalid port: ${port}`);
-    process.exit(1);
-  }
-  return { port, qr, caddy, mdns };
+  return { port, host, qr, caddy, mdns };
 }
 
 export async function runDeck(argv: string[]): Promise<void> {
-  const { port, qr, caddy: preferCaddy, mdns } = parseDeckArgs(argv);
+  const args = parseDeckArgs(argv);
   const root = deckRoot();
   if (!existsSync(path.join(root, 'index.html'))) {
     console.error('❌ Deck assets not found at', root);
@@ -255,8 +283,36 @@ export async function runDeck(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
+  // Port selection. Explicit --port must be bindable — double-binding a busy
+  // port routes traffic nondeterministically between the two servers. Auto
+  // mode claims 80 for a port-free URL when free (macOS allows unprivileged
+  // low ports), then scans 43211+ for the first verified-free port.
+  let port: number;
+  if (args.port !== null) {
+    if (!(await portAvailable(args.port))) {
+      console.error(`❌ Port ${args.port} is already in use.`);
+      process.exit(1);
+    }
+    port = args.port;
+  } else if (await portAvailable(80)) {
+    port = 80;
+  } else {
+    port = -1;
+    for (let candidate = DEFAULT_PORT; candidate < DEFAULT_PORT + 10; candidate++) {
+      if (await portAvailable(candidate)) {
+        port = candidate;
+        break;
+      }
+    }
+    if (port === -1) {
+      console.error(`❌ No free port (80 and ${DEFAULT_PORT}–${DEFAULT_PORT + 9} are all in use) — pass --port <n>.`);
+      process.exit(1);
+    }
+  }
+  const { qr, host, mdns } = args;
+
   let handle: DeckHandle;
-  const caddy = preferCaddy ? findCaddy() : null;
+  const caddy = args.caddy ? findCaddy() : null;
   try {
     handle = caddy ? await startCaddy(caddy, root, port) : await startNodeServer(root, port);
   } catch (error) {
@@ -274,21 +330,21 @@ export async function runDeck(argv: string[]): Promise<void> {
   }
 
   const lan = lanAddress();
-  const stopVanity = mdns && lan ? await advertiseVanity(port) : null;
+  const stopVanity = mdns && lan ? await advertiseVanity(host, port) : null;
   const bonjour = macBonjourName();
   const padUrl = stopVanity
-    ? `http://${VANITY_HOST}:${port}`
+    ? hostUrl(host, port)
     : bonjour
-      ? `http://${bonjour}:${port}`
+      ? hostUrl(bonjour, port)
       : `http://${lan ?? 'your-macs-ip'}:${port}`;
 
   console.log('');
   console.log(chalk.bold('  🎛  SpeakEasy Deck'));
   console.log('');
-  console.log(`  ${chalk.dim('On this Mac')}   http://localhost:${port}`);
+  console.log(`  ${chalk.dim('On this Mac')}   ${hostUrl('localhost', port)}`);
   console.log(`  ${chalk.dim('On your iPad')}  ${chalk.green(chalk.bold(padUrl))}  ${chalk.dim('← same Wi-Fi, no IP needed')}`);
   if (stopVanity && bonjour) {
-    console.log(`  ${chalk.dim('Fallback')}      http://${bonjour}:${port}${lan ? ` · http://${lan}:${port}` : ''}`);
+    console.log(`  ${chalk.dim('Fallback')}      ${hostUrl(bonjour, port)}${lan ? ` · ${hostUrl(lan, port)}` : ''}`);
   }
   console.log('');
   console.log(chalk.bold('  Set up in three steps'));
@@ -296,7 +352,7 @@ export async function runDeck(argv: string[]): Promise<void> {
   console.log(`  ${chalk.cyan('2.')} Share → ${chalk.bold('Add to Home Screen')} for the full-screen deck`);
   console.log(`  ${chalk.cyan('3.')} Themes: ${chalk.dim('?theme=paper|ember|flight')} · Variants: ${chalk.dim('?variant=oxide')}`);
   console.log('');
-  console.log(`  ${chalk.dim(`Served by ${handle.engine} · Is it running? curl http://localhost:${port}/healthz`)}`);
+  console.log(`  ${chalk.dim(`Served by ${handle.engine} · Is it running? curl ${hostUrl('localhost', port)}/healthz`)}`);
   console.log(`  ${chalk.dim('The deck runs its built-in demo state. Press Ctrl+C to stop.')}`);
   console.log('');
 
