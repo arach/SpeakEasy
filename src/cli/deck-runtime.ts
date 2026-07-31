@@ -354,8 +354,16 @@ export class DeckRuntime extends EventEmitter {
       this.changed();
 
       const file = await this.synthesize(reply);
-      if (file) msg.file = file;
       if (!alive()) return;
+      if (!file) {
+        // synthesis failed — show the reply without audio, never fake playback
+        msg.mirrored = true;
+        this.setPhase('idle', 'READY');
+        this.log('NO AUDIO', 'synthesis unavailable · text-only reply');
+        this.changed();
+        return;
+      }
+      msg.file = file;
       if (this.autoplay) {
         this.playing = id;
         this.paused = false;
@@ -363,7 +371,7 @@ export class DeckRuntime extends EventEmitter {
         this.setPhase('speaking', 'SPEAKING');
         this.ensureTicker();
         this.changed();
-        if (file) this.playFile(file);
+        this.playFile(file);
       } else {
         this.setPhase('idle', 'READY');
         this.changed();
