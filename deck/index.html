@@ -432,6 +432,8 @@ const S = {
   lanes: null,
   assign: false,
   host: null,
+  catalog: [],
+  picker: null,
   threads: LANES.map(l => l.thread.map(m => Object.assign({}, m))),
   playing: null,
   paused: false,
@@ -484,6 +486,18 @@ function logEvent(kind, detail) {
 function mmss(t) {
   const s = Math.max(0, Math.floor(t));
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function ago(ms) {
+  const s = Math.max(1, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) return s + 's ago';
+  const m = Math.round(s / 60);
+  if (m < 60) return m + 'm ago';
+  const h = Math.round(m / 60);
+  if (h < 24) return h + 'h ago';
+  return Math.round(h / 24) + 'd ago';
+}
+function baseName(p) {
+  return (p || '').split('/').filter(Boolean).pop() || '';
 }
 function sentences(text) {
   return (text.match(/[^.;]+[.;]?/g) || [text]).map(t => t.trim()).filter(Boolean);
@@ -560,6 +574,7 @@ function applySnapshot(snap) {
   S.confirm = snap.confirm;
   S.trace = snap.trace.slice();
   S.host = snap.host || null;
+  if (snap.catalog) S.catalog = snap.catalog;
   syncAudio(snap);
   paint();
 }
@@ -1008,7 +1023,13 @@ function view() {
     micSub: S.listening ? 'Release to send' : 'Hold · lane ' + l.num,
     micBg: 'linear-gradient(180deg,' + (S.listening ? T('mic-edge') : T('mic-a')) + ',' + (S.listening ? T('mic-a') : T('mic-b')) + ')',
     micEdge: S.listening ? T('mic-edge') : T('mic-a'),
-    confirmLine: S.confirm
+    confirmLine: S.confirm,
+    pickerLane: S.picker,
+    catalogRows: (S.catalog || []).map(t => ({
+      id: t.id,
+      snippet: t.snippet,
+      meta: (baseName(t.cwd) || 'codex') + ' · ' + ago(t.at) + (t.originator === 'openscout-agent-sessions' ? ' · deck' : '')
+    }))
   };
 }
 
@@ -1247,6 +1268,25 @@ function tpl(v) {
         '</div>' +
       '</div>' +
     '</div>' +
+
+    // ─────────── thread picker overlay ───────────
+    (v.pickerLane != null ?
+    '<div data-act="pickerclose" style="position:fixed;inset:0;background:rgba(24,18,10,0.42);display:flex;align-items:center;justify-content:center;z-index:60;">' +
+      '<div style="width:min(540px,92%);max-height:72%;background:var(--se-panel);border:1px solid var(--se-line);border-radius:12px;box-shadow:var(--se-panel-shadow);display:flex;flex-direction:column;overflow:hidden;">' +
+        '<div style="flex:none;padding:13px 18px;border-bottom:1px solid var(--se-line-soft);display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font:600 10px var(--se-mono);letter-spacing:0.16em;color:var(--se-ink);">MAP LANE ' + String(v.pickerLane + 1).padStart(2, '0') + ' TO A THREAD</span>' +
+          '<span style="font:500 8.5px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink-3);">' + v.catalogRows.length + ' RECENT</span>' +
+        '</div>' +
+        '<div class="se-scroll" style="overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:7px;">' +
+          '<button type="button" data-act="pick" data-arg="" style="text-align:left;border:1.5px dashed var(--se-accent-edge);border-radius:9px;background:var(--se-chip-bg);padding:11px 14px;cursor:pointer;font:600 10px var(--se-mono);letter-spacing:0.14em;color:var(--se-accent-ink);">+ FRESH SESSION</button>' +
+          v.catalogRows.map(t =>
+            '<button type="button" data-act="pick" data-arg="' + esc(t.id) + '" style="text-align:left;border:1px solid var(--se-line);border-radius:9px;background:var(--se-cell);padding:10px 14px;cursor:pointer;">' +
+              '<div style="font:500 11.5px var(--se-sans);color:var(--se-ink);line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + esc(t.snippet) + '</div>' +
+              '<div style="font:500 8px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);margin-top:5px;">' + esc(t.meta) + '</div>' +
+            '</button>').join('') +
+        '</div>' +
+      '</div>' +
+    '</div>' : '') +
   '</div>';
 }
 
@@ -1350,11 +1390,12 @@ window.addEventListener('pagehide', () => { if (timer !== null) { clearInterval(
 // ────────────────────────────────────────────────────────────────────────────
 
 const ACTIONS = {
-  // in reset mode, a pad tap wipes that pad's conversation instead of selecting it
+  // in map mode, a pad tap opens the thread picker for that pad
   lane: a => {
     if (S.assign) {
-      if (sendIntent('lane.cycle', { index: Number(a) })) return;
-      S.assign = false;
+      S.picker = Number(a);
+      paint();
+      return;
     }
     selectLane(Number(a));
   },
@@ -1365,11 +1406,23 @@ const ACTIONS = {
   stop: () => stopAll(),
   replay: () => replayLast(),
   announce: () => announce(),
-  // LINK arms pad reset in live mode; a simulated ping in demo
+  // pick a thread for the pad whose picker is open ('' = fresh session)
+  pick: a => {
+    const ix = S.picker;
+    S.picker = null;
+    S.assign = false;
+    if (ix != null) sendIntent('lane.assign', { index: ix, threadId: a || null });
+    else paint();
+  },
+  pickerclose: () => { S.picker = null; paint(); },
+  // LINK arms the thread mapper in live mode; a simulated ping in demo
   ping: () => {
     if (live) {
       S.assign = !S.assign;
-      S.confirm = S.assign ? 'RESET · TAP A PAD FOR A FRESH SESSION' : 'READY';
+      S.picker = null;
+      if (S.assign) sendIntent('catalog.refresh');
+      S.confirm = S.assign ? 'TAP A PAD TO MAP A THREAD' : 'READY';
+      paint();
     } else {
       pingMac();
     }

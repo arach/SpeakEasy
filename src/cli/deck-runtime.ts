@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, copyFileSync, readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, openSync, readSync, closeSync } from 'node:fs';
 import { tmpdir, homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
@@ -33,6 +33,15 @@ export interface DeckTraceEntry {
   detail: string;
 }
 
+/** A resumable codex thread, discovered from local rollout files. */
+export interface DeckThreadInfo {
+  id: string;
+  cwd: string;
+  snippet: string;
+  at: number;
+  originator: string;
+}
+
 export interface DeckLaneInfo {
   num: string;
   name: string;
@@ -60,6 +69,8 @@ export interface DeckSnapshot {
   trace: DeckTraceEntry[];
   /** short name of the Mac serving this deck — the deck is titled after it */
   host: string;
+  /** recent resumable codex threads — filled by the catalog.refresh intent */
+  catalog: DeckThreadInfo[];
 }
 
 const intentSchema = z.discriminatedUnion('name', [
@@ -76,6 +87,8 @@ const intentSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('capture.end'), text: z.string().max(500).optional() }),
   z.object({ name: z.literal('speak'), text: z.string().min(1).max(4000) }),
   z.object({ name: z.literal('lane.cycle'), index: z.number().int().min(0).max(8) }),
+  z.object({ name: z.literal('catalog.refresh') }),
+  z.object({ name: z.literal('lane.assign'), index: z.number().int().min(0).max(8), threadId: z.string().max(64).nullable() }),
   z.object({ name: z.literal('playback.progress'), id: z.string().regex(/^\d:\d{1,3}$/), pos: z.number().min(0), dur: z.number().positive().optional() }),
   z.object({ name: z.literal('playback.ended'), id: z.string().regex(/^\d:\d{1,3}$/) }),
 ]);
@@ -87,6 +100,113 @@ const LANE_COUNT = 9;
 const TICK_MS = 250;
 const MAX_MESSAGES_PER_LANE = 50;
 const LANES_FILE = path.join(homedir(), '.config', 'speakeasy', 'deck-lanes.json');
+
+const CODEX_SESSIONS_DIR = path.join(homedir(), '.codex', 'sessions');
+const CATALOG_LIMIT = 12;
+
+/** Read at most `bytes` from the head of a file. */
+function readHead(file: string, bytes: number): string {
+  const fd = openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(bytes);
+    const n = readSync(fd, buf, 0, bytes, 0);
+    return buf.toString('utf8', 0, n);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** Parse a rollout's head for its identity and first real human prompt. */
+function parseRollout(file: string, at: number): DeckThreadInfo | null {
+  let head: string;
+  try {
+    head = readHead(file, 65536);
+  } catch {
+    return null;
+  }
+  let id = '';
+  let cwd = '';
+  let originator = '';
+  let snippet = '';
+  for (const line of head.split('\n')) {
+    if (!line) continue;
+    let rec: { type?: string; payload?: Record<string, unknown> };
+    try {
+      rec = JSON.parse(line);
+    } catch {
+      continue; // a truncated tail line is not a thread problem
+    }
+    const p = rec.payload;
+    if (rec.type === 'session_meta' && p) {
+      id = String(p.session_id ?? p.id ?? '');
+      cwd = String(p.cwd ?? '');
+      originator = String(p.originator ?? '');
+    } else if (!snippet && rec.type === 'response_item' && p?.type === 'message' && p?.role === 'user') {
+      const content = Array.isArray(p.content) ? p.content : [];
+      const text = content
+        .filter((c) => (c as { type?: string }).type === 'input_text')
+        .map((c) => String((c as { text?: string }).text ?? ''))
+        .join(' ')
+        .trim();
+      // injected context blocks start with '<' — the first real prompt doesn't
+      if (text && !text.startsWith('<')) snippet = text.replace(/\s+/g, ' ').slice(0, 90);
+    }
+    if (id && snippet) break;
+  }
+  if (!id) return null;
+  return { id, cwd, snippet: snippet || `${path.basename(cwd)} thread`, at, originator };
+}
+
+/** The adapter's per-key runtime dir (mirrors codexLocalSessionPaths). */
+function laneRuntimeDir(key: string): string {
+  return path.join(homedir(), '.scout', 'local', 'codex', key.replace(/[^A-Za-z0-9._-]+/g, '_'), 'runtime');
+}
+
+/** Locate and parse the rollout for a thread id — filenames carry the id. */
+function findRollout(threadId: string): DeckThreadInfo | null {
+  let names: string[];
+  try {
+    names = readdirSync(CODEX_SESSIONS_DIR, { recursive: true }) as string[];
+  } catch {
+    return null;
+  }
+  const match = names.find((n) => n.includes(threadId) && n.endsWith('.jsonl'));
+  if (!match) return null;
+  const file = path.join(CODEX_SESSIONS_DIR, match);
+  try {
+    return parseRollout(file, statSync(file).mtimeMs);
+  } catch {
+    return null;
+  }
+}
+
+/** Recent codex threads from local rollout files, newest first. */
+function scanCodexThreads(): DeckThreadInfo[] {
+  let names: string[];
+  try {
+    names = readdirSync(CODEX_SESSIONS_DIR, { recursive: true }) as string[];
+  } catch {
+    return [];
+  }
+  const rollouts: { file: string; at: number }[] = [];
+  for (const n of names) {
+    if (!/rollout-.*\.jsonl$/.test(n)) continue;
+    try {
+      rollouts.push({ file: n, at: statSync(path.join(CODEX_SESSIONS_DIR, n)).mtimeMs });
+    } catch {
+      // vanished mid-scan — skip
+    }
+  }
+  rollouts.sort((a, b) => b.at - a.at);
+  const out: DeckThreadInfo[] = [];
+  // scan a few extra — some rollouts carry no usable snippet
+  for (const { file, at } of rollouts.slice(0, CATALOG_LIMIT * 3)) {
+    const info = parseRollout(path.join(CODEX_SESSIONS_DIR, file), at);
+    if (info) out.push(info);
+    if (out.length >= CATALOG_LIMIT) break;
+  }
+  return out;
+}
 
 /** Per-lane session reuse keys, persisted so a cycled (reset) lane keeps its
  * fresh session across deck restarts instead of resurrecting the base one.
@@ -173,6 +293,7 @@ export class DeckRuntime extends EventEmitter {
   private confirm = 'READY';
   private trace: DeckTraceEntry[] = [];
   private host = hostname().replace(/\.(local|lan)$/, '');
+  private catalog: DeckThreadInfo[] = [];
   private ticker: NodeJS.Timeout | null = null;
   private busy = false;
   private destroyed = false;
@@ -187,6 +308,28 @@ export class DeckRuntime extends EventEmitter {
   /** the directory synthesized audio is served from (deck-live exposes it at /audio) */
   get audioDir(): string {
     return this.synthDir;
+  }
+
+  constructor() {
+    super();
+    this.restoreLaneBindings();
+  }
+
+  /** Rebuild lane labels for persisted thread bindings — the adapter resumes
+   * the thread on its own; this restores what the pad SAYS it is bound to. */
+  private restoreLaneBindings(): void {
+    this.laneKeys.forEach((key, i) => {
+      let threadId = '';
+      try {
+        threadId = readFileSync(path.join(laneRuntimeDir(key), 'codex-thread-id.txt'), 'utf8').trim();
+      } catch {
+        return; // unseeded lane — fresh session
+      }
+      if (!threadId) return;
+      const lane = this.lanes[i];
+      lane.sessionAlias = threadId.replace(/-/g, '').slice(-8);
+      lane.title = findRollout(threadId)?.snippet ?? 'codex thread';
+    });
   }
 
   snapshot(): DeckSnapshot {
@@ -207,6 +350,7 @@ export class DeckRuntime extends EventEmitter {
       confirm: this.confirm,
       trace: this.trace,
       host: this.host,
+      catalog: this.catalog,
     };
   }
 
@@ -270,20 +414,34 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** Channel mapper: reset a pad to a fresh codex session. The old thread
-   * stays on disk under its reuse key; the lane starts clean. Only ever called
-   * while no response is in flight (apply() rejects lane.cycle when busy), so
-   * this never touches another lane's turn. */
-  private cycleLane(index: number): void {
+  /** Channel mapper: bind a pad to an existing codex thread, or to a fresh
+   * session when threadId is null. Only ever called while no response is in
+   * flight (apply() rejects lane.cycle/lane.assign when busy), so this never
+   * touches another lane's turn. */
+  private assignLane(index: number, threadId: string | null): void {
     // never let the old session's audio keep playing under a new one
     if (this.playing?.startsWith(`${index}:`)) {
       this.stopPlayer();
       this.clearPlayback('READY');
     }
     const lane = this.lanes[index];
-    this.laneKeys[index] = `speakeasy-deck-lane-${index}-${Date.now().toString(36)}`;
+    const key = `speakeasy-deck-lane-${index}-${Date.now().toString(36)}`;
+    // seed BEFORE persisting the key, and only claim the bind when the seed
+    // actually landed — a failed seed must not masquerade as a mapped lane
+    let bound = false;
+    if (threadId) {
+      try {
+        const dir = laneRuntimeDir(key);
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(path.join(dir, 'codex-thread-id.txt'), threadId);
+        bound = true;
+      } catch {
+        bound = false;
+      }
+    }
+    this.laneKeys[index] = key;
     this.persistLaneKeys();
-    // the fresh session starts with a clean conversation — no orphaned replies
+    // the new binding starts with a clean conversation — no orphaned replies
     // from the old thread, and nothing for replay to resurrect
     this.threads[index] = [];
     const existing = this.laneClients.get(index);
@@ -292,10 +450,17 @@ export class DeckRuntime extends EventEmitter {
       void existing.client.close().catch(() => undefined);
     }
     lane.name = `LANE ${index + 1}`;
-    lane.title = 'new codex session on first ask';
     lane.state = 'idle';
-    lane.sessionAlias = undefined;
-    this.log('LANE RESET', `lane ${index + 1} → fresh session`);
+    if (threadId && bound) {
+      const info = this.catalog.find((t) => t.id === threadId);
+      lane.title = info?.snippet ?? 'codex thread';
+      lane.sessionAlias = threadId.replace(/-/g, '').slice(-8);
+      this.log('LANE ASSIGNED', `lane ${index + 1} → thread ${lane.sessionAlias}`);
+    } else {
+      lane.title = 'new codex session on first ask';
+      lane.sessionAlias = undefined;
+      this.log(threadId ? 'ASSIGN FAILED' : 'LANE RESET', `lane ${index + 1} → fresh session`);
+    }
     this.changed();
   }
 
@@ -488,7 +653,17 @@ export class DeckRuntime extends EventEmitter {
         // resetting mid-response would cancel whichever lane is answering —
         // the reset is instant, so just ask the user to wait a beat
         if (this.busy) return { ok: false, rev: this.rev, error: 'response in flight — try again in a moment' };
-        this.cycleLane(intent.index);
+        this.assignLane(intent.index, null);
+        return { ok: true, rev: this.rev };
+      }
+      case 'catalog.refresh': {
+        this.catalog = scanCodexThreads();
+        this.changed();
+        return { ok: true, rev: this.rev };
+      }
+      case 'lane.assign': {
+        if (this.busy) return { ok: false, rev: this.rev, error: 'response in flight — try again in a moment' };
+        this.assignLane(intent.index, intent.threadId);
         return { ok: true, rev: this.rev };
       }
       case 'playback.progress': {
