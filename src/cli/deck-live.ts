@@ -12,7 +12,7 @@ const MAX_BUFFERED = 256 * 1024;
 
 export interface DataPlane {
   dataPort: number;
-  token: string;
+  token: string | null;
   stop: () => void;
 }
 
@@ -21,7 +21,7 @@ export interface DiscoveryInfo {
   port: number;
   dataPort: number;
   host: string;
-  token: string;
+  token: string | null;
 }
 
 /** Atomic, owner-only discovery so the speak CLI can find (and authenticate to) a running deck. */
@@ -48,9 +48,11 @@ export function clearDiscovery(): void {
   }
 }
 
-function authorized(req: IncomingMessage, token: string): boolean {
-  const url = new URL(req.url ?? '/', 'http://localhost');
-  if (url.searchParams.get('k') !== token) return false;
+function authorized(req: IncomingMessage, token: string | null): boolean {
+  if (token) {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    if (url.searchParams.get('k') !== token) return false;
+  }
   const origin = req.headers.origin;
   if (origin) {
     try {
@@ -65,10 +67,11 @@ function authorized(req: IncomingMessage, token: string): boolean {
 /**
  * The deck's data plane: WebSocket intents/snapshots for the deck client,
  * plus a small HTTP API so the speak CLI can mirror narration into the deck.
- * Loopback only — LAN clients reach it through the same-origin Caddy proxy,
- * which carries the per-run token.
+ * Loopback only — LAN clients reach it through the same-origin Caddy proxy.
+ * Open by default (trusted local network); a token is enforced when the deck
+ * is started with --pair.
  */
-export async function startDataPlane(runtime: DeckRuntime, dataPort: number, token: string): Promise<DataPlane> {
+export async function startDataPlane(runtime: DeckRuntime, dataPort: number, token: string | null): Promise<DataPlane> {
   const clients = new Set<WebSocket>();
 
   const server = createServer(async (req, res) => {
@@ -129,8 +132,10 @@ export async function startDataPlane(runtime: DeckRuntime, dataPort: number, tok
     path: '/ws',
     maxPayload: MAX_WS_PAYLOAD,
     verifyClient: (info, done) => {
-      const url = new URL(info.req.url ?? '/', 'http://localhost');
-      if (url.searchParams.get('k') !== token) return done(false, 403, 'Forbidden');
+      if (token) {
+        const url = new URL(info.req.url ?? '/', 'http://localhost');
+        if (url.searchParams.get('k') !== token) return done(false, 403, 'Forbidden');
+      }
       const origin = info.req.headers.origin;
       if (origin) {
         try {

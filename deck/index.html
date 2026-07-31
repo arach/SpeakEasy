@@ -555,9 +555,9 @@ function demoRestore() {
 
 // Speech recognition lives in the browser (HTTPS required). Recognition may
 // use the browser vendor's speech service; the Mac only ever receives text.
+// Each hold gets its own state record — an old recognizer can never leak
+// results into a new capture.
 let recog = null;
-let transcript = '';
-let recogFailed = false;
 
 function startTranscription() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -567,38 +567,38 @@ function startTranscription() {
     return;
   }
   if (recog) return;
-  transcript = '';
-  recogFailed = false;
-  recog = new SR();
-  recog.lang = 'en-US';
-  recog.interimResults = true;
-  recog.continuous = false;
-  recog.onresult = e => {
-    transcript = Array.from(e.results).map(r => r[0].transcript).join(' ').trim();
-    if (S.listening && transcript) { S.confirm = transcript.toUpperCase().slice(0, 40); paint(); }
+  const state = { transcript: '', failed: false };
+  const r = new SR();
+  recog = { r, state };
+  r.lang = 'en-US';
+  r.interimResults = true;
+  r.continuous = false;
+  r.onresult = e => {
+    state.transcript = Array.from(e.results).map(x => x[0].transcript).join(' ').trim();
+    if (S.listening && state.transcript) { S.confirm = state.transcript.toUpperCase().slice(0, 40); paint(); }
   };
-  recog.onerror = () => { recogFailed = true; };
-  try { recog.start(); } catch (_) { recog = null; recogFailed = true; }
+  r.onerror = () => { state.failed = true; };
+  try { r.start(); } catch (_) { recog = null; state.failed = true; }
 }
 
-// stop() delivers final results asynchronously — the done callback fires from
-// the recognizer's own end (or a hard cap), never synchronously.
+// stop() delivers final results asynchronously — done(state) fires from the
+// recognizer's own end (or a hard cap), never synchronously.
 function stopTranscription(abort, done) {
-  if (!recog) { done(); return; }
-  const r = recog;
+  if (!recog) { done({ transcript: '', failed: true }); return; }
+  const { r, state } = recog;
   recog = null;
   let fired = false;
-  const finish = () => { if (!fired) { fired = true; done(); } };
+  const finish = () => { if (!fired) { fired = true; done(state); } };
   r.onend = finish;
   try { abort ? r.abort() : r.stop(); } catch (_) { finish(); }
   setTimeout(finish, 1500);
 }
 
 function bootLive() {
-  if (!liveToken) return; // no capability in the URL — demo mode
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(proto + '://' + location.host + '/ws?k=' + encodeURIComponent(liveToken));
-  ws.onopen = () => { live = ws; liveRev = -1; logEvent('LINK OK', 'mac runtime · live state'); };
+  const ws = new WebSocket(proto + '://' + location.host + '/ws' + (liveToken ? '?k=' + encodeURIComponent(liveToken) : ''));
+  let established = false;
+  ws.onopen = () => { live = ws; liveRev = -1; established = true; logEvent('LINK OK', 'mac runtime · live state'); };
   ws.onmessage = e => {
     let msg;
     try { msg = JSON.parse(e.data); } catch (_) { return; }
@@ -612,7 +612,8 @@ function bootLive() {
     const wasLive = live === ws;
     live = null;
     if (wasLive) demoRestore();
-    setTimeout(bootLive, 3000);
+    // only retry a link that once worked — a demo surface stays quiet
+    if (established) setTimeout(bootLive, 3000);
   };
   ws.onerror = () => { try { ws.close(); } catch (_) {} };
 }
@@ -673,16 +674,12 @@ function holdCancel() {
 function holdEnd() {
   if (!S.listening && !live) return;
   if (live) {
-    stopTranscription(false, () => {
-      const said = transcript;
-      transcript = '';
-      if (said && !recogFailed) {
-        sendIntent('capture.end', { text: said });
+    stopTranscription(false, (state) => {
+      if (state.transcript && !state.failed) {
+        sendIntent('capture.end', { text: state.transcript });
       } else {
-        // never silently run a fallback prompt — say so and cancel cleanly
-        S.confirm = recogFailed ? 'SPEECH ERROR · TRY AGAIN' : 'NO SPEECH · TRY AGAIN';
-        sendIntent('capture.cancel');
-        paint();
+        // never silently run a fallback prompt — the reason reaches the runtime
+        sendIntent('capture.cancel', { reason: state.failed ? 'SPEECH ERROR · TRY AGAIN' : 'NO SPEECH · TRY AGAIN' });
       }
     });
     return;

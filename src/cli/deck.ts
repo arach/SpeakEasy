@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, lstatSync } from 'node:fs';
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
@@ -61,8 +61,12 @@ function deckToken(rotate: boolean): string {
   const file = path.join(os.homedir(), '.config', 'speakeasy', 'deck-token');
   if (!rotate) {
     try {
-      const existing = readFileSync(file, 'utf8').trim();
-      if (/^[a-f0-9]{24,}$/.test(existing)) return existing;
+      const st = lstatSync(file);
+      if (st.isFile() && !st.isSymbolicLink() && st.uid === process.getuid()) {
+        if ((st.mode & 0o777) !== 0o600) chmodSync(file, 0o600);
+        const existing = readFileSync(file, 'utf8').trim();
+        if (/^[a-f0-9]{24,}$/.test(existing)) return existing;
+      }
     } catch {
       // fall through to mint
     }
@@ -171,20 +175,20 @@ function findCaddy(): string | null {
   return res.status === 0 ? res.stdout.trim() : null;
 }
 
-function caddyConfig(root: string, port: number, tlsHost: string | null, caCert: string | null, live: { dataPort: number; token: string } | null): string {
+function caddyConfig(root: string, port: number, tlsHost: string | null, caCert: string | null, live: { dataPort: number; token: string | null } | null): string {
   // Same-origin proxy to the loopback data plane — LAN clients never see the
-  // data port, and the per-run token gates both the WebSocket and the API.
+  // data port. Open by default; --pair gates both routes behind the token.
+  const gate = live?.token ? `\n\t\t@tok query k=${live.token}` : '';
+  const prox = live?.token ? ' @tok' : '';
   const liveRoutes = live
     ? `
-	route /ws* {
-		@tok query k=${live.token}
-		reverse_proxy @tok 127.0.0.1:${live.dataPort}
+	route /ws* {${gate}
+		reverse_proxy${prox} 127.0.0.1:${live.dataPort}
 		respond 403
 	}
 
-	route /api/* {
-		@tok query k=${live.token}
-		reverse_proxy @tok 127.0.0.1:${live.dataPort}
+	route /api/* {${gate}
+		reverse_proxy${prox} 127.0.0.1:${live.dataPort}
 		respond 403
 	}
 `
@@ -379,11 +383,12 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
   };
 }
 
-function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr: boolean; caddy: boolean; mdns: boolean; tls: boolean; rotateToken: boolean } {
+function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr: boolean; caddy: boolean; mdns: boolean; tls: boolean; rotateToken: boolean; pair: boolean } {
   let port: number | null = null; // null = auto: 80 if free (port-free URL), else 43211
   let host = `speak.${deviceSlug()}.local`;
   let qr = true;
   let rotateToken = false;
+  let pair = false;
   let caddy = true;
   let mdns = true;
   let tls = true;
@@ -417,13 +422,15 @@ function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr:
       tls = false;
     } else if (arg === '--rotate-token') {
       rotateToken = true;
+    } else if (arg === '--pair') {
+      pair = true;
     } else {
       console.error(`❌ Unknown argument: ${arg}`);
       console.error('   Usage: speakeasy deck [--port <n>] [--host <name>] [--no-qr] [--no-caddy] [--no-mdns] [--no-tls]');
       process.exit(1);
     }
   }
-  return { port, host, qr, caddy, mdns, tls, rotateToken };
+  return { port, host, qr, caddy, mdns, tls, rotateToken, pair };
 }
 
 export async function runDeck(argv: string[]): Promise<void> {
@@ -470,9 +477,9 @@ export async function runDeck(argv: string[]): Promise<void> {
   const caCert = tlsHost ? (caddyRootCert(true) ?? null) : null;
 
   // The data plane runs loopback-only on port+1ish; Caddy proxies /ws and
-  // /api/* to it same-origin behind the capability token. The token persists
-  // across runs so a pinned iPad keeps working through restarts.
-  const token = deckToken(args.rotateToken);
+  // /api/* to it same-origin. Open on the local network by default; --pair
+  // gates both routes behind the persistent capability token.
+  const token = args.pair ? deckToken(args.rotateToken) : null;
   let dataPort: number | null = null;
   for (let candidate = port + 1; candidate <= Math.min(port + 5, 65535); candidate++) {
     if (await portAvailable(candidate)) {
@@ -529,8 +536,8 @@ export async function runDeck(argv: string[]): Promise<void> {
     : bonjour
       ? hostUrl(bonjour, port)
       : `http://${lan ?? 'your-macs-ip'}:${port}`);
-  // the capability token travels in the URL fragment — it never hits the wire
-  const padUrl = dataPlane && handle.engine === 'caddy' ? `${padUrlBase}#k=${token}` : padUrlBase;
+  // pair mode: the capability token travels in the URL fragment — never on the wire
+  const padUrl = dataPlane && token && handle.engine === 'caddy' ? `${padUrlBase}#k=${token}` : padUrlBase;
 
   console.log('');
   console.log(chalk.bold('  🎛  SpeakEasy Deck'));

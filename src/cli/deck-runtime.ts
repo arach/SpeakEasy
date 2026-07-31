@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, statSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
@@ -58,7 +58,7 @@ const intentSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('playback.stop') }),
   z.object({ name: z.literal('playback.replay') }),
   z.object({ name: z.literal('capture.start') }),
-  z.object({ name: z.literal('capture.cancel') }),
+  z.object({ name: z.literal('capture.cancel'), reason: z.string().max(60).optional() }),
   z.object({ name: z.literal('capture.end'), text: z.string().max(500).optional() }),
   z.object({ name: z.literal('speak'), text: z.string().min(1).max(4000) }),
 ]);
@@ -290,8 +290,8 @@ export class DeckRuntime extends EventEmitter {
       case 'capture.cancel':
         if (!this.listening) return { ok: false, rev: this.rev, error: 'not recording' };
         this.listening = false;
-        this.setPhase('idle', 'READY');
-        this.log('VOICE COMMAND', 'cancelled');
+        this.setPhase('idle', intent.reason ?? 'READY');
+        this.log('VOICE COMMAND', intent.reason ?? 'cancelled');
         this.changed();
         return { ok: true, rev: this.rev };
       case 'capture.end': {
@@ -417,10 +417,16 @@ export class DeckRuntime extends EventEmitter {
       if (!inv) throw new Error('no invocation id from scout');
 
       const waitOut = await this.scoutRun(['wait', inv, '--timeout', '180', '--json'], 200_000);
-      const receipt = parseJsonBlock(waitOut) as { timedOut?: boolean; state?: string; output?: string } | null;
+      const receipt = parseJsonBlock(waitOut) as {
+        timedOut?: boolean;
+        flight?: { state?: string };
+        state?: string;
+        output?: string;
+      } | null;
+      const flightState = receipt?.flight?.state ?? receipt?.state;
       const text = (receipt?.output ?? '').trim();
-      if (receipt?.timedOut || (receipt?.state && receipt.state !== 'completed') || text.length < 4) {
-        throw new Error(receipt?.timedOut ? 'agent timed out' : 'empty reply');
+      if (receipt?.timedOut || flightState !== 'completed' || text.length < 4) {
+        throw new Error(receipt?.timedOut ? 'agent timed out' : `agent flight ${flightState ?? 'unknown'}`);
       }
       return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : text;
     } catch (error) {
@@ -461,8 +467,11 @@ export class DeckRuntime extends EventEmitter {
       if (stats.dir) {
         const { TTSCache } = await import('../cache');
         const recent = await new TTSCache(stats.dir, '7d').getRecent(10);
+        // correlate by normalized text — the cache is deterministic, so an exact
+        // match IS this audio regardless of file age (punctuation may differ)
+        const wanted = text.trim().toLowerCase();
         const match = recent.find(
-          (e) => e.originalText === text && e.filePath && existsSync(e.filePath) && Date.now() - statSync(e.filePath).mtimeMs < 60_000,
+          (e) => e.originalText?.trim().toLowerCase() === wanted && e.filePath && existsSync(e.filePath),
         );
         if (match) {
           const owned = path.join(this.synthDir, `reply-${Date.now()}${path.extname(match.filePath) || '.mp3'}`);
