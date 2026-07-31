@@ -1339,7 +1339,9 @@ root.addEventListener('pointerup', e => {
   paint();
 });
 // System interruption (call, gesture takeover) must not leave the deck listening.
-window.addEventListener('pointercancel', () => { if (holdOwner !== null) { holdCancel(holdOwner); paint(); } });
+window.addEventListener('pointercancel', e => {
+  if (e.pointerId === holdOwner) { holdCancel(e.pointerId); paint(); }
+});
 
 // Keyboard hold-to-speak: Space/Enter on the focused pad behaves like the
 // pointer hold; ESC aborts from anywhere.
