@@ -24,9 +24,11 @@ claims it for a port-free URL; otherwise it uses 43211. On the iPad (same Wi-Fi)
 3. Pick a look: `?theme=paper|ember|flight`, or a variant like `?variant=oxide`.
 
 Options: `--port <n>`, `--host <name>` (default `speak.<device>.local`), `--no-qr`, `--no-caddy`,
-`--no-mdns`. The deck runs its built-in demo state — no Mac link is required, and Ctrl+C stops
-the server. Is it running? `curl http://localhost:<port>/healthz` on the printed port. Prefer
-your own server? `caddy run` in this directory uses the shipped `Caddyfile`.
+`--no-mdns`. The deck connects to a **live runtime** (WebSocket on port+1): hold-to-speak runs the
+real phase machine with real synthesis on the Mac, and `speakeasy "text"` from any shell mirrors
+into the open deck. Without the runtime it falls back to its built-in demo state. Is it running?
+`curl http://localhost:<port>/healthz` on the printed port. Prefer your own server?
+`caddy run` in this directory uses the shipped `Caddyfile`.
 
 ## Boot options
 

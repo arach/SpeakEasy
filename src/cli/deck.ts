@@ -5,6 +5,8 @@ import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_pr
 import path from 'node:path';
 import os from 'node:os';
 import chalk from 'chalk';
+import { DeckRuntime } from './deck-runtime';
+import { startDataPlane, writeDiscovery, clearDiscovery, type DataPlane } from './deck-live';
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -145,7 +147,16 @@ function findCaddy(): string | null {
   return res.status === 0 ? res.stdout.trim() : null;
 }
 
-function caddyConfig(root: string, port: number, tlsHost: string | null, caCert: string | null): string {
+function caddyConfig(root: string, port: number, tlsHost: string | null, caCert: string | null, dataPort: number | null): string {
+  const configRoute = dataPort
+    ? `
+	@deckcfg path /deck-config.json
+	handle @deckcfg {
+		header Content-Type application/json
+		respond \`{"dataPort":${dataPort}}\` 200
+	}
+`
+    : '';
   const caRoute = caCert
     ? `
 	@cacert path /ca.crt
@@ -185,7 +196,7 @@ https://${tlsHost} {
 http://:${port} {
 	root * ${root}
 	file_server
-${caRoute}
+${configRoute}${caRoute}
 	@healthz path /healthz
 	handle @healthz {
 		header Content-Type application/json
@@ -221,10 +232,10 @@ function caddyRootCert(expected = false): string | undefined {
 }
 
 /** Serve via Caddy when it is installed — the same static server users get from deck/Caddyfile. */
-async function startCaddy(caddy: string, root: string, port: number, tlsHost: string | null, caCert: string | null): Promise<DeckHandle> {
+async function startCaddy(caddy: string, root: string, port: number, tlsHost: string | null, caCert: string | null, dataPort: number | null): Promise<DeckHandle> {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'speakeasy-deck-'));
   const config = path.join(dir, 'Caddyfile');
-  await writeFile(config, caddyConfig(root, port, tlsHost, caCert));
+  await writeFile(config, caddyConfig(root, port, tlsHost, caCert, dataPort));
 
   const child: ChildProcess = spawn(caddy, ['run', '--config', config], { stdio: ['ignore', 'ignore', 'pipe'] });
   let errBuf = '';
@@ -282,7 +293,7 @@ async function startCaddy(caddy: string, root: string, port: number, tlsHost: st
 }
 
 /** Zero-dependency fallback when Caddy is not installed. */
-async function startNodeServer(root: string, port: number): Promise<DeckHandle> {
+async function startNodeServer(root: string, port: number, dataPort: number | null): Promise<DeckHandle> {
   const server = createServer(async (req, res) => {
     let pathname: string;
     try {
@@ -290,6 +301,11 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
       pathname = decodeURIComponent(url.pathname);
     } catch {
       res.writeHead(400).end('Bad request');
+      return;
+    }
+    if (pathname === '/deck-config.json' && dataPort) {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ dataPort }));
       return;
     }
     if (pathname === '/healthz') {
@@ -422,9 +438,19 @@ export async function runDeck(argv: string[]): Promise<void> {
   const tlsHost = args.tls && caddy && (await portAvailable(443)) ? host : null;
   const caCert = tlsHost ? (caddyRootCert(true) ?? null) : null;
 
+  // The data plane (WebSocket intents + speak API) always runs on port+1ish,
+  // regardless of which engine serves the static files.
+  let dataPort: number | null = null;
+  for (let candidate = port + 1; candidate <= port + 5; candidate++) {
+    if (await portAvailable(candidate)) {
+      dataPort = candidate;
+      break;
+    }
+  }
+
   let handle: DeckHandle;
   try {
-    handle = caddy ? await startCaddy(caddy, root, port, tlsHost, caCert) : await startNodeServer(root, port);
+    handle = caddy ? await startCaddy(caddy, root, port, tlsHost, caCert, dataPort) : await startNodeServer(root, port, dataPort);
   } catch (error) {
     if (!caddy) {
       console.error('❌ Could not start the deck server:', (error as Error).message);
@@ -432,10 +458,22 @@ export async function runDeck(argv: string[]): Promise<void> {
     }
     console.error(`  ⚠️  Caddy failed (${(error as Error).message}) — falling back to the built-in server.`);
     try {
-      handle = await startNodeServer(root, port);
+      handle = await startNodeServer(root, port, dataPort);
     } catch (fallbackError) {
       console.error('❌ Built-in server also failed:', (fallbackError as Error).message);
       process.exit(1);
+    }
+  }
+
+  // Live runtime — the deck connects to this; without it the deck is demo-only.
+  let dataPlane: DataPlane | null = null;
+  if (dataPort) {
+    const runtime = new DeckRuntime();
+    try {
+      dataPlane = await startDataPlane(runtime, dataPort);
+      writeDiscovery({ pid: process.pid, port, dataPort, host });
+    } catch {
+      dataPlane = null;
     }
   }
 
@@ -482,6 +520,11 @@ export async function runDeck(argv: string[]): Promise<void> {
     console.log(`  ${chalk.dim('  2. Settings → General → About → Certificate Trust Settings → enable "Caddy Local Authority"')}`);
   }
   console.log(`  ${chalk.dim('The deck runs its built-in demo state. Press Ctrl+C to stop.')}`);
+  if (dataPlane) {
+    console.log(`  ${chalk.green('✓')} ${chalk.dim(`Live runtime on :${dataPlane.dataPort} — the deck drives real synthesis; speaks from other shells mirror in.`)}`);
+  } else {
+    console.log(`  ${chalk.dim('Live runtime unavailable — deck runs demo state only.')}`);
+  }
   console.log('');
 
   if (qr && (lan || bonjour)) {
@@ -499,6 +542,8 @@ export async function runDeck(argv: string[]): Promise<void> {
     let stopping = false;
     const onShutdown = () => {
       stopping = true;
+      dataPlane?.stop();
+      clearDiscovery();
       stopEdge?.();
       stopVanity?.();
       handle.stop();
@@ -508,6 +553,8 @@ export async function runDeck(argv: string[]): Promise<void> {
     };
     const onExit = (code: number | null) => {
       cleanup();
+      dataPlane?.stop();
+      clearDiscovery();
       stopEdge?.();
       stopVanity?.();
       if (stopping) {
