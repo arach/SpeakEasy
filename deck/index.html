@@ -560,9 +560,9 @@ function demoRestore() {
 // previous one has fully finalized.
 let recog = null;
 let settling = false;
-// only a hold that holdStart actually admitted may end or cancel — a rejected
-// re-press must not settle someone else's capture
-let holdActive = false;
+// only the input that admitted the hold may end or cancel it — pointer id or
+// 'kbd:<code>'; a rejected overlapping press owns nothing
+let holdOwner = null;
 
 function startTranscription() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -670,17 +670,17 @@ function setVol(clientX, rect) {
   logEvent('NARRATION VOLUME', Math.round(S.vol * 100) + '%');
 }
 
-function holdStart() {
+function holdStart(owner) {
   if (lane().state === 'empty') return;
-  if (settling || holdActive) return; // never overlap captures
-  if (sendIntent('capture.start')) { holdActive = true; startTranscription(); return; }
-  holdActive = true;
+  if (settling || holdOwner !== null) return; // never overlap captures
+  if (sendIntent('capture.start')) { holdOwner = owner; startTranscription(); return; }
+  holdOwner = owner;
   S.listening = true; S.playing = null; S.confirm = 'LISTENING';
   host.post('capture', { phase: 'start', lane: lane().num });
 }
-function holdCancel() {
-  if (!holdActive) return;
-  holdActive = false;
+function holdCancel(owner) {
+  if (holdOwner === null || owner !== holdOwner) return;
+  holdOwner = null;
   if (settling) return;
   settling = true;
   stopTranscription(true, () => { settling = false; });
@@ -689,9 +689,9 @@ function holdCancel() {
   S.listening = false; S.confirm = 'READY · LANE ' + lane().num;
   host.post('capture', { phase: 'cancel', lane: lane().num });
 }
-function holdEnd() {
-  if (!holdActive) return;
-  holdActive = false;
+function holdEnd(owner) {
+  if (holdOwner === null || owner !== holdOwner) return;
+  holdOwner = null;
   if (live) {
     settling = true;
     stopTranscription(false, (state) => {
@@ -1325,21 +1325,21 @@ root.addEventListener('pointerdown', e => {
   if (!el) return;
   e.preventDefault();
   try { el.setPointerCapture(e.pointerId); } catch (_) {}
-  holdStart();
+  holdStart(e.pointerId);
   paint();
 });
 root.addEventListener('pointerup', e => {
   const el = e.target.closest('[data-hold]');
-  if (!el || !S.listening) return;
+  if (!el || e.pointerId !== holdOwner) return; // ownership, not S.listening — a release before the first snapshot still counts
   try { el.releasePointerCapture(e.pointerId); } catch (_) {}
   // Released off the pad still means cancel — the design's drag-away-to-abort.
   const r = el.getBoundingClientRect();
   const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-  if (inside) holdEnd(); else holdCancel();
+  if (inside) holdEnd(e.pointerId); else holdCancel(e.pointerId);
   paint();
 });
 // System interruption (call, gesture takeover) must not leave the deck listening.
-window.addEventListener('pointercancel', () => { if (S.listening) { holdCancel(); paint(); } });
+window.addEventListener('pointercancel', () => { if (holdOwner !== null) { holdCancel(holdOwner); paint(); } });
 
 // Keyboard hold-to-speak: Space/Enter on the focused pad behaves like the
 // pointer hold; ESC aborts from anywhere.
@@ -1347,18 +1347,18 @@ root.addEventListener('keydown', e => {
   if ((e.code !== 'Space' && e.code !== 'Enter') || e.repeat) return;
   if (!e.target.closest('[data-hold]')) return;
   e.preventDefault();
-  holdStart();
+  holdStart('kbd:' + e.code);
   paint();
 });
 root.addEventListener('keyup', e => {
   if (e.code !== 'Space' && e.code !== 'Enter') return;
   if (!e.target.closest('[data-hold]')) return;
   e.preventDefault();
-  holdEnd();
+  holdEnd('kbd:' + e.code);
   paint();
 });
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && S.listening) { holdCancel(); paint(); }
+  if (e.key === 'Escape' && holdOwner !== null) { holdCancel(holdOwner); paint(); }
 });
 
 // Back/forward navigation gestures are on by default in HudWebView; nothing in
