@@ -564,8 +564,16 @@ let settling = false;
 // 'kbd:<code>'; a rejected overlapping press owns nothing
 let holdOwner = null;
 
+// A native shell owns the mic when it advertises transcription support — the
+// injected flag, or simply the presence of the bridge handler itself (which
+// host.post already requires). Checking both keeps this robust to user-script
+// timing inside WKWebView.
+const nativeSpeech = () =>
+  !!(window.speakeasyNativeTranscription ||
+    (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.speakeasyDeck));
+
 function startTranscription() {
-  if (window.speakeasyNativeTranscription) {
+  if (nativeSpeech()) {
     // a native shell (the iPad app) owns the mic; results arrive via nativeTranscript
     nativeState = { transcript: '', failed: false };
     return;
@@ -596,7 +604,7 @@ function startTranscription() {
 // stop() delivers final results asynchronously — the recognizer stays current
 // until onend so those results pass the identity guard, and only then clears.
 function stopTranscription(abort, done) {
-  if (window.speakeasyNativeTranscription) {
+  if (nativeSpeech()) {
     if (abort) { done({ transcript: '', failed: false }); return; }
     // the native shell posts its final result via nativeTranscript; settle on
     // that, or on a hard cap in case nothing arrives
