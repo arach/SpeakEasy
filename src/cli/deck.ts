@@ -475,9 +475,10 @@ export async function runDeck(argv: string[]): Promise<void> {
 
   // Live runtime — the deck reaches it through the Caddy proxy; the CLI mirror
   // uses the discovery file. Without it the deck is demo-only.
+  let runtime: DeckRuntime | null = null;
   let dataPlane: DataPlane | null = null;
   if (dataPort) {
-    const runtime = new DeckRuntime();
+    runtime = new DeckRuntime();
     try {
       dataPlane = await startDataPlane(runtime, dataPort, token);
       writeDiscovery({ pid: process.pid, port, dataPort, host, token });
@@ -554,6 +555,7 @@ export async function runDeck(argv: string[]): Promise<void> {
     const onShutdown = () => {
       stopping = true;
       dataPlane?.stop();
+      runtime?.destroy();
       clearDiscovery();
       stopEdge?.();
       stopVanity?.();
@@ -565,6 +567,7 @@ export async function runDeck(argv: string[]): Promise<void> {
     const onExit = (code: number | null) => {
       cleanup();
       dataPlane?.stop();
+      runtime?.destroy();
       clearDiscovery();
       stopEdge?.();
       stopVanity?.();

@@ -11,6 +11,8 @@ export interface DeckMessage {
   dur: number;
   /** true while this is only a progress mirror — no controllable audio behind it */
   mirrored?: boolean;
+  /** synthesized audio owned by the runtime — real transport control when present */
+  file?: string;
 }
 
 export interface DeckTraceEntry {
@@ -53,7 +55,7 @@ const intentSchema = z.discriminatedUnion('name', [
 
 export type DeckIntent = z.infer<typeof intentSchema>;
 
-const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
+const SPEEDS = [1, 1.25, 1.5, 0.75]; // must match the deck client's SPEEDS exactly
 const LANE_COUNT = 9;
 const TICK_MS = 250;
 const MAX_MESSAGES_PER_LANE = 50;
@@ -180,6 +182,7 @@ export class DeckRuntime extends EventEmitter {
     switch (intent.name) {
       case 'lane.select': {
         this.laneIx = intent.index;
+        this.stopPlayer();
         this.playing = null;
         this.pos = 0;
         this.paused = false;
@@ -200,11 +203,13 @@ export class DeckRuntime extends EventEmitter {
           this.player?.kill('SIGCONT');
           this.log('PLAYBACK RESUMED', `${Math.floor(this.pos)}s elapsed`);
         } else {
+          this.stopPlayer();
           this.playing = intent.id;
           this.paused = false;
           this.pos = 0;
           this.setPhase('speaking', 'PLAYING');
           this.log('PLAYBACK STARTED', `${SPEEDS[this.speedIx].toFixed(2)}x`);
+          if (msg.file) this.playFile(msg.file);
         }
         this.ensureTicker();
         this.changed();
@@ -249,12 +254,14 @@ export class DeckRuntime extends EventEmitter {
         const t = this.threads[this.laneIx];
         for (let i = t.length - 1; i >= 0; i--) {
           if (t[i].role === 'agent') {
+            this.stopPlayer();
             this.playing = `${this.laneIx}:${i}`;
             this.paused = false;
             this.pos = 0;
             this.setPhase('speaking', 'REPLAYING LAST REPLY');
             this.ensureTicker();
             this.log('REPLAY', `lane ${this.laneIx + 1} · last reply`);
+            if (t[i].file) this.playFile(t[i].file!);
             this.changed();
             return { ok: true, rev: this.rev };
           }
@@ -262,6 +269,7 @@ export class DeckRuntime extends EventEmitter {
         return { ok: false, rev: this.rev, error: 'no reply to replay' };
       }
       case 'capture.start':
+        this.stopPlayer();
         this.listening = true;
         this.playing = null;
         this.setPhase('recording', 'LISTENING');
@@ -342,6 +350,7 @@ export class DeckRuntime extends EventEmitter {
       this.changed();
 
       const file = await this.synthesize(reply);
+      if (file) msg.file = file;
       if (!alive()) return;
       if (this.autoplay) {
         this.playing = id;
@@ -392,9 +401,11 @@ export class DeckRuntime extends EventEmitter {
     const args: string[] = [];
     if (this.vol !== 1) args.push('-v', this.vol.toFixed(2));
     if (SPEEDS[this.speedIx] !== 1) args.push('-r', String(SPEEDS[this.speedIx]));
-    this.player = spawn('afplay', [...args, file]);
-    this.player.once('exit', () => {
-      this.player = null;
+    const player = spawn('afplay', [...args, file]);
+    this.player = player;
+    player.once('exit', () => {
+      // a killed predecessor must not clear the reference of its replacement
+      if (this.player === player) this.player = null;
     });
   }
 

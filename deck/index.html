@@ -752,6 +752,7 @@ function view() {
       align: m.role === 'you' ? 'flex-end' : 'flex-start',
       isYou: m.role === 'you',
       isAgent: m.role === 'agent',
+      mirrored: !!m.mirrored,
       text: m.text,
       playing: isPlaying,
       edge: isPlaying ? T('accent') : T('line'),
@@ -1017,18 +1018,20 @@ function tpl(v) {
                 ? '<div style="max-width:82%;min-width:min(420px,100%);background:var(--se-cell);border:1px solid ' + m.edge + ';border-radius:var(--se-bubble-a);padding:12px 14px;box-shadow:' + m.ring + ';">' +
                     '<div style="font:500 12.5px/1.5 var(--se-sans);color:var(--se-ink);letter-spacing:-0.005em;">' + esc(m.gist) + '</div>' +
 
-                    // audio player
-                    '<div style="margin-top:11px;background:var(--se-player-bg);border:1px solid ' + m.playerEdge + ';border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:12px;">' +
-                      '<button type="button" class="se-press" data-act="play" data-arg="' + m.id + '" aria-label="' + (m.playing ? 'Pause reply' : 'Play reply') + '" style="width:28px;height:28px;flex:none;border-radius:50%;border:0;background:' + m.btnBg + ';display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:' + m.btnGlow + ';">' + playIcon(m.playing) + '</button>' +
-                      '<button type="button" data-act="scrub" data-arg="' + m.id + '" aria-label="Seek reply audio" style="display:block;flex:1;min-width:0;cursor:pointer;border:0;background:none;padding:0;">' +
-                        '<svg width="100%" height="26" viewBox="0 0 300 24" preserveAspectRatio="none" style="display:block;">' +
-                          '<path d="' + m.wavePlayed + '" stroke="var(--se-wave-on)" stroke-width="2.6" stroke-linecap="round"></path>' +
-                          '<path d="' + m.waveRest + '" stroke="var(--se-wave-off)" stroke-width="2.6" stroke-linecap="round"></path>' +
-                        '</svg>' +
-                      '</button>' +
-                      '<span style="font:400 10px var(--se-mono);letter-spacing:0.04em;color:var(--se-player-text);flex:none;font-variant-numeric:tabular-nums;">' + esc(m.time) + '</span>' +
-                      '<button type="button" data-act="speed" aria-label="Playback speed" style="font:500 9px var(--se-mono);letter-spacing:0.06em;color:var(--se-player-text);border:1px solid var(--se-player-edge);border-radius:4px;padding:3px 6px;cursor:pointer;flex:none;background:none;">' + esc(v.speedLabel) + '</button>' +
-                    '</div>' +
+                    // audio player — hidden for mirrored items (audio lives in another process)
+                    (m.mirrored
+                      ? '<div style="margin-top:11px;font:400 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);">MIRRORED FROM ANOTHER SHELL · PROGRESS ONLY</div>'
+                      : '<div style="margin-top:11px;background:var(--se-player-bg);border:1px solid ' + m.playerEdge + ';border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:12px;">' +
+                        '<button type="button" class="se-press" data-act="play" data-arg="' + m.id + '" aria-label="' + (m.playing ? 'Pause reply' : 'Play reply') + '" style="width:28px;height:28px;flex:none;border-radius:50%;border:0;background:' + m.btnBg + ';display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:' + m.btnGlow + ';">' + playIcon(m.playing) + '</button>' +
+                        '<button type="button" data-act="scrub" data-arg="' + m.id + '" aria-label="Seek reply audio" style="display:block;flex:1;min-width:0;cursor:pointer;border:0;background:none;padding:0;">' +
+                          '<svg width="100%" height="26" viewBox="0 0 300 24" preserveAspectRatio="none" style="display:block;">' +
+                            '<path d="' + m.wavePlayed + '" stroke="var(--se-wave-on)" stroke-width="2.6" stroke-linecap="round"></path>' +
+                            '<path d="' + m.waveRest + '" stroke="var(--se-wave-off)" stroke-width="2.6" stroke-linecap="round"></path>' +
+                          '</svg>' +
+                        '</button>' +
+                        '<span style="font:400 10px var(--se-mono);letter-spacing:0.04em;color:var(--se-player-text);flex:none;font-variant-numeric:tabular-nums;">' + esc(m.time) + '</span>' +
+                        '<button type="button" data-act="speed" aria-label="Playback speed" style="font:500 9px var(--se-mono);letter-spacing:0.06em;color:var(--se-player-text);border:1px solid var(--se-player-edge);border-radius:4px;padding:3px 6px;cursor:pointer;flex:none;background:none;">' + esc(v.speedLabel) + '</button>' +
+                      '</div>') +
 
                     (m.showCaption
                       ? '<div style="margin-top:9px;display:flex;gap:9px;align-items:flex-start;">' +
