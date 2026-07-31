@@ -14,10 +14,6 @@ settings:
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "2"
 
-packages:
-  HudsonKit:
-    path: ../../../hudson
-
 targets:
   SpeakEasyDeck:
     type: application
@@ -41,15 +37,13 @@ targets:
           - _http._tcp
         NSLocalNetworkUsageDescription: SpeakEasy Deck finds and drives your Mac over your local network.
         NSMicrophoneUsageDescription: Hold to Speak transcribes your voice on this iPad so your Mac can answer.
+        NSSpeechRecognitionUsageDescription: Hold to Speak transcribes your voice on this iPad so your Mac can answer.
         UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
           - UIInterfaceOrientationPortraitUpsideDown
-    dependencies:
-      - package: HudsonKit
-        product: HudsonUIWeb
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.arach.speakeasy.deck

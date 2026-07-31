@@ -565,6 +565,11 @@ let settling = false;
 let holdOwner = null;
 
 function startTranscription() {
+  if (window.speakeasyNativeTranscription) {
+    // a native shell (the iPad app) owns the mic; results arrive via nativeTranscript
+    nativeState = { transcript: '', failed: false };
+    return;
+  }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
     S.confirm = 'MIC TRANSCRIPTION UNSUPPORTED';
@@ -591,6 +596,20 @@ function startTranscription() {
 // stop() delivers final results asynchronously — the recognizer stays current
 // until onend so those results pass the identity guard, and only then clears.
 function stopTranscription(abort, done) {
+  if (window.speakeasyNativeTranscription) {
+    if (abort) { done({ transcript: '', failed: false }); return; }
+    // the native shell posts its final result via nativeTranscript; settle on
+    // that, or on a hard cap in case nothing arrives
+    nativeFinish = done;
+    setTimeout(() => {
+      if (nativeFinish) {
+        const f = nativeFinish;
+        nativeFinish = null;
+        f(nativeState);
+      }
+    }, 2500);
+    return;
+  }
   if (!recog) { done({ transcript: '', failed: true }); return; }
   const current = recog;
   const { r, state } = current;
@@ -605,6 +624,11 @@ function stopTranscription(abort, done) {
   try { abort ? r.abort() : r.stop(); } catch (_) { finish(); }
   setTimeout(finish, 1500);
 }
+
+// Native transcription channel — the iPad app pushes partial and final
+// transcripts here (see deck/ipad/Sources/SpeechCapture.swift).
+let nativeState = { transcript: '', failed: false };
+let nativeFinish = null;
 
 let everEstablished = false; // once live, keep trying to come back
 
@@ -673,7 +697,12 @@ function setVol(clientX, rect) {
 function holdStart(owner) {
   if (lane().state === 'empty') return;
   if (settling || holdOwner !== null) return; // never overlap captures
-  if (sendIntent('capture.start')) { holdOwner = owner; startTranscription(); return; }
+  if (sendIntent('capture.start')) {
+    holdOwner = owner;
+    startTranscription();
+    host.post('capture', { phase: 'start', lane: lane().num }); // native shells listen too
+    return;
+  }
   holdOwner = owner;
   S.listening = true; S.playing = null; S.confirm = 'LISTENING';
   host.post('capture', { phase: 'start', lane: lane().num });
@@ -684,7 +713,10 @@ function holdCancel(owner) {
   if (settling) return;
   settling = true;
   stopTranscription(true, () => { settling = false; });
-  if (sendIntent('capture.cancel')) return;
+  if (sendIntent('capture.cancel')) {
+    host.post('capture', { phase: 'cancel', lane: lane().num });
+    return;
+  }
   if (!S.listening) return;
   S.listening = false; S.confirm = 'READY · LANE ' + lane().num;
   host.post('capture', { phase: 'cancel', lane: lane().num });
@@ -698,9 +730,11 @@ function holdEnd(owner) {
       settling = false;
       if (state.transcript && !state.failed) {
         sendIntent('capture.end', { text: state.transcript });
+        host.post('capture', { phase: 'end', lane: lane().num });
       } else {
         // never silently run a fallback prompt — the reason reaches the runtime
         sendIntent('capture.cancel', { reason: state.failed ? 'SPEECH ERROR · TRY AGAIN' : 'NO SPEECH · TRY AGAIN' });
+        host.post('capture', { phase: 'cancel', lane: lane().num });
       }
     });
     return;
@@ -1373,7 +1407,18 @@ window.speakeasyDeck = {
   selectLane: i => { selectLane(Number(i)); paint(); },
   stop: () => { stopAll(); paint(); },
   setTheme: (name, overrides) => { seedName = applySeed(String(name).toLowerCase()); applyOverrides(overrides); paint(); },
-  state: () => ({ lane: S.lane, playing: S.playing, confirm: S.confirm, theme: seedName, overrides: seedOverrides })
+  state: () => ({ lane: S.lane, playing: S.playing, confirm: S.confirm, theme: seedName, overrides: seedOverrides }),
+  // native shells (the iPad app) push transcripts here: partial updates paint
+  // the confirm bar, final ones settle the pending capture
+  nativeTranscript: (text, isFinal) => {
+    nativeState.transcript = String(text || '');
+    if (S.listening && nativeState.transcript) { S.confirm = nativeState.transcript.toUpperCase().slice(0, 40); paint(); }
+    if (isFinal && nativeFinish) {
+      const f = nativeFinish;
+      nativeFinish = null;
+      f(nativeState);
+    }
+  }
 };
 host.post('ready', { lanes: LANES.length });
 

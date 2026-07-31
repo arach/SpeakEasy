@@ -1,25 +1,19 @@
 import SwiftUI
-import HudsonUIWeb
 
 /// The whole app: the deck web surface, discovered on the LAN and hosted
-/// full-screen. The page itself owns the WebSocket to the Mac runtime.
+/// full-screen with the native speech bridge attached. The page itself owns
+/// the WebSocket to the Mac runtime.
 struct DeckRootView: View {
     @StateObject private var discovery = DeckDiscovery()
-    @State private var webState = HudWebViewState()
+    @StateObject private var controller = DeckWebController()
 
     var body: some View {
         Group {
             if let url = discovery.deckURL {
-                HudWebView(
-                    .url(url),
-                    state: $webState,
-                    configuration: HudWebViewConfiguration(
-                        allowsBackForwardNavigationGestures: false,
-                        isInspectable: true
-                    )
-                )
-                .id(url) // rebuild when the discovered endpoint changes
-                .ignoresSafeArea()
+                DeckWebView(controller: controller)
+                    .ignoresSafeArea()
+                    .onAppear { controller.deckURL = url }
+                    .onChange(of: url) { _, newValue in controller.deckURL = newValue }
             } else {
                 VStack(spacing: 16) {
                     ProgressView()
