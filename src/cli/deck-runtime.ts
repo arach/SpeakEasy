@@ -463,21 +463,11 @@ export class DeckRuntime extends EventEmitter {
       const { SpeakEasy } = await import('../index');
       const speaker = new SpeakEasy({ volume: this.vol });
       await speaker.speak(text, { silent: true });
-      const stats = await speaker.getCacheStats();
-      if (stats.dir) {
-        const { TTSCache } = await import('../cache');
-        const recent = await new TTSCache(stats.dir, '7d').getRecent(10);
-        // correlate by normalized text — the cache is deterministic, so an exact
-        // match IS this audio regardless of file age (punctuation may differ)
-        const wanted = text.trim().toLowerCase();
-        const match = recent.find(
-          (e) => e.originalText?.trim().toLowerCase() === wanted && e.filePath && existsSync(e.filePath),
-        );
-        if (match) {
-          const owned = path.join(this.synthDir, `reply-${Date.now()}${path.extname(match.filePath) || '.mp3'}`);
-          copyFileSync(match.filePath, owned);
-          return owned;
-        }
+      // the SDK reports the exact file it used — no scanning, no correlation guesswork
+      if (speaker.lastAudioFile && existsSync(speaker.lastAudioFile)) {
+        const owned = path.join(this.synthDir, `reply-${Date.now()}${path.extname(speaker.lastAudioFile) || '.mp3'}`);
+        copyFileSync(speaker.lastAudioFile, owned);
+        return owned;
       }
     } catch {
       // cloud silent mode unavailable — fall through to the system voice

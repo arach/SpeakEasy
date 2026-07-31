@@ -556,8 +556,10 @@ function demoRestore() {
 // Speech recognition lives in the browser (HTTPS required). Recognition may
 // use the browser vendor's speech service; the Mac only ever receives text.
 // Each hold gets its own state record — an old recognizer can never leak
-// results into a new capture.
+// results into a new capture, and `settling` blocks a new hold until the
+// previous one has fully finalized.
 let recog = null;
+let settling = false;
 
 function startTranscription() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -566,7 +568,7 @@ function startTranscription() {
     paint();
     return;
   }
-  if (recog) return;
+  if (recog || settling) return;
   const state = { transcript: '', failed: false };
   const r = new SR();
   recog = { r, state };
@@ -574,6 +576,8 @@ function startTranscription() {
   r.interimResults = true;
   r.continuous = false;
   r.onresult = e => {
+    // ignore stragglers from a recognizer that is no longer current
+    if (!recog || recog.r !== r) return;
     state.transcript = Array.from(e.results).map(x => x[0].transcript).join(' ').trim();
     if (S.listening && state.transcript) { S.confirm = state.transcript.toUpperCase().slice(0, 40); paint(); }
   };
@@ -594,11 +598,12 @@ function stopTranscription(abort, done) {
   setTimeout(finish, 1500);
 }
 
+let everEstablished = false; // once live, keep trying to come back
+
 function bootLive() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(proto + '://' + location.host + '/ws' + (liveToken ? '?k=' + encodeURIComponent(liveToken) : ''));
-  let established = false;
-  ws.onopen = () => { live = ws; liveRev = -1; established = true; logEvent('LINK OK', 'mac runtime · live state'); };
+  ws.onopen = () => { live = ws; liveRev = -1; everEstablished = true; logEvent('LINK OK', 'mac runtime · live state'); };
   ws.onmessage = e => {
     let msg;
     try { msg = JSON.parse(e.data); } catch (_) { return; }
@@ -613,7 +618,7 @@ function bootLive() {
     live = null;
     if (wasLive) demoRestore();
     // only retry a link that once worked — a demo surface stays quiet
-    if (established) setTimeout(bootLive, 3000);
+    if (everEstablished) setTimeout(bootLive, 3000);
   };
   ws.onerror = () => { try { ws.close(); } catch (_) {} };
 }
@@ -674,7 +679,9 @@ function holdCancel() {
 function holdEnd() {
   if (!S.listening && !live) return;
   if (live) {
+    settling = true;
     stopTranscription(false, (state) => {
+      settling = false;
       if (state.transcript && !state.failed) {
         sendIntent('capture.end', { text: state.transcript });
       } else {

@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, lstatSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, lstatSync, renameSync } from 'node:fs';
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
@@ -62,7 +62,8 @@ function deckToken(rotate: boolean): string {
   if (!rotate) {
     try {
       const st = lstatSync(file);
-      if (st.isFile() && !st.isSymbolicLink() && st.uid === process.getuid()) {
+      const uid = typeof process.getuid === 'function' ? process.getuid() : -1;
+      if (st.isFile() && !st.isSymbolicLink() && (uid === -1 || st.uid === uid)) {
         if ((st.mode & 0o777) !== 0o600) chmodSync(file, 0o600);
         const existing = readFileSync(file, 'utf8').trim();
         if (/^[a-f0-9]{24,}$/.test(existing)) return existing;
@@ -73,9 +74,13 @@ function deckToken(rotate: boolean): string {
   }
   const token = randomBytes(12).toString('hex');
   try {
-    mkdirSync(path.dirname(file), { recursive: true });
-    writeFileSync(file, token, { mode: 0o600 });
-    chmodSync(file, 0o600);
+    const dir = path.dirname(file);
+    mkdirSync(dir, { recursive: true });
+    // temp + atomic rename — a symlink at the target is replaced, never followed
+    const tmp = path.join(dir, `.deck-token.${process.pid}.tmp`);
+    writeFileSync(tmp, token, { mode: 0o600 });
+    chmodSync(tmp, 0o600);
+    renameSync(tmp, file);
   } catch {
     // best-effort — a per-run token still works for this run
   }
@@ -268,7 +273,7 @@ function caddyRootCert(expected = false): string | undefined {
 }
 
 /** Serve via Caddy when it is installed — the same static server users get from deck/Caddyfile. */
-async function startCaddy(caddy: string, root: string, port: number, tlsHost: string | null, caCert: string | null, live: { dataPort: number; token: string } | null): Promise<DeckHandle> {
+async function startCaddy(caddy: string, root: string, port: number, tlsHost: string | null, caCert: string | null, live: { dataPort: number; token: string | null } | null): Promise<DeckHandle> {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'speakeasy-deck-'));
   const config = path.join(dir, 'Caddyfile');
   await writeFile(config, caddyConfig(root, port, tlsHost, caCert, live));
