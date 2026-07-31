@@ -1054,7 +1054,7 @@ function tpl(v) {
   const plainBtn = 'border:1px solid var(--se-btn-edge);border-radius:8px;background:var(--se-btn-face);padding:12px 8px;text-align:center;font:600 9.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-btn-ink);cursor:pointer;box-shadow:var(--se-btn-sheen);';
 
   return '' +
-  '<div class="se-shell" style="height:100%;min-height:0;overflow:hidden;background:var(--se-page-bg);padding:14px 16px 0;display:flex;flex-direction:column;gap:12px;">' +
+  '<div class="se-shell" style="height:100%;min-height:0;overflow:hidden;background:var(--se-page-bg);padding:calc(14px + env(safe-area-inset-top,0px)) 16px calc(12px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px;">' +
 
     // ─────────── top bar ───────────
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 4px;flex:none;">' +
@@ -1062,11 +1062,9 @@ function tpl(v) {
         '<div style="width:30px;height:30px;border-radius:7px;background:var(--se-chip-bg);border:1px solid var(--se-accent-edge);color:var(--se-accent-ink);font:600 11px var(--se-mono);display:flex;align-items:center;justify-content:center;">SE</div>' +
         '<div>' +
           '<div style="font:600 11.5px var(--se-mono);letter-spacing:0.22em;color:var(--se-ink);">SPEAKEASY</div>' +
-          '<div style="font:400 9px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);margin-top:2px;">CONTROL SURFACE</div>' +
         '</div>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;">' +
-        '<div style="display:flex;align-items:center;padding:8px 2px;font:500 9.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-3);">MICRO DECK</div>' +
         '<div style="display:flex;align-items:center;padding:8px 2px;font:500 9.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-3);">INSTALL</div>' +
         '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border:1px solid var(--se-accent-edge);border-radius:6px;background:var(--se-chip-bg);">' +
           '<span style="width:6px;height:6px;border-radius:50%;background:var(--se-accent);box-shadow:0 0 0 3px var(--se-accent-ring);animation:se-breathe 2.6s ease-in-out infinite;"></span>' +
@@ -1087,13 +1085,7 @@ function tpl(v) {
 
         // plate masthead · mirrors the console header
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:2px 6px 12px;border-bottom:1px solid var(--se-plate-rule);flex:none;">' +
-          '<div style="display:flex;align-items:baseline;gap:14px;">' +
-            '<span style="font:600 26px var(--se-sans);line-height:0.9;letter-spacing:-0.02em;color:var(--se-pad-accent);">01</span>' +
-            '<div>' +
-              '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.2em;color:var(--se-plate-ink-3);">PAD SURFACE</div>' +
-              '<div style="font-weight:600;font-size:19px;font-family:var(--se-title);line-height:1.1;letter-spacing:-0.015em;color:var(--se-plate-ink);margin-top:3px;">Micro Deck</div>' +
-            '</div>' +
-          '</div>' +
+          '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.2em;color:var(--se-plate-ink-3);padding-top:4px;">PAD SURFACE</div>' +
           '<div style="text-align:right;">' +
             '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-pad-accent);">' + esc(v.boundLabel) + '</div>' +
             '<div style="font:400 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-plate-ink-3);margin-top:4px;">9 KEYS · USB-C</div>' +
@@ -1174,7 +1166,6 @@ function tpl(v) {
         // lane header
         '<div style="flex:none;padding:16px 20px 14px;border-bottom:1px solid var(--se-line-soft);display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px 20px;background:var(--se-panel-head);">' +
           '<div style="display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 14px;min-width:0;flex:1 1 260px;">' +
-            '<span style="font:600 26px var(--se-sans);line-height:0.9;letter-spacing:-0.02em;color:' + v.laneNumColor + ';">' + esc(v.laneNum) + '</span>' +
             '<div>' +
               '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.2em;color:var(--se-ink-3);">ACTIVE LANE</div>' +
               '<div style="font-weight:600;font-size:19px;font-family:var(--se-title);line-height:1.1;letter-spacing:-0.015em;color:var(--se-ink);margin-top:3px;">' + esc(v.laneTitle) + '</div>' +
@@ -1309,13 +1300,6 @@ function tpl(v) {
           '<div style="font:400 9.5px var(--se-mono);letter-spacing:0.06em;color:var(--se-ink-3);text-align:right;">' + esc(v.footNote) + '</div>' +
         '</div>' +
       '</div>' +
-    '</div>' +
-
-    // ─────────── status rail ───────────
-    '<div style="display:flex;justify-content:space-between;gap:20px;padding:6px 6px 12px;flex:none;font:400 8.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-4);">' +
-      '<span>' + (live ? 'LIVE RUNTIME' : 'INTERACTIVE DEMO') + '</span>' +
-      '<span>' + (live ? 'MAC AUTHORITATIVE' : 'MAC COMMANDS SIMULATED') + '</span>' +
-      '<span>BUILD 4726.2</span>' +
     '</div>' +
   '</div>';
 }
