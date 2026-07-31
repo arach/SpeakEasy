@@ -94,8 +94,17 @@ interface ScoutAgent {
   lastSeen: number;
 }
 
+/** Strip the node qualifier from a roster id — session: routing wants the bare id. */
+function bareSessionId(agentId: string): string {
+  return agentId.replace(/(\.[a-z0-9-]+)?\.[a-z0-9-]+-local$/, '');
+}
+
 /** Derive a pad label and title from a scout agent id. */
 function laneName(agentId: string): { name: string; title: string } {
+  if (agentId.startsWith('session-')) {
+    // a live harness session — no friendly alias is known until the first ask lands
+    return { name: agentId.split('-')[1].toUpperCase().slice(0, 10), title: 'codex session' };
+  }
   const clean = agentId.replace(/\.[a-z0-9-]+-local$/, '');
   const [project, ...rest] = clean.split('.');
   const title = rest.length ? rest.join(' · ').replace(/-/g, ' ') : 'agent';
@@ -218,9 +227,23 @@ export class DeckRuntime extends EventEmitter {
     try {
       const out = await run('scout', ['who', '--json'], 10_000);
       const agents = JSON.parse(out) as ScoutAgent[];
+      // this deck is codex-session native: lanes bind to live harness sessions.
+      // agent cards are deliberately excluded — asking a card is a fresh relay
+      // spawn every time ("normal dispatch"), which is exactly what lanes are not.
+      // active/idle/waiting are all routable (scout wakes dormant sessions on
+      // delivery); offline and discovered are not. scout who can list the same
+      // session under several node-qualified ids — dedupe to the bare id,
+      // keeping the most recently seen record
+      const seen = new Set<string>();
       this.roster = agents
-        .filter((a) => a.state === 'active' && !a.agentId.startsWith('session-') && a.agentId !== 'operator')
-        .sort((a, b) => b.lastSeen - a.lastSeen);
+        .filter((a) => (a.state === 'active' || a.state === 'idle' || a.state === 'waiting') && a.agentId.startsWith('session-'))
+        .sort((a, b) => b.lastSeen - a.lastSeen)
+        .filter((a) => {
+          const bare = bareSessionId(a.agentId);
+          if (seen.has(bare)) return false;
+          seen.add(bare);
+          return true;
+        });
       this.applyAssignments();
       this.log('LANES', `${this.roster.length} agents on the roster`);
       this.changed();
@@ -230,9 +253,9 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  private savedAssignments(): Record<string, string> {
+  private savedAssignments(): Record<string, string | null> {
     try {
-      return JSON.parse(readFileSync(LANES_FILE, 'utf8')) as Record<string, string>;
+      return JSON.parse(readFileSync(LANES_FILE, 'utf8')) as Record<string, string | null>;
     } catch {
       return {};
     }
@@ -240,9 +263,11 @@ export class DeckRuntime extends EventEmitter {
 
   private persistAssignments(): void {
     try {
-      const out: Record<string, string> = {};
+      const out: Record<string, string | null> = {};
       this.lanes.forEach((l, i) => {
-        if (l.agentId) out[String(i)] = l.agentId;
+        // explicit null = intentionally unbound (fresh session on first ask) —
+        // a missing key would mean "auto-assign from the roster" instead
+        out[String(i)] = l.sessionId ?? l.agentId;
       });
       writeFileSync(LANES_FILE, JSON.stringify(out), { mode: 0o600 });
     } catch {
@@ -252,22 +277,35 @@ export class DeckRuntime extends EventEmitter {
 
   private applyAssignments(): void {
     const saved = this.savedAssignments();
-    const known = new Set(this.roster.map((a) => a.agentId));
-    this.lanes = this.lanes.map((lane, i) => {
-      const agentId = saved[String(i)] && known.has(saved[String(i)]) ? saved[String(i)] : this.roster[i]?.agentId ?? null;
-      const meta = agentId ? laneName(agentId) : { name: 'EMPTY', title: 'unassigned' };
-      return {
-        ...lane,
-        agentId,
-        name: meta.name,
-        title: meta.title,
-        state: agentId ? (lane.state === 'empty' ? 'idle' : lane.state) : 'empty',
-      };
+    // mutate in place — an in-flight askAgent holds its lane across awaits and
+    // must never pin a session onto a replaced (detached) lane object
+    this.lanes.forEach((lane, i) => {
+      const hasSaved = Object.prototype.hasOwnProperty.call(saved, String(i));
+      const savedId = hasSaved ? saved[String(i)] : undefined;
+      // a saved session binds directly even when it is not on the roster right
+      // now — scout wakes on-demand sessions on first delivery
+      const agentId =
+        savedId === null ? null
+        : typeof savedId === 'string' && savedId.startsWith('session-') ? savedId
+        : this.roster[i]?.agentId ?? null;
+      const meta = agentId
+        ? laneName(agentId)
+        : i === LANE_COUNT - 1
+          ? { name: 'EMPTY', title: 'unassigned' }
+          : { name: `LANE ${i + 1}`, title: 'new codex session on first ask' };
+      lane.agentId = agentId;
+      lane.name = meta.name;
+      lane.title = meta.title;
+      // an unassigned lane stays usable — its first question creates a
+      // dedicated codex session; only the last pad remains a placeholder
+      lane.state = agentId ? (lane.state === 'empty' ? 'idle' : lane.state) : i === LANE_COUNT - 1 ? 'empty' : 'idle';
+      lane.sessionId = agentId?.startsWith('session-') ? bareSessionId(agentId) : undefined;
     });
     if (Object.keys(saved).length === 0 && this.roster.length) this.persistAssignments();
   }
 
-  /** Channel mapper: advance a pad to the next agent on the roster. */
+  /** Channel mapper: advance a pad to the next session on the roster. One extra
+   * slot past the end unbinds the pad — its next question mints a fresh session. */
   private cycleLane(index: number): void {
     if (!this.roster.length) return;
     // never attribute an in-flight response to a newly assigned agent
@@ -279,10 +317,34 @@ export class DeckRuntime extends EventEmitter {
       this.clearPlayback('READY');
     }
     const lane = this.lanes[index];
-    const currentIx = lane.agentId ? this.roster.findIndex((a) => a.agentId === lane.agentId) : -1;
-    const next = this.roster[(currentIx + 1) % this.roster.length];
+    const slots: (ScoutAgent | null)[] = [...this.roster, null];
+    // compare normalized ids — the lane may hold a bare saved id while the
+    // roster's deduped representative of the same session is node-qualified
+    const laneKey = lane.sessionId ?? (lane.agentId ? bareSessionId(lane.agentId) : null);
+    const currentIx = laneKey ? slots.findIndex((a) => a !== null && bareSessionId(a.agentId) === laneKey) : slots.length - 1;
+    const next = slots[(currentIx + 1) % slots.length];
+    // mutate in place — an in-flight askAgent may be holding this lane object
+    if (!next) {
+      lane.agentId = null;
+      lane.name = `LANE ${index + 1}`;
+      lane.title = 'new codex session on first ask';
+      lane.state = 'idle';
+      lane.sessionId = undefined;
+      lane.conversationId = undefined;
+      lane.sessionAlias = undefined;
+      this.persistAssignments();
+      this.log('LANE ASSIGNED', `lane ${index + 1} → fresh session`);
+      this.changed();
+      return;
+    }
     const meta = laneName(next.agentId);
-    this.lanes[index] = { ...lane, agentId: next.agentId, name: meta.name, title: meta.title, state: 'idle', sessionId: undefined };
+    lane.agentId = next.agentId;
+    lane.name = meta.name;
+    lane.title = meta.title;
+    lane.state = 'idle';
+    lane.sessionId = next.agentId.startsWith('session-') ? bareSessionId(next.agentId) : undefined;
+    lane.conversationId = undefined;
+    lane.sessionAlias = undefined;
     this.persistAssignments();
     this.log('LANE ASSIGNED', `lane ${index + 1} → ${meta.name.toLowerCase()}`);
     this.changed();
@@ -442,7 +504,7 @@ export class DeckRuntime extends EventEmitter {
         return { ok: false, rev: this.rev, error: 'no replayable reply' };
       }
       case 'capture.start':
-        if (!this.lanes[this.laneIx]?.agentId) {
+        if (this.lanes[this.laneIx]?.state === 'empty') {
           return { ok: false, rev: this.rev, error: 'lane unassigned — pick an agent first' };
         }
         this.gen++;
@@ -601,21 +663,19 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** Ask a real agent (Codex via Scout) and get a spoken-length answer back.
-   * When the lane is assigned, the question goes to that agent; a captured
-   * session id keeps follow-ups in the same conversation. */
+  /** Ask the lane's Codex session (via Scout) and get a spoken-length answer back.
+   * A lane is one persistent session: a pinned session id is steered in place,
+   * an unassigned lane gets its own fresh session (--new) which is then pinned,
+   * so every follow-up continues the exact same conversation. */
   private async askAgent(question: string, laneIx: number): Promise<string> {
     const prompt =
       'You are a voice responder for a spoken interface. Do not use tools, do not read or write files, do not access the network. ' +
       'Answer from general knowledge only, in one or two spoken-style sentences, plain words, no lists, no code. Question: ' +
       question.slice(0, 500);
     const lane = this.lanes[laneIx];
-    // session: targeting only works with real session ids — a named agent's
-    // card id is not routable that way; target it directly instead
-    const target = lane?.sessionId?.startsWith('session-') ? `session:${lane.sessionId}` : lane?.agentId;
-    const args = target
-      ? ['ask', '--json', '--to', target, prompt]
-      : ['ask', '--json', '--project', process.cwd(), '--harness', 'codex', prompt];
+    const args = lane?.sessionId
+      ? ['ask', '--json', '--to', `session:${lane.sessionId}`, prompt]
+      : ['ask', '--json', '--project', process.cwd(), '--harness', 'codex', '--new', prompt];
     try {
       const askOut = await this.scoutRun(args, 45_000);
       const ask = parseJsonBlock(askOut) as {
@@ -623,16 +683,26 @@ export class DeckRuntime extends EventEmitter {
       } | null;
       const inv = ask?.receipt?.ids?.invocationId;
       if (!inv) throw new Error('no invocation id from scout');
-      // pin follow-ups in this lane to the same agent session — but only when
-      // the receipt names a real session id (project-routed workers); named
-      // agents stay targeted by agentId
+      // pin the concrete session the broker routed to, so follow-ups steer the
+      // exact same codex session instead of dispatching fresh each time.
+      // the receipt's id is node-qualified — store the bare routable id
       const targetId = ask?.receipt?.ids?.targetAgentId;
-      if (lane && targetId && targetId.startsWith('session-') && lane.sessionId !== targetId) {
-        lane.sessionId = targetId;
+      if (lane && targetId && targetId.startsWith('session-')) {
+        const bare = bareSessionId(targetId);
+        if (lane.sessionId !== bare) {
+          lane.sessionId = bare;
+          this.persistAssignments();
+        }
       }
       // and always remember which conversation this lane is talking in
       if (lane && ask?.receipt?.ids?.conversationId) lane.conversationId = ask.receipt.ids.conversationId;
-      if (lane && ask?.receipt?.ids?.sessionAlias) lane.sessionAlias = ask.receipt.ids.sessionAlias;
+      if (lane && ask?.receipt?.ids?.sessionAlias) {
+        lane.sessionAlias = ask.receipt.ids.sessionAlias;
+        // a freshly minted session renames its lane to the broker alias
+        const alias = ask.receipt.ids.sessionAlias.replace(/^[a-z]+-/, '');
+        lane.name = alias.toUpperCase().slice(0, 10);
+        lane.title = 'codex session';
+      }
 
       const waitOut = await this.scoutRun(['wait', inv, '--timeout', '180', '--json'], 200_000);
       const receipt = parseJsonBlock(waitOut) as {
