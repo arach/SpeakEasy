@@ -274,7 +274,7 @@ export class DeckRuntime extends EventEmitter {
     // and never let the old agent's audio keep playing under a new name
     if (this.playing?.startsWith(`${index}:`)) {
       this.stopPlayer();
-      this.clearPlayback();
+      this.clearPlayback('READY');
     }
     const lane = this.lanes[index];
     const currentIx = lane.agentId ? this.roster.findIndex((a) => a.agentId === lane.agentId) : -1;

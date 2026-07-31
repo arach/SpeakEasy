@@ -102,11 +102,13 @@ export async function startDataPlane(runtime: DeckRuntime, dataPort: number, tok
       readSync(fd, head, 0, 12, 0);
       closeSync(fd);
       const type =
-        head.toString('ascii', 0, 4) === 'RIFF'
+        head.toString('ascii', 0, 4) === 'RIFF' && head.toString('ascii', 8, 12) === 'WAVE'
           ? 'audio/wav'
-          : head.toString('ascii', 0, 3) === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0)
-            ? 'audio/mpeg'
-            : 'application/octet-stream';
+          : head.toString('ascii', 0, 4) === 'FORM' && ['AIFF', 'AIFC'].includes(head.toString('ascii', 8, 12))
+            ? 'audio/aiff'
+            : head.toString('ascii', 0, 3) === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0)
+              ? 'audio/mpeg'
+              : 'application/octet-stream';
       res.writeHead(200, { 'content-type': type, 'content-length': statSync(file).size, 'cache-control': 'no-store' });
       createReadStream(file).pipe(res);
       return;

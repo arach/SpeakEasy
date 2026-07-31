@@ -561,13 +561,28 @@ function applySnapshot(snap) {
 }
 
 // The deck plays narration on the device, not the Mac — an HTMLAudio element
-// synced to runtime state, and the device reports its real clock back.
+// synced to runtime state, and the device reports its real clock back on its
+// own events (never gated on snapshots arriving).
 let audioEl = null;
 let lastProgressAt = 0;
+
+function reportProgress(force) {
+  if (!audioEl || !audioEl.dataset.id || audioEl.paused) return;
+  const now = Date.now();
+  if (!force && now - lastProgressAt < 500) return;
+  lastProgressAt = now;
+  sendIntent('playback.progress', {
+    id: audioEl.dataset.id,
+    pos: audioEl.currentTime,
+    dur: isFinite(audioEl.duration) ? audioEl.duration : undefined
+  });
+}
 
 function ensureAudioEl() {
   if (!audioEl) {
     audioEl = new Audio();
+    audioEl.addEventListener('timeupdate', () => reportProgress(false));
+    audioEl.addEventListener('durationchange', () => reportProgress(true));
     audioEl.addEventListener('ended', () => {
       if (audioEl.dataset.id) sendIntent('playback.ended', { id: audioEl.dataset.id });
     });
@@ -604,22 +619,17 @@ function syncAudio(snap) {
   if (Math.abs((el.currentTime || 0) - (snap.pos || 0)) > 2.0) {
     el.currentTime = snap.pos || 0;
   }
-  // report the device's real progress back to the runtime
-  if (!el.paused && el.dataset.id && Date.now() - lastProgressAt > 500) {
-    lastProgressAt = Date.now();
-    sendIntent('playback.progress', {
-      id: el.dataset.id,
-      pos: el.currentTime,
-      dur: isFinite(el.duration) ? el.duration : undefined
-    });
-  }
 }
 
-// Browsers gate audio on a user gesture — unlock the channel with a throwaway
-// element on first touch so it can never clobber an active track.
+// WebKit grants autoplay per element — unlock the playback element itself,
+// never a throwaway, and never by replacing an active track.
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 document.addEventListener('pointerdown', () => {
-  new Audio(SILENT_WAV).play().catch(() => {});
+  const el = ensureAudioEl();
+  if (el.dataset.url) return; // a track is already loading — its play() will unlock
+  el.dataset.url = 'unlock';
+  el.src = SILENT_WAV;
+  el.play().then(() => { el.pause(); delete el.dataset.url; }).catch(() => {});
 }, { once: true });
 
 function demoRestore() {
