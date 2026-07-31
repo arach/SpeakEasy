@@ -72,9 +72,10 @@ async function advertiseVanity(host: string, port: number): Promise<(() => void)
   try {
     const { default: Bonjour } = await import('bonjour-service');
     const bonjour = new Bonjour();
-    const service = bonjour.publish({ name: 'SpeakEasy Deck', type: 'http', port, host });
+    const service = bonjour.publish({ name: `SpeakEasy Deck (${host})`, type: 'http', port, host });
     const up = await new Promise<boolean>((resolve) => {
       service.on('up', () => resolve(true));
+      service.on('error', () => resolve(false)); // e.g. name already on the network
       setTimeout(() => resolve(false), 2000).unref();
     });
     if (!up) {
@@ -208,13 +209,15 @@ function trustLocalCA(rootCert: string): boolean {
   return added.status === 0;
 }
 
-/** Caddy's local-CA root certificate — the file the iPad needs to trust once. */
-function caddyRootCert(): string | undefined {
+/** Caddy's local-CA root certificate path. When `expected` is true, returns the
+ * platform default even if Caddy has not created the file yet (first run). */
+function caddyRootCert(expected = false): string | undefined {
   const candidates = [
     path.join(os.homedir(), 'Library', 'Application Support', 'Caddy', 'pki', 'authorities', 'local', 'root.crt'),
     path.join(os.homedir(), '.local', 'share', 'caddy', 'pki', 'authorities', 'local', 'root.crt'),
   ];
-  return candidates.find((p) => existsSync(p));
+  const existing = candidates.find((p) => existsSync(p));
+  return existing ?? (expected ? candidates[process.platform === 'darwin' ? 0 : 1] : undefined);
 }
 
 /** Serve via Caddy when it is installed — the same static server users get from deck/Caddyfile. */
@@ -417,7 +420,7 @@ export async function runDeck(argv: string[]): Promise<void> {
   // HTTPS on :443 with Caddy's local CA when we can — browsers only grant mic
   // (hold-to-speak) in a secure context. Independent of the HTTP port.
   const tlsHost = args.tls && caddy && (await portAvailable(443)) ? host : null;
-  const caCert = tlsHost ? (caddyRootCert() ?? null) : null;
+  const caCert = tlsHost ? (caddyRootCert(true) ?? null) : null;
 
   let handle: DeckHandle;
   try {
@@ -441,7 +444,8 @@ export async function runDeck(argv: string[]): Promise<void> {
   // port-free URL when an edge Caddy on :80 can host-route to us
   const stopEdge = stopVanity && port !== 80 ? await registerEdgeRoute(host, port) : null;
   const tlsUrl = stopVanity && tlsHost && handle.engine === 'caddy' ? `https://${host}` : null;
-  const macTrusted = tlsUrl && caCert ? trustLocalCA(caCert) : false;
+  // the CA file may only exist after Caddy's first TLS startup — re-verify before trusting
+  const macTrusted = tlsUrl && caCert && existsSync(caCert) ? trustLocalCA(caCert) : false;
   const bonjour = macBonjourName();
   const padUrl = tlsUrl ?? (stopVanity
     ? stopEdge
