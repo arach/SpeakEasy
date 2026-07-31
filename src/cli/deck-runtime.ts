@@ -40,6 +40,8 @@ export interface DeckLaneInfo {
   title: string;
   state: 'speaking' | 'working' | 'idle' | 'empty';
   sessionId?: string;
+  conversationId?: string;
+  sessionAlias?: string;
 }
 
 export interface DeckSnapshot {
@@ -616,7 +618,9 @@ export class DeckRuntime extends EventEmitter {
       : ['ask', '--json', '--project', process.cwd(), '--harness', 'codex', prompt];
     try {
       const askOut = await this.scoutRun(args, 45_000);
-      const ask = parseJsonBlock(askOut) as { receipt?: { ids?: { invocationId?: string; targetAgentId?: string } } } | null;
+      const ask = parseJsonBlock(askOut) as {
+        receipt?: { ids?: { invocationId?: string; targetAgentId?: string; conversationId?: string; sessionAlias?: string } };
+      } | null;
       const inv = ask?.receipt?.ids?.invocationId;
       if (!inv) throw new Error('no invocation id from scout');
       // pin follow-ups in this lane to the same agent session — but only when
@@ -626,6 +630,9 @@ export class DeckRuntime extends EventEmitter {
       if (lane && targetId && targetId.startsWith('session-') && lane.sessionId !== targetId) {
         lane.sessionId = targetId;
       }
+      // and always remember which conversation this lane is talking in
+      if (lane && ask?.receipt?.ids?.conversationId) lane.conversationId = ask.receipt.ids.conversationId;
+      if (lane && ask?.receipt?.ids?.sessionAlias) lane.sessionAlias = ask.receipt.ids.sessionAlias;
 
       const waitOut = await this.scoutRun(['wait', inv, '--timeout', '180', '--json'], 200_000);
       const receipt = parseJsonBlock(waitOut) as {

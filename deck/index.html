@@ -454,9 +454,11 @@ const lane = () => laneMeta(S.lane);
 function laneMeta(i) {
   const l = live && S.lanes && S.lanes[i];
   if (l) {
+    const thread = l.sessionAlias || (l.conversationId ? l.conversationId.replace('chn-', '').slice(0, 8) : null);
     return {
       num: l.num, name: l.name, title: l.title, state: l.state,
-      task: l.title, rev: l.agentId ? l.agentId.split('.')[0].toUpperCase() : 'UNASSIGNED',
+      task: l.title,
+      rev: thread ? 'THREAD ' + thread.toUpperCase() : l.agentId ? 'NEW THREAD' : 'UNASSIGNED',
       voice: l.name + ' Voice', thread: LANES[i] ? LANES[i].thread : []
     };
   }
