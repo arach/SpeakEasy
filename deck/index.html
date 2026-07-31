@@ -560,6 +560,9 @@ function demoRestore() {
 // previous one has fully finalized.
 let recog = null;
 let settling = false;
+// only a hold that holdStart actually admitted may end or cancel — a rejected
+// re-press must not settle someone else's capture
+let holdActive = false;
 
 function startTranscription() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -669,13 +672,15 @@ function setVol(clientX, rect) {
 
 function holdStart() {
   if (lane().state === 'empty') return;
-  if (settling) return; // a previous hold is still finalizing — never overlap captures
-  if (sendIntent('capture.start')) { startTranscription(); return; }
+  if (settling || holdActive) return; // never overlap captures
+  if (sendIntent('capture.start')) { holdActive = true; startTranscription(); return; }
+  holdActive = true;
   S.listening = true; S.playing = null; S.confirm = 'LISTENING';
   host.post('capture', { phase: 'start', lane: lane().num });
 }
 function holdCancel() {
-  if (!S.listening && !live) return;
+  if (!holdActive) return;
+  holdActive = false;
   if (settling) return;
   settling = true;
   stopTranscription(true, () => { settling = false; });
@@ -685,7 +690,8 @@ function holdCancel() {
   host.post('capture', { phase: 'cancel', lane: lane().num });
 }
 function holdEnd() {
-  if (!S.listening && !live) return;
+  if (!holdActive) return;
+  holdActive = false;
   if (live) {
     settling = true;
     stopTranscription(false, (state) => {
