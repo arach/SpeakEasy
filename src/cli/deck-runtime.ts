@@ -112,6 +112,7 @@ export class DeckRuntime extends EventEmitter {
   /** bumped on stop/cancel — pending response work checks it before every phase */
   private gen = 0;
   private player: ChildProcess | null = null;
+  private playerRate = 1;
   private replyIx = 0;
   private synthDir = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-synth-'));
 
@@ -147,11 +148,13 @@ export class DeckRuntime extends EventEmitter {
     if (this.ticker) return;
     this.ticker = setInterval(() => {
       if (!this.playing || this.paused) return;
-      // file-backed playback progresses at the afplay rate; mirrors estimate at 1x
-      const rate = this.player ? SPEEDS[this.speedIx] : 1;
+      // file-backed progress tracks the launch rate; completion for those is
+      // owned exclusively by the afplay exit handler. Only mirrors use the
+      // estimated-duration completion.
+      const rate = this.player ? this.playerRate : 1;
       this.pos += (TICK_MS / 1000) * rate;
       const dur = this.durOf(this.playing);
-      if (this.pos >= dur) {
+      if (!this.player && this.pos >= dur) {
         this.playing = null;
         this.pos = 0;
         this.paused = false;
@@ -197,7 +200,7 @@ export class DeckRuntime extends EventEmitter {
       case 'playback.toggle': {
         const msg = this.messageAt(intent.id);
         if (!msg) return { ok: false, rev: this.rev, error: 'no such message' };
-        if (msg.mirrored) return { ok: false, rev: this.rev, error: 'progress mirror — audio lives in another shell' };
+        if (!msg.file) return { ok: false, rev: this.rev, error: 'no controllable audio for this item' };
         if (this.playing === intent.id && !this.paused) {
           this.paused = true;
           this.player?.kill('SIGSTOP');
@@ -219,15 +222,9 @@ export class DeckRuntime extends EventEmitter {
         this.changed();
         return { ok: true, rev: this.rev };
       }
-      case 'playback.scrub': {
-        if (!this.messageAt(intent.id)) return { ok: false, rev: this.rev, error: 'no such message' };
-        this.playing = intent.id;
-        this.paused = false;
-        this.pos = intent.frac * this.durOf(intent.id);
-        this.ensureTicker();
-        this.changed();
-        return { ok: true, rev: this.rev };
-      }
+      case 'playback.scrub':
+        // afplay cannot seek — scrub stays rejected until real seeking exists
+        return { ok: false, rev: this.rev, error: 'seek not supported yet' };
       case 'playback.speed':
         this.speedIx = (this.speedIx + 1) % SPEEDS.length;
         this.log('SPEED CHANGE', `${SPEEDS[this.speedIx].toFixed(2)}x · applies to next play`);
@@ -307,10 +304,11 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** CLI mirror: an item spoken elsewhere, shown (and optionally voiced) here. */
+  /** CLI mirror: an item spoken elsewhere, shown (and optionally voiced) here.
+   * Audio is never runtime-owned on this path — always a progress mirror. */
   async narrate(text: string, laneIx: number, play: boolean): Promise<void> {
     const lane = Math.min(LANE_COUNT - 1, Math.max(0, laneIx));
-    const msg: DeckMessage = { role: 'agent', text, dur: estimateDuration(text), mirrored: !play };
+    const msg: DeckMessage = { role: 'agent', text, dur: estimateDuration(text), mirrored: true };
     this.pushMessage(lane, msg);
     const id = `${lane}:${this.threads[lane].length - 1}`;
     this.log('NARRATION', `lane ${lane + 1} · ${msg.dur.toFixed(0)}s`);
@@ -406,7 +404,8 @@ export class DeckRuntime extends EventEmitter {
     this.stopPlayer();
     const args: string[] = [];
     if (this.vol !== 1) args.push('-v', this.vol.toFixed(2));
-    if (SPEEDS[this.speedIx] !== 1) args.push('-r', String(SPEEDS[this.speedIx]));
+    this.playerRate = SPEEDS[this.speedIx];
+    if (this.playerRate !== 1) args.push('-r', String(this.playerRate));
     const player = spawn('afplay', [...args, file]);
     this.player = player;
     player.once('exit', () => {
