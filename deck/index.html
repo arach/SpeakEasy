@@ -431,6 +431,7 @@ const S = {
   lane: 1,
   lanes: null,
   assign: false,
+  host: null,
   threads: LANES.map(l => l.thread.map(m => Object.assign({}, m))),
   playing: null,
   paused: false,
@@ -558,6 +559,7 @@ function applySnapshot(snap) {
   S.listening = snap.listening;
   S.confirm = snap.confirm;
   S.trace = snap.trace.slice();
+  S.host = snap.host || null;
   syncAudio(snap);
   paint();
 }
@@ -1000,9 +1002,6 @@ function view() {
     volPct: Math.round(S.vol * 100) + '%',
     volLabel: Math.round(S.vol * 100) + '%',
     speedLabel: speed.toFixed(2) + '×',
-    autoplayLabel: S.autoplay ? 'ON' : 'OFF',
-    autoplayColor: S.autoplay ? T('accent-ink') : T('ink-3'),
-    queueLabel: S.playing ? '01' : '00',
     turnCount: thread().length + ' TURNS',
     listening: S.listening,
     micTitle: S.listening ? 'LISTENING…' : 'HOLD TO SPEAK',
@@ -1044,18 +1043,13 @@ function tpl(v) {
   return '' +
   '<div class="se-shell" style="height:100%;min-height:0;overflow:hidden;background:var(--se-page-bg);padding:calc(14px + env(safe-area-inset-top,0px)) 16px 12px;display:flex;flex-direction:column;gap:12px;">' +
 
-    // ─────────── top bar ───────────
+    // ─────────── top bar — titled after the host we're linked to ───────────
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 4px;flex:none;">' +
       '<div style="display:flex;align-items:center;gap:12px;">' +
         '<div style="width:30px;height:30px;border-radius:7px;background:var(--se-chip-bg);border:1px solid var(--se-accent-edge);color:var(--se-accent-ink);font:600 11px var(--se-mono);display:flex;align-items:center;justify-content:center;">SE</div>' +
         '<div>' +
-          '<div style="font:600 11.5px var(--se-mono);letter-spacing:0.22em;color:var(--se-ink);">SPEAKEASY</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:8px;">' +
-        '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border:1px solid var(--se-accent-edge);border-radius:6px;background:var(--se-chip-bg);">' +
-          '<span style="width:6px;height:6px;border-radius:50%;background:var(--se-accent);box-shadow:0 0 0 3px var(--se-accent-ring);animation:se-breathe 2.6s ease-in-out infinite;"></span>' +
-          '<div><div style="font:600 9.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-accent-ink);">' + (live ? 'LIVE · MAC LINKED' : 'LOCAL DEMO') + '</div></div>' +
+          '<div style="font:600 11.5px var(--se-mono);letter-spacing:0.22em;color:var(--se-ink);">' + esc(live && S.host ? String(S.host).toUpperCase() : 'SPEAKEASY') + '</div>' +
+          '<div style="font:400 9px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);margin-top:2px;">' + (live ? 'SPEAKEASY' : 'LOCAL DEMO') + '</div>' +
         '</div>' +
       '</div>' +
     '</div>' +
@@ -1160,28 +1154,6 @@ function tpl(v) {
           '</div>' +
           '<div style="text-align:right;flex:0 1 auto;min-width:0;">' +
             '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-accent-ink);align-self:center;padding-top:6px;display:inline-block;">' + esc(v.laneRev) + '</div>' +
-          '</div>' +
-        '</div>' +
-
-        // audio settings
-        '<div style="flex:none;padding:12px 20px;display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;border-bottom:1px solid var(--se-line-soft);">' +
-          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:1px;border:1px solid var(--se-line);border-radius:8px;overflow:hidden;background:var(--se-line);flex:1 1 320px;">' +
-            '<div style="background:var(--se-cell);padding:10px 12px;">' +
-              '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);">VOLUME</div>' +
-              '<div style="font:500 11.5px var(--se-mono);color:var(--se-ink-2);margin-top:3px;">' + esc(v.volLabel) + '</div>' +
-            '</div>' +
-            '<button type="button" data-act="speed" aria-label="Playback speed" style="text-align:left;background:var(--se-cell);padding:10px 12px;cursor:pointer;border:0;">' +
-              '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);">SPEED</div>' +
-              '<div style="font:500 11.5px var(--se-mono);color:var(--se-ink-2);margin-top:3px;">' + esc(v.speedLabel) + '</div>' +
-            '</button>' +
-            '<button type="button" data-act="autoplay" aria-label="Toggle autoplay" aria-pressed="' + S.autoplay + '" style="text-align:left;background:var(--se-cell);padding:10px 12px;cursor:pointer;border:0;">' +
-              '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);">AUTOPLAY</div>' +
-              '<div style="font:500 11.5px var(--se-mono);color:' + v.autoplayColor + ';margin-top:3px;">' + esc(v.autoplayLabel) + '</div>' +
-            '</button>' +
-            '<div style="background:var(--se-cell);padding:10px 12px;">' +
-              '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);">QUEUE</div>' +
-              '<div style="font:500 11.5px var(--se-mono);color:var(--se-ink-2);margin-top:3px;">' + esc(v.queueLabel) + '</div>' +
-            '</div>' +
           '</div>' +
         '</div>' +
 

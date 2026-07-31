@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { tmpdir, homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 
@@ -58,6 +58,8 @@ export interface DeckSnapshot {
   phase: string;
   confirm: string;
   trace: DeckTraceEntry[];
+  /** short name of the Mac serving this deck — the deck is titled after it */
+  host: string;
 }
 
 const intentSchema = z.discriminatedUnion('name', [
@@ -170,6 +172,7 @@ export class DeckRuntime extends EventEmitter {
   private phase = 'idle';
   private confirm = 'READY';
   private trace: DeckTraceEntry[] = [];
+  private host = hostname().replace(/\.(local|lan)$/, '');
   private ticker: NodeJS.Timeout | null = null;
   private busy = false;
   private destroyed = false;
@@ -203,6 +206,7 @@ export class DeckRuntime extends EventEmitter {
       phase: this.phase,
       confirm: this.confirm,
       trace: this.trace,
+      host: this.host,
     };
   }
 
