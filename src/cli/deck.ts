@@ -196,6 +196,11 @@ function caddyConfig(root: string, port: number, tlsHost: string | null, caCert:
 		reverse_proxy${prox} 127.0.0.1:${live.dataPort}
 		respond 403
 	}
+
+	route /audio/* {${gate}
+		reverse_proxy${prox} 127.0.0.1:${live.dataPort}
+		respond 403
+	}
 `
     : '';
   const caRoute = caCert

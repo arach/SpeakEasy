@@ -23,6 +23,8 @@ export interface DeckMessage {
   mirrored?: boolean;
   /** synthesized audio owned by the runtime — real transport control when present */
   file?: string;
+  /** where a connected deck can fetch the audio to play it on the device */
+  audioUrl?: string;
 }
 
 export interface DeckTraceEntry {
@@ -154,10 +156,26 @@ export class DeckRuntime extends EventEmitter {
   private playerRate = 1;
   private agentChild: ChildProcess | null = null;
   private synthDir = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-synth-'));
+  /** set by the data plane — how many live deck clients are connected */
+  liveClients: () => number = () => 0;
+
+  /** the directory synthesized audio is served from (deck-live exposes it at /audio) */
+  get audioDir(): string {
+    return this.synthDir;
+  }
 
   constructor() {
     super();
     void this.discoverAgents();
+    // scout can be slow on a cold start — retry discovery until the roster lands
+    const retry = setInterval(() => {
+      if (this.roster.length) {
+        clearInterval(retry);
+        return;
+      }
+      void this.discoverAgents();
+    }, 15_000);
+    retry.unref();
   }
 
   snapshot(): DeckSnapshot {
@@ -202,8 +220,9 @@ export class DeckRuntime extends EventEmitter {
       this.applyAssignments();
       this.log('LANES', `${this.roster.length} agents on the roster`);
       this.changed();
-    } catch {
+    } catch (error) {
       // keep placeholder lanes — deck still works with the default channel
+      console.error('  ⚠️  lane discovery failed:', (error as Error).message);
     }
   }
 
@@ -247,6 +266,9 @@ export class DeckRuntime extends EventEmitter {
   /** Channel mapper: advance a pad to the next agent on the roster. */
   private cycleLane(index: number): void {
     if (!this.roster.length) return;
+    // never attribute an in-flight response to a newly assigned agent
+    this.gen++;
+    this.cancelAgentWork();
     const lane = this.lanes[index];
     const currentIx = lane.agentId ? this.roster.findIndex((a) => a.agentId === lane.agentId) : -1;
     const next = this.roster[(currentIx + 1) % this.roster.length];
@@ -261,11 +283,24 @@ export class DeckRuntime extends EventEmitter {
     return this.lanes[ix]?.name.toLowerCase() ?? `lane ${ix + 1}`;
   }
 
-  private setLaneState(ix: number, state: DeckLaneInfo['state']): void {
+  private setLaneState(ix: number, state: DeckLaneInfo['state']): boolean {
     const lane = this.lanes[ix];
-    if (!lane || lane.state === 'empty') return;
-    if (lane.state === state) return;
+    if (!lane || lane.state === 'empty') return false;
+    if (lane.state === state) return false;
     lane.state = state;
+    return true;
+  }
+
+  /** Reset playback and the state of whichever lane was playing. */
+  private clearPlayback(confirm?: string): void {
+    if (this.playing) {
+      const [li] = this.playing.split(':').map(Number);
+      this.setLaneState(li, 'idle');
+    }
+    this.playing = null;
+    this.paused = false;
+    this.pos = 0;
+    if (confirm) this.setPhase(this.phase === 'speaking' ? 'idle' : this.phase, confirm);
   }
 
   private ensureTicker(): void {
@@ -314,9 +349,7 @@ export class DeckRuntime extends EventEmitter {
         this.cancelAgentWork();
         this.laneIx = intent.index;
         this.stopPlayer();
-        this.playing = null;
-        this.pos = 0;
-        this.paused = false;
+        this.clearPlayback();
         this.setPhase(this.phase, `READY · LANE ${String(intent.index + 1).padStart(2, '0')}`);
         this.log('LANE SELECTED', `lane ${intent.index + 1}`);
         this.changed();
@@ -369,9 +402,7 @@ export class DeckRuntime extends EventEmitter {
         this.gen++; // cancel any pending response work
         this.cancelAgentWork();
         this.stopPlayer();
-        this.playing = null;
-        this.paused = false;
-        this.pos = 0;
+        this.clearPlayback();
         this.listening = false;
         this.setPhase('idle', 'CANCELLED');
         this.log('PLAYBACK STOPPED', 'buffer cleared');
@@ -403,8 +434,8 @@ export class DeckRuntime extends EventEmitter {
         this.gen++;
         this.cancelAgentWork();
         this.stopPlayer();
+        this.clearPlayback();
         this.listening = true;
-        this.playing = null;
         this.setPhase('recording', 'LISTENING');
         this.log('VOICE COMMAND', `${this.laneLabel(this.laneIx)} · recording`);
         this.changed();
@@ -511,6 +542,7 @@ export class DeckRuntime extends EventEmitter {
         return;
       }
       msg.file = file;
+      msg.audioUrl = `/audio/${path.basename(file)}`;
       if (this.autoplay) {
         this.playing = id;
         this.paused = false;
@@ -519,14 +551,16 @@ export class DeckRuntime extends EventEmitter {
         this.setLaneState(lane, 'speaking');
         this.ensureTicker();
         this.changed();
-        this.playFile(file);
+        // a connected deck plays the audio on the device; the Mac speaks only
+        // when nobody is watching
+        if (this.liveClients() === 0) this.playFile(file);
       } else {
         this.setPhase('idle', 'READY');
         this.changed();
       }
     } finally {
       this.busy = false;
-      if (this.lanes[lane]?.state !== 'speaking') this.setLaneState(lane, 'idle');
+      if (this.lanes[lane]?.state !== 'speaking' && this.setLaneState(lane, 'idle')) this.changed();
     }
   }
 
@@ -620,8 +654,11 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** Controlled playback of a runtime-owned file: pause/resume/stop are real. */
+  /** Controlled playback of a runtime-owned file: pause/resume/stop are real.
+   * Skipped entirely while a deck is connected — the deck plays the audio on
+   * the device instead (double audio is the bug this prevents). */
   private playFile(file: string): void {
+    if (this.liveClients() > 0) return;
     this.stopPlayer();
     const args: string[] = [];
     if (this.vol !== 1) args.push('-v', this.vol.toFixed(2));

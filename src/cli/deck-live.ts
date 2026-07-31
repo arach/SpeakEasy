@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage } from 'node:http';
-import { mkdirSync, writeFileSync, renameSync, rmSync, existsSync, chmodSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, renameSync, rmSync, existsSync, chmodSync, readFileSync, statSync, createReadStream } from 'node:fs';
 import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { CONFIG_DIR } from './constants';
@@ -73,9 +73,35 @@ function authorized(req: IncomingMessage, token: string | null): boolean {
  */
 export async function startDataPlane(runtime: DeckRuntime, dataPort: number, token: string | null): Promise<DataPlane> {
   const clients = new Set<WebSocket>();
+  // the runtime only plays through the Mac when no deck is watching
+  runtime.liveClients = () => clients.size;
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
+
+    // synthesized audio for connected decks — the device plays it, not the Mac
+    if (url.pathname.startsWith('/audio/') && req.method === 'GET') {
+      if (!authorized(req, token)) {
+        res.writeHead(403).end();
+        return;
+      }
+      let file: string;
+      try {
+        file = path.join(runtime.audioDir, path.basename(decodeURIComponent(url.pathname)));
+      } catch {
+        res.writeHead(400).end();
+        return;
+      }
+      if (!file.startsWith(runtime.audioDir) || !existsSync(file)) {
+        res.writeHead(404).end();
+        return;
+      }
+      const ext = path.extname(file).toLowerCase();
+      const type = ext === '.mp3' ? 'audio/mpeg' : ext === '.wav' ? 'audio/wav' : 'audio/aiff';
+      res.writeHead(200, { 'content-type': type, 'content-length': statSync(file).size, 'cache-control': 'no-store' });
+      createReadStream(file).pipe(res);
+      return;
+    }
 
     if (url.pathname === '/api/snapshot') {
       if (!authorized(req, token)) {

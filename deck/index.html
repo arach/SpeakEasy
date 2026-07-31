@@ -556,8 +556,51 @@ function applySnapshot(snap) {
   S.listening = snap.listening;
   S.confirm = snap.confirm;
   S.trace = snap.trace.slice();
+  syncAudio(snap);
   paint();
 }
+
+// The deck plays narration on the device, not the Mac — an HTMLAudio element
+// synced to the runtime's playback state.
+let audioEl = null;
+
+function syncAudio(snap) {
+  if (!audioEl) audioEl = new Audio();
+  if (!snap.playing) {
+    audioEl.pause();
+    delete audioEl.dataset.url;
+    return;
+  }
+  const parts = snap.playing.split(':').map(Number);
+  const msg = snap.threads[parts[0]] && snap.threads[parts[0]][parts[1]];
+  if (!msg || !msg.audioUrl) return;
+  if (audioEl.dataset.url !== msg.audioUrl) {
+    audioEl.dataset.url = msg.audioUrl;
+    audioEl.src = msg.audioUrl;
+    audioEl.currentTime = snap.pos || 0;
+  }
+  audioEl.playbackRate = SPEEDS[snap.speedIx] || 1;
+  audioEl.volume = typeof snap.vol === 'number' ? snap.vol : 0.8;
+  if (snap.paused) {
+    audioEl.pause();
+  } else if (audioEl.paused) {
+    audioEl.play().catch(() => {});
+  }
+  // keep the element honest against runtime corrections
+  if (Math.abs((audioEl.currentTime || 0) - (snap.pos || 0)) > 1.0) {
+    audioEl.currentTime = snap.pos || 0;
+  }
+}
+
+// Browsers gate audio on a user gesture — unlock the channel on first touch.
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+document.addEventListener('pointerdown', () => {
+  if (!audioEl) audioEl = new Audio();
+  if (audioEl.dataset.unlocked) return;
+  audioEl.dataset.unlocked = '1';
+  audioEl.src = SILENT_WAV;
+  audioEl.play().then(() => audioEl.pause()).catch(() => {});
+}, { once: true });
 
 function demoRestore() {
   // back to a clean local state — never simulate over the last authoritative snapshot
@@ -911,7 +954,9 @@ function view() {
       at: x.at, kind: x.kind, detail: x.detail,
       kindColor: /VOICE|AGENT|PLAYBACK|LANE/.test(x.kind) ? T('accent-ink') : T('ink-2')
     })),
-    boundLabel: LANES.filter(x => x.state !== 'empty').length + ' / ' + LANES.length + ' BOUND',
+    boundLabel: live && S.lanes
+      ? S.lanes.filter(x => x.agentId).length + ' / ' + S.lanes.length + ' BOUND'
+      : LANES.filter(x => x.state !== 'empty').length + ' / ' + LANES.length + ' BOUND',
     laneNum: l.num,
     laneNumColor: l.state === 'empty' ? T('ink-4') : T('accent'),
     laneTitle: l.title,
@@ -1038,7 +1083,7 @@ function tpl(v) {
         // pads
         '<div class="se-scroll se-pads" style="display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:minmax(136px,1fr);gap:9px;flex:1;min-height:0;overflow-y:auto;padding-right:2px;color:var(--se-plate-ink-3);">' +
           v.pads.map(p =>
-            '<button type="button" class="se-press" data-act="lane" data-arg="' + p.i + '" aria-pressed="' + (p.i === S.lane) + '" aria-label="Lane ' + p.num + ', ' + esc(p.name) + ', ' + esc(p.status) + '" style="text-align:left;border-radius:9px;padding:11px 12px;display:flex;flex-direction:column;min-height:0;overflow:hidden;cursor:pointer;background:' + p.face + ';border:1.5px solid ' + p.edge + ';box-shadow:' + p.shadow + ';">' +
+            '<button type="button" class="se-press" data-act="lane" data-arg="' + p.i + '" aria-pressed="' + (p.i === S.lane) + '" aria-label="Lane ' + p.num + ', ' + esc(p.name) + ', ' + esc(p.status) + '" style="text-align:left;border-radius:9px;padding:11px 12px;display:flex;flex-direction:column;min-height:0;overflow:hidden;cursor:pointer;background:' + p.face + ';border:1.5px solid ' + p.edge + ';box-shadow:' + (S.assign ? '0 0 0 2px var(--se-accent-ring), ' : '') + p.shadow + ';">' +
               '<div style="display:flex;align-items:flex-start;justify-content:space-between;">' +
                 '<span style="font:600 17px var(--se-sans);line-height:1;color:' + p.numColor + ';">' + p.num + '</span>' +
                 '<span style="width:6px;height:6px;border-radius:50%;margin-top:4px;background:' + p.led + ';box-shadow:' + p.ledGlow + ';animation:' + p.ledAnim + ';"></span>' +
