@@ -621,16 +621,24 @@ function syncAudio(snap) {
   }
 }
 
-// WebKit grants autoplay per element — unlock the playback element itself,
-// never a throwaway, and never by replacing an active track.
+// WebKit grants autoplay per element. On each gesture, prime with silence if
+// nothing is loaded or retry the real track's play() — and only drop the
+// listener once a play actually succeeds.
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
-document.addEventListener('pointerdown', () => {
+const unlockAudio = () => {
   const el = ensureAudioEl();
-  if (el.dataset.url) return; // a track is already loading — its play() will unlock
-  el.dataset.url = 'unlock';
-  el.src = SILENT_WAV;
-  el.play().then(() => { el.pause(); delete el.dataset.url; }).catch(() => {});
-}, { once: true });
+  if (!el.dataset.url) {
+    el.dataset.url = 'unlock';
+    el.src = SILENT_WAV;
+  }
+  el.play()
+    .then(() => {
+      if (el.dataset.url === 'unlock') { el.pause(); delete el.dataset.url; }
+      document.removeEventListener('pointerdown', unlockAudio);
+    })
+    .catch(() => { /* rejected — stay registered for the next gesture */ });
+};
+document.addEventListener('pointerdown', unlockAudio);
 
 function demoRestore() {
   // back to a clean local state — never simulate over the last authoritative snapshot
