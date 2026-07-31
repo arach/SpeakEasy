@@ -325,7 +325,7 @@ export class SpeakEasy {
             if (this.useCache && providerName !== 'system' && this.cache && audioBuffer) {
               const cacheKey = this.cache!.generateCacheKey(text, providerName, voice, rate);
               const startTime = Date.now();
-              await this.cache!.set(cacheKey, {
+              const stored = await this.cache!.set(cacheKey, {
                 provider: providerName,
                 voice,
                 rate,
@@ -335,7 +335,9 @@ export class SpeakEasy {
                 durationMs: Date.now() - startTime,
                 success: true
               });
-              this.lastAudioFile = path.join(this.cache!.getCacheDir(), `${cacheKey}.mp3`);
+              // only publish the path when storage actually succeeded — a failed
+              // write could leave stale audio at the deterministic path
+              if (stored) this.lastAudioFile = path.join(this.cache!.getCacheDir(), `${cacheKey}.mp3`);
               
               console.log('cached');
 

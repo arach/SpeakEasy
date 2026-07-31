@@ -585,14 +585,19 @@ function startTranscription() {
   try { r.start(); } catch (_) { recog = null; state.failed = true; }
 }
 
-// stop() delivers final results asynchronously — done(state) fires from the
-// recognizer's own end (or a hard cap), never synchronously.
+// stop() delivers final results asynchronously — the recognizer stays current
+// until onend so those results pass the identity guard, and only then clears.
 function stopTranscription(abort, done) {
   if (!recog) { done({ transcript: '', failed: true }); return; }
-  const { r, state } = recog;
-  recog = null;
+  const current = recog;
+  const { r, state } = current;
   let fired = false;
-  const finish = () => { if (!fired) { fired = true; done(state); } };
+  const finish = () => {
+    if (fired) return;
+    fired = true;
+    if (recog === current) recog = null; // clear only at settlement
+    done(state);
+  };
   r.onend = finish;
   try { abort ? r.abort() : r.stop(); } catch (_) { finish(); }
   setTimeout(finish, 1500);
@@ -664,13 +669,16 @@ function setVol(clientX, rect) {
 
 function holdStart() {
   if (lane().state === 'empty') return;
+  if (settling) return; // a previous hold is still finalizing — never overlap captures
   if (sendIntent('capture.start')) { startTranscription(); return; }
   S.listening = true; S.playing = null; S.confirm = 'LISTENING';
   host.post('capture', { phase: 'start', lane: lane().num });
 }
 function holdCancel() {
   if (!S.listening && !live) return;
-  stopTranscription(true, () => {});
+  if (settling) return;
+  settling = true;
+  stopTranscription(true, () => { settling = false; });
   if (sendIntent('capture.cancel')) return;
   if (!S.listening) return;
   S.listening = false; S.confirm = 'READY · LANE ' + lane().num;
