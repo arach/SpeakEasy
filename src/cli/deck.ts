@@ -215,6 +215,8 @@ https://${tlsHost} {
 	tls internal
 	root * ${root}
 	file_server
+
+	header Cache-Control "no-store"
 ${liveRoutes}${caRoute}
 	@healthz path /healthz
 	handle @healthz {
@@ -237,6 +239,8 @@ ${liveRoutes}${caRoute}
 http://:${port} {
 	root * ${root}
 	file_server
+
+	header Cache-Control "no-store"
 ${liveRoutes}${caRoute}
 	@healthz path /healthz
 	handle @healthz {

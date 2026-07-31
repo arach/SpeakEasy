@@ -38,7 +38,9 @@ final class DeckWebController: NSObject, ObservableObject, WKNavigationDelegate,
 
     private func loadIfNeeded() {
         guard let url = deckURL else { return }
-        webView.load(URLRequest(url: url))
+        // the deck page ships with the server build — never let a stale
+        // WKWebView cache hold an old copy
+        webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
     }
 
     // JS → native: capture phases from the page's host bridge
