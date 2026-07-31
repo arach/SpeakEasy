@@ -144,7 +144,18 @@ function findCaddy(): string | null {
   return res.status === 0 ? res.stdout.trim() : null;
 }
 
-function caddyConfig(root: string, port: number, tlsHost: string | null): string {
+function caddyConfig(root: string, port: number, tlsHost: string | null, caCert: string | null): string {
+  const caRoute = caCert
+    ? `
+	@cacert path /ca.crt
+	handle @cacert {
+		root * "${path.dirname(caCert)}"
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		file_server
+	}
+`
+    : '';
   const tlsSite = tlsHost
     ? `
 https://${tlsHost} {
@@ -164,14 +175,16 @@ https://${tlsHost} {
 }
 `
     : '';
+  // TLS on: keep automatic certs but not redirects — the iPad fetches /ca.crt
+  // over plain HTTP before it can trust anything.
   const globalOpts = tlsHost
-    ? '{\n\tadmin off\n}\n'
+    ? '{\n\tadmin off\n\tauto_https disable_redirects\n}\n'
     : '{\n\tadmin off\n\tauto_https off\n}\n';
   return `${globalOpts}
 http://:${port} {
 	root * ${root}
 	file_server
-
+${caRoute}
 	@healthz path /healthz
 	handle @healthz {
 		header Content-Type application/json
@@ -185,6 +198,16 @@ http://:${port} {
 ${tlsSite}`;
 }
 
+/** Trust Caddy's local CA in the user's login keychain — no sudo, no prompt. */
+function trustLocalCA(rootCert: string): boolean {
+  if (process.platform !== 'darwin') return false;
+  const keychain = path.join(os.homedir(), 'Library', 'Keychains', 'login.keychain-db');
+  const found = spawnSync('security', ['find-certificate', '-c', 'Caddy Local Authority', keychain], { stdio: 'pipe' });
+  if (found.status === 0) return true; // already trusted
+  const added = spawnSync('security', ['add-trusted-cert', '-r', 'trustRoot', '-k', keychain, rootCert], { stdio: 'pipe' });
+  return added.status === 0;
+}
+
 /** Caddy's local-CA root certificate — the file the iPad needs to trust once. */
 function caddyRootCert(): string | undefined {
   const candidates = [
@@ -195,10 +218,10 @@ function caddyRootCert(): string | undefined {
 }
 
 /** Serve via Caddy when it is installed — the same static server users get from deck/Caddyfile. */
-async function startCaddy(caddy: string, root: string, port: number, tlsHost: string | null): Promise<DeckHandle> {
+async function startCaddy(caddy: string, root: string, port: number, tlsHost: string | null, caCert: string | null): Promise<DeckHandle> {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'speakeasy-deck-'));
   const config = path.join(dir, 'Caddyfile');
-  await writeFile(config, caddyConfig(root, port, tlsHost));
+  await writeFile(config, caddyConfig(root, port, tlsHost, caCert));
 
   const child: ChildProcess = spawn(caddy, ['run', '--config', config], { stdio: ['ignore', 'ignore', 'pipe'] });
   let errBuf = '';
@@ -270,6 +293,14 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       res.end(JSON.stringify({ ok: true, service: 'speakeasy-deck', port }));
       return;
+    }
+    if (pathname === '/ca.crt') {
+      const cert = caddyRootCert();
+      if (cert) {
+        res.writeHead(200, { 'content-type': 'application/x-x509-ca-cert', 'cache-control': 'no-store' });
+        res.end(await readFile(cert));
+        return;
+      }
     }
     if (pathname === '/') pathname = '/index.html';
     const file = path.join(root, path.normalize(pathname));
@@ -386,10 +417,11 @@ export async function runDeck(argv: string[]): Promise<void> {
   // HTTPS on :443 with Caddy's local CA when we can — browsers only grant mic
   // (hold-to-speak) in a secure context. Independent of the HTTP port.
   const tlsHost = args.tls && caddy && (await portAvailable(443)) ? host : null;
+  const caCert = tlsHost ? (caddyRootCert() ?? null) : null;
 
   let handle: DeckHandle;
   try {
-    handle = caddy ? await startCaddy(caddy, root, port, tlsHost) : await startNodeServer(root, port);
+    handle = caddy ? await startCaddy(caddy, root, port, tlsHost, caCert) : await startNodeServer(root, port);
   } catch (error) {
     if (!caddy) {
       console.error('❌ Could not start the deck server:', (error as Error).message);
@@ -409,6 +441,7 @@ export async function runDeck(argv: string[]): Promise<void> {
   // port-free URL when an edge Caddy on :80 can host-route to us
   const stopEdge = stopVanity && port !== 80 ? await registerEdgeRoute(host, port) : null;
   const tlsUrl = stopVanity && tlsHost && handle.engine === 'caddy' ? `https://${host}` : null;
+  const macTrusted = tlsUrl && caCert ? trustLocalCA(caCert) : false;
   const bonjour = macBonjourName();
   const padUrl = tlsUrl ?? (stopVanity
     ? stopEdge
@@ -434,15 +467,15 @@ export async function runDeck(argv: string[]): Promise<void> {
   console.log('');
   console.log(`  ${chalk.dim(`Served by ${handle.engine} · Is it running? curl ${hostUrl('localhost', port)}/healthz`)}`);
   if (tlsUrl) {
-    const rootCert = caddyRootCert();
-    console.log(`  ${chalk.dim('HTTPS is on (local CA, mic-ready). One-time iPad trust:')}`);
-    if (rootCert) {
-      console.log(`  ${chalk.dim(`  1. AirDrop this to the iPad: ${rootCert}`)}`);
-      console.log(`  ${chalk.dim('  2. Open it and install the profile')}`);
-      console.log(`  ${chalk.dim('  3. Settings → General → About → Certificate Trust Settings → enable "Caddy Local CA"')}`);
+    console.log(`  ${chalk.dim('HTTPS is on (local CA, mic-ready).')}`);
+    if (macTrusted) {
+      console.log(`  ${chalk.green('✓')} ${chalk.dim('This Mac now trusts the CA — no action needed here.')}`);
     } else {
-      console.log(`  ${chalk.dim('  install Caddy\'s local root CA on the iPad (see caddyserver.com/docs/pki)')}`);
+      console.log(`  ${chalk.dim('  This Mac: run `sudo caddy trust` once to trust the CA system-wide.')}`);
     }
+    console.log(`  ${chalk.dim('  iPad, one time:')}`);
+    console.log(`  ${chalk.dim(`  1. Open ${stopEdge ? `http://${host}` : hostUrl(host, port)}/ca.crt and install the profile`)}`);
+    console.log(`  ${chalk.dim('  2. Settings → General → About → Certificate Trust Settings → enable "Caddy Local Authority"')}`);
   }
   console.log(`  ${chalk.dim('The deck runs its built-in demo state. Press Ctrl+C to stop.')}`);
   console.log('');
