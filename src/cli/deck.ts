@@ -92,6 +92,47 @@ async function advertiseVanity(host: string, port: number): Promise<(() => void)
   }
 }
 
+const EDGE_ROUTE_ID = 'speakeasy-deck';
+
+/**
+ * When another Caddy already owns :80 with its admin API exposed (e.g. a local
+ * edge router), register a host route to our port — the vanity name then works
+ * with no port in the URL. Returns a deregistration function, or null.
+ */
+async function registerEdgeRoute(host: string, port: number): Promise<(() => void) | null> {
+  try {
+    const admin = 'http://127.0.0.1:2019';
+    // find the server listening on :80
+    const serversRes = await fetch(`${admin}/config/apps/http/servers/`, { signal: AbortSignal.timeout(1500) });
+    if (!serversRes.ok) return null;
+    const servers = (await serversRes.json()) as Record<string, { listen?: string[] }>;
+    const srv = Object.keys(servers).find((name) => (servers[name].listen ?? []).some((l) => l.endsWith(':80')));
+    if (!srv) return null;
+
+    // clear any stale route from a previous run so the @id never conflicts
+    await fetch(`${admin}/id/${EDGE_ROUTE_ID}`, { method: 'DELETE', signal: AbortSignal.timeout(1500) }).catch(() => {});
+
+    const res = await fetch(`${admin}/config/apps/http/servers/${srv}/routes/`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        '@id': EDGE_ROUTE_ID,
+        match: [{ host: [host] }],
+        handle: [{ handler: 'reverse_proxy', upstreams: [{ dial: `127.0.0.1:${port}` }] }],
+        terminal: true,
+      }),
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) return null;
+
+    return () => {
+      fetch(`${admin}/id/${EDGE_ROUTE_ID}`, { method: 'DELETE', signal: AbortSignal.timeout(2000) }).catch(() => {});
+    };
+  } catch {
+    return null;
+  }
+}
+
 interface DeckHandle {
   engine: string;
   stop: () => void;
@@ -331,9 +372,13 @@ export async function runDeck(argv: string[]): Promise<void> {
 
   const lan = lanAddress();
   const stopVanity = mdns && lan ? await advertiseVanity(host, port) : null;
+  // port-free URL when an edge Caddy on :80 can host-route to us
+  const stopEdge = stopVanity && port !== 80 ? await registerEdgeRoute(host, port) : null;
   const bonjour = macBonjourName();
   const padUrl = stopVanity
-    ? hostUrl(host, port)
+    ? stopEdge
+      ? `http://${host}`
+      : hostUrl(host, port)
     : bonjour
       ? hostUrl(bonjour, port)
       : `http://${lan ?? 'your-macs-ip'}:${port}`;
@@ -371,6 +416,7 @@ export async function runDeck(argv: string[]): Promise<void> {
     let stopping = false;
     const onShutdown = () => {
       stopping = true;
+      stopEdge?.();
       stopVanity?.();
       handle.stop();
       cleanup();
@@ -379,6 +425,7 @@ export async function runDeck(argv: string[]): Promise<void> {
     };
     const onExit = (code: number | null) => {
       cleanup();
+      stopEdge?.();
       stopVanity?.();
       if (stopping) {
         resolve();
