@@ -147,7 +147,9 @@ export class DeckRuntime extends EventEmitter {
     if (this.ticker) return;
     this.ticker = setInterval(() => {
       if (!this.playing || this.paused) return;
-      this.pos += TICK_MS / 1000;
+      // file-backed playback progresses at the afplay rate; mirrors estimate at 1x
+      const rate = this.player ? SPEEDS[this.speedIx] : 1;
+      this.pos += (TICK_MS / 1000) * rate;
       const dur = this.durOf(this.playing);
       if (this.pos >= dur) {
         this.playing = null;
@@ -181,6 +183,7 @@ export class DeckRuntime extends EventEmitter {
   async apply(intent: DeckIntent): Promise<{ ok: boolean; rev: number; error?: string }> {
     switch (intent.name) {
       case 'lane.select': {
+        this.gen++; // an in-flight response must not restart audio under a new lane
         this.laneIx = intent.index;
         this.stopPlayer();
         this.playing = null;
@@ -194,6 +197,7 @@ export class DeckRuntime extends EventEmitter {
       case 'playback.toggle': {
         const msg = this.messageAt(intent.id);
         if (!msg) return { ok: false, rev: this.rev, error: 'no such message' };
+        if (msg.mirrored) return { ok: false, rev: this.rev, error: 'progress mirror — audio lives in another shell' };
         if (this.playing === intent.id && !this.paused) {
           this.paused = true;
           this.player?.kill('SIGSTOP');
@@ -253,7 +257,8 @@ export class DeckRuntime extends EventEmitter {
       case 'playback.replay': {
         const t = this.threads[this.laneIx];
         for (let i = t.length - 1; i >= 0; i--) {
-          if (t[i].role === 'agent') {
+          // only file-backed replies can actually replay — mirrors have no audio here
+          if (t[i].role === 'agent' && t[i].file) {
             this.stopPlayer();
             this.playing = `${this.laneIx}:${i}`;
             this.paused = false;
@@ -261,14 +266,15 @@ export class DeckRuntime extends EventEmitter {
             this.setPhase('speaking', 'REPLAYING LAST REPLY');
             this.ensureTicker();
             this.log('REPLAY', `lane ${this.laneIx + 1} · last reply`);
-            if (t[i].file) this.playFile(t[i].file!);
+            this.playFile(t[i].file!);
             this.changed();
             return { ok: true, rev: this.rev };
           }
         }
-        return { ok: false, rev: this.rev, error: 'no reply to replay' };
+        return { ok: false, rev: this.rev, error: 'no replayable reply' };
       }
       case 'capture.start':
+        this.gen++;
         this.stopPlayer();
         this.listening = true;
         this.playing = null;
@@ -405,7 +411,17 @@ export class DeckRuntime extends EventEmitter {
     this.player = player;
     player.once('exit', () => {
       // a killed predecessor must not clear the reference of its replacement
-      if (this.player === player) this.player = null;
+      if (this.player !== player) return;
+      this.player = null;
+      // natural completion is authoritative — the audio really is done
+      if (this.playing && !this.paused) {
+        this.playing = null;
+        this.pos = 0;
+        this.paused = false;
+        this.setPhase('idle', 'READY');
+        this.log('PLAYBACK ENDED', 'buffer complete');
+        this.changed();
+      }
     });
   }
 

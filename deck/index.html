@@ -431,6 +431,7 @@ const S = {
   lane: 1,
   threads: LANES.map(l => l.thread.map(m => Object.assign({}, m))),
   playing: null,
+  paused: false,
   pos: 0,
   speedIx: 0,
   vol: 0.8,
@@ -532,6 +533,7 @@ function applySnapshot(snap) {
   S.lane = snap.lane;
   S.threads = snap.threads.map(t => t.map(m => Object.assign({}, m)));
   S.playing = snap.playing;
+  S.paused = !!snap.paused;
   S.pos = snap.pos;
   S.speedIx = snap.speedIx;
   S.vol = snap.vol;
@@ -546,7 +548,7 @@ function demoRestore() {
   // back to a clean local state — never simulate over the last authoritative snapshot
   S.lane = 1;
   S.threads = LANES.map(l => l.thread.map(m => Object.assign({}, m)));
-  S.playing = null; S.pos = 0; S.listening = false;
+  S.playing = null; S.paused = false; S.pos = 0; S.listening = false;
   S.confirm = 'READY · LANE 02';
   paint();
 }
@@ -657,7 +659,7 @@ function toggleAutoplay() {
 }
 function stopAll() {
   if (sendIntent('playback.stop')) return;
-  S.playing = null; S.pos = 0; S.listening = false; S.confirm = 'CANCELLED';
+  S.playing = null; S.paused = false; S.pos = 0; S.listening = false; S.confirm = 'CANCELLED';
   logEvent('PLAYBACK STOPPED', 'buffer cleared');
 }
 function replayLast() {
@@ -1022,7 +1024,7 @@ function tpl(v) {
                     (m.mirrored
                       ? '<div style="margin-top:11px;font:400 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);">MIRRORED FROM ANOTHER SHELL · PROGRESS ONLY</div>'
                       : '<div style="margin-top:11px;background:var(--se-player-bg);border:1px solid ' + m.playerEdge + ';border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:12px;">' +
-                        '<button type="button" class="se-press" data-act="play" data-arg="' + m.id + '" aria-label="' + (m.playing ? 'Pause reply' : 'Play reply') + '" style="width:28px;height:28px;flex:none;border-radius:50%;border:0;background:' + m.btnBg + ';display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:' + m.btnGlow + ';">' + playIcon(m.playing) + '</button>' +
+                        '<button type="button" class="se-press" data-act="play" data-arg="' + m.id + '" aria-label="' + (m.playing && !S.paused ? 'Pause reply' : 'Play reply') + '" style="width:28px;height:28px;flex:none;border-radius:50%;border:0;background:' + m.btnBg + ';display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:' + m.btnGlow + ';">' + playIcon(m.playing && !S.paused) + '</button>' +
                         '<button type="button" data-act="scrub" data-arg="' + m.id + '" aria-label="Seek reply audio" style="display:block;flex:1;min-width:0;cursor:pointer;border:0;background:none;padding:0;">' +
                           '<svg width="100%" height="26" viewBox="0 0 300 24" preserveAspectRatio="none" style="display:block;">' +
                             '<path d="' + m.wavePlayed + '" stroke="var(--se-wave-on)" stroke-width="2.6" stroke-linecap="round"></path>' +
@@ -1178,7 +1180,7 @@ function tick() {
   const next = S.pos + 0.12 * SPEEDS[S.speedIx];
   if (live) {
     // the runtime owns completion; locally just smooth the progress between snapshots
-    S.pos = Math.min(next, dur(S.playing));
+    if (!S.paused) S.pos = Math.min(next, dur(S.playing));
     paint();
     return;
   }
