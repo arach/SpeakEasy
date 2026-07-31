@@ -1,9 +1,19 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+
+/** execFile as a promise, capturing stdout, with a hard timeout. */
+function run(cmd: string, args: string[], timeout: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { timeout, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
+      if (err) reject(err);
+      else resolve(stdout);
+    });
+  });
+}
 
 export interface DeckMessage {
   role: 'you' | 'agent';
@@ -72,11 +82,6 @@ export function estimateDuration(text: string, rate = 1): number {
   return Math.max(1.5, words / (2.5 * rate));
 }
 
-const REPLIES = [
-  'On it. The blocking item is the manifest signature; I am rotating the stale key in the same pass and will read back the result when it lands.',
-  'Status: the merge train is green except for one pending check. I am watching it and will pick up the release notes next.',
-  'Update: the queue is clear, the last two checks passed, and I am moving on to the cleanup pass now.',
-];
 
 export function parseIntent(raw: unknown): { intent?: DeckIntent; error?: string } {
   const parsed = intentSchema.safeParse(raw);
@@ -113,7 +118,6 @@ export class DeckRuntime extends EventEmitter {
   private gen = 0;
   private player: ChildProcess | null = null;
   private playerRate = 1;
-  private replyIx = 0;
   private synthDir = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-synth-'));
 
   snapshot(): DeckSnapshot {
@@ -320,7 +324,10 @@ export class DeckRuntime extends EventEmitter {
       this.ensureTicker();
     }
     this.changed();
-    if (play) await this.voice(text);
+    if (play) {
+      const file = await this.synthesize(text);
+      if (file) this.playFile(file);
+    }
   }
 
   private pushMessage(lane: number, msg: DeckMessage): void {
@@ -328,7 +335,7 @@ export class DeckRuntime extends EventEmitter {
     this.threads[lane] = t.slice(-MAX_MESSAGES_PER_LANE);
   }
 
-  /** The PTT loop: real phases, real synthesis, cancellable via this.gen. */
+  /** The PTT loop: real question → real agent answer → real voice, cancellable via this.gen. */
   private async respond(laneIx: number, command: string, gen: number): Promise<void> {
     this.busy = true;
     const lane = laneIx;
@@ -338,13 +345,15 @@ export class DeckRuntime extends EventEmitter {
       this.changed();
       await wait(600);
       if (!alive()) return;
-      this.setPhase('submitting', 'SUBMITTING');
-      this.changed();
-      await wait(500);
-      if (!alive()) return;
 
       this.pushMessage(lane, { role: 'you', text: command, dur: estimateDuration(command) });
-      const reply = REPLIES[this.replyIx++ % REPLIES.length];
+      this.setPhase('submitting', 'SUBMITTING');
+      this.log('AGENT ASKED', command.slice(0, 48));
+      this.changed();
+
+      const reply = await this.askAgent(command);
+      if (!alive()) return;
+
       const msg: DeckMessage = { role: 'agent', text: reply, dur: estimateDuration(reply) };
       this.pushMessage(lane, msg);
       const id = `${lane}:${this.threads[lane].length - 1}`;
@@ -388,29 +397,51 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** Synthesize to a file without playing. System voice via `say -o`; cloud via the SDK's silent mode. */
+  /** Ask a real agent (Codex via Scout) and get a spoken-length answer back. */
+  private async askAgent(question: string): Promise<string> {
+    try {
+      const ask = await run('scout', ['ask', '--project', process.cwd(), '--harness', 'codex',
+        `Answer in one or two spoken-style sentences, plain words, no lists, no code: ${question}`], 20_000);
+      const inv = ask.match(/scout wait (inv-\S+)/)?.[1];
+      if (!inv) throw new Error('no invocation id from scout');
+      const reply = await run('scout', ['wait', inv, '--timeout', '180'], 200_000);
+      const text = reply.split('\nOutput:').pop()?.trim() ?? '';
+      if (!text || text.length < 4) throw new Error('empty reply');
+      // spoken answers stay short: cap at ~60 words
+      const words = text.split(/\s+/);
+      return words.length > 60 ? words.slice(0, 60).join(' ') + '…' : text;
+    } catch (error) {
+      this.log('AGENT FAILED', (error as Error).message.slice(0, 60));
+      return 'Sorry, the agent did not answer that one. Try again in a moment.';
+    }
+  }
+
+  /** Synthesize to a file without playing — the user's configured provider first
+   * (cloud silent mode → cache file), the macOS system voice as fallback. */
   private async synthesize(text: string): Promise<string | null> {
+    try {
+      const { SpeakEasy } = await import('../index');
+      const speaker = new SpeakEasy({ volume: this.vol });
+      await speaker.speak(text, { silent: true });
+      const stats = await speaker.getCacheStats();
+      if (stats.dir) {
+        const { TTSCache } = await import('../cache');
+        const recent = await new TTSCache(stats.dir, '7d').getRecent(1);
+        const file = recent[0]?.filePath;
+        // guard against stale cache entries — the file must be from this call
+        if (file && existsSync(file) && Date.now() - statSync(file).mtimeMs < 30_000) return file;
+      }
+    } catch {
+      // cloud silent mode unavailable — fall through to the system voice
+    }
     const file = path.join(this.synthDir, `reply-${Date.now()}.aiff`);
     try {
-      await new Promise<void>((resolve, reject) => {
-        execFile('say', ['-o', file, text], { timeout: 30_000 }, (err) => (err ? reject(err) : resolve()));
-      });
+      await run('say', ['-o', file, text], 30_000);
       return file;
     } catch (error) {
       this.log('SYNTH FAILED', (error as Error).message.slice(0, 60));
       this.changed();
       return null;
-    }
-  }
-
-  /** Cloud-provider narration through the SDK (plays on the Mac's speakers). */
-  private async voice(text: string): Promise<void> {
-    try {
-      const { SpeakEasy } = await import('../index');
-      await new SpeakEasy({ volume: this.vol }).speak(text);
-    } catch (error) {
-      this.log('SYNTH FAILED', (error as Error).message.slice(0, 60));
-      this.changed();
     }
   }
 

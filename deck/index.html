@@ -553,6 +553,34 @@ function demoRestore() {
   paint();
 }
 
+// Speech recognition lives in the browser (HTTPS required) — the iPad
+// transcribes locally and sends text, never audio, to the runtime.
+let recog = null;
+let transcript = '';
+
+function startTranscription() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR || recog) return;
+  transcript = '';
+  recog = new SR();
+  recog.lang = 'en-US';
+  recog.interimResults = true;
+  recog.continuous = false;
+  recog.onresult = e => {
+    transcript = Array.from(e.results).map(r => r[0].transcript).join(' ').trim();
+    if (S.listening && transcript) { S.confirm = transcript.toUpperCase().slice(0, 40); paint(); }
+  };
+  recog.onerror = () => { recog = null; };
+  recog.onend = () => { recog = null; };
+  try { recog.start(); } catch (_) { recog = null; }
+}
+
+function stopTranscription(abort) {
+  if (!recog) return;
+  try { abort ? recog.abort() : recog.stop(); } catch (_) {}
+  recog = null;
+}
+
 function bootLive() {
   if (!liveToken) return; // no capability in the URL — demo mode
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -617,12 +645,13 @@ function setVol(clientX, rect) {
 
 function holdStart() {
   if (lane().state === 'empty') return;
-  if (sendIntent('capture.start')) return;
+  if (sendIntent('capture.start')) { startTranscription(); return; }
   S.listening = true; S.playing = null; S.confirm = 'LISTENING';
   host.post('capture', { phase: 'start', lane: lane().num });
 }
 function holdCancel() {
   if (!S.listening && !live) return;
+  stopTranscription(true);
   if (sendIntent('capture.cancel')) return;
   if (!S.listening) return;
   S.listening = false; S.confirm = 'READY · LANE ' + lane().num;
@@ -630,7 +659,10 @@ function holdCancel() {
 }
 function holdEnd() {
   if (!S.listening && !live) return;
-  if (sendIntent('capture.end')) return;
+  stopTranscription(false);
+  const said = transcript;
+  transcript = '';
+  if (sendIntent('capture.end', said ? { text: said } : {})) return;
   if (!S.listening) return;
   const li = S.lane;
   const l = LANES[li];
