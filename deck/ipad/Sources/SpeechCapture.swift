@@ -61,10 +61,10 @@ final class SpeechCapture: NSObject {
     }
 
     /// User released the pad — close the audio stream; the final result
-    /// arrives through the task callback, with a teardown backstop.
+    /// arrives through the task callback, with a short teardown backstop.
     func finish() {
         request?.endAudio()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             self?.teardown()
         }
     }

@@ -608,7 +608,9 @@ export class DeckRuntime extends EventEmitter {
       'Answer from general knowledge only, in one or two spoken-style sentences, plain words, no lists, no code. Question: ' +
       question.slice(0, 500);
     const lane = this.lanes[laneIx];
-    const target = lane?.sessionId ? `session:${lane.sessionId}` : lane?.agentId;
+    // session: targeting only works with real session ids — a named agent's
+    // card id is not routable that way; target it directly instead
+    const target = lane?.sessionId?.startsWith('session-') ? `session:${lane.sessionId}` : lane?.agentId;
     const args = target
       ? ['ask', '--json', '--to', target, prompt]
       : ['ask', '--json', '--project', process.cwd(), '--harness', 'codex', prompt];
@@ -617,9 +619,12 @@ export class DeckRuntime extends EventEmitter {
       const ask = parseJsonBlock(askOut) as { receipt?: { ids?: { invocationId?: string; targetAgentId?: string } } } | null;
       const inv = ask?.receipt?.ids?.invocationId;
       if (!inv) throw new Error('no invocation id from scout');
-      // pin follow-ups in this lane to the same agent session
-      if (lane && ask?.receipt?.ids?.targetAgentId && lane.sessionId !== ask.receipt.ids.targetAgentId) {
-        lane.sessionId = ask.receipt.ids.targetAgentId;
+      // pin follow-ups in this lane to the same agent session — but only when
+      // the receipt names a real session id (project-routed workers); named
+      // agents stay targeted by agentId
+      const targetId = ask?.receipt?.ids?.targetAgentId;
+      if (lane && targetId && targetId.startsWith('session-') && lane.sessionId !== targetId) {
+        lane.sessionId = targetId;
       }
 
       const waitOut = await this.scoutRun(['wait', inv, '--timeout', '180', '--json'], 200_000);
@@ -637,7 +642,10 @@ export class DeckRuntime extends EventEmitter {
       return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : text;
     } catch (error) {
       this.log('AGENT FAILED', (error as Error).message.slice(0, 60));
-      return 'Sorry, the agent did not answer that one. Try again in a moment.';
+      const who = this.lanes[laneIx]?.name.toLowerCase();
+      return who
+        ? `${who[0].toUpperCase() + who.slice(1)} didn't answer that one — try again in a moment.`
+        : 'Sorry, the agent did not answer that one. Try again in a moment.';
     }
   }
 

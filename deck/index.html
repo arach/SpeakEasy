@@ -703,7 +703,7 @@ function stopTranscription(abort, done) {
   if (nativeSpeech()) {
     if (abort) { done({ transcript: '', failed: false }); return; }
     // the native shell posts its final result via nativeTranscript; settle on
-    // that, or on a hard cap in case nothing arrives
+    // that, or quickly on the latest partial so release never feels sticky
     nativeFinish = done;
     setTimeout(() => {
       if (nativeFinish) {
@@ -711,7 +711,7 @@ function stopTranscription(abort, done) {
         nativeFinish = null;
         f(nativeState);
       }
-    }, 2500);
+    }, 800);
     return;
   }
   if (!recog) { done({ transcript: '', failed: true }); return; }
