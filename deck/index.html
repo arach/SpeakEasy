@@ -755,6 +755,8 @@ function view() {
       isYou: m.role === 'you',
       isAgent: m.role === 'agent',
       mirrored: !!m.mirrored,
+      // live mode only offers transport on runtime-owned audio; demo keeps its player
+      playable: live ? !!m.file : true,
       text: m.text,
       playing: isPlaying,
       edge: isPlaying ? T('accent') : T('line'),
@@ -1020,9 +1022,9 @@ function tpl(v) {
                 ? '<div style="max-width:82%;min-width:min(420px,100%);background:var(--se-cell);border:1px solid ' + m.edge + ';border-radius:var(--se-bubble-a);padding:12px 14px;box-shadow:' + m.ring + ';">' +
                     '<div style="font:500 12.5px/1.5 var(--se-sans);color:var(--se-ink);letter-spacing:-0.005em;">' + esc(m.gist) + '</div>' +
 
-                    // audio player — hidden for mirrored items (audio lives in another process)
-                    (m.mirrored
-                      ? '<div style="margin-top:11px;font:400 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);">MIRRORED FROM ANOTHER SHELL · PROGRESS ONLY</div>'
+                    // audio player — live mode requires runtime-owned audio
+                    (!m.playable
+                      ? '<div style="margin-top:11px;font:400 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);">' + (m.mirrored ? 'MIRRORED FROM ANOTHER SHELL · PROGRESS ONLY' : 'TEXT ONLY · NO AUDIO') + '</div>'
                       : '<div style="margin-top:11px;background:var(--se-player-bg);border:1px solid ' + m.playerEdge + ';border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:12px;">' +
                         '<button type="button" class="se-press" data-act="play" data-arg="' + m.id + '" aria-label="' + (m.playing && !S.paused ? 'Pause reply' : 'Play reply') + '" style="width:28px;height:28px;flex:none;border-radius:50%;border:0;background:' + m.btnBg + ';display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:' + m.btnGlow + ';">' + playIcon(m.playing && !S.paused) + '</button>' +
                         '<div aria-hidden="true" style="display:block;flex:1;min-width:0;padding:0;">' +

@@ -354,7 +354,14 @@ export class DeckRuntime extends EventEmitter {
       this.changed();
 
       const file = await this.synthesize(reply);
-      if (!alive()) return;
+      if (!alive()) {
+        // cancelled while synthesizing — finalize the reply as text-only
+        if (!msg.file) {
+          msg.mirrored = true;
+          this.changed();
+        }
+        return;
+      }
       if (!file) {
         // synthesis failed — show the reply without audio, never fake playback
         msg.mirrored = true;
