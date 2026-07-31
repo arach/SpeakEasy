@@ -1,9 +1,16 @@
 import { EventEmitter } from 'node:events';
+import { spawn, execFile, type ChildProcess } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { z } from 'zod';
 
 export interface DeckMessage {
   role: 'you' | 'agent';
   text: string;
   dur: number;
+  /** true while this is only a progress mirror — no controllable audio behind it */
+  mirrored?: boolean;
 }
 
 export interface DeckTraceEntry {
@@ -18,6 +25,7 @@ export interface DeckSnapshot {
   lane: number;
   threads: DeckMessage[][];
   playing: string | null;
+  paused: boolean;
   pos: number;
   speedIx: number;
   vol: number;
@@ -28,14 +36,27 @@ export interface DeckSnapshot {
   trace: DeckTraceEntry[];
 }
 
-export interface DeckIntent {
-  name: string;
-  [key: string]: unknown;
-}
+const intentSchema = z.discriminatedUnion('name', [
+  z.object({ name: z.literal('lane.select'), index: z.number().int().min(0).max(8) }),
+  z.object({ name: z.literal('playback.toggle'), id: z.string().regex(/^\d:\d{1,3}$/) }),
+  z.object({ name: z.literal('playback.scrub'), id: z.string().regex(/^\d:\d{1,3}$/), frac: z.number().min(0).max(1) }),
+  z.object({ name: z.literal('playback.speed') }),
+  z.object({ name: z.literal('playback.volume'), vol: z.number().min(0).max(1) }),
+  z.object({ name: z.literal('playback.autoplay') }),
+  z.object({ name: z.literal('playback.stop') }),
+  z.object({ name: z.literal('playback.replay') }),
+  z.object({ name: z.literal('capture.start') }),
+  z.object({ name: z.literal('capture.cancel') }),
+  z.object({ name: z.literal('capture.end'), text: z.string().max(500).optional() }),
+  z.object({ name: z.literal('speak'), text: z.string().min(1).max(4000) }),
+]);
+
+export type DeckIntent = z.infer<typeof intentSchema>;
 
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
 const LANE_COUNT = 9;
 const TICK_MS = 250;
+const MAX_MESSAGES_PER_LANE = 50;
 
 function clock(): string {
   const d = new Date();
@@ -55,15 +76,27 @@ const REPLIES = [
   'Update: the queue is clear, the last two checks passed, and I am moving on to the cleanup pass now.',
 ];
 
+export function parseIntent(raw: unknown): { intent?: DeckIntent; error?: string } {
+  const parsed = intentSchema.safeParse(raw);
+  if (!parsed.success) return { error: 'invalid intent' };
+  return { intent: parsed.data };
+}
+
 /**
  * The Mac-authoritative deck runtime. Owns lanes, threads, the phase machine,
  * and playback state; the deck renders snapshots and sends intents.
+ *
+ * Audio model: runtime-originated speech is synthesized to a file and played
+ * through our own afplay child process, so pause (SIGSTOP), resume (SIGCONT),
+ * and stop (kill) are real. Mirrored items (spoken by another process) are
+ * progress mirrors only — the transport does not pretend to control them.
  */
 export class DeckRuntime extends EventEmitter {
   private rev = 0;
   private laneIx = 1;
   private threads: DeckMessage[][] = Array.from({ length: LANE_COUNT }, () => []);
   private playing: string | null = null;
+  private paused = false;
   private pos = 0;
   private speedIx = 0;
   private vol = 0.8;
@@ -73,8 +106,12 @@ export class DeckRuntime extends EventEmitter {
   private confirm = 'READY';
   private trace: DeckTraceEntry[] = [];
   private ticker: NodeJS.Timeout | null = null;
-  private speaking = false;
+  private busy = false;
+  /** bumped on stop/cancel — pending response work checks it before every phase */
+  private gen = 0;
+  private player: ChildProcess | null = null;
   private replyIx = 0;
+  private synthDir = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-synth-'));
 
   snapshot(): DeckSnapshot {
     return {
@@ -83,6 +120,7 @@ export class DeckRuntime extends EventEmitter {
       lane: this.laneIx,
       threads: this.threads,
       playing: this.playing,
+      paused: this.paused,
       pos: this.pos,
       speedIx: this.speedIx,
       vol: this.vol,
@@ -106,12 +144,13 @@ export class DeckRuntime extends EventEmitter {
   private ensureTicker(): void {
     if (this.ticker) return;
     this.ticker = setInterval(() => {
-      if (!this.playing) return;
+      if (!this.playing || this.paused) return;
       this.pos += TICK_MS / 1000;
       const dur = this.durOf(this.playing);
       if (this.pos >= dur) {
         this.playing = null;
         this.pos = 0;
+        this.paused = false;
         this.log('PLAYBACK ENDED', 'buffer complete');
         this.setPhase('idle', 'READY');
       }
@@ -126,86 +165,101 @@ export class DeckRuntime extends EventEmitter {
     return this.threads[li]?.[mi]?.dur ?? 30;
   }
 
+  private messageAt(id: string): DeckMessage | null {
+    const [li, mi] = id.split(':').map(Number);
+    return this.threads[li]?.[mi] ?? null;
+  }
+
   private setPhase(phase: string, confirm: string): void {
     this.phase = phase;
     this.confirm = confirm;
   }
 
-  /** User actions from the deck. Unknown intents fail explicitly. */
-  async apply(intent: DeckIntent): Promise<{ ok: boolean; error?: string }> {
+  /** User actions from the deck — already schema-validated by parseIntent. */
+  async apply(intent: DeckIntent): Promise<{ ok: boolean; rev: number; error?: string }> {
     switch (intent.name) {
       case 'lane.select': {
-        const i = Number(intent.index);
-        if (!Number.isInteger(i) || i < 0 || i >= LANE_COUNT) return { ok: false, error: 'bad lane index' };
-        this.laneIx = i;
+        this.laneIx = intent.index;
         this.playing = null;
         this.pos = 0;
-        this.setPhase(this.phase, `READY · LANE ${String(i + 1).padStart(2, '0')}`);
-        this.log('LANE SELECTED', `lane ${i + 1}`);
+        this.paused = false;
+        this.setPhase(this.phase, `READY · LANE ${String(intent.index + 1).padStart(2, '0')}`);
+        this.log('LANE SELECTED', `lane ${intent.index + 1}`);
         this.changed();
-        return { ok: true };
+        return { ok: true, rev: this.rev };
       }
       case 'playback.toggle': {
-        const id = String(intent.id ?? '');
-        if (this.playing === id) {
-          this.playing = null;
+        const msg = this.messageAt(intent.id);
+        if (!msg) return { ok: false, rev: this.rev, error: 'no such message' };
+        if (this.playing === intent.id && !this.paused) {
+          this.paused = true;
+          this.player?.kill('SIGSTOP');
           this.log('PLAYBACK PAUSED', `${Math.floor(this.pos)}s elapsed`);
+        } else if (this.playing === intent.id && this.paused) {
+          this.paused = false;
+          this.player?.kill('SIGCONT');
+          this.log('PLAYBACK RESUMED', `${Math.floor(this.pos)}s elapsed`);
         } else {
-          this.playing = id;
+          this.playing = intent.id;
+          this.paused = false;
           this.pos = 0;
           this.setPhase('speaking', 'PLAYING');
           this.log('PLAYBACK STARTED', `${SPEEDS[this.speedIx].toFixed(2)}x`);
-          this.ensureTicker();
         }
-        this.changed();
-        return { ok: true };
-      }
-      case 'playback.scrub': {
-        const id = String(intent.id ?? '');
-        const frac = Math.min(1, Math.max(0, Number(intent.frac) || 0));
-        this.playing = id;
-        this.pos = frac * this.durOf(id);
         this.ensureTicker();
         this.changed();
-        return { ok: true };
+        return { ok: true, rev: this.rev };
+      }
+      case 'playback.scrub': {
+        if (!this.messageAt(intent.id)) return { ok: false, rev: this.rev, error: 'no such message' };
+        this.playing = intent.id;
+        this.paused = false;
+        this.pos = intent.frac * this.durOf(intent.id);
+        this.ensureTicker();
+        this.changed();
+        return { ok: true, rev: this.rev };
       }
       case 'playback.speed':
         this.speedIx = (this.speedIx + 1) % SPEEDS.length;
-        this.log('SPEED CHANGE', `${SPEEDS[this.speedIx].toFixed(2)}x`);
+        this.log('SPEED CHANGE', `${SPEEDS[this.speedIx].toFixed(2)}x · applies to next play`);
         this.changed();
-        return { ok: true };
+        return { ok: true, rev: this.rev };
       case 'playback.volume':
-        this.vol = Math.min(1, Math.max(0, Number(intent.vol) || 0));
+        this.vol = intent.vol;
         this.log('NARRATION VOLUME', `${Math.round(this.vol * 100)}%`);
         this.changed();
-        return { ok: true };
+        return { ok: true, rev: this.rev };
       case 'playback.autoplay':
         this.autoplay = !this.autoplay;
         this.log('AUTOPLAY', this.autoplay ? 'on' : 'off');
         this.changed();
-        return { ok: true };
+        return { ok: true, rev: this.rev };
       case 'playback.stop':
+        this.gen++; // cancel any pending response work
+        this.stopPlayer();
         this.playing = null;
+        this.paused = false;
         this.pos = 0;
         this.listening = false;
         this.setPhase('idle', 'CANCELLED');
         this.log('PLAYBACK STOPPED', 'buffer cleared');
         this.changed();
-        return { ok: true };
+        return { ok: true, rev: this.rev };
       case 'playback.replay': {
         const t = this.threads[this.laneIx];
         for (let i = t.length - 1; i >= 0; i--) {
           if (t[i].role === 'agent') {
             this.playing = `${this.laneIx}:${i}`;
+            this.paused = false;
             this.pos = 0;
             this.setPhase('speaking', 'REPLAYING LAST REPLY');
             this.ensureTicker();
             this.log('REPLAY', `lane ${this.laneIx + 1} · last reply`);
             this.changed();
-            return { ok: true };
+            return { ok: true, rev: this.rev };
           }
         }
-        return { ok: false, error: 'no reply to replay' };
+        return { ok: false, rev: this.rev, error: 'no reply to replay' };
       }
       case 'capture.start':
         this.listening = true;
@@ -213,43 +267,42 @@ export class DeckRuntime extends EventEmitter {
         this.setPhase('recording', 'LISTENING');
         this.log('VOICE COMMAND', `lane ${this.laneIx + 1} · recording`);
         this.changed();
-        return { ok: true };
+        return { ok: true, rev: this.rev };
       case 'capture.cancel':
-        if (!this.listening) return { ok: false, error: 'not recording' };
+        if (!this.listening) return { ok: false, rev: this.rev, error: 'not recording' };
         this.listening = false;
         this.setPhase('idle', 'READY');
         this.log('VOICE COMMAND', 'cancelled');
         this.changed();
-        return { ok: true };
+        return { ok: true, rev: this.rev };
       case 'capture.end': {
-        if (!this.listening) return { ok: false, error: 'not recording' };
+        if (!this.listening) return { ok: false, rev: this.rev, error: 'not recording' };
         this.listening = false;
-        const command = typeof intent.text === 'string' && intent.text.trim()
-          ? intent.text.trim()
-          : 'Walk me through what is still blocking, then keep going.';
-        void this.respond(this.laneIx, command);
-        return { ok: true };
+        if (this.busy) {
+          this.changed(); // corrective snapshot — the client learns listening cleared
+          return { ok: false, rev: this.rev, error: 'response already in flight' };
+        }
+        const command = intent.text?.trim() || 'Walk me through what is still blocking, then keep going.';
+        void this.respond(this.laneIx, command, this.gen);
+        return { ok: true, rev: this.rev };
       }
       case 'speak': {
-        const text = String(intent.text ?? '').trim();
-        if (!text) return { ok: false, error: 'text required' };
-        void this.narrate(text, this.laneIx, true);
-        return { ok: true };
+        void this.narrate(intent.text, this.laneIx, true);
+        return { ok: true, rev: this.rev };
       }
-      default:
-        return { ok: false, error: `unknown intent: ${intent.name}` };
     }
   }
 
   /** CLI mirror: an item spoken elsewhere, shown (and optionally voiced) here. */
   async narrate(text: string, laneIx: number, play: boolean): Promise<void> {
     const lane = Math.min(LANE_COUNT - 1, Math.max(0, laneIx));
-    const msg: DeckMessage = { role: 'agent', text, dur: estimateDuration(text) };
-    this.threads[lane] = [...this.threads[lane], msg];
+    const msg: DeckMessage = { role: 'agent', text, dur: estimateDuration(text), mirrored: !play };
+    this.pushMessage(lane, msg);
     const id = `${lane}:${this.threads[lane].length - 1}`;
     this.log('NARRATION', `lane ${lane + 1} · ${msg.dur.toFixed(0)}s`);
     if (this.autoplay) {
       this.playing = id;
+      this.paused = false;
       this.pos = 0;
       this.setPhase('speaking', 'SPEAKING');
       this.ensureTicker();
@@ -258,44 +311,71 @@ export class DeckRuntime extends EventEmitter {
     if (play) await this.voice(text);
   }
 
-  /** The PTT loop with the real phase machine and real synthesis on the Mac. */
-  private async respond(laneIx: number, command: string): Promise<void> {
-    if (this.speaking) return;
-    this.speaking = true;
+  private pushMessage(lane: number, msg: DeckMessage): void {
+    const t = [...this.threads[lane], msg];
+    this.threads[lane] = t.slice(-MAX_MESSAGES_PER_LANE);
+  }
+
+  /** The PTT loop: real phases, real synthesis, cancellable via this.gen. */
+  private async respond(laneIx: number, command: string, gen: number): Promise<void> {
+    this.busy = true;
     const lane = laneIx;
+    const alive = () => this.gen === gen;
     try {
       this.setPhase('transcribing', 'TRANSCRIBING');
       this.changed();
       await wait(600);
+      if (!alive()) return;
       this.setPhase('submitting', 'SUBMITTING');
       this.changed();
       await wait(500);
+      if (!alive()) return;
 
-      this.threads[lane] = [...this.threads[lane], { role: 'you', text: command, dur: estimateDuration(command) }];
+      this.pushMessage(lane, { role: 'you', text: command, dur: estimateDuration(command) });
       const reply = REPLIES[this.replyIx++ % REPLIES.length];
       const msg: DeckMessage = { role: 'agent', text: reply, dur: estimateDuration(reply) };
-      this.threads[lane] = [...this.threads[lane], msg];
+      this.pushMessage(lane, msg);
       const id = `${lane}:${this.threads[lane].length - 1}`;
 
       this.setPhase('preparingSpeech', 'PREPARING SPEECH');
       this.log('AGENT REPLY', `${msg.dur.toFixed(0)}s queued`);
       this.changed();
 
-      const speech = this.voice(reply);
+      const file = await this.synthesize(reply);
+      if (!alive()) return;
       if (this.autoplay) {
         this.playing = id;
+        this.paused = false;
         this.pos = 0;
         this.setPhase('speaking', 'SPEAKING');
         this.ensureTicker();
         this.changed();
+        if (file) this.playFile(file);
+      } else {
+        this.setPhase('idle', 'READY');
+        this.changed();
       }
-      await speech;
     } finally {
-      this.speaking = false;
+      this.busy = false;
     }
   }
 
-  /** Real audio through the SpeakEasy providers — the Mac actually speaks. */
+  /** Synthesize to a file without playing. System voice via `say -o`; cloud via the SDK's silent mode. */
+  private async synthesize(text: string): Promise<string | null> {
+    const file = path.join(this.synthDir, `reply-${Date.now()}.aiff`);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        execFile('say', ['-o', file, text], { timeout: 30_000 }, (err) => (err ? reject(err) : resolve()));
+      });
+      return file;
+    } catch (error) {
+      this.log('SYNTH FAILED', (error as Error).message.slice(0, 60));
+      this.changed();
+      return null;
+    }
+  }
+
+  /** Cloud-provider narration through the SDK (plays on the Mac's speakers). */
   private async voice(text: string): Promise<void> {
     try {
       const { SpeakEasy } = await import('../index');
@@ -304,6 +384,32 @@ export class DeckRuntime extends EventEmitter {
       this.log('SYNTH FAILED', (error as Error).message.slice(0, 60));
       this.changed();
     }
+  }
+
+  /** Controlled playback of a runtime-owned file: pause/resume/stop are real. */
+  private playFile(file: string): void {
+    this.stopPlayer();
+    const args: string[] = [];
+    if (this.vol !== 1) args.push('-v', this.vol.toFixed(2));
+    if (SPEEDS[this.speedIx] !== 1) args.push('-r', String(SPEEDS[this.speedIx]));
+    this.player = spawn('afplay', [...args, file]);
+    this.player.once('exit', () => {
+      this.player = null;
+    });
+  }
+
+  private stopPlayer(): void {
+    if (this.player) {
+      this.player.kill('SIGKILL');
+      this.player = null;
+    }
+  }
+
+  destroy(): void {
+    this.gen++;
+    this.stopPlayer();
+    if (this.ticker) clearInterval(this.ticker);
+    rmSync(this.synthDir, { recursive: true, force: true });
   }
 }
 

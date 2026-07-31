@@ -18,9 +18,9 @@ function mirrorToDeck(text: string): void {
       const path = await import('path');
       const infoFile = path.join(CONFIG_DIR, 'deck-listener.json');
       if (!fs.existsSync(infoFile)) return;
-      const info = JSON.parse(fs.readFileSync(infoFile, 'utf8')) as { dataPort?: number };
-      if (!info.dataPort) return;
-      await fetch(`http://127.0.0.1:${info.dataPort}/api/speak`, {
+      const info = JSON.parse(fs.readFileSync(infoFile, 'utf8')) as { dataPort?: number; token?: string };
+      if (!info.dataPort || !info.token) return;
+      await fetch(`http://127.0.0.1:${info.dataPort}/api/speak?k=${encodeURIComponent(info.token)}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text, play: false }),

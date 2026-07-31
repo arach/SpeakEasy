@@ -509,13 +509,16 @@ function spark(seed, active) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Live transport — when the Mac runtime offers a WebSocket it becomes
-// authoritative: actions go out as intents, state comes back as snapshots.
-// Without it, everything below runs on the built-in demo state.
+// Live transport — when the Mac runtime is reachable same-origin (Caddy proxies
+// /ws to it), it becomes authoritative: actions go out as intents, state comes
+// back as snapshots. The capability token rides the URL fragment, so it never
+// travels over the wire in a request. Without a socket, demo state runs.
 // ────────────────────────────────────────────────────────────────────────────
 
 let live = null;
+let liveRev = -1;
 let intentId = 0;
+const liveToken = (location.hash.match(/(?:^|#|&)k=([a-f0-9]{8,})/) || [])[1] || '';
 
 function sendIntent(name, args) {
   if (!live || live.readyState !== 1) return false;
@@ -524,6 +527,8 @@ function sendIntent(name, args) {
 }
 
 function applySnapshot(snap) {
+  if (typeof snap.rev === 'number' && snap.rev <= liveRev) return; // stale or duplicate
+  liveRev = typeof snap.rev === 'number' ? snap.rev : liveRev;
   S.lane = snap.lane;
   S.threads = snap.threads.map(t => t.map(m => Object.assign({}, m)));
   S.playing = snap.playing;
@@ -537,23 +542,36 @@ function applySnapshot(snap) {
   paint();
 }
 
+function demoRestore() {
+  // back to a clean local state — never simulate over the last authoritative snapshot
+  S.lane = 1;
+  S.threads = LANES.map(l => l.thread.map(m => Object.assign({}, m)));
+  S.playing = null; S.pos = 0; S.listening = false;
+  S.confirm = 'READY · LANE 02';
+  paint();
+}
+
 function bootLive() {
-  fetch('deck-config.json', { cache: 'no-store' })
-    .then(r => (r.ok ? r.json() : null))
-    .then(cfg => {
-      if (!cfg || !cfg.dataPort) return;
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(proto + '://' + location.hostname + ':' + cfg.dataPort + '/ws');
-      ws.onopen = () => { live = ws; logEvent('LINK OK', 'mac runtime · live state'); };
-      ws.onmessage = e => {
-        let msg;
-        try { msg = JSON.parse(e.data); } catch (_) { return; }
-        if (msg.type === 'snapshot') applySnapshot(msg);
-      };
-      ws.onclose = () => { live = null; setTimeout(bootLive, 3000); };
-      ws.onerror = () => { try { ws.close(); } catch (_) {} };
-    })
-    .catch(() => { /* no runtime offered — demo mode */ });
+  if (!liveToken) return; // no capability in the URL — demo mode
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(proto + '://' + location.host + '/ws?k=' + encodeURIComponent(liveToken));
+  ws.onopen = () => { live = ws; liveRev = -1; logEvent('LINK OK', 'mac runtime · live state'); };
+  ws.onmessage = e => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch (_) { return; }
+    if (msg.type === 'snapshot') applySnapshot(msg);
+    else if (msg.type === 'ack' && msg.ok === false) {
+      S.confirm = (msg.error || 'rejected').toUpperCase().slice(0, 40);
+      paint();
+    }
+  };
+  ws.onclose = () => {
+    const wasLive = live === ws;
+    live = null;
+    if (wasLive) demoRestore();
+    setTimeout(bootLive, 3000);
+  };
+  ws.onerror = () => { try { ws.close(); } catch (_) {} };
 }
 
 // ────────────────────────────────────────────────────────────────────────────

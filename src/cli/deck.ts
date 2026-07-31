@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import chalk from 'chalk';
@@ -147,13 +148,21 @@ function findCaddy(): string | null {
   return res.status === 0 ? res.stdout.trim() : null;
 }
 
-function caddyConfig(root: string, port: number, tlsHost: string | null, caCert: string | null, dataPort: number | null): string {
-  const configRoute = dataPort
+function caddyConfig(root: string, port: number, tlsHost: string | null, caCert: string | null, live: { dataPort: number; token: string } | null): string {
+  // Same-origin proxy to the loopback data plane — LAN clients never see the
+  // data port, and the per-run token gates both the WebSocket and the API.
+  const liveRoutes = live
     ? `
-	@deckcfg path /deck-config.json
-	handle @deckcfg {
-		header Content-Type application/json
-		respond \`{"dataPort":${dataPort}}\` 200
+	route /ws* {
+		@tok query k=${live.token}
+		reverse_proxy @tok 127.0.0.1:${live.dataPort}
+		respond 403
+	}
+
+	route /api/* {
+		@tok query k=${live.token}
+		reverse_proxy @tok 127.0.0.1:${live.dataPort}
+		respond 403
 	}
 `
     : '';
@@ -174,7 +183,7 @@ https://${tlsHost} {
 	tls internal
 	root * ${root}
 	file_server
-
+${liveRoutes}${caRoute}
 	@healthz path /healthz
 	handle @healthz {
 		header Content-Type application/json
@@ -196,7 +205,7 @@ https://${tlsHost} {
 http://:${port} {
 	root * ${root}
 	file_server
-${configRoute}${caRoute}
+${liveRoutes}${caRoute}
 	@healthz path /healthz
 	handle @healthz {
 		header Content-Type application/json
@@ -232,10 +241,10 @@ function caddyRootCert(expected = false): string | undefined {
 }
 
 /** Serve via Caddy when it is installed — the same static server users get from deck/Caddyfile. */
-async function startCaddy(caddy: string, root: string, port: number, tlsHost: string | null, caCert: string | null, dataPort: number | null): Promise<DeckHandle> {
+async function startCaddy(caddy: string, root: string, port: number, tlsHost: string | null, caCert: string | null, live: { dataPort: number; token: string } | null): Promise<DeckHandle> {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'speakeasy-deck-'));
   const config = path.join(dir, 'Caddyfile');
-  await writeFile(config, caddyConfig(root, port, tlsHost, caCert, dataPort));
+  await writeFile(config, caddyConfig(root, port, tlsHost, caCert, live));
 
   const child: ChildProcess = spawn(caddy, ['run', '--config', config], { stdio: ['ignore', 'ignore', 'pipe'] });
   let errBuf = '';
@@ -292,8 +301,9 @@ async function startCaddy(caddy: string, root: string, port: number, tlsHost: st
   };
 }
 
-/** Zero-dependency fallback when Caddy is not installed. */
-async function startNodeServer(root: string, port: number, dataPort: number | null): Promise<DeckHandle> {
+/** Zero-dependency fallback when Caddy is not installed. Demo mode only — the
+ * live data plane needs Caddy's same-origin proxy. */
+async function startNodeServer(root: string, port: number): Promise<DeckHandle> {
   const server = createServer(async (req, res) => {
     let pathname: string;
     try {
@@ -301,11 +311,6 @@ async function startNodeServer(root: string, port: number, dataPort: number | nu
       pathname = decodeURIComponent(url.pathname);
     } catch {
       res.writeHead(400).end('Bad request');
-      return;
-    }
-    if (pathname === '/deck-config.json' && dataPort) {
-      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-      res.end(JSON.stringify({ dataPort }));
       return;
     }
     if (pathname === '/healthz') {
@@ -438,10 +443,11 @@ export async function runDeck(argv: string[]): Promise<void> {
   const tlsHost = args.tls && caddy && (await portAvailable(443)) ? host : null;
   const caCert = tlsHost ? (caddyRootCert(true) ?? null) : null;
 
-  // The data plane (WebSocket intents + speak API) always runs on port+1ish,
-  // regardless of which engine serves the static files.
+  // The data plane runs loopback-only on port+1ish; Caddy proxies /ws and
+  // /api/* to it same-origin behind a per-run token.
+  const token = randomBytes(12).toString('hex');
   let dataPort: number | null = null;
-  for (let candidate = port + 1; candidate <= port + 5; candidate++) {
+  for (let candidate = port + 1; candidate <= Math.min(port + 5, 65535); candidate++) {
     if (await portAvailable(candidate)) {
       dataPort = candidate;
       break;
@@ -450,28 +456,31 @@ export async function runDeck(argv: string[]): Promise<void> {
 
   let handle: DeckHandle;
   try {
-    handle = caddy ? await startCaddy(caddy, root, port, tlsHost, caCert, dataPort) : await startNodeServer(root, port, dataPort);
+    handle = caddy
+      ? await startCaddy(caddy, root, port, tlsHost, caCert, dataPort ? { dataPort, token } : null)
+      : await startNodeServer(root, port);
   } catch (error) {
     if (!caddy) {
       console.error('❌ Could not start the deck server:', (error as Error).message);
       process.exit(1);
     }
-    console.error(`  ⚠️  Caddy failed (${(error as Error).message}) — falling back to the built-in server.`);
+    console.error(`  ⚠️  Caddy failed (${(error as Error).message}) — falling back to the built-in server (demo mode only).`);
     try {
-      handle = await startNodeServer(root, port, dataPort);
+      handle = await startNodeServer(root, port);
     } catch (fallbackError) {
       console.error('❌ Built-in server also failed:', (fallbackError as Error).message);
       process.exit(1);
     }
   }
 
-  // Live runtime — the deck connects to this; without it the deck is demo-only.
+  // Live runtime — the deck reaches it through the Caddy proxy; the CLI mirror
+  // uses the discovery file. Without it the deck is demo-only.
   let dataPlane: DataPlane | null = null;
   if (dataPort) {
     const runtime = new DeckRuntime();
     try {
-      dataPlane = await startDataPlane(runtime, dataPort);
-      writeDiscovery({ pid: process.pid, port, dataPort, host });
+      dataPlane = await startDataPlane(runtime, dataPort, token);
+      writeDiscovery({ pid: process.pid, port, dataPort, host, token });
     } catch {
       dataPlane = null;
     }
@@ -485,13 +494,15 @@ export async function runDeck(argv: string[]): Promise<void> {
   // the CA file may only exist after Caddy's first TLS startup — re-verify before trusting
   const macTrusted = tlsUrl && caCert && existsSync(caCert) ? trustLocalCA(caCert) : false;
   const bonjour = macBonjourName();
-  const padUrl = tlsUrl ?? (stopVanity
+  const padUrlBase = tlsUrl ?? (stopVanity
     ? stopEdge
       ? `http://${host}`
       : hostUrl(host, port)
     : bonjour
       ? hostUrl(bonjour, port)
       : `http://${lan ?? 'your-macs-ip'}:${port}`);
+  // the capability token travels in the URL fragment — it never hits the wire
+  const padUrl = dataPlane && handle.engine === 'caddy' ? `${padUrlBase}#k=${token}` : padUrlBase;
 
   console.log('');
   console.log(chalk.bold('  🎛  SpeakEasy Deck'));
