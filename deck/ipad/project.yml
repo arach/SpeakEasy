@@ -1,0 +1,70 @@
+name: SpeakEasyDeck
+options:
+  bundleIdPrefix: dev.arach
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: 2U83JFPW66
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: Apple Development
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "2"
+
+packages:
+  HudsonKit:
+    path: ../../../hudson
+
+targets:
+  SpeakEasyDeck:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources
+        type: group
+      - path: Assets.xcassets
+        type: group
+        excludes:
+          - Contents.json
+          - AppIcon.appiconset/Contents.json
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: SpeakEasy Deck
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSBonjourServices:
+          - _http._tcp
+        NSLocalNetworkUsageDescription: SpeakEasy Deck finds and drives your Mac over your local network.
+        NSMicrophoneUsageDescription: Hold to Speak transcribes your voice on this iPad so your Mac can answer.
+        UILaunchStoryboardName: LaunchScreen
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+          - UIInterfaceOrientationPortraitUpsideDown
+    dependencies:
+      - package: HudsonKit
+        product: HudsonUIWeb
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.arach.speakeasy.deck
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+
+schemes:
+  SpeakEasyDeck:
+    build:
+      targets:
+        SpeakEasyDeck: all
+    run:
+      config: Debug
+    archive:
+      config: Release
