@@ -144,12 +144,30 @@ function findCaddy(): string | null {
   return res.status === 0 ? res.stdout.trim() : null;
 }
 
-function caddyConfig(root: string, port: number): string {
-  return `{
-	admin off
-	auto_https off
-}
+function caddyConfig(root: string, port: number, tlsHost: string | null): string {
+  const tlsSite = tlsHost
+    ? `
+https://${tlsHost} {
+	tls internal
+	root * ${root}
+	file_server
 
+	@healthz path /healthz
+	handle @healthz {
+		header Content-Type application/json
+		respond \`{"ok":true,"service":"speakeasy-deck","port":${port},"tls":true}\` 200
+	}
+
+	log {
+		output discard
+	}
+}
+`
+    : '';
+  const globalOpts = tlsHost
+    ? '{\n\tadmin off\n}\n'
+    : '{\n\tadmin off\n\tauto_https off\n}\n';
+  return `${globalOpts}
 http://:${port} {
 	root * ${root}
 	file_server
@@ -164,14 +182,23 @@ http://:${port} {
 		output discard
 	}
 }
-`;
+${tlsSite}`;
+}
+
+/** Caddy's local-CA root certificate — the file the iPad needs to trust once. */
+function caddyRootCert(): string | undefined {
+  const candidates = [
+    path.join(os.homedir(), 'Library', 'Application Support', 'Caddy', 'pki', 'authorities', 'local', 'root.crt'),
+    path.join(os.homedir(), '.local', 'share', 'caddy', 'pki', 'authorities', 'local', 'root.crt'),
+  ];
+  return candidates.find((p) => existsSync(p));
 }
 
 /** Serve via Caddy when it is installed — the same static server users get from deck/Caddyfile. */
-async function startCaddy(caddy: string, root: string, port: number): Promise<DeckHandle> {
+async function startCaddy(caddy: string, root: string, port: number, tlsHost: string | null): Promise<DeckHandle> {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'speakeasy-deck-'));
   const config = path.join(dir, 'Caddyfile');
-  await writeFile(config, caddyConfig(root, port));
+  await writeFile(config, caddyConfig(root, port, tlsHost));
 
   const child: ChildProcess = spawn(caddy, ['run', '--config', config], { stdio: ['ignore', 'ignore', 'pipe'] });
   let errBuf = '';
@@ -274,12 +301,13 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
   };
 }
 
-function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr: boolean; caddy: boolean; mdns: boolean } {
+function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr: boolean; caddy: boolean; mdns: boolean; tls: boolean } {
   let port: number | null = null; // null = auto: 80 if free (port-free URL), else 43211
   let host = `speak.${deviceSlug()}.local`;
   let qr = true;
   let caddy = true;
   let mdns = true;
+  let tls = true;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--port') {
@@ -306,13 +334,15 @@ function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr:
       caddy = false;
     } else if (arg === '--no-mdns') {
       mdns = false;
+    } else if (arg === '--no-tls') {
+      tls = false;
     } else {
       console.error(`❌ Unknown argument: ${arg}`);
-      console.error('   Usage: speakeasy deck [--port <n>] [--host <name>] [--no-qr] [--no-caddy] [--no-mdns]');
+      console.error('   Usage: speakeasy deck [--port <n>] [--host <name>] [--no-qr] [--no-caddy] [--no-mdns] [--no-tls]');
       process.exit(1);
     }
   }
-  return { port, host, qr, caddy, mdns };
+  return { port, host, qr, caddy, mdns, tls };
 }
 
 export async function runDeck(argv: string[]): Promise<void> {
@@ -351,11 +381,15 @@ export async function runDeck(argv: string[]): Promise<void> {
     }
   }
   const { qr, host, mdns } = args;
+  const caddy = args.caddy ? findCaddy() : null;
+
+  // HTTPS on :443 with Caddy's local CA when we can — browsers only grant mic
+  // (hold-to-speak) in a secure context. Independent of the HTTP port.
+  const tlsHost = args.tls && caddy && (await portAvailable(443)) ? host : null;
 
   let handle: DeckHandle;
-  const caddy = args.caddy ? findCaddy() : null;
   try {
-    handle = caddy ? await startCaddy(caddy, root, port) : await startNodeServer(root, port);
+    handle = caddy ? await startCaddy(caddy, root, port, tlsHost) : await startNodeServer(root, port);
   } catch (error) {
     if (!caddy) {
       console.error('❌ Could not start the deck server:', (error as Error).message);
@@ -374,14 +408,15 @@ export async function runDeck(argv: string[]): Promise<void> {
   const stopVanity = mdns && lan ? await advertiseVanity(host, port) : null;
   // port-free URL when an edge Caddy on :80 can host-route to us
   const stopEdge = stopVanity && port !== 80 ? await registerEdgeRoute(host, port) : null;
+  const tlsUrl = stopVanity && tlsHost && handle.engine === 'caddy' ? `https://${host}` : null;
   const bonjour = macBonjourName();
-  const padUrl = stopVanity
+  const padUrl = tlsUrl ?? (stopVanity
     ? stopEdge
       ? `http://${host}`
       : hostUrl(host, port)
     : bonjour
       ? hostUrl(bonjour, port)
-      : `http://${lan ?? 'your-macs-ip'}:${port}`;
+      : `http://${lan ?? 'your-macs-ip'}:${port}`);
 
   console.log('');
   console.log(chalk.bold('  🎛  SpeakEasy Deck'));
@@ -398,6 +433,17 @@ export async function runDeck(argv: string[]): Promise<void> {
   console.log(`  ${chalk.cyan('3.')} Themes: ${chalk.dim('?theme=paper|ember|flight')} · Variants: ${chalk.dim('?variant=oxide')}`);
   console.log('');
   console.log(`  ${chalk.dim(`Served by ${handle.engine} · Is it running? curl ${hostUrl('localhost', port)}/healthz`)}`);
+  if (tlsUrl) {
+    const rootCert = caddyRootCert();
+    console.log(`  ${chalk.dim('HTTPS is on (local CA, mic-ready). One-time iPad trust:')}`);
+    if (rootCert) {
+      console.log(`  ${chalk.dim(`  1. AirDrop this to the iPad: ${rootCert}`)}`);
+      console.log(`  ${chalk.dim('  2. Open it and install the profile')}`);
+      console.log(`  ${chalk.dim('  3. Settings → General → About → Certificate Trust Settings → enable "Caddy Local CA"')}`);
+    } else {
+      console.log(`  ${chalk.dim('  install Caddy\'s local root CA on the iPad (see caddyserver.com/docs/pki)')}`);
+    }
+  }
   console.log(`  ${chalk.dim('The deck runs its built-in demo state. Press Ctrl+C to stop.')}`);
   console.log('');
 
