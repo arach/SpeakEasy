@@ -74,6 +74,8 @@ const intentSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('capture.end'), text: z.string().max(500).optional() }),
   z.object({ name: z.literal('speak'), text: z.string().min(1).max(4000) }),
   z.object({ name: z.literal('lane.cycle'), index: z.number().int().min(0).max(8) }),
+  z.object({ name: z.literal('playback.progress'), id: z.string().regex(/^\d:\d{1,3}$/), pos: z.number().min(0), dur: z.number().positive().optional() }),
+  z.object({ name: z.literal('playback.ended'), id: z.string().regex(/^\d:\d{1,3}$/) }),
 ]);
 
 export type DeckIntent = z.infer<typeof intentSchema>;
@@ -269,6 +271,11 @@ export class DeckRuntime extends EventEmitter {
     // never attribute an in-flight response to a newly assigned agent
     this.gen++;
     this.cancelAgentWork();
+    // and never let the old agent's audio keep playing under a new name
+    if (this.playing?.startsWith(`${index}:`)) {
+      this.stopPlayer();
+      this.clearPlayback();
+    }
     const lane = this.lanes[index];
     const currentIx = lane.agentId ? this.roster.findIndex((a) => a.agentId === lane.agentId) : -1;
     const next = this.roster[(currentIx + 1) % this.roster.length];
@@ -307,6 +314,11 @@ export class DeckRuntime extends EventEmitter {
     if (this.ticker) return;
     this.ticker = setInterval(() => {
       if (!this.playing || this.paused) return;
+      if (!this.player && this.liveClients() > 0 && !this.messageAt(this.playing)?.mirrored) {
+        // a connected deck owns playback of runtime files — progress arrives
+        // as playback.progress intents; nothing to estimate here
+        return;
+      }
       // file-backed progress tracks the launch rate; completion for those is
       // owned exclusively by the afplay exit handler. Only mirrors use the
       // estimated-duration completion.
@@ -464,6 +476,29 @@ export class DeckRuntime extends EventEmitter {
       }
       case 'lane.cycle': {
         this.cycleLane(intent.index);
+        return { ok: true, rev: this.rev };
+      }
+      case 'playback.progress': {
+        // the device owns playback of runtime files — adopt its clock
+        if (this.playing !== intent.id) return { ok: false, rev: this.rev, error: 'not playing' };
+        this.pos = intent.pos;
+        if (intent.dur) {
+          const msg = this.messageAt(intent.id);
+          if (msg) msg.dur = intent.dur;
+        }
+        this.changed();
+        return { ok: true, rev: this.rev };
+      }
+      case 'playback.ended': {
+        if (this.playing !== intent.id) return { ok: false, rev: this.rev, error: 'not playing' };
+        const [li] = intent.id.split(':').map(Number);
+        this.playing = null;
+        this.pos = 0;
+        this.paused = false;
+        this.setPhase('idle', 'READY');
+        this.setLaneState(li, 'idle');
+        this.log('PLAYBACK ENDED', 'buffer complete');
+        this.changed();
         return { ok: true, rev: this.rev };
       }
     }

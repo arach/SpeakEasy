@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage } from 'node:http';
-import { mkdirSync, writeFileSync, renameSync, rmSync, existsSync, chmodSync, readFileSync, statSync, createReadStream } from 'node:fs';
+import { mkdirSync, writeFileSync, renameSync, rmSync, existsSync, chmodSync, readFileSync, statSync, createReadStream, openSync, readSync, closeSync } from 'node:fs';
 import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { CONFIG_DIR } from './constants';
@@ -96,8 +96,17 @@ export async function startDataPlane(runtime: DeckRuntime, dataPort: number, tok
         res.writeHead(404).end();
         return;
       }
-      const ext = path.extname(file).toLowerCase();
-      const type = ext === '.mp3' ? 'audio/mpeg' : ext === '.wav' ? 'audio/wav' : 'audio/aiff';
+      // sniff the magic bytes — the cache stores some providers' WAV under .mp3
+      const head = Buffer.alloc(12);
+      const fd = openSync(file, 'r');
+      readSync(fd, head, 0, 12, 0);
+      closeSync(fd);
+      const type =
+        head.toString('ascii', 0, 4) === 'RIFF'
+          ? 'audio/wav'
+          : head.toString('ascii', 0, 3) === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0)
+            ? 'audio/mpeg'
+            : 'application/octet-stream';
       res.writeHead(200, { 'content-type': type, 'content-length': statSync(file).size, 'cache-control': 'no-store' });
       createReadStream(file).pipe(res);
       return;

@@ -561,45 +561,65 @@ function applySnapshot(snap) {
 }
 
 // The deck plays narration on the device, not the Mac — an HTMLAudio element
-// synced to the runtime's playback state.
+// synced to runtime state, and the device reports its real clock back.
 let audioEl = null;
+let lastProgressAt = 0;
+
+function ensureAudioEl() {
+  if (!audioEl) {
+    audioEl = new Audio();
+    audioEl.addEventListener('ended', () => {
+      if (audioEl.dataset.id) sendIntent('playback.ended', { id: audioEl.dataset.id });
+    });
+  }
+  return audioEl;
+}
 
 function syncAudio(snap) {
-  if (!audioEl) audioEl = new Audio();
+  const el = ensureAudioEl();
   if (!snap.playing) {
-    audioEl.pause();
-    delete audioEl.dataset.url;
+    el.pause();
+    delete el.dataset.url;
+    delete el.dataset.id;
     return;
   }
   const parts = snap.playing.split(':').map(Number);
   const msg = snap.threads[parts[0]] && snap.threads[parts[0]][parts[1]];
   if (!msg || !msg.audioUrl) return;
-  if (audioEl.dataset.url !== msg.audioUrl) {
-    audioEl.dataset.url = msg.audioUrl;
-    audioEl.src = msg.audioUrl;
-    audioEl.currentTime = snap.pos || 0;
+  const src = msg.audioUrl + (liveToken ? '?k=' + encodeURIComponent(liveToken) : '');
+  if (el.dataset.url !== src) {
+    el.dataset.url = src;
+    el.dataset.id = snap.playing;
+    el.src = src;
+    el.currentTime = snap.pos || 0;
   }
-  audioEl.playbackRate = SPEEDS[snap.speedIx] || 1;
-  audioEl.volume = typeof snap.vol === 'number' ? snap.vol : 0.8;
+  el.playbackRate = SPEEDS[snap.speedIx] || 1;
+  el.volume = typeof snap.vol === 'number' ? snap.vol : 0.8;
   if (snap.paused) {
-    audioEl.pause();
-  } else if (audioEl.paused) {
-    audioEl.play().catch(() => {});
+    el.pause();
+  } else if (el.paused) {
+    el.play().catch(() => {});
   }
-  // keep the element honest against runtime corrections
-  if (Math.abs((audioEl.currentTime || 0) - (snap.pos || 0)) > 1.0) {
-    audioEl.currentTime = snap.pos || 0;
+  // runtime corrections still win, but only on real drift — the device owns the clock
+  if (Math.abs((el.currentTime || 0) - (snap.pos || 0)) > 2.0) {
+    el.currentTime = snap.pos || 0;
+  }
+  // report the device's real progress back to the runtime
+  if (!el.paused && el.dataset.id && Date.now() - lastProgressAt > 500) {
+    lastProgressAt = Date.now();
+    sendIntent('playback.progress', {
+      id: el.dataset.id,
+      pos: el.currentTime,
+      dur: isFinite(el.duration) ? el.duration : undefined
+    });
   }
 }
 
-// Browsers gate audio on a user gesture — unlock the channel on first touch.
+// Browsers gate audio on a user gesture — unlock the channel with a throwaway
+// element on first touch so it can never clobber an active track.
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 document.addEventListener('pointerdown', () => {
-  if (!audioEl) audioEl = new Audio();
-  if (audioEl.dataset.unlocked) return;
-  audioEl.dataset.unlocked = '1';
-  audioEl.src = SILENT_WAV;
-  audioEl.play().then(() => audioEl.pause()).catch(() => {});
+  new Audio(SILENT_WAV).play().catch(() => {});
 }, { once: true });
 
 function demoRestore() {
