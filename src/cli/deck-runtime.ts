@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, copyFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, rmSync, existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir, homedir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 
@@ -31,10 +31,20 @@ export interface DeckTraceEntry {
   detail: string;
 }
 
+export interface DeckLaneInfo {
+  num: string;
+  agentId: string | null;
+  name: string;
+  title: string;
+  state: 'speaking' | 'working' | 'idle' | 'empty';
+  sessionId?: string;
+}
+
 export interface DeckSnapshot {
   type: 'snapshot';
   rev: number;
   lane: number;
+  lanes: DeckLaneInfo[];
   threads: DeckMessage[][];
   playing: string | null;
   paused: boolean;
@@ -61,6 +71,7 @@ const intentSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('capture.cancel'), reason: z.string().max(60).optional() }),
   z.object({ name: z.literal('capture.end'), text: z.string().max(500).optional() }),
   z.object({ name: z.literal('speak'), text: z.string().min(1).max(4000) }),
+  z.object({ name: z.literal('lane.cycle'), index: z.number().int().min(0).max(8) }),
 ]);
 
 export type DeckIntent = z.infer<typeof intentSchema>;
@@ -69,6 +80,21 @@ const SPEEDS = [1, 1.25, 1.5, 0.75]; // must match the deck client's SPEEDS exac
 const LANE_COUNT = 9;
 const TICK_MS = 250;
 const MAX_MESSAGES_PER_LANE = 50;
+const LANES_FILE = path.join(homedir(), '.config', 'speakeasy', 'deck-lanes.json');
+
+interface ScoutAgent {
+  agentId: string;
+  state: string;
+  lastSeen: number;
+}
+
+/** Derive a pad label and title from a scout agent id. */
+function laneName(agentId: string): { name: string; title: string } {
+  const clean = agentId.replace(/\.[a-z0-9-]+-local$/, '');
+  const [project, ...rest] = clean.split('.');
+  const title = rest.length ? rest.join(' · ').replace(/-/g, ' ') : 'agent';
+  return { name: (project || clean).toUpperCase().slice(0, 10), title };
+}
 
 function clock(): string {
   const d = new Date();
@@ -101,6 +127,14 @@ export function parseIntent(raw: unknown): { intent?: DeckIntent; error?: string
 export class DeckRuntime extends EventEmitter {
   private rev = 0;
   private laneIx = 1;
+  private lanes: DeckLaneInfo[] = Array.from({ length: LANE_COUNT }, (_, i) => ({
+    num: String(i + 1).padStart(2, '0'),
+    agentId: null,
+    name: i === LANE_COUNT - 1 ? 'EMPTY' : `LANE ${i + 1}`,
+    title: 'unassigned',
+    state: i === LANE_COUNT - 1 ? 'empty' : 'idle',
+  }));
+  private roster: ScoutAgent[] = [];
   private threads: DeckMessage[][] = Array.from({ length: LANE_COUNT }, () => []);
   private playing: string | null = null;
   private paused = false;
@@ -121,11 +155,17 @@ export class DeckRuntime extends EventEmitter {
   private agentChild: ChildProcess | null = null;
   private synthDir = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-synth-'));
 
+  constructor() {
+    super();
+    void this.discoverAgents();
+  }
+
   snapshot(): DeckSnapshot {
     return {
       type: 'snapshot',
       rev: this.rev,
       lane: this.laneIx,
+      lanes: this.lanes,
       threads: this.threads,
       playing: this.playing,
       paused: this.paused,
@@ -147,6 +187,85 @@ export class DeckRuntime extends EventEmitter {
 
   private log(kind: string, detail: string): void {
     this.trace = [{ at: clock(), kind, detail }, ...this.trace].slice(0, 7);
+  }
+
+  // ── lanes ────────────────────────────────────────────────────────────────
+
+  /** Discover live agents from the scout roster and (re)build pad assignments. */
+  private async discoverAgents(): Promise<void> {
+    try {
+      const out = await run('scout', ['who', '--json'], 10_000);
+      const agents = JSON.parse(out) as ScoutAgent[];
+      this.roster = agents
+        .filter((a) => a.state === 'active' && !a.agentId.startsWith('session-') && a.agentId !== 'operator')
+        .sort((a, b) => b.lastSeen - a.lastSeen);
+      this.applyAssignments();
+      this.log('LANES', `${this.roster.length} agents on the roster`);
+      this.changed();
+    } catch {
+      // keep placeholder lanes — deck still works with the default channel
+    }
+  }
+
+  private savedAssignments(): Record<string, string> {
+    try {
+      return JSON.parse(readFileSync(LANES_FILE, 'utf8')) as Record<string, string>;
+    } catch {
+      return {};
+    }
+  }
+
+  private persistAssignments(): void {
+    try {
+      const out: Record<string, string> = {};
+      this.lanes.forEach((l, i) => {
+        if (l.agentId) out[String(i)] = l.agentId;
+      });
+      writeFileSync(LANES_FILE, JSON.stringify(out), { mode: 0o600 });
+    } catch {
+      // best-effort
+    }
+  }
+
+  private applyAssignments(): void {
+    const saved = this.savedAssignments();
+    const known = new Set(this.roster.map((a) => a.agentId));
+    this.lanes = this.lanes.map((lane, i) => {
+      const agentId = saved[String(i)] && known.has(saved[String(i)]) ? saved[String(i)] : this.roster[i]?.agentId ?? null;
+      const meta = agentId ? laneName(agentId) : { name: 'EMPTY', title: 'unassigned' };
+      return {
+        ...lane,
+        agentId,
+        name: meta.name,
+        title: meta.title,
+        state: agentId ? (lane.state === 'empty' ? 'idle' : lane.state) : 'empty',
+      };
+    });
+    if (Object.keys(saved).length === 0 && this.roster.length) this.persistAssignments();
+  }
+
+  /** Channel mapper: advance a pad to the next agent on the roster. */
+  private cycleLane(index: number): void {
+    if (!this.roster.length) return;
+    const lane = this.lanes[index];
+    const currentIx = lane.agentId ? this.roster.findIndex((a) => a.agentId === lane.agentId) : -1;
+    const next = this.roster[(currentIx + 1) % this.roster.length];
+    const meta = laneName(next.agentId);
+    this.lanes[index] = { ...lane, agentId: next.agentId, name: meta.name, title: meta.title, state: 'idle', sessionId: undefined };
+    this.persistAssignments();
+    this.log('LANE ASSIGNED', `lane ${index + 1} → ${meta.name.toLowerCase()}`);
+    this.changed();
+  }
+
+  private laneLabel(ix: number): string {
+    return this.lanes[ix]?.name.toLowerCase() ?? `lane ${ix + 1}`;
+  }
+
+  private setLaneState(ix: number, state: DeckLaneInfo['state']): void {
+    const lane = this.lanes[ix];
+    if (!lane || lane.state === 'empty') return;
+    if (lane.state === state) return;
+    lane.state = state;
   }
 
   private ensureTicker(): void {
@@ -278,13 +397,16 @@ export class DeckRuntime extends EventEmitter {
         return { ok: false, rev: this.rev, error: 'no replayable reply' };
       }
       case 'capture.start':
+        if (!this.lanes[this.laneIx]?.agentId) {
+          return { ok: false, rev: this.rev, error: 'lane unassigned — pick an agent first' };
+        }
         this.gen++;
         this.cancelAgentWork();
         this.stopPlayer();
         this.listening = true;
         this.playing = null;
         this.setPhase('recording', 'LISTENING');
-        this.log('VOICE COMMAND', `lane ${this.laneIx + 1} · recording`);
+        this.log('VOICE COMMAND', `${this.laneLabel(this.laneIx)} · recording`);
         this.changed();
         return { ok: true, rev: this.rev };
       case 'capture.cancel':
@@ -307,6 +429,10 @@ export class DeckRuntime extends EventEmitter {
       }
       case 'speak': {
         void this.narrate(intent.text, this.laneIx, true);
+        return { ok: true, rev: this.rev };
+      }
+      case 'lane.cycle': {
+        this.cycleLane(intent.index);
         return { ok: true, rev: this.rev };
       }
     }
@@ -344,6 +470,7 @@ export class DeckRuntime extends EventEmitter {
     this.busy = true;
     const lane = laneIx;
     const alive = () => this.gen === gen;
+    this.setLaneState(lane, 'working');
     try {
       this.setPhase('transcribing', 'TRANSCRIBING');
       this.changed();
@@ -352,10 +479,10 @@ export class DeckRuntime extends EventEmitter {
 
       this.pushMessage(lane, { role: 'you', text: command, dur: estimateDuration(command) });
       this.setPhase('submitting', 'SUBMITTING');
-      this.log('AGENT ASKED', command.slice(0, 48));
+      this.log('AGENT ASKED', `${this.laneLabel(lane)} · ${command.slice(0, 40)}`);
       this.changed();
 
-      const reply = await this.askAgent(command);
+      const reply = await this.askAgent(command, lane);
       if (!alive()) return;
 
       const msg: DeckMessage = { role: 'agent', text: reply, dur: estimateDuration(reply) };
@@ -389,6 +516,7 @@ export class DeckRuntime extends EventEmitter {
         this.paused = false;
         this.pos = 0;
         this.setPhase('speaking', 'SPEAKING');
+        this.setLaneState(lane, 'speaking');
         this.ensureTicker();
         this.changed();
         this.playFile(file);
@@ -398,23 +526,32 @@ export class DeckRuntime extends EventEmitter {
       }
     } finally {
       this.busy = false;
+      if (this.lanes[lane]?.state !== 'speaking') this.setLaneState(lane, 'idle');
     }
   }
 
-  /** Ask a real agent (Codex via Scout) and get a spoken-length answer back. */
-  private async askAgent(question: string): Promise<string> {
+  /** Ask a real agent (Codex via Scout) and get a spoken-length answer back.
+   * When the lane is assigned, the question goes to that agent; a captured
+   * session id keeps follow-ups in the same conversation. */
+  private async askAgent(question: string, laneIx: number): Promise<string> {
     const prompt =
       'You are a voice responder for a spoken interface. Do not use tools, do not read or write files, do not access the network. ' +
       'Answer from general knowledge only, in one or two spoken-style sentences, plain words, no lists, no code. Question: ' +
       question.slice(0, 500);
+    const lane = this.lanes[laneIx];
+    const target = lane?.sessionId ? `session:${lane.sessionId}` : lane?.agentId;
+    const args = target
+      ? ['ask', '--json', '--to', target, prompt]
+      : ['ask', '--json', '--project', process.cwd(), '--harness', 'codex', prompt];
     try {
-      const askOut = await this.scoutRun(
-        ['ask', '--json', '--project', process.cwd(), '--harness', 'codex', prompt],
-        45_000,
-      );
-      const ask = parseJsonBlock(askOut) as { receipt?: { ids?: { invocationId?: string } } } | null;
+      const askOut = await this.scoutRun(args, 45_000);
+      const ask = parseJsonBlock(askOut) as { receipt?: { ids?: { invocationId?: string; targetAgentId?: string } } } | null;
       const inv = ask?.receipt?.ids?.invocationId;
       if (!inv) throw new Error('no invocation id from scout');
+      // pin follow-ups in this lane to the same agent session
+      if (lane && ask?.receipt?.ids?.targetAgentId && lane.sessionId !== ask.receipt.ids.targetAgentId) {
+        lane.sessionId = ask.receipt.ids.targetAgentId;
+      }
 
       const waitOut = await this.scoutRun(['wait', inv, '--timeout', '180', '--json'], 200_000);
       const receipt = parseJsonBlock(waitOut) as {
@@ -498,10 +635,12 @@ export class DeckRuntime extends EventEmitter {
       this.player = null;
       // natural completion is authoritative — the audio really is done
       if (this.playing && !this.paused) {
+        const [li] = this.playing.split(':').map(Number);
         this.playing = null;
         this.pos = 0;
         this.paused = false;
         this.setPhase('idle', 'READY');
+        this.setLaneState(li, 'idle');
         this.log('PLAYBACK ENDED', 'buffer complete');
         this.changed();
       }

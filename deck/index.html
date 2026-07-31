@@ -429,6 +429,8 @@ applyOverrides(overridesFromQuery(Q));
 
 const S = {
   lane: 1,
+  lanes: null,
+  assign: false,
   threads: LANES.map(l => l.thread.map(m => Object.assign({}, m))),
   playing: null,
   paused: false,
@@ -447,7 +449,19 @@ const S = {
   ]
 };
 
-const lane = () => LANES[S.lane];
+const lane = () => laneMeta(S.lane);
+// live lanes come from the runtime (real agents); demo lanes are the constant
+function laneMeta(i) {
+  const l = live && S.lanes && S.lanes[i];
+  if (l) {
+    return {
+      num: l.num, name: l.name, title: l.title, state: l.state,
+      task: l.title, rev: l.agentId ? l.agentId.split('.')[0].toUpperCase() : 'UNASSIGNED',
+      voice: l.name + ' Voice', thread: LANES[i] ? LANES[i].thread : []
+    };
+  }
+  return LANES[i];
+}
 const thread = () => S.threads[S.lane];
 
 function dur(id) {
@@ -531,6 +545,7 @@ function applySnapshot(snap) {
   if (typeof snap.rev === 'number' && snap.rev <= liveRev) return; // stale or duplicate
   liveRev = typeof snap.rev === 'number' ? snap.rev : liveRev;
   S.lane = snap.lane;
+  if (snap.lanes) S.lanes = snap.lanes;
   S.threads = snap.threads.map(t => t.map(m => Object.assign({}, m)));
   S.playing = snap.playing;
   S.paused = !!snap.paused;
@@ -810,9 +825,10 @@ function view() {
     empty:    { led: T('led-empty'), glow: 'none', ink: T('ink-empty'), label: 'UNASSIGNED' }
   };
 
-  const pads = LANES.map((ln, i) => {
+  const pads = LANES.map((unused, i) => {
+    const ln = laneMeta(i);
     const sel = i === S.lane;
-    const live = ln.state === 'speaking' || ln.state === 'working';
+    const liveLane = ln.state === 'speaking' || ln.state === 'working';
     const ink = stateInk[ln.state];
     const isEmpty = ln.state === 'empty';
     const last = (S.threads[i] || []).filter(m => m.role === 'agent').slice(-1)[0];
@@ -832,9 +848,9 @@ function view() {
       shadow: sel ? '0 0 0 3px ' + T('pad-ring') + ', ' + T('card-shadow') : T('card-shadow'),
       led: ink.led,
       ledGlow: ink.glow,
-      ledAnim: ln.state === 'speaking' || ln.state === 'working' ? 'se-breathe 1.6s ease-in-out infinite' : 'none',
-      spark: spark(ln.name, live || (sel && !!S.playing)),
-      sparkColor: sel ? T('pad-accent') : live ? ink.led : T('pad-spark-idle')
+      ledAnim: liveLane ? 'se-breathe 1.6s ease-in-out infinite' : 'none',
+      spark: spark(ln.name, liveLane || (sel && !!S.playing)),
+      sparkColor: sel ? T('pad-accent') : liveLane ? ink.led : T('pad-spark-idle')
     };
   });
 
@@ -1319,7 +1335,14 @@ window.addEventListener('pagehide', () => { if (timer !== null) { clearInterval(
 // ────────────────────────────────────────────────────────────────────────────
 
 const ACTIONS = {
-  lane: a => selectLane(Number(a)),
+  // in assign mode, a pad tap cycles that pad's agent instead of selecting it
+  lane: a => {
+    if (S.assign) {
+      if (sendIntent('lane.cycle', { index: Number(a) })) return;
+      S.assign = false;
+    }
+    selectLane(Number(a));
+  },
   play: a => togglePlay(a),
   expand: a => toggleExpand(a),
   speed: () => cycleSpeed(),
@@ -1327,7 +1350,15 @@ const ACTIONS = {
   stop: () => stopAll(),
   replay: () => replayLast(),
   announce: () => announce(),
-  ping: () => pingMac(),
+  // LINK is the channel mapper in live mode; a simulated ping in demo
+  ping: () => {
+    if (live) {
+      S.assign = !S.assign;
+      S.confirm = S.assign ? 'ASSIGN · TAP A PAD TO CYCLE' : 'READY';
+    } else {
+      pingMac();
+    }
+  },
   openmac: () => openMac()
 };
 
