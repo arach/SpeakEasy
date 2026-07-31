@@ -985,9 +985,6 @@ function view() {
     };
   });
 
-  const chip = stateInk[S.playing ? 'speaking' : l.state];
-  const hot = S.playing || l.state === 'speaking';
-
   return {
     pads: pads, messages: messages, traceOn: PROPS.showTrace,
     trace: S.trace.slice(0, 4).map(x => ({
@@ -998,16 +995,8 @@ function view() {
       ? S.lanes.filter(x => x.sessionAlias).length + ' / ' + S.lanes.length + ' BOUND'
       : LANES.filter(x => x.state !== 'empty').length + ' / ' + LANES.length + ' BOUND',
     laneNum: l.num,
-    laneNumColor: l.state === 'empty' ? T('ink-4') : T('accent'),
     laneTitle: l.title,
-    laneTask: l.task,
     laneRev: l.rev,
-    laneStatus: S.playing ? 'SPEAKING' : chip.label,
-    laneChipBg: hot ? T('chip-bg') : T('cell'),
-    laneChipEdge: hot ? T('accent-edge') : T('line'),
-    laneChipDot: hot ? T('accent') : chip.led,
-    laneChipInk: hot ? T('chip-ink') : T('ink-2'),
-    voiceName: l.voice,
     volPct: Math.round(S.vol * 100) + '%',
     volLabel: Math.round(S.vol * 100) + '%',
     speedLabel: speed.toFixed(2) + '×',
@@ -1020,8 +1009,7 @@ function view() {
     micSub: S.listening ? 'Release to send' : 'Hold · lane ' + l.num,
     micBg: 'linear-gradient(180deg,' + (S.listening ? T('mic-edge') : T('mic-a')) + ',' + (S.listening ? T('mic-a') : T('mic-b')) + ')',
     micEdge: S.listening ? T('mic-edge') : T('mic-a'),
-    confirmLine: S.confirm,
-    footNote: 'Replay plays on this device'
+    confirmLine: S.confirm
   };
 }
 
@@ -1065,7 +1053,6 @@ function tpl(v) {
         '</div>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;">' +
-        '<div style="display:flex;align-items:center;padding:8px 2px;font:500 9.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-3);">INSTALL</div>' +
         '<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border:1px solid var(--se-accent-edge);border-radius:6px;background:var(--se-chip-bg);">' +
           '<span style="width:6px;height:6px;border-radius:50%;background:var(--se-accent);box-shadow:0 0 0 3px var(--se-accent-ring);animation:se-breathe 2.6s ease-in-out infinite;"></span>' +
           '<div><div style="font:600 9.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-accent-ink);">' + (live ? 'LIVE · MAC LINKED' : 'LOCAL DEMO') + '</div></div>' +
@@ -1170,26 +1157,14 @@ function tpl(v) {
               '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.2em;color:var(--se-ink-3);">ACTIVE LANE</div>' +
               '<div style="font-weight:600;font-size:19px;font-family:var(--se-title);line-height:1.1;letter-spacing:-0.015em;color:var(--se-ink);margin-top:3px;">' + esc(v.laneTitle) + '</div>' +
             '</div>' +
-            '<span style="display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:999px;border:1px solid ' + v.laneChipEdge + ';background:' + v.laneChipBg + ';align-self:center;">' +
-              '<span style="width:5px;height:5px;border-radius:50%;background:' + v.laneChipDot + ';"></span>' +
-              '<span style="font:600 8.5px var(--se-mono);letter-spacing:0.16em;color:' + v.laneChipInk + ';">' + esc(v.laneStatus) + '</span>' +
-            '</span>' +
           '</div>' +
           '<div style="text-align:right;flex:0 1 auto;min-width:0;">' +
-            '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-accent-ink);">' + esc(v.voiceName) + '</div>' +
-            '<div style="font:400 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);margin-top:4px;">' + (live ? 'MAC LINKED' : 'NO MAC LINK') + '</div>' +
+            '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-accent-ink);align-self:center;padding-top:6px;display:inline-block;">' + esc(v.laneRev) + '</div>' +
           '</div>' +
         '</div>' +
 
-        // task lock + audio settings
+        // audio settings
         '<div style="flex:none;padding:12px 20px;display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;border-bottom:1px solid var(--se-line-soft);">' +
-          '<div style="flex:1 1 260px;min-width:0;border:1px solid var(--se-line);border-radius:8px;background:var(--se-cell);padding:10px 14px;">' +
-            '<div style="display:flex;justify-content:space-between;">' +
-              '<span style="font:500 8px var(--se-mono);letter-spacing:0.2em;color:var(--se-ink-3);">TASK LOCK</span>' +
-              '<span style="font:500 8px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-3);">' + esc(v.laneRev) + '</span>' +
-            '</div>' +
-            '<div style="font:500 12.5px var(--se-sans);color:var(--se-ink);margin-top:4px;">' + esc(v.laneTask) + '</div>' +
-          '</div>' +
           '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:1px;border:1px solid var(--se-line);border-radius:8px;overflow:hidden;background:var(--se-line);flex:1 1 320px;">' +
             '<div style="background:var(--se-cell);padding:10px 12px;">' +
               '<div style="font:500 7.5px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);">VOLUME</div>' +
@@ -1297,7 +1272,6 @@ function tpl(v) {
         // confirmation footer
         '<div style="flex:none;border-top:1px solid var(--se-line-soft);background:var(--se-panel-head);padding:11px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 20px;">' +
           '<div><div style="font:600 11px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink);">' + esc(v.confirmLine) + '</div></div>' +
-          '<div style="font:400 9.5px var(--se-mono);letter-spacing:0.06em;color:var(--se-ink-3);text-align:right;">' + esc(v.footNote) + '</div>' +
         '</div>' +
       '</div>' +
     '</div>' +
