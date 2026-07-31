@@ -34,6 +34,7 @@
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.72",
     "@google/generative-ai": "^0.24.1",
+    "@openscout/agent-sessions": "file:../openscout/packages/agent-sessions",
     "@types/uuid": "^10.0.0",
     "better-sqlite3": "^12.2.0",
     "bonjour-service": "^1.4.4",

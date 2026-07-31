@@ -454,11 +454,11 @@ const lane = () => laneMeta(S.lane);
 function laneMeta(i) {
   const l = live && S.lanes && S.lanes[i];
   if (l) {
-    const thread = l.sessionAlias || (l.conversationId ? l.conversationId.replace('chn-', '').slice(0, 8) : null);
+    const thread = l.sessionAlias || null;
     return {
       num: l.num, name: l.name, title: l.title, state: l.state,
       task: l.title,
-      rev: thread ? 'THREAD ' + thread.toUpperCase() : l.agentId ? 'NEW THREAD' : 'UNASSIGNED',
+      rev: thread ? 'THREAD ' + thread.toUpperCase() : 'NEW SESSION',
       voice: l.name + ' Voice', thread: LANES[i] ? LANES[i].thread : []
     };
   }
@@ -995,7 +995,7 @@ function view() {
       kindColor: /VOICE|AGENT|PLAYBACK|LANE/.test(x.kind) ? T('accent-ink') : T('ink-2')
     })),
     boundLabel: live && S.lanes
-      ? S.lanes.filter(x => x.agentId).length + ' / ' + S.lanes.length + ' BOUND'
+      ? S.lanes.filter(x => x.sessionAlias).length + ' / ' + S.lanes.length + ' BOUND'
       : LANES.filter(x => x.state !== 'empty').length + ' / ' + LANES.length + ' BOUND',
     laneNum: l.num,
     laneNumColor: l.state === 'empty' ? T('ink-4') : T('accent'),
@@ -1420,7 +1420,7 @@ window.addEventListener('pagehide', () => { if (timer !== null) { clearInterval(
 // ────────────────────────────────────────────────────────────────────────────
 
 const ACTIONS = {
-  // in assign mode, a pad tap cycles that pad's agent instead of selecting it
+  // in reset mode, a pad tap wipes that pad's conversation instead of selecting it
   lane: a => {
     if (S.assign) {
       if (sendIntent('lane.cycle', { index: Number(a) })) return;
@@ -1435,11 +1435,11 @@ const ACTIONS = {
   stop: () => stopAll(),
   replay: () => replayLast(),
   announce: () => announce(),
-  // LINK is the channel mapper in live mode; a simulated ping in demo
+  // LINK arms pad reset in live mode; a simulated ping in demo
   ping: () => {
     if (live) {
       S.assign = !S.assign;
-      S.confirm = S.assign ? 'ASSIGN · TAP A PAD TO CYCLE' : 'READY';
+      S.confirm = S.assign ? 'RESET · TAP A PAD FOR A FRESH SESSION' : 'READY';
     } else {
       pingMac();
     }

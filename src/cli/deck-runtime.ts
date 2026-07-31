@@ -35,12 +35,10 @@ export interface DeckTraceEntry {
 
 export interface DeckLaneInfo {
   num: string;
-  agentId: string | null;
   name: string;
   title: string;
   state: 'speaking' | 'working' | 'idle' | 'empty';
-  sessionId?: string;
-  conversationId?: string;
+  /** short codex thread id, shown once the lane's session has answered */
   sessionAlias?: string;
 }
 
@@ -88,27 +86,36 @@ const TICK_MS = 250;
 const MAX_MESSAGES_PER_LANE = 50;
 const LANES_FILE = path.join(homedir(), '.config', 'speakeasy', 'deck-lanes.json');
 
-interface ScoutAgent {
-  agentId: string;
-  state: string;
-  lastSeen: number;
-}
-
-/** Strip the node qualifier from a roster id — session: routing wants the bare id. */
-function bareSessionId(agentId: string): string {
-  return agentId.replace(/(\.[a-z0-9-]+)?\.[a-z0-9-]+-local$/, '');
-}
-
-/** Derive a pad label and title from a scout agent id. */
-function laneName(agentId: string): { name: string; title: string } {
-  if (agentId.startsWith('session-')) {
-    // a live harness session — no friendly alias is known until the first ask lands
-    return { name: agentId.split('-')[1].toUpperCase().slice(0, 10), title: 'codex session' };
+/** Per-lane session reuse keys, persisted so a cycled (reset) lane keeps its
+ * fresh session across deck restarts instead of resurrecting the base one.
+ * Only deck-owned keys are honored — legacy scout session ids are ignored. */
+function loadLaneKeys(): string[] {
+  const base = Array.from({ length: LANE_COUNT }, (_, i) => `speakeasy-deck-lane-${i}`);
+  try {
+    const saved = JSON.parse(readFileSync(LANES_FILE, 'utf8')) as Record<string, unknown>;
+    return base.map((b, i) => {
+      const v = saved[String(i)];
+      return typeof v === 'string' && v.startsWith('speakeasy-deck-lane-') ? v : b;
+    });
+  } catch {
+    return base;
   }
-  const clean = agentId.replace(/\.[a-z0-9-]+-local$/, '');
-  const [project, ...rest] = clean.split('.');
-  const title = rest.length ? rest.join(' · ').replace(/-/g, ' ') : 'agent';
-  return { name: (project || clean).toUpperCase().slice(0, 10), title };
+}
+
+/** Session-level instructions for every lane's codex session. */
+const VOICE_SYSTEM_PROMPT =
+  'You are a voice responder for a spoken interface. Do not use tools, do not read or write files, do not access the network. ' +
+  'Answer from general knowledge only, in one or two spoken-style sentences, plain words, no lists, no code.';
+
+/** Kept in a variable so the bundler leaves a native import() — the package is ESM-only. */
+const AGENT_SESSIONS_SPEC = '@openscout/agent-sessions/local';
+
+/** Minimal structural type for the agent-sessions local client, declared here
+ * so the CJS build never has to resolve the ESM-only package's types. */
+interface LaneAgentClient {
+  turn(input: { input: string; timeoutMs?: number }): Promise<{ text: string; session: { id: string; nativeId?: string } }>;
+  close(): Promise<void>;
+  interrupt?(): void;
 }
 
 function clock(): string {
@@ -144,12 +151,14 @@ export class DeckRuntime extends EventEmitter {
   private laneIx = 1;
   private lanes: DeckLaneInfo[] = Array.from({ length: LANE_COUNT }, (_, i) => ({
     num: String(i + 1).padStart(2, '0'),
-    agentId: null,
-    name: i === LANE_COUNT - 1 ? 'EMPTY' : `LANE ${i + 1}`,
-    title: 'unassigned',
-    state: i === LANE_COUNT - 1 ? 'empty' : 'idle',
+    name: `LANE ${i + 1}`,
+    title: 'new codex session on first ask',
+    state: 'idle',
   }));
-  private roster: ScoutAgent[] = [];
+  /** per-lane session reuse keys — cycling a lane bumps its key to reset the session */
+  private laneKeys: string[] = loadLaneKeys();
+  /** warm session clients, created lazily on each lane's first question */
+  private laneClients = new Map<number, { key: string; client: LaneAgentClient }>();
   private threads: DeckMessage[][] = Array.from({ length: LANE_COUNT }, () => []);
   private playing: string | null = null;
   private paused = false;
@@ -163,11 +172,11 @@ export class DeckRuntime extends EventEmitter {
   private trace: DeckTraceEntry[] = [];
   private ticker: NodeJS.Timeout | null = null;
   private busy = false;
+  private destroyed = false;
   /** bumped on stop/cancel — pending response work checks it before every phase */
   private gen = 0;
   private player: ChildProcess | null = null;
   private playerRate = 1;
-  private agentChild: ChildProcess | null = null;
   private synthDir = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-synth-'));
   /** set by the data plane — how many live deck clients are connected */
   liveClients: () => number = () => 0;
@@ -175,20 +184,6 @@ export class DeckRuntime extends EventEmitter {
   /** the directory synthesized audio is served from (deck-live exposes it at /audio) */
   get audioDir(): string {
     return this.synthDir;
-  }
-
-  constructor() {
-    super();
-    void this.discoverAgents();
-    // scout can be slow on a cold start — retry discovery until the roster lands
-    const retry = setInterval(() => {
-      if (this.roster.length) {
-        clearInterval(retry);
-        return;
-      }
-      void this.discoverAgents();
-    }, 15_000);
-    retry.unref();
   }
 
   snapshot(): DeckSnapshot {
@@ -222,52 +217,48 @@ export class DeckRuntime extends EventEmitter {
 
   // ── lanes ────────────────────────────────────────────────────────────────
 
-  /** Discover live agents from the scout roster and (re)build pad assignments. */
-  private async discoverAgents(): Promise<void> {
-    try {
-      const out = await run('scout', ['who', '--json'], 10_000);
-      const agents = JSON.parse(out) as ScoutAgent[];
-      // this deck is codex-session native: lanes bind to live harness sessions.
-      // agent cards are deliberately excluded — asking a card is a fresh relay
-      // spawn every time ("normal dispatch"), which is exactly what lanes are not.
-      // active/idle/waiting are all routable (scout wakes dormant sessions on
-      // delivery); offline and discovered are not. scout who can list the same
-      // session under several node-qualified ids — dedupe to the bare id,
-      // keeping the most recently seen record
-      const seen = new Set<string>();
-      this.roster = agents
-        .filter((a) => (a.state === 'active' || a.state === 'idle' || a.state === 'waiting') && a.agentId.startsWith('session-'))
-        .sort((a, b) => b.lastSeen - a.lastSeen)
-        .filter((a) => {
-          const bare = bareSessionId(a.agentId);
-          if (seen.has(bare)) return false;
-          seen.add(bare);
-          return true;
-        });
-      this.applyAssignments();
-      this.log('LANES', `${this.roster.length} agents on the roster`);
-      this.changed();
-    } catch (error) {
-      // keep placeholder lanes — deck still works with the default channel
-      console.error('  ⚠️  lane discovery failed:', (error as Error).message);
+  /** The lane's warm codex session client, created on first use. Sessions are
+   * owned by the deck via @openscout/agent-sessions — the adapter persists the
+   * codex thread id under the reuse key, so a lane resumes its exact thread
+   * across deck restarts with no broker involvement. */
+  private async laneClient(ix: number): Promise<LaneAgentClient> {
+    const key = this.laneKeys[ix];
+    const existing = this.laneClients.get(ix);
+    if (existing && existing.key === key) return existing.client;
+    if (existing) {
+      this.laneClients.delete(ix);
+      void existing.client.close().catch(() => undefined);
     }
+    const { createLocalAgentClient } = (await import(AGENT_SESSIONS_SPEC)) as {
+      createLocalAgentClient(options: {
+        harness: 'codex';
+        cwd: string;
+        reuseKey: string;
+        warmth: 'lazy';
+        systemPrompt: string;
+      }): Promise<LaneAgentClient>;
+    };
+    const client = await createLocalAgentClient({
+      harness: 'codex',
+      cwd: process.cwd(),
+      reuseKey: key,
+      warmth: 'lazy',
+      systemPrompt: VOICE_SYSTEM_PROMPT,
+    });
+    // a reset or destroy during creation must not install a stale client
+    if (this.destroyed || this.laneKeys[ix] !== key) {
+      void client.close().catch(() => undefined);
+      throw new Error('lane was reset');
+    }
+    this.laneClients.set(ix, { key, client });
+    return client;
   }
 
-  private savedAssignments(): Record<string, string | null> {
+  private persistLaneKeys(): void {
     try {
-      return JSON.parse(readFileSync(LANES_FILE, 'utf8')) as Record<string, string | null>;
-    } catch {
-      return {};
-    }
-  }
-
-  private persistAssignments(): void {
-    try {
-      const out: Record<string, string | null> = {};
-      this.lanes.forEach((l, i) => {
-        // explicit null = intentionally unbound (fresh session on first ask) —
-        // a missing key would mean "auto-assign from the roster" instead
-        out[String(i)] = l.sessionId ?? l.agentId;
+      const out: Record<string, string> = {};
+      this.laneKeys.forEach((k, i) => {
+        out[String(i)] = k;
       });
       writeFileSync(LANES_FILE, JSON.stringify(out), { mode: 0o600 });
     } catch {
@@ -275,78 +266,32 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  private applyAssignments(): void {
-    const saved = this.savedAssignments();
-    // mutate in place — an in-flight askAgent holds its lane across awaits and
-    // must never pin a session onto a replaced (detached) lane object
-    this.lanes.forEach((lane, i) => {
-      const hasSaved = Object.prototype.hasOwnProperty.call(saved, String(i));
-      const savedId = hasSaved ? saved[String(i)] : undefined;
-      // a saved session binds directly even when it is not on the roster right
-      // now — scout wakes on-demand sessions on first delivery
-      const agentId =
-        savedId === null ? null
-        : typeof savedId === 'string' && savedId.startsWith('session-') ? savedId
-        : this.roster[i]?.agentId ?? null;
-      const meta = agentId
-        ? laneName(agentId)
-        : i === LANE_COUNT - 1
-          ? { name: 'EMPTY', title: 'unassigned' }
-          : { name: `LANE ${i + 1}`, title: 'new codex session on first ask' };
-      lane.agentId = agentId;
-      lane.name = meta.name;
-      lane.title = meta.title;
-      // an unassigned lane stays usable — its first question creates a
-      // dedicated codex session; only the last pad remains a placeholder
-      lane.state = agentId ? (lane.state === 'empty' ? 'idle' : lane.state) : i === LANE_COUNT - 1 ? 'empty' : 'idle';
-      lane.sessionId = agentId?.startsWith('session-') ? bareSessionId(agentId) : undefined;
-    });
-    if (Object.keys(saved).length === 0 && this.roster.length) this.persistAssignments();
-  }
-
-  /** Channel mapper: advance a pad to the next session on the roster. One extra
-   * slot past the end unbinds the pad — its next question mints a fresh session. */
+  /** Channel mapper: reset a pad to a fresh codex session. The old thread
+   * stays on disk under its reuse key; the lane starts clean. Only ever called
+   * while no response is in flight (apply() rejects lane.cycle when busy), so
+   * this never touches another lane's turn. */
   private cycleLane(index: number): void {
-    if (!this.roster.length) return;
-    // never attribute an in-flight response to a newly assigned agent
-    this.gen++;
-    this.cancelAgentWork();
-    // and never let the old agent's audio keep playing under a new name
+    // never let the old session's audio keep playing under a new one
     if (this.playing?.startsWith(`${index}:`)) {
       this.stopPlayer();
       this.clearPlayback('READY');
     }
     const lane = this.lanes[index];
-    const slots: (ScoutAgent | null)[] = [...this.roster, null];
-    // compare normalized ids — the lane may hold a bare saved id while the
-    // roster's deduped representative of the same session is node-qualified
-    const laneKey = lane.sessionId ?? (lane.agentId ? bareSessionId(lane.agentId) : null);
-    const currentIx = laneKey ? slots.findIndex((a) => a !== null && bareSessionId(a.agentId) === laneKey) : slots.length - 1;
-    const next = slots[(currentIx + 1) % slots.length];
-    // mutate in place — an in-flight askAgent may be holding this lane object
-    if (!next) {
-      lane.agentId = null;
-      lane.name = `LANE ${index + 1}`;
-      lane.title = 'new codex session on first ask';
-      lane.state = 'idle';
-      lane.sessionId = undefined;
-      lane.conversationId = undefined;
-      lane.sessionAlias = undefined;
-      this.persistAssignments();
-      this.log('LANE ASSIGNED', `lane ${index + 1} → fresh session`);
-      this.changed();
-      return;
+    this.laneKeys[index] = `speakeasy-deck-lane-${index}-${Date.now().toString(36)}`;
+    this.persistLaneKeys();
+    // the fresh session starts with a clean conversation — no orphaned replies
+    // from the old thread, and nothing for replay to resurrect
+    this.threads[index] = [];
+    const existing = this.laneClients.get(index);
+    if (existing) {
+      this.laneClients.delete(index);
+      void existing.client.close().catch(() => undefined);
     }
-    const meta = laneName(next.agentId);
-    lane.agentId = next.agentId;
-    lane.name = meta.name;
-    lane.title = meta.title;
+    lane.name = `LANE ${index + 1}`;
+    lane.title = 'new codex session on first ask';
     lane.state = 'idle';
-    lane.sessionId = next.agentId.startsWith('session-') ? bareSessionId(next.agentId) : undefined;
-    lane.conversationId = undefined;
     lane.sessionAlias = undefined;
-    this.persistAssignments();
-    this.log('LANE ASSIGNED', `lane ${index + 1} → ${meta.name.toLowerCase()}`);
+    this.log('LANE RESET', `lane ${index + 1} → fresh session`);
     this.changed();
   }
 
@@ -504,9 +449,6 @@ export class DeckRuntime extends EventEmitter {
         return { ok: false, rev: this.rev, error: 'no replayable reply' };
       }
       case 'capture.start':
-        if (this.lanes[this.laneIx]?.state === 'empty') {
-          return { ok: false, rev: this.rev, error: 'lane unassigned — pick an agent first' };
-        }
         this.gen++;
         this.cancelAgentWork();
         this.stopPlayer();
@@ -539,6 +481,9 @@ export class DeckRuntime extends EventEmitter {
         return { ok: true, rev: this.rev };
       }
       case 'lane.cycle': {
+        // resetting mid-response would cancel whichever lane is answering —
+        // the reset is instant, so just ask the user to wait a beat
+        if (this.busy) return { ok: false, rev: this.rev, error: 'response in flight — try again in a moment' };
         this.cycleLane(intent.index);
         return { ok: true, rev: this.rev };
       }
@@ -663,59 +608,21 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** Ask the lane's Codex session (via Scout) and get a spoken-length answer back.
-   * A lane is one persistent session: a pinned session id is steered in place,
-   * an unassigned lane gets its own fresh session (--new) which is then pinned,
-   * so every follow-up continues the exact same conversation. */
+  /** Ask the lane's codex session and get a spoken-length answer back. Each
+   * lane owns one warm session via @openscout/agent-sessions — turns steer the
+   * codex app-server transport directly (no broker dispatch, no receipts), so
+   * follow-ups continue the exact same thread. */
   private async askAgent(question: string, laneIx: number): Promise<string> {
-    const prompt =
-      'You are a voice responder for a spoken interface. Do not use tools, do not read or write files, do not access the network. ' +
-      'Answer from general knowledge only, in one or two spoken-style sentences, plain words, no lists, no code. Question: ' +
-      question.slice(0, 500);
     const lane = this.lanes[laneIx];
-    const args = lane?.sessionId
-      ? ['ask', '--json', '--to', `session:${lane.sessionId}`, prompt]
-      : ['ask', '--json', '--project', process.cwd(), '--harness', 'codex', '--new', prompt];
     try {
-      const askOut = await this.scoutRun(args, 45_000);
-      const ask = parseJsonBlock(askOut) as {
-        receipt?: { ids?: { invocationId?: string; targetAgentId?: string; conversationId?: string; sessionAlias?: string } };
-      } | null;
-      const inv = ask?.receipt?.ids?.invocationId;
-      if (!inv) throw new Error('no invocation id from scout');
-      // pin the concrete session the broker routed to, so follow-ups steer the
-      // exact same codex session instead of dispatching fresh each time.
-      // the receipt's id is node-qualified — store the bare routable id
-      const targetId = ask?.receipt?.ids?.targetAgentId;
-      if (lane && targetId && targetId.startsWith('session-')) {
-        const bare = bareSessionId(targetId);
-        if (lane.sessionId !== bare) {
-          lane.sessionId = bare;
-          this.persistAssignments();
-        }
-      }
-      // and always remember which conversation this lane is talking in
-      if (lane && ask?.receipt?.ids?.conversationId) lane.conversationId = ask.receipt.ids.conversationId;
-      if (lane && ask?.receipt?.ids?.sessionAlias) {
-        lane.sessionAlias = ask.receipt.ids.sessionAlias;
-        // a freshly minted session renames its lane to the broker alias
-        const alias = ask.receipt.ids.sessionAlias.replace(/^[a-z]+-/, '');
-        lane.name = alias.toUpperCase().slice(0, 10);
-        lane.title = 'codex session';
-      }
-
-      const waitOut = await this.scoutRun(['wait', inv, '--timeout', '180', '--json'], 200_000);
-      const receipt = parseJsonBlock(waitOut) as {
-        timedOut?: boolean;
-        flight?: { state?: string };
-        state?: string;
-        output?: string;
-      } | null;
-      const flightState = receipt?.flight?.state ?? receipt?.state;
-      const text = (receipt?.output ?? '').trim();
-      if (receipt?.timedOut || flightState !== 'completed' || text.length < 4) {
-        throw new Error(receipt?.timedOut ? 'agent timed out' : `agent flight ${flightState ?? 'unknown'}`);
-      }
+      const client = await this.laneClient(laneIx);
+      const result = await client.turn({ input: question.slice(0, 500), timeoutMs: 180_000 });
+      const thread = result.session.nativeId;
+      // codex thread ids are UUIDv7 — the leading bytes are a timestamp, so
+      // alias from the random tail to tell threads apart
+      if (lane && thread) lane.sessionAlias = thread.replace(/-/g, '').slice(-8);
+      const text = result.text.trim();
+      if (!text) throw new Error('empty reply from session');
       return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : text;
     } catch (error) {
       this.log('AGENT FAILED', (error as Error).message.slice(0, 60));
@@ -726,24 +633,9 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** Run a scout command, tracking the child so cancellation can kill it. */
-  private scoutRun(args: string[], timeout: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const child = execFile('scout', args, { timeout, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
-        if (this.agentChild === child) this.agentChild = null;
-        if (err) reject(err);
-        else resolve(stdout);
-      });
-      this.agentChild = child;
-    });
-  }
-
-  /** Kill any in-flight agent request — called on stop, lane change, new capture, destroy. */
+  /** Interrupt any in-flight lane turn — called on stop, lane change, new capture, destroy. */
   private cancelAgentWork(): void {
-    if (this.agentChild) {
-      this.agentChild.kill('SIGKILL');
-      this.agentChild = null;
-    }
+    for (const { client } of this.laneClients.values()) client.interrupt?.();
   }
 
   /** Synthesize to a runtime-owned file — the user's configured provider first
@@ -812,25 +704,17 @@ export class DeckRuntime extends EventEmitter {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.gen++;
     this.cancelAgentWork();
     this.stopPlayer();
     if (this.ticker) clearInterval(this.ticker);
+    for (const { client } of this.laneClients.values()) void client.close().catch(() => undefined);
+    this.laneClients.clear();
     rmSync(this.synthDir, { recursive: true, force: true });
   }
 }
 
 function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-/** Scout prints status lines before its JSON receipt — parse the JSON block. */
-function parseJsonBlock(out: string): unknown | null {
-  const start = out.indexOf('{');
-  if (start === -1) return null;
-  try {
-    return JSON.parse(out.slice(start));
-  } catch {
-    return null;
-  }
 }
