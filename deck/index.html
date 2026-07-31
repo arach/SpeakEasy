@@ -553,15 +553,22 @@ function demoRestore() {
   paint();
 }
 
-// Speech recognition lives in the browser (HTTPS required) — the iPad
-// transcribes locally and sends text, never audio, to the runtime.
+// Speech recognition lives in the browser (HTTPS required). Recognition may
+// use the browser vendor's speech service; the Mac only ever receives text.
 let recog = null;
 let transcript = '';
+let recogFailed = false;
 
 function startTranscription() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR || recog) return;
+  if (!SR) {
+    S.confirm = 'MIC TRANSCRIPTION UNSUPPORTED';
+    paint();
+    return;
+  }
+  if (recog) return;
   transcript = '';
+  recogFailed = false;
   recog = new SR();
   recog.lang = 'en-US';
   recog.interimResults = true;
@@ -570,15 +577,21 @@ function startTranscription() {
     transcript = Array.from(e.results).map(r => r[0].transcript).join(' ').trim();
     if (S.listening && transcript) { S.confirm = transcript.toUpperCase().slice(0, 40); paint(); }
   };
-  recog.onerror = () => { recog = null; };
-  recog.onend = () => { recog = null; };
-  try { recog.start(); } catch (_) { recog = null; }
+  recog.onerror = () => { recogFailed = true; };
+  try { recog.start(); } catch (_) { recog = null; recogFailed = true; }
 }
 
-function stopTranscription(abort) {
-  if (!recog) return;
-  try { abort ? recog.abort() : recog.stop(); } catch (_) {}
+// stop() delivers final results asynchronously — the done callback fires from
+// the recognizer's own end (or a hard cap), never synchronously.
+function stopTranscription(abort, done) {
+  if (!recog) { done(); return; }
+  const r = recog;
   recog = null;
+  let fired = false;
+  const finish = () => { if (!fired) { fired = true; done(); } };
+  r.onend = finish;
+  try { abort ? r.abort() : r.stop(); } catch (_) { finish(); }
+  setTimeout(finish, 1500);
 }
 
 function bootLive() {
@@ -651,7 +664,7 @@ function holdStart() {
 }
 function holdCancel() {
   if (!S.listening && !live) return;
-  stopTranscription(true);
+  stopTranscription(true, () => {});
   if (sendIntent('capture.cancel')) return;
   if (!S.listening) return;
   S.listening = false; S.confirm = 'READY · LANE ' + lane().num;
@@ -659,10 +672,21 @@ function holdCancel() {
 }
 function holdEnd() {
   if (!S.listening && !live) return;
-  stopTranscription(false);
-  const said = transcript;
-  transcript = '';
-  if (sendIntent('capture.end', said ? { text: said } : {})) return;
+  if (live) {
+    stopTranscription(false, () => {
+      const said = transcript;
+      transcript = '';
+      if (said && !recogFailed) {
+        sendIntent('capture.end', { text: said });
+      } else {
+        // never silently run a fallback prompt — say so and cancel cleanly
+        S.confirm = recogFailed ? 'SPEECH ERROR · TRY AGAIN' : 'NO SPEECH · TRY AGAIN';
+        sendIntent('capture.cancel');
+        paint();
+      }
+    });
+    return;
+  }
   if (!S.listening) return;
   const li = S.lane;
   const l = LANES[li];

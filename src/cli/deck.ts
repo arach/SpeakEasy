@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
@@ -53,6 +53,29 @@ function deviceSlug(): string {
 function macBonjourName(): string | undefined {
   const slug = deviceSlug();
   return slug ? `${slug}.local` : undefined;
+}
+
+/** The deck capability token. Persistent across runs so a pinned iPad app keeps
+ * working after a restart; file is owner-only, rotation on demand. */
+function deckToken(rotate: boolean): string {
+  const file = path.join(os.homedir(), '.config', 'speakeasy', 'deck-token');
+  if (!rotate) {
+    try {
+      const existing = readFileSync(file, 'utf8').trim();
+      if (/^[a-f0-9]{24,}$/.test(existing)) return existing;
+    } catch {
+      // fall through to mint
+    }
+  }
+  const token = randomBytes(12).toString('hex');
+  try {
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, token, { mode: 0o600 });
+    chmodSync(file, 0o600);
+  } catch {
+    // best-effort — a per-run token still works for this run
+  }
+  return token;
 }
 
 /** Format a URL, omitting the port when it is the default HTTP port. */
@@ -356,10 +379,11 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
   };
 }
 
-function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr: boolean; caddy: boolean; mdns: boolean; tls: boolean } {
+function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr: boolean; caddy: boolean; mdns: boolean; tls: boolean; rotateToken: boolean } {
   let port: number | null = null; // null = auto: 80 if free (port-free URL), else 43211
   let host = `speak.${deviceSlug()}.local`;
   let qr = true;
+  let rotateToken = false;
   let caddy = true;
   let mdns = true;
   let tls = true;
@@ -391,13 +415,15 @@ function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr:
       mdns = false;
     } else if (arg === '--no-tls') {
       tls = false;
+    } else if (arg === '--rotate-token') {
+      rotateToken = true;
     } else {
       console.error(`❌ Unknown argument: ${arg}`);
       console.error('   Usage: speakeasy deck [--port <n>] [--host <name>] [--no-qr] [--no-caddy] [--no-mdns] [--no-tls]');
       process.exit(1);
     }
   }
-  return { port, host, qr, caddy, mdns, tls };
+  return { port, host, qr, caddy, mdns, tls, rotateToken };
 }
 
 export async function runDeck(argv: string[]): Promise<void> {
@@ -444,8 +470,9 @@ export async function runDeck(argv: string[]): Promise<void> {
   const caCert = tlsHost ? (caddyRootCert(true) ?? null) : null;
 
   // The data plane runs loopback-only on port+1ish; Caddy proxies /ws and
-  // /api/* to it same-origin behind a per-run token.
-  const token = randomBytes(12).toString('hex');
+  // /api/* to it same-origin behind the capability token. The token persists
+  // across runs so a pinned iPad keeps working through restarts.
+  const token = deckToken(args.rotateToken);
   let dataPort: number | null = null;
   for (let candidate = port + 1; candidate <= Math.min(port + 5, 65535); candidate++) {
     if (await portAvailable(candidate)) {

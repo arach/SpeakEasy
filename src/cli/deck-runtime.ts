@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, statSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
@@ -118,6 +118,7 @@ export class DeckRuntime extends EventEmitter {
   private gen = 0;
   private player: ChildProcess | null = null;
   private playerRate = 1;
+  private agentChild: ChildProcess | null = null;
   private synthDir = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-synth-'));
 
   snapshot(): DeckSnapshot {
@@ -191,6 +192,7 @@ export class DeckRuntime extends EventEmitter {
     switch (intent.name) {
       case 'lane.select': {
         this.gen++; // an in-flight response must not restart audio under a new lane
+        this.cancelAgentWork();
         this.laneIx = intent.index;
         this.stopPlayer();
         this.playing = null;
@@ -246,6 +248,7 @@ export class DeckRuntime extends EventEmitter {
         return { ok: true, rev: this.rev };
       case 'playback.stop':
         this.gen++; // cancel any pending response work
+        this.cancelAgentWork();
         this.stopPlayer();
         this.playing = null;
         this.paused = false;
@@ -276,6 +279,7 @@ export class DeckRuntime extends EventEmitter {
       }
       case 'capture.start':
         this.gen++;
+        this.cancelAgentWork();
         this.stopPlayer();
         this.listening = true;
         this.playing = null;
@@ -399,25 +403,55 @@ export class DeckRuntime extends EventEmitter {
 
   /** Ask a real agent (Codex via Scout) and get a spoken-length answer back. */
   private async askAgent(question: string): Promise<string> {
+    const prompt =
+      'You are a voice responder for a spoken interface. Do not use tools, do not read or write files, do not access the network. ' +
+      'Answer from general knowledge only, in one or two spoken-style sentences, plain words, no lists, no code. Question: ' +
+      question.slice(0, 500);
     try {
-      const ask = await run('scout', ['ask', '--project', process.cwd(), '--harness', 'codex',
-        `Answer in one or two spoken-style sentences, plain words, no lists, no code: ${question}`], 20_000);
-      const inv = ask.match(/scout wait (inv-\S+)/)?.[1];
+      const askOut = await this.scoutRun(
+        ['ask', '--json', '--project', process.cwd(), '--harness', 'codex', prompt],
+        45_000,
+      );
+      const ask = parseJsonBlock(askOut) as { receipt?: { ids?: { invocationId?: string } } } | null;
+      const inv = ask?.receipt?.ids?.invocationId;
       if (!inv) throw new Error('no invocation id from scout');
-      const reply = await run('scout', ['wait', inv, '--timeout', '180'], 200_000);
-      const text = reply.split('\nOutput:').pop()?.trim() ?? '';
-      if (!text || text.length < 4) throw new Error('empty reply');
-      // spoken answers stay short: cap at ~60 words
-      const words = text.split(/\s+/);
-      return words.length > 60 ? words.slice(0, 60).join(' ') + '…' : text;
+
+      const waitOut = await this.scoutRun(['wait', inv, '--timeout', '180', '--json'], 200_000);
+      const receipt = parseJsonBlock(waitOut) as { timedOut?: boolean; state?: string; output?: string } | null;
+      const text = (receipt?.output ?? '').trim();
+      if (receipt?.timedOut || (receipt?.state && receipt.state !== 'completed') || text.length < 4) {
+        throw new Error(receipt?.timedOut ? 'agent timed out' : 'empty reply');
+      }
+      return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : text;
     } catch (error) {
       this.log('AGENT FAILED', (error as Error).message.slice(0, 60));
       return 'Sorry, the agent did not answer that one. Try again in a moment.';
     }
   }
 
-  /** Synthesize to a file without playing — the user's configured provider first
-   * (cloud silent mode → cache file), the macOS system voice as fallback. */
+  /** Run a scout command, tracking the child so cancellation can kill it. */
+  private scoutRun(args: string[], timeout: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const child = execFile('scout', args, { timeout, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
+        if (this.agentChild === child) this.agentChild = null;
+        if (err) reject(err);
+        else resolve(stdout);
+      });
+      this.agentChild = child;
+    });
+  }
+
+  /** Kill any in-flight agent request — called on stop, lane change, new capture, destroy. */
+  private cancelAgentWork(): void {
+    if (this.agentChild) {
+      this.agentChild.kill('SIGKILL');
+      this.agentChild = null;
+    }
+  }
+
+  /** Synthesize to a runtime-owned file — the user's configured provider first
+   * (cloud silent mode → exact cache entry copied out), the macOS system voice
+   * as fallback. The copy means cache eviction can never pull audio mid-play. */
   private async synthesize(text: string): Promise<string | null> {
     try {
       const { SpeakEasy } = await import('../index');
@@ -426,10 +460,15 @@ export class DeckRuntime extends EventEmitter {
       const stats = await speaker.getCacheStats();
       if (stats.dir) {
         const { TTSCache } = await import('../cache');
-        const recent = await new TTSCache(stats.dir, '7d').getRecent(1);
-        const file = recent[0]?.filePath;
-        // guard against stale cache entries — the file must be from this call
-        if (file && existsSync(file) && Date.now() - statSync(file).mtimeMs < 30_000) return file;
+        const recent = await new TTSCache(stats.dir, '7d').getRecent(10);
+        const match = recent.find(
+          (e) => e.originalText === text && e.filePath && existsSync(e.filePath) && Date.now() - statSync(e.filePath).mtimeMs < 60_000,
+        );
+        if (match) {
+          const owned = path.join(this.synthDir, `reply-${Date.now()}${path.extname(match.filePath) || '.mp3'}`);
+          copyFileSync(match.filePath, owned);
+          return owned;
+        }
       }
     } catch {
       // cloud silent mode unavailable — fall through to the system voice
@@ -479,6 +518,7 @@ export class DeckRuntime extends EventEmitter {
 
   destroy(): void {
     this.gen++;
+    this.cancelAgentWork();
     this.stopPlayer();
     if (this.ticker) clearInterval(this.ticker);
     rmSync(this.synthDir, { recursive: true, force: true });
@@ -487,4 +527,15 @@ export class DeckRuntime extends EventEmitter {
 
 function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Scout prints status lines before its JSON receipt — parse the JSON block. */
+function parseJsonBlock(out: string): unknown | null {
+  const start = out.indexOf('{');
+  if (start === -1) return null;
+  try {
+    return JSON.parse(out.slice(start));
+  } catch {
+    return null;
+  }
 }
