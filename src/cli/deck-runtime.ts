@@ -108,7 +108,9 @@ const LANE_COUNT = 9;
 const MASTER_IX = 9;
 const MASTER_REUSE_KEY = 'speakeasy-deck-master';
 const OVERVIEW_MODEL = 'gpt-5.6-luna';
-const OVERVIEW_EFFORT = 'medium';
+/** low on purpose: the digest does the work — the overview lane should read
+ * the board and report, never overthink or get clever. */
+const OVERVIEW_EFFORT = 'low';
 const TICK_MS = 250;
 const MAX_MESSAGES_PER_LANE = 50;
 const LANES_FILE = path.join(homedir(), '.config', 'speakeasy', 'deck-lanes.json');
