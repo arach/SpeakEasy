@@ -1006,8 +1006,9 @@ function view() {
   });
 
   // ── mapper catalog: bound-lane state + term-wise search (Talkie-style) ──
-  // identity is the full thread id — the 8-char alias is display-only
-  const laneThreads = (S.lanes || []).map(l => l.threadId || null);
+  // identity is the full thread id — the 8-char alias is display-only.
+  // only the nine worker lanes are mappable; the overview lane is deck-owned.
+  const laneThreads = (S.lanes || []).slice(0, 9).map(l => l.threadId || null);
   const pTerms = (S.pickerQuery || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   const allRows = (S.catalog || []).map(t => {
     const alias = String(t.id).replace(/-/g, '').slice(-8);
@@ -1030,7 +1031,7 @@ function view() {
       kindColor: /VOICE|AGENT|PLAYBACK|LANE/.test(x.kind) ? T('accent-ink') : T('ink-2')
     })),
     boundLabel: live && S.lanes
-      ? S.lanes.filter(x => x.sessionAlias).length + ' / ' + S.lanes.length + ' BOUND'
+      ? S.lanes.slice(0, 9).filter(x => x.threadId).length + ' / 9 BOUND'
       : LANES.filter(x => x.state !== 'empty').length + ' / ' + LANES.length + ' BOUND',
     laneNum: l.num,
     laneTitle: l.title,
@@ -1045,6 +1046,7 @@ function view() {
     micBg: 'linear-gradient(180deg,' + (S.listening ? T('mic-edge') : T('mic-a')) + ',' + (S.listening ? T('mic-a') : T('mic-b')) + ')',
     micEdge: S.listening ? T('mic-edge') : T('mic-a'),
     confirmLine: S.confirm,
+    overviewActive: live && S.lane === 9,
     pickerLane: S.picker,
     pickerQuery: S.pickerQuery,
     pickerCurrent: currentRow ? currentRow.snippet : (currentThread ? 'thread ' + String(currentThread).replace(/-/g, '').slice(-8) : null),
@@ -1173,8 +1175,9 @@ function tpl(v) {
           '</div>' +
         '</div>' +
 
-        // action row
-        '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px;flex:none;">' +
+        // action row — OVERVIEW selects the deck-owned luna lane (whole-deck view)
+        '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px;flex:none;">' +
+          '<button type="button" class="se-press" data-act="overview" style="' + plainBtn + (v.overviewActive ? 'border-color:var(--se-accent-edge);color:var(--se-accent-ink);background:var(--se-chip-bg);' : '') + '">OVERVIEW</button>' +
           '<button type="button" class="se-press" data-act="ping" style="' + plainBtn + '">PING MAC</button>' +
           '<button type="button" class="se-press" data-act="stop" style="' + plainBtn + '">CANCEL</button>' +
           '<button type="button" class="se-press" data-act="replay" style="' + plainBtn + '">REPLAY</button>' +
@@ -1473,7 +1476,18 @@ const ACTIONS = {
       pingMac();
     }
   },
-  openmac: () => openMac()
+  openmac: () => openMac(),
+  // the deck-owned overview lane (index 9): fast luna answers about the whole system
+  overview: () => {
+    if (live) {
+      S.assign = false;
+      S.picker = null;
+      sendIntent('lane.select', { index: 9 });
+    } else {
+      S.confirm = 'OVERVIEW NEEDS A LIVE LINK';
+      paint();
+    }
+  }
 };
 
 root.addEventListener('click', e => {

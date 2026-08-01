@@ -78,7 +78,9 @@ export interface DeckSnapshot {
 }
 
 const intentSchema = z.discriminatedUnion('name', [
-  z.object({ name: z.literal('lane.select'), index: z.number().int().min(0).max(8) }),
+  // max 9: lanes 0-8 plus the deck-owned overview lane (MASTER_IX below —
+  // a literal here because the schema initializes before the constants)
+  z.object({ name: z.literal('lane.select'), index: z.number().int().min(0).max(9) }),
   z.object({ name: z.literal('playback.toggle'), id: z.string().regex(/^\d:\d{1,3}$/) }),
   z.object({ name: z.literal('playback.scrub'), id: z.string().regex(/^\d:\d{1,3}$/), frac: z.number().min(0).max(1) }),
   z.object({ name: z.literal('playback.speed') }),
@@ -101,6 +103,12 @@ export type DeckIntent = z.infer<typeof intentSchema>;
 
 const SPEEDS = [1, 1.25, 1.5, 0.75]; // must match the deck client's SPEEDS exactly
 const LANE_COUNT = 9;
+/** The overview officer: a deck-owned 10th lane on a cheap, fast model that
+ * answers questions about the whole system from a live digest. Not mappable. */
+const MASTER_IX = 9;
+const MASTER_REUSE_KEY = 'speakeasy-deck-master';
+const OVERVIEW_MODEL = 'gpt-5.6-luna';
+const OVERVIEW_EFFORT = 'medium';
 const TICK_MS = 250;
 const MAX_MESSAGES_PER_LANE = 50;
 const LANES_FILE = path.join(homedir(), '.config', 'speakeasy', 'deck-lanes.json');
@@ -235,6 +243,13 @@ const VOICE_SYSTEM_PROMPT =
   'You are a voice responder for a spoken interface. Do not use tools, do not read or write files, do not access the network. ' +
   'Answer from general knowledge only, in one or two spoken-style sentences, plain words, no lists, no code.';
 
+/** Session-level instructions for the overview lane: the digest is its eyes. */
+const OVERVIEW_SYSTEM_PROMPT =
+  'You are the overview officer of a voice-command deck with nine lanes, each a live codex thread. ' +
+  'Every question arrives with a DECK STATUS digest that is live and authoritative — answer from it and never invent state. ' +
+  'Do not use tools, do not read or write files, do not access the network. ' +
+  'Speak plainly, no lists, no code: one or two sentences for a status question, up to five for a full summary.';
+
 /** Kept in a variable so the bundler leaves a native import() — the package is ESM-only. */
 const AGENT_SESSIONS_SPEC = '@openscout/agent-sessions/local';
 
@@ -244,6 +259,18 @@ interface LaneAgentClient {
   turn(input: { input: string; timeoutMs?: number }): Promise<{ text: string; session: { id: string; nativeId?: string } }>;
   close(): Promise<void>;
   interrupt?(): void;
+}
+
+/** Options for the lane session factory — model/effort select a cheaper,
+ * faster brain for the overview lane while workers keep the default. */
+interface LaneClientOptions {
+  harness: 'codex';
+  cwd: string;
+  reuseKey: string;
+  warmth: 'lazy';
+  systemPrompt: string;
+  model?: string;
+  effort?: string;
 }
 
 function clock(): string {
@@ -277,17 +304,25 @@ export function parseIntent(raw: unknown): { intent?: DeckIntent; error?: string
 export class DeckRuntime extends EventEmitter {
   private rev = 0;
   private laneIx = 1;
-  private lanes: DeckLaneInfo[] = Array.from({ length: LANE_COUNT }, (_, i) => ({
-    num: String(i + 1).padStart(2, '0'),
-    name: `LANE ${i + 1}`,
-    title: 'new codex session on first ask',
-    state: 'idle',
-  }));
+  private lanes: DeckLaneInfo[] = [
+    ...Array.from({ length: LANE_COUNT }, (_, i) => ({
+      num: String(i + 1).padStart(2, '0'),
+      name: `LANE ${i + 1}`,
+      title: 'new codex session on first ask',
+      state: 'idle' as const,
+    })),
+    {
+      num: 'OV',
+      name: 'OVERVIEW',
+      title: `whole-deck view · ${OVERVIEW_MODEL} · ${OVERVIEW_EFFORT}`,
+      state: 'idle' as const,
+    },
+  ];
   /** per-lane session reuse keys — cycling a lane bumps its key to reset the session */
   private laneKeys: string[] = loadLaneKeys();
   /** warm session clients, created lazily on each lane's first question */
   private laneClients = new Map<number, { key: string; client: LaneAgentClient }>();
-  private threads: DeckMessage[][] = Array.from({ length: LANE_COUNT }, () => []);
+  private threads: DeckMessage[][] = Array.from({ length: LANE_COUNT + 1 }, () => []);
   private playing: string | null = null;
   private paused = false;
   private pos = 0;
@@ -392,7 +427,8 @@ export class DeckRuntime extends EventEmitter {
    * codex thread id under the reuse key, so a lane resumes its exact thread
    * across deck restarts with no broker involvement. */
   private async laneClient(ix: number): Promise<LaneAgentClient> {
-    const key = this.laneKeys[ix];
+    // the overview lane has a fixed, deck-owned key — it is never remapped
+    const key = ix === MASTER_IX ? MASTER_REUSE_KEY : this.laneKeys[ix];
     const existing = this.laneClients.get(ix);
     if (existing && existing.key === key) return existing.client;
     if (existing) {
@@ -400,23 +436,23 @@ export class DeckRuntime extends EventEmitter {
       void existing.client.close().catch(() => undefined);
     }
     const { createLocalAgentClient } = (await import(AGENT_SESSIONS_SPEC)) as {
-      createLocalAgentClient(options: {
-        harness: 'codex';
-        cwd: string;
-        reuseKey: string;
-        warmth: 'lazy';
-        systemPrompt: string;
-      }): Promise<LaneAgentClient>;
+      createLocalAgentClient(options: LaneClientOptions): Promise<LaneAgentClient>;
     };
-    const client = await createLocalAgentClient({
+    const options: LaneClientOptions = {
       harness: 'codex',
       cwd: process.cwd(),
       reuseKey: key,
       warmth: 'lazy',
-      systemPrompt: VOICE_SYSTEM_PROMPT,
-    });
+      systemPrompt: ix === MASTER_IX ? OVERVIEW_SYSTEM_PROMPT : VOICE_SYSTEM_PROMPT,
+    };
+    if (ix === MASTER_IX) {
+      options.model = OVERVIEW_MODEL;
+      options.effort = OVERVIEW_EFFORT;
+    }
+    const client = await createLocalAgentClient(options);
     // a reset or destroy during creation must not install a stale client
-    if (this.destroyed || this.laneKeys[ix] !== key) {
+    const currentKey = ix === MASTER_IX ? MASTER_REUSE_KEY : this.laneKeys[ix];
+    if (this.destroyed || currentKey !== key) {
       void client.close().catch(() => undefined);
       throw new Error('lane was reset');
     }
@@ -433,6 +469,20 @@ export class DeckRuntime extends EventEmitter {
       writeFileSync(LANES_FILE, JSON.stringify(out), { mode: 0o600 });
     } catch {
       // best-effort
+    }
+  }
+
+  /** The overview lane's own thread id, if it has one. A worker pad must never
+   * be mapped to it — two sessions steering one codex thread is the failure
+   * this guards (runtime dedupe only sweeps the nine worker lanes). */
+  private masterThreadId(): string | null {
+    const live = this.lanes[MASTER_IX].threadId;
+    if (live) return live;
+    try {
+      const id = readFileSync(path.join(laneRuntimeDir(MASTER_REUSE_KEY), 'codex-thread-id.txt'), 'utf8').trim();
+      return id || null;
+    } catch {
+      return null;
     }
   }
 
@@ -514,6 +564,22 @@ export class DeckRuntime extends EventEmitter {
     return this.lanes[ix]?.name.toLowerCase() ?? `lane ${ix + 1}`;
   }
 
+  /** Live, compact picture of the whole deck — the overview lane's eyes. One
+   * line per lane: binding, state, title, and the last exchange if there is one. */
+  private systemDigest(): string {
+    const lines = this.lanes.slice(0, LANE_COUNT).map((lane, i) => {
+      const bound = lane.threadId ? `bound ${lane.sessionAlias}` : 'fresh session';
+      let line = `lane ${i + 1}: ${bound} · ${lane.state} · "${lane.title}"`;
+      const msgs = this.threads[i];
+      const lastYou = [...msgs].reverse().find((m) => m.role === 'you')?.text;
+      const lastAgent = [...msgs].reverse().find((m) => m.role === 'agent')?.text;
+      if (lastYou) line += ` · last asked "${lastYou.slice(0, 80)}"`;
+      if (lastAgent) line += ` · last answered "${lastAgent.slice(0, 80)}"`;
+      return line;
+    });
+    return [`DECK STATUS (live, authoritative): host ${this.host} · ${LANE_COUNT} lanes`, ...lines].join('\n');
+  }
+
   private setLaneState(ix: number, state: DeckLaneInfo['state']): boolean {
     const lane = this.lanes[ix];
     if (!lane || lane.state === 'empty') return false;
@@ -586,8 +652,9 @@ export class DeckRuntime extends EventEmitter {
         this.laneIx = intent.index;
         this.stopPlayer();
         this.clearPlayback();
-        this.setPhase(this.phase, `READY · LANE ${String(intent.index + 1).padStart(2, '0')}`);
-        this.log('LANE SELECTED', `lane ${intent.index + 1}`);
+        const label = intent.index === MASTER_IX ? 'OVERVIEW' : `LANE ${String(intent.index + 1).padStart(2, '0')}`;
+        this.setPhase(this.phase, `READY · ${label}`);
+        this.log('LANE SELECTED', intent.index === MASTER_IX ? 'overview' : `lane ${intent.index + 1}`);
         this.changed();
         return { ok: true, rev: this.rev };
       }
@@ -705,7 +772,9 @@ export class DeckRuntime extends EventEmitter {
       case 'catalog.refresh': {
         const scanned = scanCodexThreads();
         if (scanned) {
-          this.catalog = scanned;
+          // the overview lane's own thread is deck-owned — never offer it for mapping
+          const master = this.masterThreadId();
+          this.catalog = master ? scanned.filter((t) => t.id !== master) : scanned;
           this.catalogError = null;
         } else {
           // keep whatever we last showed — a stale list beats an empty one
@@ -717,6 +786,9 @@ export class DeckRuntime extends EventEmitter {
       }
       case 'lane.assign': {
         if (this.busy) return { ok: false, rev: this.rev, error: 'response in flight — try again in a moment' };
+        if (intent.threadId && intent.threadId === this.masterThreadId()) {
+          return { ok: false, rev: this.rev, error: 'that thread belongs to the overview lane' };
+        }
         this.assignLane(intent.index, intent.threadId);
         return { ok: true, rev: this.rev };
       }
@@ -749,7 +821,7 @@ export class DeckRuntime extends EventEmitter {
   /** CLI mirror: an item spoken elsewhere, shown (and optionally voiced) here.
    * Audio is never runtime-owned on this path — always a progress mirror. */
   async narrate(text: string, laneIx: number, play: boolean): Promise<void> {
-    const lane = Math.min(LANE_COUNT - 1, Math.max(0, laneIx));
+    const lane = Math.min(MASTER_IX, Math.max(0, laneIx));
     const msg: DeckMessage = { role: 'agent', text, dur: estimateDuration(text), mirrored: true };
     this.pushMessage(lane, msg);
     const id = `${lane}:${this.threads[lane].length - 1}`;
@@ -849,7 +921,12 @@ export class DeckRuntime extends EventEmitter {
     const lane = this.lanes[laneIx];
     try {
       const client = await this.laneClient(laneIx);
-      const result = await client.turn({ input: question.slice(0, 500), timeoutMs: 180_000 });
+      // the overview lane sees the whole deck: its question rides on a live digest
+      const input =
+        laneIx === MASTER_IX
+          ? `${this.systemDigest()}\n\nOperator asks: ${question.slice(0, 500)}`
+          : question.slice(0, 500);
+      const result = await client.turn({ input, timeoutMs: 180_000 });
       const thread = result.session.nativeId;
       // codex thread ids are UUIDv7 — the leading bytes are a timestamp, so
       // alias from the random tail to tell threads apart
