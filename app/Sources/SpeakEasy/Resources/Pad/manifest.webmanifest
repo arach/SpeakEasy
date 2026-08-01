@@ -1,0 +1,21 @@
+{
+  "name": "SpeakEasy Pad",
+  "short_name": "SpeakEasy",
+  "description": "A tactile iPad control surface for SpeakEasy voice lanes.",
+  "id": "/",
+  "start_url": "/?source=installed",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#071013",
+  "theme_color": "#071013",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

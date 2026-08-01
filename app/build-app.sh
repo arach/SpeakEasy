@@ -1,14 +1,15 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="SpeakEasy"
+# shellcheck source=tools/release/common.sh
+source "$SCRIPT_DIR/tools/release/common.sh"
+
 BUNDLE_NAME="SpeakEasy.app"
 BUILD_DIR="$SCRIPT_DIR/.build/release"
 APP_DIR="$SCRIPT_DIR/$BUNDLE_NAME"
 INSTALL=false
 
-# Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         -i|--install)
@@ -24,40 +25,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "Building SpeakEasy..."
+"$SCRIPT_DIR/Scripts/sync-pad-assets.sh"
 
-# Build release version
+echo "Building SpeakEasy..."
 swift build -c release
 
 echo "Creating app bundle..."
+speakeasy_bundle_app "$SCRIPT_DIR" "$APP_DIR"
+speakeasy_verify_bundle_layout "$APP_DIR"
 
-# Create app bundle structure
-rm -rf "$APP_DIR"
-mkdir -p "$APP_DIR/Contents/MacOS"
-mkdir -p "$APP_DIR/Contents/Resources"
-
-# Copy executable
-cp "$BUILD_DIR/SpeakEasy" "$APP_DIR/Contents/MacOS/SpeakEasy"
-
-# Copy Info.plist
-cp "$SCRIPT_DIR/Resources/Info.plist" "$APP_DIR/Contents/"
-
-# Copy audio resources
-if [ -f "$SCRIPT_DIR/Resources/hud-preview-sample.aiff" ]; then
-    cp "$SCRIPT_DIR/Resources/hud-preview-sample.aiff" "$APP_DIR/Contents/Resources/"
-fi
-
-# Generate icon
-echo "Generating app icon..."
-chmod +x "$SCRIPT_DIR/Scripts/generate_icon.swift"
-swift "$SCRIPT_DIR/Scripts/generate_icon.swift" "$APP_DIR/Contents/Resources"
-
-# Create PkgInfo
-echo -n "APPL????" > "$APP_DIR/Contents/PkgInfo"
-
-# Sign the app (ad-hoc for local use)
 echo "Signing app..."
-codesign --force --deep --sign - "$APP_DIR"
+"$SCRIPT_DIR/tools/release/sign-bundle.sh" "$APP_DIR"
+speakeasy_verify_signed_bundle "$APP_DIR"
 
 echo ""
 echo "App bundle created: $APP_DIR"
@@ -65,7 +44,6 @@ echo ""
 
 if [ "$INSTALL" = true ]; then
     echo "Installing to /Applications..."
-    # Remove old version first
     rm -rf "/Applications/$BUNDLE_NAME"
     cp -R "$APP_DIR" /Applications/
     echo "Installed to /Applications/$BUNDLE_NAME"
@@ -81,4 +59,7 @@ else
     echo ""
     echo "To build and install in one step, use:"
     echo "  ./build-app.sh --install"
+    echo ""
+    echo "For a signed/notarized release DMG:"
+    echo "  ./Scripts/build.sh"
 fi

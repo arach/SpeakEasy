@@ -1,0 +1,22 @@
+{
+  "pins" : [
+    {
+      "identity" : "hudsonkit-xcframework",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/arach/hudsonkit-xcframework.git",
+      "state" : {
+        "revision" : "c72a1575552ac964dc7ba04c85e3a4a681592023",
+        "version" : "0.3.4"
+      }
+    },
+    {
+      "identity" : "vox",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/arach/vox.git",
+      "state" : {
+        "revision" : "19be9f1d30b2fd7a79c5f88feffcb44091854761"
+      }
+    }
+  ],
+  "version" : 2
+}

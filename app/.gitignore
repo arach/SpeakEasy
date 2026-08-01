@@ -9,6 +9,7 @@
 # Build artifacts
 *.app
 *.dSYM
+dist/
 
 # OS files
 .DS_Store
