@@ -18,6 +18,13 @@
   "bin": {
     "speakeasy": "dist/bin/speakeasy-cli.js"
   },
+  "files": [
+    "dist",
+    "!dist/test.*",
+    "deck/index.html",
+    "deck/themes.json",
+    "deck/variants"
+  ],
   "keywords": [
     "tts",
     "speech",
@@ -32,9 +39,8 @@
   "author": "arach",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/claude-code": "^1.0.72",
     "@google/generative-ai": "^0.24.1",
-    "@openscout/agent-sessions": "file:../openscout/packages/agent-sessions",
+    "@openscout/agent-sessions": "^0.2.64",
     "@types/uuid": "^10.0.0",
     "better-sqlite3": "^12.2.0",
     "bonjour-service": "^1.4.4",
@@ -44,7 +50,7 @@
     "keyv": "^5.3.4",
     "node-fetch": "^3.3.2",
     "qrcode": "^1.5.4",
-    "uuid": "^11.1.0",
+    "uuid": "^11.1.1",
     "ws": "^8.21.1",
     "zod": "^3.23.8"
   },
@@ -55,5 +61,8 @@
     "playwright": "^1.54.2",
     "tsup": "^7.0.0",
     "typescript": "^5.0.0"
+  },
+  "overrides": {
+    "tar-fs": "^2.1.4"
   }
 }

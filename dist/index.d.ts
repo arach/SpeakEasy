@@ -295,4 +295,4 @@ declare const speak: (text: string, options?: SpeakEasyOptions & {
     volume?: number;
 }) => Promise<void>;
 
-export { CONFIG_FILE, ElevenLabsProvider, GeminiProvider, type GlobalConfig, GroqProvider, OpenAIProvider, type Provider, type ProviderConfig, SpeakEasy, type SpeakEasyConfig, type SpeakEasyOptions, SystemProvider, TTSCache, say, speak };
+export { CONFIG_FILE, ElevenLabsProvider, GeminiProvider, GlobalConfig, GroqProvider, OpenAIProvider, Provider, ProviderConfig, SpeakEasy, SpeakEasyConfig, SpeakEasyOptions, SystemProvider, TTSCache, say, speak };
