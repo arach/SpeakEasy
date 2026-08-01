@@ -972,7 +972,12 @@ export class DeckRuntime extends EventEmitter {
   private async synthesize(text: string): Promise<string | null> {
     try {
       const { SpeakEasy } = await import('../index');
-      const speaker = new SpeakEasy({ volume: this.vol });
+      const speaker = new SpeakEasy({
+        volume: this.vol,
+        // The deck needs a durable file it can copy to its own playback area.
+        // Caching also makes silent system-voice synthesis return that exact file.
+        cache: { enabled: true },
+      });
       await speaker.speak(text, { silent: true });
       // the SDK reports the exact file it used — no scanning, no correlation guesswork
       if (speaker.lastAudioFile && existsSync(speaker.lastAudioFile)) {

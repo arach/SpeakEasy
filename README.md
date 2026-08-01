@@ -126,14 +126,34 @@ comes online.
 
 ## Installation
 
+For the macOS menu-bar app and the easiest Deck setup:
+
 ```bash
-npm install speakeasy
+git clone https://github.com/arach/speakeasy.git
+cd speakeasy
+bun install
+./app/install.sh
+```
+
+Open **SpeakEasy → Settings → Deck**, click **Start Deck**, then scan the device
+card. Enable **Start the deck with SpeakEasy** to keep it ready whenever the app
+runs. The app includes the Deck runtime and web surface; it finds the native
+Codex binary from the desktop app or the `codex` command from your login shell.
+
+Repeat the install on another Mac and it advertises itself separately. The
+native iPad shell shows every available Mac in its machine menu and remembers
+the last one; any laptop can use the QR/copy link from that Mac's Deck tab.
+
+For the TypeScript library or CLI only:
+
+```bash
+bun add @arach/speakeasy
 ```
 
 ## Quick Start
 
 ```typescript
-import { say } from 'speakeasy';
+import { say } from '@arach/speakeasy';
 
 await say('Hello world!');                    // system voice
 await say('Hello!', 'openai');                // OpenAI TTS
@@ -222,7 +242,7 @@ export GEMINI_API_KEY=your_gemini_key
 ### Basic Usage
 
 ```typescript
-import { say, speak } from 'speakeasy';
+import { say, speak } from '@arach/speakeasy';
 
 // Quick one-liners
 await say('Hello world!');                    // system voice
@@ -236,7 +256,7 @@ await speak('Hello world!', { priority: 'high', volume: 0.5 });
 await speak('Hello!', { provider: 'openai', priority: 'high', volume: 0.8 });
 
 // Custom configuration
-import { SpeakEasy } from 'speakeasy';
+import { SpeakEasy } from '@arach/speakeasy';
 const speech = new SpeakEasy({
   provider: 'openai',
   openaiVoice: 'nova',
@@ -250,7 +270,7 @@ await speech.speak('Hello world!');
 
 ```typescript
 // notifications.ts
-import { say } from 'speakeasy';
+import { say } from '@arach/speakeasy';
 
 export async function speakNotification(message: string, project: string) {
   await say(`In ${project}, ${message}`, { priority: 'high', volume: 0.8 });
@@ -262,7 +282,7 @@ export async function speakNotification(message: string, project: string) {
 SpeakEasy provides granular volume control (0.0-1.0) that only affects speech playback without changing your system volume:
 
 ```typescript
-import { say, speak, SpeakEasy } from 'speakeasy';
+import { say, speak, SpeakEasy } from '@arach/speakeasy';
 
 // Quick volume control
 await say('Quiet message', 'openai', { volume: 0.3 });     // 30% volume
@@ -312,13 +332,13 @@ UUID = SHA1(text|provider|voice|rate + namespace) → UUID v5
 ## Examples
 
 ```bash
-npm run example
+bun run example
 ```
 
 ## Declarative Caching Configuration
 
 ```typescript
-import { SpeakEasy } from 'speakeasy';
+import { SpeakEasy } from '@arach/speakeasy';
 
 // Simple declarative configuration
 const speaker = new SpeakEasy({
@@ -347,7 +367,7 @@ const speaker = new SpeakEasy({
 Install globally for command-line access:
 
 ```bash
-npm install -g speakeasy
+bun add --global @arach/speakeasy
 
 # Basic usage
 speakeasy "Hello world"
@@ -491,9 +511,9 @@ $ speakeasy --doctor
 ## Testing
 
 ```bash
-npm run build
+bun run build
 npm test
 npm test cache  # Test caching specifically
-npm run cli -- --help  # Test CLI
-npm run cli -- --doctor  # Test health check
+bun run cli -- --help  # Test CLI
+bun run cli -- --doctor  # Test health check
 ```

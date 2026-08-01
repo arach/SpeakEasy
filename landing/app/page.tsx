@@ -3,18 +3,18 @@ import HeroSection from "@/components/hero-section"
 import FeaturesSection from "@/components/features-section"
 import CodeExamples from "@/components/code-examples"
 import ClaudeIntegrationSection from "@/components/claude-integration-section"
-import AgentVoiceSection from "@/components/agent-voice-section"
 import QuickStartSection from "@/components/quick-start-section"
+import DownloadSection from "@/components/download-section"
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 relative overflow-hidden">
       <HeroSection />
+      <DownloadSection />
       <Suspense fallback={<div className="h-96" />}>
         <CodeExamples />
       </Suspense>
       <QuickStartSection />
-      <AgentVoiceSection />
       <ClaudeIntegrationSection />
       <FeaturesSection />
       
@@ -23,10 +23,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col items-center gap-4">
             <div className="flex items-center gap-6 text-sm">
-              <a href="/features" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
-                Features
-              </a>
-              <a href="/docs/overview" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
+              <a href="/docs/quickstart/" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
                 Documentation
               </a>
               <a href="https://github.com/arach/SpeakEasy" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
