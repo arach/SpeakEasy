@@ -15,6 +15,16 @@ The deck ships inside the SpeakEasy CLI package. On the Mac:
 npx @arach/speakeasy deck
 ```
 
+For the native menu-bar app, the recommended first run is simply:
+
+```bash
+./app/install.sh
+```
+
+The installer opens the Deck settings checklist after it verifies and installs
+the bundled runtime. A device link appears only after Codex and the live data
+plane are ready, so a half-configured bridge is never presented as success.
+
 That serves the live deck on the local network (via Caddy when installed, the fully live built-in server otherwise),
 advertises **speak.\<your-mac\>.local** over Bonjour, and prints a QR code. It uses 43211 for a
 normal user install (or port 80 only when the process is permitted to bind it). On the iPad (same Wi-Fi):

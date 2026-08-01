@@ -131,14 +131,21 @@ For the macOS menu-bar app and the easiest Deck setup:
 ```bash
 git clone https://github.com/arach/speakeasy.git
 cd speakeasy
-bun install
 ./app/install.sh
 ```
 
-Open **SpeakEasy → Settings → Deck**, click **Start Deck**, then scan the device
-card. Enable **Start the deck with SpeakEasy** to keep it ready whenever the app
-runs. The app includes the Deck runtime and web surface; it finds the native
-Codex binary from the desktop app or the `codex` command from your login shell.
+The installer checks macOS, Bun, and Apple build tools; installs the pinned
+dependencies; builds and signs the app; safely replaces any running copy; and
+opens **SpeakEasy → Settings → Deck**. Its three-step checklist confirms the
+bundled runtime, finds Codex, and starts the live bridge. The device card and QR
+appear only when the bridge is genuinely ready.
+
+There is no separate server package and Caddy is optional. SpeakEasy finds the
+native Codex binary from the desktop app or the `codex` command in your login
+shell. Re-running `./app/install.sh` is safe; use `--no-open` in automation.
+
+Enable **Start the deck with SpeakEasy** after the first successful launch to
+keep it ready whenever the menu-bar app runs.
 
 Repeat the install on another Mac and it advertises itself separately. The
 native iPad shell shows every available Mac in its machine menu and remembers

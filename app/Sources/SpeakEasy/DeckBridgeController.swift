@@ -70,9 +70,17 @@ final class DeckBridgeController: ObservableObject {
     @Published private(set) var unreachable = false
     @Published private(set) var actionInFlight = false
     @Published private(set) var actionError: String?
+    @Published private(set) var readinessChecked = false
+    @Published private(set) var codexPath: String?
 
     /// True when the discovery pid is alive — the snapshot may still be loading.
     var running: Bool { pidAlive }
+
+    /// The setup card disappears only when the real data plane answers. A pid
+    /// alone is not a successful first run.
+    var onboardingComplete: Bool {
+        readinessChecked && codexPath != nil && running && snapshot != nil && !unreachable
+    }
 
     /// Release builds carry the complete deck runtime inside the app bundle.
     /// Development builds can still fall back to SPEAKEASY_CLI or PATH.
@@ -114,6 +122,7 @@ final class DeckBridgeController: ObservableObject {
     /// The Deck tab calls this on appear; polling stops on disappear so a
     /// hidden settings window never holds a timer or a socket.
     func beginUpdates() {
+        checkReadiness()
         poll()
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
@@ -124,6 +133,28 @@ final class DeckBridgeController: ObservableObject {
     func endUpdates() {
         timer?.invalidate()
         timer = nil
+    }
+
+    /// Resolve Codex outside the main actor so opening Settings never blocks
+    /// on a login shell. The same resolver is used by Start, so the checklist
+    /// is a preview of the real launch precondition rather than a second guess.
+    func checkReadiness() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self else { return }
+            let codex = self.resolveCodexCLI()
+            DispatchQueue.main.async {
+                self.codexPath = codex
+                self.readinessChecked = true
+            }
+        }
+    }
+
+    func openLog() {
+        try? fm.createDirectory(at: configDir, withIntermediateDirectories: true)
+        if !fm.fileExists(atPath: logFile.path) {
+            fm.createFile(atPath: logFile.path, contents: nil)
+        }
+        NSWorkspace.shared.open(logFile)
     }
 
     /// App-launch path for the persisted "start automatically" preference.
@@ -326,6 +357,7 @@ final class DeckBridgeController: ObservableObject {
     private var resolvedCLI: String?
     private var resolvedCodex: String?
     private var resolvedLoginPath: String?
+    private let codexResolutionQueue = DispatchQueue(label: "speakeasy.deck.codex-resolution")
 
     private func loginShellPath() -> String? {
         if let resolvedLoginPath { return resolvedLoginPath }
@@ -350,6 +382,10 @@ final class DeckBridgeController: ObservableObject {
     /// minimal PATH, while fnm/nvm/Homebrew are usually initialized by shell
     /// startup; passing CODEX_BIN gives the bundled runtime the exact result.
     private func resolveCodexCLI() -> String? {
+        codexResolutionQueue.sync { resolveCodexCLIUnlocked() }
+    }
+
+    private func resolveCodexCLIUnlocked() -> String? {
         if let resolvedCodex { return resolvedCodex }
         for key in ["SPEAKEASY_CODEX_BIN", "CODEX_BIN"] {
             if let candidate = ProcessInfo.processInfo.environment[key],
@@ -429,10 +465,16 @@ final class DeckBridgeController: ObservableObject {
             }
             guard let codex = self.resolveCodexCLI() else {
                 DispatchQueue.main.async {
+                    self.codexPath = nil
+                    self.readinessChecked = true
                     self.actionError = "Codex CLI wasn't found. Make `codex` available in your login shell, then try Start again."
                     self.actionInFlight = false
                 }
                 return
+            }
+            DispatchQueue.main.async {
+                self.codexPath = codex
+                self.readinessChecked = true
             }
             // Spawn the resolved binary directly — no login shell, so no job
             // control and the deck survives this app quitting (reparented to

@@ -30,11 +30,13 @@ function gitBranchFor(cwd: string): string {
     const branch = execFileSync('git', ['-C', cwd, 'branch', '--show-current'], {
       encoding: 'utf8',
       timeout: 1_500,
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     if (branch) return branch;
     const commit = execFileSync('git', ['-C', cwd, 'rev-parse', '--short', 'HEAD'], {
       encoding: 'utf8',
       timeout: 1_500,
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     return commit ? `detached @ ${commit}` : '';
   } catch {

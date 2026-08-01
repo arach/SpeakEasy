@@ -11,11 +11,15 @@ struct DeckSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            statusSection
-            if bridge.running, let deviceURL = bridge.deviceURLString, let url = URL(string: deviceURL) {
-                deviceSection(url: url)
+            if !bridge.onboardingComplete {
+                setupSection
+            } else {
+                statusSection
+                if bridge.running, let deviceURL = bridge.deviceURLString, let url = URL(string: deviceURL) {
+                    deviceSection(url: url)
+                }
+                bridgeSection
             }
-            bridgeSection
             Spacer()
         }
         .onAppear {
@@ -30,6 +34,107 @@ struct DeckSettingsView: View {
     }
 
     // MARK: - Understand
+
+    private var setupSection: some View {
+        GlassSection(title: "Get Started", icon: "checklist", color: .clear) {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Three checks, then talk to Codex")
+                        .font(.headline)
+                        .foregroundColor(theme.text)
+                    Text("The app carries the runtime. There are no server packages, URLs, or Caddy steps to configure.")
+                        .font(.caption)
+                        .foregroundColor(theme.textSecondary)
+                }
+
+                setupRow(
+                    number: 1,
+                    title: "SpeakEasy runtime",
+                    detail: bridge.includesRuntime ? "Included in this app" : "Build or install the release app",
+                    ready: bridge.includesRuntime
+                )
+
+                setupRow(
+                    number: 2,
+                    title: "Codex",
+                    detail: codexReadinessDetail,
+                    ready: bridge.codexPath != nil,
+                    buttonTitle: bridge.readinessChecked && bridge.codexPath == nil ? "Check Again" : nil,
+                    action: bridge.checkReadiness
+                )
+
+                setupRow(
+                    number: 3,
+                    title: "Deck bridge",
+                    detail: deckReadinessDetail,
+                    ready: bridge.running && bridge.snapshot != nil && !bridge.unreachable,
+                    buttonTitle: bridge.running ? nil : "Start Deck",
+                    action: bridge.start,
+                    buttonDisabled: bridge.codexPath == nil || bridge.actionInFlight
+                )
+
+                if let error = bridge.actionError {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button("Open log") { bridge.openLog() }
+                            .buttonStyle(.glassCompat)
+                    }
+                }
+            }
+        }
+    }
+
+    private var codexReadinessDetail: String {
+        if let path = bridge.codexPath {
+            return "Found \(URL(fileURLWithPath: path).lastPathComponent)"
+        }
+        return bridge.readinessChecked
+            ? "Open the Codex desktop app or add codex to your login shell"
+            : "Checking your login shell…"
+    }
+
+    private var deckReadinessDetail: String {
+        if bridge.running && bridge.snapshot != nil && !bridge.unreachable { return "Ready for browser and iPad" }
+        if bridge.running { return "Starting the live data plane…" }
+        return "Starts locally and publishes the device link"
+    }
+
+    private func setupRow(
+        number: Int,
+        title: String,
+        detail: String,
+        ready: Bool,
+        buttonTitle: String? = nil,
+        action: (() -> Void)? = nil,
+        buttonDisabled: Bool = false
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: ready ? "checkmark.circle.fill" : "\(number).circle")
+                .foregroundColor(ready ? .green : theme.textTertiary)
+                .font(.system(size: 17, weight: .medium))
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(theme.text)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundColor(theme.textSecondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            if let buttonTitle, let action {
+                Button(buttonTitle, action: action)
+                    .buttonStyle(.glassProminentCompat)
+                    .disabled(buttonDisabled)
+            }
+        }
+        .padding(.vertical, 2)
+    }
 
     private var statusSection: some View {
         GlassSection(title: "Status", icon: "dot.radiowaves.left.and.right", color: .clear) {
@@ -284,7 +389,7 @@ struct DeckSettingsView: View {
                         .frame(width: 90)
                         .onSubmit { commitPort() }
                         .onChange(of: portText) { commitPort() }
-                    Text("empty = auto (80 when free, else 43211+)")
+                    Text("empty = 43211+ (port 80 only when permitted)")
                         .font(.caption)
                         .foregroundColor(theme.textSecondary)
                 }
