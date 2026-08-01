@@ -63,17 +63,25 @@ struct HUDConversationPresentation: Equatable {
         // Header already shows the exact task; body explains the status check.
         case .cueing: return "Status check · microphone is off"
         case .ready:
-            if let laneNumber { return "Press ⌘⌥\(laneNumber) for this lane or ⌃⌥Space" }
+            if let laneNumber { return "⌘⌥\(laneNumber) to listen" }
             return "Press ⌃⌥Space and speak"
-        case .warmingUp: return "Opening the microphone before Vox warmup"
+        case .warmingUp:
+            if let laneNumber { return "⌘⌥\(laneNumber) again to stop and send" }
+            return "⌃⌥Space again to stop and send"
         case .recording:
-            if let inputDeviceName { return "⌃⌥Space to send · \(inputDeviceName)" }
+            if let laneNumber, let inputDeviceName {
+                return "⌘⌥\(laneNumber) to stop and send · \(inputDeviceName)"
+            }
+            if let laneNumber { return "⌘⌥\(laneNumber) to stop and send" }
+            if let inputDeviceName { return "⌃⌥Space to stop and send · \(inputDeviceName)" }
             return "⌃⌥Space to stop and send"
         case .transcribing: return "Turning this utterance into text"
         case .submitting:
             return transcript.isEmpty ? "Routing through Codex Desktop" : transcript
         case .preparingSpeech: return "Using your configured SpeakEasy voice"
-        case .speaking: return "⌃⌥Space interrupts and listens again"
+        case .speaking:
+            if let laneNumber { return "⌘⌥\(laneNumber) interrupts and listens again" }
+            return "⌃⌥Space interrupts and listens again"
         case .failed: return "Open SpeakEasy for details"
         case .unlocked: return "Lock SpeakEasy before listening"
         }
@@ -114,6 +122,7 @@ class HUDWindowManager: ObservableObject {
     private var visibilityHandler: ((Bool) -> Void)?
     private var listeningObservation: AnyCancellable?
     private var lastListeningPhase: ListeningPhase = .unlocked
+    private var dismissedConversation: HUDConversationPresentation?
 
     private init() {}
 
@@ -208,11 +217,12 @@ class HUDWindowManager: ObservableObject {
         defer { lastListeningPhase = phase }
         guard let lock, phase != .unlocked else {
             conversation = nil
+            dismissedConversation = nil
             if playbackProgress == nil { hideMessage() }
             return
         }
 
-        conversation = HUDConversationPresentation(
+        let nextConversation = HUDConversationPresentation(
             phase: phase,
             taskTitle: lock.title,
             taskID: lock.id,
@@ -221,6 +231,18 @@ class HUDWindowManager: ObservableObject {
             error: error,
             inputDeviceName: inputDeviceName
         )
+        let conversationChanged = conversation != nextConversation
+        conversation = nextConversation
+
+        if let dismissedConversation {
+            guard dismissedConversation != nextConversation else { return }
+            self.dismissedConversation = nil
+        }
+
+        // Repeated publications of the same state must not resurrect a HUD that
+        // already timed out. A new phase, transcript, task, or lane can present
+        // a fresh status update.
+        guard conversationChanged || isVisible else { return }
 
         hideTimer?.invalidate()
         hideTimer = nil
@@ -230,10 +252,8 @@ class HUDWindowManager: ObservableObject {
             if lastListeningPhase != .ready { scheduleHide(after: 2.8) }
         case .failed:
             scheduleHide(after: 8)
-        case .speaking:
-            break // Playback completion owns dismissal.
         default:
-            break // Keep active work visible until the phase changes.
+            scheduleHide()
         }
     }
 
@@ -281,6 +301,7 @@ class HUDWindowManager: ObservableObject {
     func dismiss() {
         hideTimer?.invalidate()
         hideTimer = nil
+        dismissedConversation = conversation
         hideMessage()
     }
 }

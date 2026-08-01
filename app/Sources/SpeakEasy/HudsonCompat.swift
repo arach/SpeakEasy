@@ -97,15 +97,15 @@ struct FlatProminentButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(HudFont.ui(13, weight: .semibold))
-            .foregroundStyle(HudPalette.ink)
+            .foregroundStyle(HudPalette.chrome)
             .padding(.horizontal, HudSpacing.xl)
             .padding(.vertical, HudSpacing.md)
             .background(
                 RoundedRectangle(cornerRadius: HudRadius.standard)
-                    .fill(HudSurface.hover)
+                    .fill(HudTint.green.color)
                     .overlay(
                         RoundedRectangle(cornerRadius: HudRadius.standard)
-                            .stroke(HudPalette.border, lineWidth: 0.5)
+                            .stroke(HudSurface.tintFocus(HudTint.green.color), lineWidth: 0.5)
                     )
             )
             .opacity(configuration.isPressed ? 0.7 : 1.0)

@@ -2,8 +2,17 @@ import SwiftUI
 
 /// Compact menu-bar player popover. Observes `PlaybackEngine.shared` and only
 /// surfaces transport actions that the engine already implements.
+///
+/// Layout is three zones with three different treatments, so the pop-up reads as
+/// a player rather than a stack of equally weighted cards:
+///
+///   1. conversation / task state — flat on the pop-up background
+///   2. playback — a single raised well holding now-playing, timeline,
+///      transport, and the output controls
+///   3. queue + utility — flat, separated by hairlines
 struct PlayerPopoverView: View {
     @ObservedObject private var engine = PlaybackEngine.shared
+    @ObservedObject private var listening = ListeningSessionController.shared
     @Environment(\.theme) private var theme
 
     let onOpenSettings: () -> Void
@@ -12,15 +21,9 @@ struct PlayerPopoverView: View {
     @State private var isScrubbing = false
     @State private var scrubTime: TimeInterval = 0
 
-    private let popoverWidth: CGFloat = 320
-    private let outerInset: CGFloat = 14
-    private let trailingControlWidth: CGFloat = 64
     private let speedOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
 
-    /// Controller accent from the generated SpeakEasy concept (mint).
-    private var accent: Color {
-        Color(red: 0.36, green: 0.87, blue: 0.66)
-    }
+    private var accent: Color { SpeakEasyAccent.mint }
 
     init(
         onOpenSettings: @escaping () -> Void = {},
@@ -33,15 +36,15 @@ struct PlayerPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            PopoverHairline()
             ListeningPopoverSection()
-            nowPlayingSection
-            scrubberSection
-            transportSection
-            controlsSection
+            playbackWell
+            PopoverHairline()
             queueSection
+            PopoverHairline()
             footer
         }
-        .frame(width: popoverWidth)
+        .frame(width: PopoverMetrics.width)
         .background(theme.background)
     }
 
@@ -58,233 +61,178 @@ struct PlayerPopoverView: View {
                 .accessibilityHidden(true)
 
             Text("SpeakEasy")
-                .font(.system(size: 13, weight: .semibold))
+                .font(PopoverType.title)
                 .foregroundColor(theme.text)
 
             Spacer()
 
             stateBadge
         }
-        .padding(.horizontal, outerInset)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
+        .padding(.horizontal, PopoverMetrics.gutter)
+        .padding(.top, 13)
+        .padding(.bottom, 11)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("SpeakEasy player, \(stateAccessibilityLabel)")
     }
 
+    /// Playback state only. The listening phase has its own readout in the
+    /// conversation zone, so the two never describe the same thing.
     private var stateBadge: some View {
         HStack(spacing: 5) {
             Circle()
                 .fill(stateColor)
-                .frame(width: 6, height: 6)
+                .frame(width: 5, height: 5)
                 .accessibilityHidden(true)
 
             Text(stateLabel)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(PopoverType.caption)
                 .foregroundColor(stateColor)
         }
-        .padding(.horizontal, 9)
+        .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
-            Capsule()
-                .fill(stateColor.opacity(0.14))
+            Capsule().fill(engine.state == .idle ? Color.clear : stateColor.opacity(0.13))
         )
         .accessibilityLabel("Playback state: \(stateLabel)")
     }
 
-    // MARK: - Now Playing
+    // MARK: - Playback well
 
-    private var nowPlayingSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let item = engine.currentItem {
-                activeNowPlaying(item)
-            } else {
-                idleNowPlaying
-            }
+    /// The one raised surface in the pop-up: now playing, timeline, transport,
+    /// and output controls read as a single instrument.
+    private var playbackWell: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            nowPlayingRow
+                .padding(.bottom, 12)
+
+            timelineRow
+                .padding(.bottom, 10)
+
+            transportRow
+                .padding(.bottom, 4)
+
+            PopoverHairline()
+                .padding(.bottom, 10)
+
+            outputControls
 
             if let error = engine.lastError, engine.state == .failed {
-                errorBanner(error)
+                PopoverCallout(message: error, accessibilityPrefix: "Playback error")
+                    .padding(.top, 10)
             }
         }
-        .padding(.horizontal, outerInset)
-        .padding(.bottom, 10)
-    }
-
-    private func activeNowPlaying(_ item: PlaybackItem) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(theme.text.opacity(0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(theme.text.opacity(0.10), lineWidth: 0.5)
-                    )
-                    .frame(width: 44, height: 44)
-                Image(systemName: "doc.text.fill")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(theme.textTertiary)
-            }
-            .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(theme.text)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel("Now playing: \(item.title)")
-
-                if let provider = item.provider, !provider.isEmpty {
-                    Text(provider.capitalized)
-                        .font(.system(size: 12))
-                        .foregroundColor(theme.textSecondary)
-                        .lineLimit(1)
-                        .accessibilityLabel("Provider: \(provider)")
-                } else if let text = item.text, !text.isEmpty {
-                    Text(text)
-                        .font(.system(size: 12))
-                        .foregroundColor(theme.textTertiary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .accessibilityLabel("Spoken text: \(text)")
-                }
-            }
-        }
-        .padding(12)
+        .padding(PopoverMetrics.wellPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(theme.text.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(theme.text.opacity(0.10), lineWidth: 0.5)
-                )
+            RoundedRectangle(cornerRadius: PopoverMetrics.wellRadius, style: .continuous)
+                .fill(theme.wellFill)
         )
+        .padding(.horizontal, PopoverMetrics.gutter)
+        .padding(.vertical, PopoverMetrics.zonePadding)
     }
 
-    private var idleNowPlaying: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(theme.text.opacity(0.04))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(theme.text.opacity(0.08), lineWidth: 0.5)
-                    )
-                    .frame(width: 44, height: 44)
-                Image(systemName: idleIcon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(theme.textTertiary)
-            }
-            .accessibilityHidden(true)
+    // MARK: - Now playing
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(idleTitle)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(theme.textSecondary)
-                Text(idleSubtitle)
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textTertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+    private var nowPlayingRow: some View {
+        HStack(alignment: .center, spacing: 11) {
+            artworkTile
 
-            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(primaryTitle)
+                    .font(PopoverType.itemTitle)
+                    .foregroundColor(engine.currentItem == nil ? theme.textSecondary : theme.text)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Text(primarySubtitle)
+                    .font(PopoverType.secondary)
+                    .foregroundColor(theme.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(theme.text.opacity(0.04))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(theme.text.opacity(0.08), lineWidth: 0.5)
-                )
-        )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(idleTitle). \(idleSubtitle)")
+        .accessibilityLabel(nowPlayingAccessibilityLabel)
     }
 
-    private func errorBanner(_ message: String) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 11))
-                .foregroundColor(.orange)
-            Text(message)
-                .font(.system(size: 11))
-                .foregroundColor(theme.textSecondary)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
+    private var artworkTile: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(engine.currentItem == nil ? theme.insetFillMuted : accent.opacity(0.16))
+                .frame(width: 36, height: 36)
+
+            Image(systemName: artworkSymbol)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(engine.currentItem == nil ? theme.textTertiary : accent)
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.orange.opacity(0.12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.orange.opacity(0.25), lineWidth: 0.5)
-                )
-        )
-        .accessibilityLabel("Playback error: \(message)")
+        .accessibilityHidden(true)
     }
 
-    // MARK: - Scrubber
+    // MARK: - Timeline
 
-    private var scrubberSection: some View {
-        VStack(spacing: 4) {
-            Slider(
-                value: scrubBinding,
-                in: 0...max(engine.duration, 0.001),
-                onEditingChanged: handleScrubEditing
+    private var timelineRow: some View {
+        VStack(spacing: 5) {
+            PopoverScrubBar(
+                value: displayedTime,
+                span: max(engine.duration, 0.001),
+                enabled: canScrub,
+                accent: accent,
+                trackHeight: 4,
+                step: 5,
+                accessibilityLabelText: "Playback position",
+                accessibilityValueText: timeAccessibilityValue,
+                onScrub: { newValue in
+                    isScrubbing = true
+                    scrubTime = newValue
+                },
+                onCommit: { newValue in
+                    scrubTime = newValue
+                    engine.seek(to: newValue)
+                    isScrubbing = false
+                }
             )
-            .disabled(!canScrub)
-            .controlSize(.small)
-            .tint(accent)
-            .accessibilityLabel("Playback position")
-            .accessibilityValue(timeAccessibilityValue)
-            .accessibilityHint(canScrub ? "Drag to seek" : "Seek unavailable")
 
             HStack {
-                Text(formatTime(displayedTime))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                Text(PopoverFormat.time(displayedTime))
+                    .font(PopoverType.mono)
                     .foregroundColor(theme.textTertiary)
-                    .accessibilityLabel("Elapsed \(formatTimeSpoken(displayedTime))")
+                    .accessibilityHidden(true)
 
                 Spacer()
 
-                Text(formatTime(engine.duration))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                Text(PopoverFormat.time(engine.duration))
+                    .font(PopoverType.mono)
                     .foregroundColor(theme.textTertiary)
-                    .accessibilityLabel("Duration \(formatTimeSpoken(engine.duration))")
+                    .accessibilityHidden(true)
             }
         }
-        .padding(.horizontal, outerInset)
-        .padding(.bottom, 6)
-        .opacity(canScrub || engine.currentItem != nil ? 1 : 0.5)
+        .opacity(canScrub ? 1 : 0.55)
     }
 
     // MARK: - Transport
 
-    private var transportSection: some View {
+    /// Three balanced zones. Stop is a distinct utility on the leading edge and
+    /// an equal-width trailing spacer keeps play/pause on the exact centre axis.
+    private var transportRow: some View {
         HStack(spacing: 0) {
-            Spacer(minLength: 0)
+            transportButton(
+                systemName: "stop.fill",
+                label: "Stop",
+                enabled: canStop,
+                action: { engine.stop() }
+            )
+            .frame(width: 36)
 
-            HStack(spacing: 10) {
-                transportButton(
-                    systemName: "stop.fill",
-                    label: "Stop",
-                    enabled: canStop,
-                    action: { engine.stop() }
-                )
-                .frame(width: 44)
+            Spacer(minLength: 4)
 
+            HStack(spacing: 14) {
                 transportButton(
                     systemName: "backward.end.fill",
                     label: "Restart",
                     enabled: canRestart,
                     action: { engine.seek(to: 0) }
                 )
-                .frame(width: 44)
 
                 transportButton(
                     systemName: playPauseSymbol,
@@ -300,19 +248,15 @@ struct PlayerPopoverView: View {
                     enabled: canSkip,
                     action: skip
                 )
-                .frame(width: 44)
-
-                // Balance the second leading action so Play stays on the center axis.
-                Color.clear
-                    .frame(width: 44, height: 34)
-                    .accessibilityHidden(true)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 4)
+
+            // Balances the leading Stop slot so Play stays centred.
+            Color.clear
+                .frame(width: 36, height: 32)
+                .accessibilityHidden(true)
         }
-        .padding(.horizontal, outerInset)
-        .padding(.top, 4)
-        .padding(.bottom, 12)
     }
 
     private func transportButton(
@@ -322,254 +266,184 @@ struct PlayerPopoverView: View {
         prominent: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
-        let side: CGFloat = prominent ? 52 : 34
-        let iconSize: CGFloat = prominent ? 18 : 12
-        let iconColor: Color = {
-            if prominent {
-                return enabled ? Color.black.opacity(0.85) : Color.black.opacity(0.45)
-            }
-            return enabled ? theme.text.opacity(0.9) : theme.textTertiary
-        }()
-        let fillColor: Color = {
-            if prominent {
-                return enabled ? accent : accent.opacity(0.45)
-            }
-            return enabled ? theme.text.opacity(0.10) : theme.text.opacity(0.04)
-        }()
-        let strokeColor: Color = {
-            if prominent { return Color.clear }
-            return enabled ? theme.text.opacity(0.16) : theme.text.opacity(0.08)
-        }()
+        let side: CGFloat = prominent ? 46 : 32
+        let iconSize: CGFloat = prominent ? 17 : 12
 
         return Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: iconSize, weight: .semibold))
-                .foregroundColor(iconColor)
-                .frame(width: side, height: side)
-                .contentShape(Circle())
-                .background(
-                    Circle()
-                        .fill(fillColor)
-                        .overlay(
-                            Circle()
-                                .stroke(strokeColor, lineWidth: 1)
-                        )
+                .foregroundColor(
+                    prominent
+                        ? Color.black.opacity(enabled ? 0.88 : 0.45)
+                        : (enabled ? theme.text.opacity(0.85) : theme.textTertiary)
                 )
+                .frame(width: side, height: side)
+                .background(
+                    Circle().fill(
+                        prominent
+                            ? (enabled ? accent : accent.opacity(0.35))
+                            : (enabled ? theme.insetFill : theme.insetFillMuted)
+                    )
+                )
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-        .opacity(enabled || prominent ? 1 : 0.55)
+        .opacity(enabled ? 1 : 0.75)
         .accessibilityLabel(label)
         .help(label)
     }
 
-    // MARK: - Controls (volume / speed / autoplay)
+    // MARK: - Output controls
 
-    private var controlsSection: some View {
-        VStack(spacing: 10) {
+    /// Two rows instead of three, and no icon column for speed/autoplay — the
+    /// point is to stay reachable without turning into a settings form.
+    private var outputControls: some View {
+        VStack(spacing: 12) {
             volumeRow
-            speedRow
-            autoplayRow
+            speedAndAutoplayRow
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(theme.text.opacity(0.045))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(theme.text.opacity(0.08), lineWidth: 0.5)
-                )
-        )
-        .padding(.horizontal, outerInset)
-        .padding(.bottom, 10)
     }
 
     private var volumeRow: some View {
         HStack(spacing: 10) {
-            Image(systemName: volumeIcon)
+            Image(systemName: PopoverFormat.volumeSymbol(for: engine.volume))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(theme.textSecondary)
-                .frame(width: 16)
+                .frame(width: 15, alignment: .leading)
                 .accessibilityHidden(true)
 
-            Slider(
-                value: volumeBinding,
-                in: 0...1
+            PopoverScrubBar(
+                value: Double(engine.volume),
+                span: 1,
+                enabled: true,
+                // Neutral, not mint. Volume is a level, not an active state —
+                // a full-width green bar was pulling focus off play/pause.
+                accent: theme.text.opacity(0.45),
+                trackHeight: 3,
+                step: 0.05,
+                accessibilityLabelText: "Volume",
+                accessibilityValueText: "\(Int((engine.volume * 100).rounded())) percent",
+                onScrub: { engine.setVolume(Float($0)) },
+                onCommit: { engine.setVolume(Float($0)) }
             )
-            .controlSize(.small)
-            .tint(accent)
-            .accessibilityLabel("Volume")
-            .accessibilityValue("\(Int((engine.volume * 100).rounded())) percent")
 
-            Text("\(Int((engine.volume * 100).rounded()))%")
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
+            Text(PopoverFormat.percent(engine.volume))
+                .font(PopoverType.mono)
                 .foregroundColor(theme.textSecondary)
-                .frame(width: trailingControlWidth, alignment: .trailing)
+                .frame(width: 34, alignment: .trailing)
                 .accessibilityHidden(true)
         }
     }
 
-    private var speedRow: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "gauge")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(theme.textSecondary)
-                .frame(width: 16)
-                .accessibilityHidden(true)
-
-            Text("Playback speed")
-                .font(.system(size: 12, weight: .medium))
+    private var speedAndAutoplayRow: some View {
+        HStack(spacing: 8) {
+            Text(speedLane.map { "Speed · L\($0.number)" } ?? "Speed")
+                .font(PopoverType.rowLabel)
                 .foregroundColor(theme.textSecondary)
 
-            Spacer()
+            speedMenu
 
-            Menu {
-                ForEach(speedOptions, id: \.self) { rate in
-                    Button {
-                        engine.setPlaybackRate(rate)
-                    } label: {
-                        if abs(rate - engine.playbackRate) < 0.001 {
-                            Label(speedLabel(rate), systemImage: "checkmark")
-                        } else {
-                            Text(speedLabel(rate))
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(speedLabel(engine.playbackRate))
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 8, weight: .semibold))
-                }
-                // Plain style + theme primary: borderless Menu otherwise draws black NSButton text.
-                .foregroundStyle(theme.text.opacity(0.88))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(theme.text.opacity(0.08))
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            }
-            .menuStyle(.borderlessButton)
-            .buttonStyle(.plain)
-            .tint(theme.text.opacity(0.88))
-            .frame(width: trailingControlWidth, alignment: .trailing)
-            .accessibilityLabel("Playback speed")
-            .accessibilityValue(speedLabel(engine.playbackRate))
-        }
-    }
+            Spacer(minLength: 8)
 
-    private var autoplayRow: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 11, weight: .semibold))
+            Text("Autoplay")
+                .font(PopoverType.rowLabel)
                 .foregroundColor(theme.textSecondary)
-                .frame(width: 16)
-                .accessibilityHidden(true)
-
-            Text("Autoplay next")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(theme.textSecondary)
-
-            Spacer()
 
             Toggle("", isOn: autoplayBinding)
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .controlSize(.small)
+                .controlSize(.mini)
                 .tint(accent)
-                .frame(width: trailingControlWidth, alignment: .trailing)
                 .accessibilityLabel("Autoplay next")
                 .accessibilityValue(engine.autoplayEnabled ? "On" : "Off")
                 .accessibilityHint("When on, play the next queued item automatically")
         }
     }
 
+    private var speedMenu: some View {
+        Picker("Playback speed", selection: speedBinding) {
+            ForEach(speedOptions, id: \.self) { rate in
+                Text(PopoverFormat.speed(rate)).tag(rate)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .controlSize(.small)
+        .environment(\.colorScheme, .dark)
+        .tint(theme.text)
+        .fixedSize()
+        .disabled(speedLane == nil)
+        .accessibilityValue(speedLane.map {
+            "Lane \($0.number), \(PopoverFormat.speed($0.effectivePlaybackRate))"
+        } ?? "No assigned lane")
+        .help(speedLane.map { "Playback speed for Lane \($0.number)" } ?? "Assign a lane to set its speed")
+    }
+
     // MARK: - Queue
 
     private var queueSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Up Next")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(theme.textSecondary)
-                    .textCase(.uppercase)
-                    .tracking(0.4)
+            HStack(spacing: 7) {
+                PopoverSectionLabel(text: "Up next")
 
                 Text("\(engine.queue.count)")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(theme.textTertiary)
+                    .font(PopoverType.mono)
+                    .foregroundColor(engine.queue.isEmpty ? theme.textTertiary : theme.text)
                     .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(theme.surface))
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(theme.insetFill))
                     .accessibilityLabel("\(engine.queue.count) items in queue")
 
                 Spacer()
 
                 if !engine.queue.isEmpty {
-                    Button("Clear") {
-                        engine.clearQueue()
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(theme.textSecondary)
-                    .accessibilityLabel("Clear queue")
-                    .help("Clear queue")
+                    Button("Clear") { engine.clearQueue() }
+                        .buttonStyle(.popoverText)
+                        .accessibilityLabel("Clear queue")
+                        .help("Clear queue")
                 }
             }
 
             if engine.queue.isEmpty {
                 Text(emptyQueueMessage)
-                    .font(.system(size: 11))
+                    .font(PopoverType.secondary)
                     .foregroundColor(theme.textTertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 6)
+                    .padding(.bottom, 2)
                     .accessibilityLabel(emptyQueueMessage)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 4) {
+                    LazyVStack(spacing: 3) {
                         ForEach(Array(engine.queue.enumerated()), id: \.element.id) { index, item in
                             queueRow(item, index: index)
                         }
                     }
                 }
-                .frame(maxHeight: 140)
+                .frame(maxHeight: 132)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(theme.text.opacity(0.04))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(theme.text.opacity(0.08), lineWidth: 0.5)
-                )
-        )
-        .padding(.horizontal, outerInset)
-        .padding(.bottom, 10)
+        .padding(.horizontal, PopoverMetrics.gutter)
+        .padding(.vertical, PopoverMetrics.zonePadding)
     }
 
     private func queueRow(_ item: PlaybackItem, index: Int) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "list.bullet.rectangle")
-                .font(.system(size: 11, weight: .medium))
+        HStack(spacing: 9) {
+            Text("\(index + 1)")
+                .font(PopoverType.mono)
                 .foregroundColor(theme.textTertiary)
-                .frame(width: 16)
+                .frame(width: 14, alignment: .trailing)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(PopoverType.secondaryStrong)
                     .foregroundColor(theme.text)
                     .lineLimit(1)
 
                 if let provider = item.provider, !provider.isEmpty {
                     Text(provider.capitalized)
-                        .font(.system(size: 10))
+                        .font(PopoverType.caption)
                         .foregroundColor(theme.textTertiary)
                         .lineLimit(1)
                 }
@@ -583,46 +457,46 @@ struct PlayerPopoverView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(theme.textTertiary)
-                    .frame(width: 20, height: 20)
-                    .background(Circle().fill(theme.surface))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Remove \(item.title) from queue")
             .help("Remove from queue")
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
+        .padding(.leading, 6)
+        .padding(.trailing, 2)
+        .padding(.vertical, 5)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(theme.surface.opacity(0.7))
+            RoundedRectangle(cornerRadius: PopoverMetrics.chipRadius, style: .continuous)
+                .fill(theme.wellFill)
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel(queueItemAccessibilityLabel(item, index: index))
     }
 
+    // MARK: - Footer
+
     private var footer: some View {
-        HStack {
+        HStack(spacing: 0) {
             Button(action: onOpenSettings) {
                 Label("Settings", systemImage: "gearshape")
+                    .labelStyle(.titleAndIcon)
             }
-            .buttonStyle(.plain)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundColor(theme.textSecondary)
+            .buttonStyle(.popoverText)
             .accessibilityHint("Open SpeakEasy settings")
 
             Spacer()
 
             Button(action: onQuit) {
                 Label("Quit", systemImage: "power")
+                    .labelStyle(.titleAndIcon)
             }
-            .buttonStyle(.plain)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundColor(theme.textTertiary)
+            .buttonStyle(.popoverTextTertiary)
             .accessibilityLabel("Quit SpeakEasy")
         }
-        .padding(.horizontal, outerInset)
-        .padding(.top, 4)
-        .padding(.bottom, 14)
+        .padding(.horizontal, PopoverMetrics.gutter - 8)
+        .padding(.vertical, 9)
     }
 
     // MARK: - Actions
@@ -643,31 +517,7 @@ struct PlayerPopoverView: View {
         }
     }
 
-    private func handleScrubEditing(_ editing: Bool) {
-        if editing {
-            isScrubbing = true
-            scrubTime = engine.currentTime
-        } else {
-            engine.seek(to: scrubTime)
-            isScrubbing = false
-        }
-    }
-
     // MARK: - Bindings
-
-    private var scrubBinding: Binding<Double> {
-        Binding(
-            get: { isScrubbing ? scrubTime : engine.currentTime },
-            set: { scrubTime = $0 }
-        )
-    }
-
-    private var volumeBinding: Binding<Double> {
-        Binding(
-            get: { Double(engine.volume) },
-            set: { engine.setVolume(Float($0)) }
-        )
-    }
 
     private var autoplayBinding: Binding<Bool> {
         Binding(
@@ -715,17 +565,30 @@ struct PlayerPopoverView: View {
         isScrubbing ? scrubTime : engine.currentTime
     }
 
-    private var volumeIcon: String {
-        if engine.volume <= 0.001 {
-            return "speaker.slash.fill"
+    private var activeLane: VoiceLane? {
+        listening.activeLaneNumber.flatMap(listening.lane(_:))
+    }
+
+    /// Playback speed belongs to a lane, but changing it should not require the
+    /// microphone session to be active. Prefer the selected lane, then the lane
+    /// for the locked task, and finally the first assigned lane.
+    private var speedLane: VoiceLane? {
+        if let activeLane { return activeLane }
+        if let lockedTask = listening.lockedTask,
+           let matchingLane = listening.lanes.first(where: { $0.task.id == lockedTask.id }) {
+            return matchingLane
         }
-        if engine.volume < 0.34 {
-            return "speaker.wave.1.fill"
-        }
-        if engine.volume < 0.67 {
-            return "speaker.wave.2.fill"
-        }
-        return "speaker.wave.3.fill"
+        return listening.lanes.first
+    }
+
+    private var speedBinding: Binding<Float> {
+        Binding(
+            get: { speedLane?.effectivePlaybackRate ?? 1 },
+            set: { rate in
+                guard let laneNumber = speedLane?.number else { return }
+                listening.setPlaybackRate(rate, forLane: laneNumber)
+            }
+        )
     }
 
     private var stateLabel: String {
@@ -742,7 +605,7 @@ struct PlayerPopoverView: View {
         switch engine.state {
         case .idle: return theme.textTertiary
         case .loading: return .orange
-        case .playing: return accent
+        case .playing: return SpeakEasyAccent.mint
         case .paused: return theme.textSecondary
         case .failed: return .orange
         }
@@ -752,82 +615,67 @@ struct PlayerPopoverView: View {
         stateLabel.lowercased()
     }
 
-    private var idleTitle: String {
+    // MARK: - Now-playing copy
+
+    private var primaryTitle: String {
+        if let item = engine.currentItem {
+            return item.title
+        }
         if !engine.queue.isEmpty {
             return "Ready to play"
         }
         switch engine.state {
-        case .failed:
-            return "Playback failed"
-        case .loading:
-            return "Loading…"
-        default:
-            return "Nothing playing"
+        case .failed: return "Playback failed"
+        case .loading: return "Loading…"
+        default: return "Nothing playing"
         }
     }
 
-    private var idleSubtitle: String {
+    private var primarySubtitle: String {
+        if let item = engine.currentItem {
+            if let provider = item.provider, !provider.isEmpty {
+                return provider.capitalized
+            }
+            if let text = item.text, !text.isEmpty {
+                return text
+            }
+            return "Speech"
+        }
         if !engine.queue.isEmpty {
             let count = engine.queue.count
             return count == 1
-                ? "1 item waiting — press Play to start"
-                : "\(count) items waiting — press Play to start"
+                ? "1 item waiting — press play to start"
+                : "\(count) items waiting — press play to start"
         }
         switch engine.state {
-        case .failed:
-            return engine.lastError ?? "Try enqueueing audio again"
-        default:
-            return "Enqueue speech from the CLI or skills"
+        // The raw engine error is carried by the callout below the controls, so
+        // the subtitle stays a short, un-truncated summary.
+        case .failed: return "Try enqueueing audio again"
+        default: return "Enqueue speech from the CLI or skills"
         }
     }
 
-    private var idleIcon: String {
-        if !engine.queue.isEmpty {
-            return "play.circle"
+    private var artworkSymbol: String {
+        if engine.currentItem != nil {
+            return engine.state == .playing ? "waveform" : "doc.text.fill"
         }
-        if engine.state == .failed {
-            return "exclamationmark.triangle"
-        }
+        if !engine.queue.isEmpty { return "play.fill" }
+        if engine.state == .failed { return "exclamationmark.triangle" }
         return "text.bubble"
     }
 
+    private var nowPlayingAccessibilityLabel: String {
+        engine.currentItem == nil
+            ? "\(primaryTitle). \(primarySubtitle)"
+            : "Now playing: \(primaryTitle), \(primarySubtitle)"
+    }
+
     private var emptyQueueMessage: String {
-        if engine.currentItem != nil {
-            return "No more items after this one"
-        }
-        return "Queue is empty"
+        engine.currentItem != nil ? "No more items after this one" : "Queue is empty"
     }
 
     private var timeAccessibilityValue: String {
-        "\(formatTimeSpoken(displayedTime)) of \(formatTimeSpoken(engine.duration))"
-    }
-
-    // MARK: - Formatting
-
-    private func formatTime(_ time: TimeInterval) -> String {
-        guard time.isFinite, time >= 0 else { return "0:00" }
-        let total = Int(time.rounded(.down))
-        let minutes = total / 60
-        let seconds = total % 60
-        return String(format: "%d:%02d", minutes, seconds)
-    }
-
-    private func formatTimeSpoken(_ time: TimeInterval) -> String {
-        guard time.isFinite, time >= 0 else { return "0 seconds" }
-        let total = Int(time.rounded(.down))
-        let minutes = total / 60
-        let seconds = total % 60
-        if minutes == 0 {
-            return "\(seconds) seconds"
-        }
-        return "\(minutes) minutes \(seconds) seconds"
-    }
-
-    private func speedLabel(_ rate: Float) -> String {
-        if abs(rate - rate.rounded()) < 0.001 {
-            return String(format: "%.0f×", rate)
-        }
-        return String(format: "%.2g×", rate)
+        "\(PopoverFormat.spokenTime(displayedTime)) of \(PopoverFormat.spokenTime(engine.duration))"
     }
 
     private func queueItemAccessibilityLabel(_ item: PlaybackItem, index: Int) -> String {

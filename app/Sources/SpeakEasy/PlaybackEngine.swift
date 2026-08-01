@@ -112,6 +112,67 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         player?.rate = playbackRate
     }
 
+    #if DEBUG
+    /// Which playback state a design snapshot should render.
+    enum SnapshotFixture: String, CaseIterable {
+        case idle
+        case playing
+        case queued
+        case failed
+    }
+
+    /// Populates published state directly so the popover can be rendered without
+    /// real audio files. Never called outside `--snapshot-player`.
+    func installSnapshotFixture(_ fixture: SnapshotFixture) {
+        func item(_ title: String, _ provider: String) -> PlaybackItem {
+            PlaybackItem(
+                id: UUID(uuidString: "0000000\(abs(title.hashValue % 9))-0000-4000-8000-00000000000\(abs(title.count % 9))")
+                    ?? UUID(),
+                audioPath: "/tmp/speakeasy-snapshot.mp3",
+                title: title,
+                text: nil,
+                provider: provider,
+                createdAt: "2026-07-26T17:00:00Z",
+                synthesisRateWPM: 160,
+                sourceThreadId: nil
+            )
+        }
+
+        volume = 0.8
+        playbackRate = 1
+        autoplayEnabled = true
+        lastError = nil
+
+        switch fixture {
+        case .idle:
+            state = .idle
+            currentItem = nil
+            queue = []
+            currentTime = 0
+            duration = 0
+        case .playing:
+            state = .playing
+            currentItem = item("Popover redesign summary", "elevenlabs")
+            queue = [item("Build log digest", "openai"), item("Scout relay update", "groq")]
+            currentTime = 41
+            duration = 128
+        case .queued:
+            state = .idle
+            currentItem = nil
+            queue = [item("Build log digest", "openai"), item("Scout relay update", "groq")]
+            currentTime = 0
+            duration = 0
+        case .failed:
+            state = .failed
+            currentItem = nil
+            queue = []
+            currentTime = 0
+            duration = 0
+            lastError = "could_not_open_audio: the file could not be opened because it is not in a recognised format"
+        }
+    }
+    #endif
+
     func snapshot() -> PlayerSnapshot {
         PlayerSnapshot(
             state: state,
@@ -216,10 +277,12 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
         do {
             let nextPlayer = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: item.audioPath))
+            let itemPlaybackRate = VoiceLane.normalizedPlaybackRate(item.playbackRate) ?? playbackRate
+            playbackRate = itemPlaybackRate
             nextPlayer.delegate = self
             nextPlayer.enableRate = true
             nextPlayer.volume = volume
-            nextPlayer.rate = playbackRate
+            nextPlayer.rate = itemPlaybackRate
             nextPlayer.isMeteringEnabled = true
             nextPlayer.prepareToPlay()
 

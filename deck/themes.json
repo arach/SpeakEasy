@@ -1,0 +1,21 @@
+{
+  "templates": [
+    {
+      "id": "speakeasy-deck",
+      "title": "Micro Deck",
+      "path": "./index.html",
+      "contract": 1,
+      "seeds": ["paper", "ember", "flight"],
+      "description": "9-pad hardware plate + lane console with conversation, audio scrubbing, and trace rail."
+    }
+  ],
+  "variants": [
+    {
+      "id": "oxide",
+      "title": "Oxide",
+      "base": "flight",
+      "path": "./variants/oxide/",
+      "description": "Rusted flight: ember-orange accent family over the dark teal base, squared geometry."
+    }
+  ]
+}

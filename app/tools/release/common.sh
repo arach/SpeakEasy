@@ -101,6 +101,9 @@ speakeasy_verify_bundle_layout() {
     local bundle_path="$1"
     local executable="$bundle_path/Contents/MacOS/SpeakEasy"
     local frameworks_dir="$bundle_path/Contents/Frameworks"
+    local resources_dir="$bundle_path/Contents/Resources"
+    local info_plist="$bundle_path/Contents/Info.plist"
+    local pad_index
     local framework_name
 
     if [ ! -x "$executable" ]; then
@@ -124,6 +127,50 @@ speakeasy_verify_bundle_layout() {
             | awk '/@rpath\/.*\.framework\// { split($1, parts, "/"); print parts[2] }' \
             | sort -u
     )
+
+    pad_index="$(find "$resources_dir" -type f -path '*/Pad/index.html' -print -quit 2>/dev/null || true)"
+    if [ -z "$pad_index" ]; then
+        echo "Bundled SpeakEasy Pad index.html is missing." >&2
+        return 1
+    fi
+
+    local pad_dir
+    pad_dir="$(dirname "$pad_index")"
+    for pad_asset in app.js app.css; do
+        if [ ! -s "$pad_dir/$pad_asset" ]; then
+            echo "Bundled SpeakEasy Pad asset is missing or empty: $pad_asset" >&2
+            return 1
+        fi
+    done
+
+    if [ -z "$(/usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "$info_plist" 2>/dev/null || true)" ]; then
+        echo "NSLocalNetworkUsageDescription is missing from the app bundle." >&2
+        return 1
+    fi
+
+    local bonjour_services
+    bonjour_services="$(/usr/libexec/PlistBuddy -c 'Print :NSBonjourServices' "$info_plist" 2>/dev/null || true)"
+    for service in '_http._tcp' '_speakeasy-pad._tcp'; do
+        if ! grep -Fq "$service" <<<"$bonjour_services"; then
+            echo "Required Bonjour service is missing from the app bundle: $service" >&2
+            return 1
+        fi
+    done
+}
+
+speakeasy_verify_signed_bundle() {
+    local bundle_path="$1"
+    local signed_entitlements
+
+    codesign --verify --deep --strict --verbose=2 "$bundle_path"
+
+    signed_entitlements="$({ codesign -d --entitlements :- "$bundle_path" 2>&1 \
+        | sed -n '/<?xml/,$p' \
+        | plutil -p - 2>/dev/null; } || true)"
+    if ! grep -Fq '"com.apple.security.network.server" => true' <<<"$signed_entitlements"; then
+        echo "Signed app is missing com.apple.security.network.server=true." >&2
+        return 1
+    fi
 }
 
 speakeasy_bundle_app() {

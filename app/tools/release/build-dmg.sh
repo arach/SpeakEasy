@@ -30,6 +30,8 @@ if [ "$SKIP_NOTARIZE" != "1" ] && [ "$SKIP_SIGN" != "1" ]; then
     xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null
 fi
 
+"$APP_ROOT/Scripts/sync-pad-assets.sh"
+
 echo "==> Building SpeakEasy v$VERSION (release)..."
 cd "$APP_ROOT"
 build_log="$(mktemp)"
@@ -49,6 +51,9 @@ speakeasy_verify_bundle_layout "$BUNDLE"
 echo "    App bundle created at $BUNDLE"
 
 SPEAKEASY_SIGN_STRICT=1 "$SCRIPT_DIR/sign-bundle.sh" "$BUNDLE"
+if [ "$SKIP_SIGN" != "1" ]; then
+    speakeasy_verify_signed_bundle "$BUNDLE"
+fi
 
 echo "==> Creating DMG..."
 DMG_STAGING="$(mktemp -d)"

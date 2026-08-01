@@ -42,6 +42,7 @@ struct PlaybackItem: Codable, Identifiable, Equatable {
     let synthesisRateWPM: Int?
     let sourceThreadId: String?
     let cleanupAfterPlayback: Bool?
+    let playbackRate: Float?
 
     init(
         id: UUID,
@@ -52,7 +53,8 @@ struct PlaybackItem: Codable, Identifiable, Equatable {
         createdAt: String,
         synthesisRateWPM: Int?,
         sourceThreadId: String?,
-        cleanupAfterPlayback: Bool? = nil
+        cleanupAfterPlayback: Bool? = nil,
+        playbackRate: Float? = nil
     ) {
         self.id = id
         self.audioPath = audioPath
@@ -63,6 +65,7 @@ struct PlaybackItem: Codable, Identifiable, Equatable {
         self.synthesisRateWPM = synthesisRateWPM
         self.sourceThreadId = sourceThreadId
         self.cleanupAfterPlayback = cleanupAfterPlayback
+        self.playbackRate = playbackRate
     }
 }
 

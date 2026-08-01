@@ -1,0 +1,4 @@
+[install]
+# Turbopack (Next 16) refuses the symlink chains bun's default isolated
+# linker creates for file: dependencies; hoisted installs real directories.
+linker = "hoisted"

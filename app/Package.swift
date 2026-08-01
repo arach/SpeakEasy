@@ -11,7 +11,7 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(url: "https://github.com/arach/hudsonkit-xcframework.git", exact: "0.3.3"),
+        .package(url: "https://github.com/arach/hudsonkit-xcframework.git", exact: "0.3.4"),
         // 0.4.5's root SwiftPM manifest points at a resource absent from that
         // tag. Pin the first known-good repository package revision instead.
         .package(
@@ -30,7 +30,8 @@ let package = Package(
             ],
             path: "Sources/SpeakEasy",
             resources: [
-                .copy("Resources/codex-desktop-bridge.cjs")
+                .copy("Resources/codex-desktop-bridge.cjs"),
+                .copy("Resources/Pad")
             ]
         ),
         .testTarget(

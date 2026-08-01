@@ -86,3 +86,6 @@ test-*.js
 test-*.json
 gemini-*
 test-request.json
+
+# OpenScout local state
+.openscout/project.json

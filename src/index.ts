@@ -59,6 +59,8 @@ export class SpeakEasy {
   private useCache = false;
   private debug = false;
   private hudEnabled = false;
+  /** Exact cached audio file used by the most recent speak() call, if any. */
+  public lastAudioFile: string | null = null;
 
   constructor(config: SpeakEasyConfig) {
     const globalConfig = loadGlobalConfig();
@@ -175,6 +177,7 @@ export class SpeakEasy {
   private async speakText(text: string, options: SpeakEasyOptions = {}): Promise<void> {
     const requestedId = (this.config.provider || 'system') as TTSProviderId;
     const silent = options.silent || false;
+    this.lastAudioFile = null;
 
     if (this.debug) {
       console.log(`🔍 Requested provider: ${requestedId}`);
@@ -221,6 +224,7 @@ export class SpeakEasy {
 
           if (cachedEntry) {
             console.log('(already cached)');
+            this.lastAudioFile = cachedEntry.audioFilePath;
             if (this.debug) {
               console.log(`📦 Using cached audio from: ${cachedEntry.audioFilePath}`);
             }
@@ -243,7 +247,7 @@ export class SpeakEasy {
             request.rate,
             adapter.capabilities.instructions ? request.instructions : undefined
           );
-          await this.cache.set(
+          const stored = await this.cache.set(
             cacheKey,
             {
               provider: providerId,
@@ -259,6 +263,12 @@ export class SpeakEasy {
               extension: result.format,
             }
           );
+          if (stored) {
+            this.lastAudioFile = path.join(
+              this.cache.getCacheDir(),
+              `${cacheKey}.${result.format}`
+            );
+          }
           console.log('cached');
         }
 

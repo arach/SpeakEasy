@@ -65,9 +65,25 @@ SpeakEasy uses a hierarchical configuration system with the following precedence
     "ttl": "7d",
     "maxSize": "100mb",
     "dir": "/tmp/speakeasy-cache"
+  },
+  "deck": {
+    "port": 43211,
+    "pair": false
   }
 }
 ```
+
+### Deck Bridge Settings
+
+Optional defaults for `speakeasy deck` (CLI flags always win):
+
+| Key | Type | Effect |
+|---|---|---|
+| `deck.port` | number | Preferred deck port. Falls back to auto (80 when free, else 43211+) when busy — unlike `--port`, which must be bindable. |
+| `deck.pair` | boolean | Require the persistent pairing token from devices, like `--pair`. Override per-run with `--no-pair`. |
+
+The Mac settings app edits these from its Deck section, which also shows live
+deck status and can start/stop/restart the bridge.
 
 ## Provider Configuration
 

@@ -7,8 +7,31 @@ import { runDoctor as runDoctorCmd } from '../cli/doctor';
 import { clearCache as clearCacheCmd, playCachedAudio as playCachedAudioCmd, listCacheEntries as listCacheEntriesCmd } from '../cli/cache';
 import { ensureAppInstalled, launchApp, updateApp, isAppInstalled } from '../app-manager';
 import { Command } from 'commander';
-import { getPackageVersion } from '../cli/constants';
+import { getPackageVersion, CONFIG_DIR } from '../cli/constants';
 import { parseAndValidate } from '../cli/args';
+
+/** If a deck listener is running, mirror this narration into it (fire-and-forget). */
+function mirrorToDeck(text: string): void {
+  void (async () => {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const infoFile = path.join(CONFIG_DIR, 'deck-listener.json');
+      if (!fs.existsSync(infoFile)) return;
+      const info = JSON.parse(fs.readFileSync(infoFile, 'utf8')) as { dataPort?: number; token?: string | null };
+      if (!info.dataPort) return;
+      const query = info.token ? `?k=${encodeURIComponent(info.token)}` : '';
+      await fetch(`http://127.0.0.1:${info.dataPort}/api/speak${query}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text, play: false }),
+        signal: AbortSignal.timeout(800),
+      });
+    } catch {
+      // no deck listening — speaking is unaffected
+    }
+  })();
+}
 
 interface CLIOptions {
   text?: string;
@@ -46,6 +69,20 @@ interface CLIOptions {
 async function run(): Promise<void> {
   if (process.argv.length <= 2) {
     showHelpUI();
+    return;
+  }
+
+  // `speakeasy deck` — serve the deck control surface on the local network.
+  if (process.argv[2] === 'deck') {
+    const { runDeck } = await import('../cli/deck');
+    await runDeck(process.argv.slice(3));
+    return;
+  }
+
+  // `speakeasy plugin <host>` — install the SpeakEasy skill into an agent host.
+  if (process.argv[2] === 'plugin') {
+    const { runPlugin } = await import('../cli/plugin');
+    await runPlugin(process.argv.slice(3));
     return;
   }
 
@@ -276,6 +313,7 @@ async function run(): Promise<void> {
     // Skip pre-validation - let the main class handle it properly with config file loading
 
     const speaker = new SpeakEasy(config);
+    mirrorToDeck(text);
     await speaker.speak(text, { interrupt: options.interrupt, silent: options.silent });
 
     // Save to file if --out flag is provided

@@ -1,13 +1,12 @@
 {
-  "originHash" : "de86578c859ed5e4cb23f2c28395243714d42a32076b7d47fa1347ff87dcd486",
   "pins" : [
     {
       "identity" : "hudsonkit-xcframework",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/arach/hudsonkit-xcframework.git",
       "state" : {
-        "revision" : "913a62e8b6be2f457ba14a12685824b5b9d2aa3e",
-        "version" : "0.3.3"
+        "revision" : "c72a1575552ac964dc7ba04c85e3a4a681592023",
+        "version" : "0.3.4"
       }
     },
     {
@@ -19,5 +18,5 @@
       }
     }
   ],
-  "version" : 3
+  "version" : 2
 }

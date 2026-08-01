@@ -32,6 +32,13 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>SpeakEasy uses the microphone only while you explicitly record an utterance for a locked Codex task.</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>SpeakEasy uses your local network only when you connect an iPad control pad to this Mac.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_http._tcp</string>
+        <string>_speakeasy-pad._tcp</string>
+    </array>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>SpeakEasy uses Apple Speech to transcribe explicit voice turns while its on-device Parakeet model becomes ready.</string>
     <key>NSSupportsAutomaticGraphicsSwitching</key>

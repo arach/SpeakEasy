@@ -451,6 +451,8 @@ declare class SpeakEasy {
     private useCache;
     private debug;
     private hudEnabled;
+    /** Exact cached audio file used by the most recent speak() call, if any. */
+    lastAudioFile: string | null;
     constructor(config: SpeakEasyConfig);
     speak(text: string, options?: SpeakEasyOptions): Promise<void>;
     private processQueue;
