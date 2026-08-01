@@ -106,7 +106,9 @@ const LANE_COUNT = 9;
 /** The overview officer: a deck-owned 10th lane on a cheap, fast model that
  * answers questions about the whole system from a live digest. Not mappable. */
 const MASTER_IX = 9;
-const MASTER_REUSE_KEY = 'speakeasy-deck-master';
+/** v2: session prompts apply at session creation, so a prompt change means a
+ * fresh key — the old thread held the old instructions. */
+const MASTER_REUSE_KEY = 'speakeasy-deck-master-v2';
 const OVERVIEW_MODEL = 'gpt-5.6-luna';
 /** low on purpose: the digest does the work — the overview lane should read
  * the board and report, never overthink or get clever. */
@@ -248,9 +250,10 @@ const VOICE_SYSTEM_PROMPT =
 /** Session-level instructions for the overview lane: the digest is its eyes. */
 const OVERVIEW_SYSTEM_PROMPT =
   'You are the overview officer of a voice-command deck with nine lanes, each a live codex thread. ' +
-  'Every question arrives with a DECK STATUS digest that is live and authoritative — answer from it and never invent state. ' +
+  'Every question arrives with a DECK STATUS digest that is live and authoritative. ' +
+  'Report exactly what the digest shows and nothing more — no interpretation, no suggestions, no color commentary, never invent state. ' +
   'Do not use tools, do not read or write files, do not access the network. ' +
-  'Speak plainly, no lists, no code: one or two sentences for a status question, up to five for a full summary.';
+  'Plain spoken words, no lists, no code: one or two sentences for a status question, a few plain sentences for a summary.';
 
 /** Kept in a variable so the bundler leaves a native import() — the package is ESM-only. */
 const AGENT_SESSIONS_SPEC = '@openscout/agent-sessions/local';
