@@ -18,6 +18,7 @@ enum SpeakEasySection: String, CaseIterable, Identifiable {
     case dashboard
     case providers
     case pad
+    case deck
     case cache
     case hud
     case history
@@ -29,6 +30,7 @@ enum SpeakEasySection: String, CaseIterable, Identifiable {
         case .dashboard: return "Dashboard"
         case .providers: return "Providers"
         case .pad: return "Pad"
+        case .deck: return "Deck"
         case .cache: return "Cache"
         case .hud: return "HUD"
         case .history: return "History"
@@ -40,6 +42,7 @@ enum SpeakEasySection: String, CaseIterable, Identifiable {
         case .dashboard: return "square.grid.2x2"
         case .providers: return "waveform.badge.plus"
         case .pad: return "ipad.and.iphone"
+        case .deck: return "rectangle.3.group"
         case .cache: return "externaldrive"
         case .hud: return "square.stack.3d.up"
         case .history: return "clock.arrow.circlepath"
@@ -55,6 +58,7 @@ enum SpeakEasySection: String, CaseIterable, Identifiable {
         case .dashboard: return "Providers, defaults, and quick settings"
         case .providers: return "Credentials, voices, models, and previews"
         case .pad: return "Local iPad lane controls"
+        case .deck: return "Bridge status and lane activity"
         case .cache: return "TTL, size limits, and cleanup"
         case .hud: return "Floating notification overlay"
         case .history: return "Recent spoken notifications"
@@ -80,6 +84,8 @@ struct ShellRootView: View {
         var requestedSection = initialSection
         if arguments.contains("--pad-settings") {
             requestedSection = .pad
+        } else if arguments.contains("--deck-settings") {
+            requestedSection = .deck
         } else if arguments.contains("--provider-settings") {
             requestedSection = .providers
         }
@@ -282,6 +288,8 @@ struct ShellRootView: View {
             ProviderSettingsView(selection: $selectedProvider)
         case .pad:
             SpeakEasyPadSettingsView()
+        case .deck:
+            DeckSettingsView()
         case .cache:
             CacheManagementView()
         case .hud:

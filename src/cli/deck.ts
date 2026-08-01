@@ -8,6 +8,7 @@ import os from 'node:os';
 import chalk from 'chalk';
 import { DeckRuntime } from './deck-runtime';
 import { startDataPlane, writeDiscovery, clearDiscovery, type DataPlane } from './deck-live';
+import { CONFIG_FILE } from './constants';
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -397,12 +398,28 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
   };
 }
 
-function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr: boolean; caddy: boolean; mdns: boolean; tls: boolean; rotateToken: boolean; pair: boolean } {
-  let port: number | null = null; // null = auto: 80 if free (port-free URL), else 43211
+/** Bridge defaults from ~/.config/speakeasy/settings.json — the settings app's
+ * Deck tab writes these; CLI flags always win over config. */
+function deckConfigDefaults(): { port: number | null; pair: boolean } {
+  try {
+    const raw = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) as {
+      deck?: { port?: unknown; pair?: unknown };
+    };
+    const port = typeof raw.deck?.port === 'number' && raw.deck.port > 0 && raw.deck.port <= 65535 ? raw.deck.port : null;
+    return { port, pair: raw.deck?.pair === true };
+  } catch {
+    return { port: null, pair: false };
+  }
+}
+
+function parseDeckArgs(argv: string[]): { port: number | null; portFromFlag: boolean; host: string; qr: boolean; caddy: boolean; mdns: boolean; tls: boolean; rotateToken: boolean; pair: boolean } {
+  const defaults = deckConfigDefaults();
+  let port: number | null = defaults.port; // null = auto: 80 if free (port-free URL), else 43211
+  let portFromFlag = false;
   let host = `speak.${deviceSlug()}.local`;
   let qr = true;
   let rotateToken = false;
-  let pair = false;
+  let pair = defaults.pair;
   let caddy = true;
   let mdns = true;
   let tls = true;
@@ -415,6 +432,7 @@ function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr:
         process.exit(1);
       }
       port = Number(value);
+      portFromFlag = true;
       if (port <= 0 || port > 65535) {
         console.error(`❌ Invalid port: ${port}`);
         process.exit(1);
@@ -438,13 +456,15 @@ function parseDeckArgs(argv: string[]): { port: number | null; host: string; qr:
       rotateToken = true;
     } else if (arg === '--pair') {
       pair = true;
+    } else if (arg === '--no-pair') {
+      pair = false;
     } else {
       console.error(`❌ Unknown argument: ${arg}`);
-      console.error('   Usage: speakeasy deck [--port <n>] [--host <name>] [--no-qr] [--no-caddy] [--no-mdns] [--no-tls]');
+      console.error('   Usage: speakeasy deck [--port <n>] [--host <name>] [--pair|--no-pair] [--no-qr] [--no-caddy] [--no-mdns] [--no-tls]');
       process.exit(1);
     }
   }
-  return { port, host, qr, caddy, mdns, tls, rotateToken, pair };
+  return { port, portFromFlag, host, qr, caddy, mdns, tls, rotateToken, pair };
 }
 
 export async function runDeck(argv: string[]): Promise<void> {
@@ -456,16 +476,19 @@ export async function runDeck(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  // Port selection. Explicit --port must be bindable — double-binding a busy
-  // port routes traffic nondeterministically between the two servers. Auto
-  // mode claims 80 for a port-free URL when free (macOS allows unprivileged
+  // Port selection. An explicit --port must be bindable — double-binding a busy
+  // port routes traffic nondeterministically between the two servers. A port
+  // from config is only a preference: if it's busy, fall through to auto mode,
+  // which claims 80 for a port-free URL when free (macOS allows unprivileged
   // low ports), then scans 43211+ for the first verified-free port.
   let port: number;
-  if (args.port !== null) {
+  if (args.port !== null && args.portFromFlag) {
     if (!(await portAvailable(args.port))) {
       console.error(`❌ Port ${args.port} is already in use.`);
       process.exit(1);
     }
+    port = args.port;
+  } else if (args.port !== null && (await portAvailable(args.port))) {
     port = args.port;
   } else if (await portAvailable(80)) {
     port = 80;
@@ -529,7 +552,6 @@ export async function runDeck(argv: string[]): Promise<void> {
     runtime = new DeckRuntime();
     try {
       dataPlane = await startDataPlane(runtime, dataPort, token);
-      writeDiscovery({ pid: process.pid, port, dataPort, host, token });
     } catch {
       dataPlane = null;
     }
@@ -552,6 +574,12 @@ export async function runDeck(argv: string[]): Promise<void> {
       : `http://${lan ?? 'your-macs-ip'}:${port}`);
   // pair mode: the capability token travels in the URL fragment — never on the wire
   const padUrl = dataPlane && token && handle.engine === 'caddy' ? `${padUrlBase}#k=${token}` : padUrlBase;
+
+  // the settings app discovers the deck through this file — the canonical URL
+  // (https/vanity aware, token in the fragment) travels with it
+  if (dataPlane) {
+    writeDiscovery({ pid: process.pid, port, dataPort, host, token, url: padUrl });
+  }
 
   console.log('');
   console.log(chalk.bold('  🎛  SpeakEasy Deck'));

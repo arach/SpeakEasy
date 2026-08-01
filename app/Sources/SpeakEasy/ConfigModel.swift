@@ -6,6 +6,14 @@ struct GlobalConfig: Codable {
     var global: Global?
     var cache: Cache?
     var hud: HUD?
+    var deck: Deck?
+
+    /// Bridge settings for `speakeasy deck` — the CLI reads these as defaults,
+    /// the Deck section in this app writes them.
+    struct Deck: Codable {
+        var pair: Bool?
+        var port: Int?
+    }
 
     struct Providers: Codable {
         var openai: OpenAIConfig?
@@ -491,6 +499,31 @@ class ConfigManager: ObservableObject {
     private func ensureDefaults() {
         if config.defaults == nil {
             config.defaults = GlobalConfig.Defaults()
+        }
+    }
+
+    private func ensureDeck() {
+        if config.deck == nil {
+            config.deck = GlobalConfig.Deck()
+        }
+    }
+
+    // Deck bridge — the CLI reads these as defaults for `speakeasy deck`
+    var deckPair: Bool {
+        get { config.deck?.pair ?? false }
+        set {
+            ensureDeck()
+            config.deck?.pair = newValue
+            markUnsaved()
+        }
+    }
+
+    var deckPort: Int? {
+        get { config.deck?.port }
+        set {
+            ensureDeck()
+            config.deck?.port = newValue
+            markUnsaved()
         }
     }
 

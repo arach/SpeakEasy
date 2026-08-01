@@ -75,6 +75,8 @@ export interface DeckSnapshot {
   catalog: DeckThreadInfo[];
   /** set when the last catalog scan failed and the list is stale */
   catalogError: string | null;
+  /** live deck clients connected to the data plane right now */
+  clients: number;
 }
 
 const intentSchema = z.discriminatedUnion('name', [
@@ -413,6 +415,7 @@ export class DeckRuntime extends EventEmitter {
       host: this.host,
       catalog: this.catalog,
       catalogError: this.catalogError,
+      clients: this.liveClients(),
     };
   }
 

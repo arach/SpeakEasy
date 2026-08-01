@@ -22,6 +22,8 @@ export interface DiscoveryInfo {
   dataPort: number;
   host: string;
   token: string | null;
+  /** the exact URL a device should open — https/vanity aware, #k= when paired */
+  url?: string | null;
 }
 
 /** Atomic, owner-only discovery so the speak CLI can find (and authenticate to) a running deck. */

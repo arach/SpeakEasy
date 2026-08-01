@@ -121,6 +121,44 @@ speakeasy --config
 speakeasy "Test debug" --debug --provider openai
 ```
 
+## Deck
+
+`speakeasy deck` serves the iPad command deck: a pad surface of nine lanes, each
+bound to its own codex thread, plus a deck-owned OVERVIEW lane (cheap, fast model)
+that answers questions about the whole system from a live status digest.
+
+```bash
+# Start the deck (port-free URL when 80 is free, else 43211+)
+speakeasy deck
+
+# Pin a port and require a pairing token from devices
+speakeasy deck --port 43211 --pair
+
+# Full option set
+speakeasy deck [--port <n>] [--host <name>] [--pair|--no-pair] [--no-qr] [--no-caddy] [--no-mdns] [--no-tls]
+```
+
+Bridge defaults can also live in `settings.json` — the Mac settings app writes
+them from its Deck section, and CLI flags always win over config:
+
+```json
+{
+  "deck": {
+    "port": 43211,
+    "pair": false
+  }
+}
+```
+
+A config `port` is a preference (falls back to auto when busy); an explicit
+`--port` must be bindable.
+
+The Deck section of the Mac settings app shows live status (running host/port,
+connected devices, lane bindings, trace) and owns the bridge: start/stop/restart,
+pairing, and port. It discovers the running deck through
+`~/.config/speakeasy/deck-listener.json`, so it works no matter how the deck
+was started.
+
 ## Complete Examples
 
 ### Basic Usage
