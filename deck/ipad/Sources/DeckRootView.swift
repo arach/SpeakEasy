@@ -9,11 +9,19 @@ struct DeckRootView: View {
 
     var body: some View {
         Group {
-            if let url = discovery.deckURL {
-                DeckWebView(controller: controller)
-                    .ignoresSafeArea()
-                    .onAppear { controller.deckURL = url }
-                    .onChange(of: url) { _, newValue in controller.deckURL = newValue }
+            if let deck = discovery.selectedDeck {
+                ZStack(alignment: .topTrailing) {
+                    DeckWebView(controller: controller)
+                        .ignoresSafeArea()
+                        .onAppear { controller.deckURL = deck.url }
+                        .onChange(of: deck.url) { _, newValue in controller.deckURL = newValue }
+
+                    if discovery.decks.count > 1 {
+                        machineMenu(selected: deck)
+                            .padding(.top, 12)
+                            .padding(.trailing, 14)
+                    }
+                }
             } else {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -32,5 +40,30 @@ struct DeckRootView: View {
                 .background(Color(.systemBackground))
             }
         }
+    }
+
+    private func machineMenu(selected: DiscoveredDeck) -> some View {
+        Menu {
+            ForEach(discovery.decks) { deck in
+                Button {
+                    discovery.select(deck)
+                } label: {
+                    Label(deck.displayName, systemImage: deck.id == selected.id ? "checkmark" : "desktopcomputer")
+                }
+            }
+            Divider()
+            Button("Find Macs again", systemImage: "arrow.clockwise") {
+                discovery.refresh()
+            }
+        } label: {
+            Label(selected.displayName, systemImage: "rectangle.connected.to.line.below")
+                .font(.system(.caption, design: .monospaced, weight: .semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay { Capsule().stroke(.white.opacity(0.16), lineWidth: 1) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Current SpeakEasy Mac: \(selected.displayName)")
     }
 }

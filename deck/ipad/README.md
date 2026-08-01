@@ -1,17 +1,20 @@
 # SpeakEasy Deck — iPad app
 
-A native shell for the deck: a full-screen web surface that finds
-`speakeasy deck` on the local network and loads it — plus a native
-hold-to-speak engine. No QR, no URL, no pin.
+A native shell for the deck: a full-screen web surface that finds every
+`speakeasy deck` on the local network, remembers the selected Mac, and loads
+it — plus a native hold-to-speak engine. No QR, URL entry, or pin.
 
 ## How it works
 
-- `DeckDiscovery` browses `_http._tcp` for the `SpeakEasy Deck (<mac>)` service
-  that `speakeasy deck` advertises over Bonjour, then loads
-  `http://<mac-host>:<port>` in the web view.
+- `DeckDiscovery` browses `_http._tcp` for every `SpeakEasy Deck (<mac>)`
+  service advertised over Bonjour. With multiple Macs, a native machine menu
+  switches between them and remembers the last selection.
 - The deck page itself owns the WebSocket to the Mac runtime (same-origin,
-  through Caddy's proxy) — the app is a pure shell for lanes, playback,
-  themes, and the trace rail.
+  through either the bundled server or Caddy proxy) — the app is a pure shell
+  for lanes, playback, themes, and the trace rail.
+- **Set lanes is shared with the website.** It shows all nine pads alongside
+  the Mac's Codex projects and exact user-facing task titles, so lane bindings
+  can be searched, moved, or reset to a fresh task without leaving the iPad.
 - **Hold to Speak is native.** The page posts capture phases to the
   `speakeasyDeck` message handler; `SpeechCapture` runs `SFSpeechRecognizer`
   with `AVAudioEngine` and streams partial and final transcripts back through
