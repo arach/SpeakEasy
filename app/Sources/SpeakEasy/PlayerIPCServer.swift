@@ -114,6 +114,12 @@ final class PlayerIPCServer {
             return
         }
 
+        if let envelope = try? JSONDecoder().decode(IPCCommandEnvelope.self, from: requestData),
+           envelope.command == "transcribe" {
+            handleTranscription(requestData, descriptor: descriptor)
+            return
+        }
+
         let request: PlayerCommandRequest
         do {
             request = try JSONDecoder().decode(PlayerCommandRequest.self, from: requestData)
@@ -127,6 +133,62 @@ final class PlayerIPCServer {
             let response = PlaybackEngine.shared.handle(request)
             self.write(response, to: descriptor)
             Darwin.close(descriptor)
+        }
+    }
+
+    private func handleTranscription(_ data: Data, descriptor: Int32) {
+        let request: TranscriptionCommandRequest
+        do {
+            request = try JSONDecoder().decode(TranscriptionCommandRequest.self, from: data)
+            guard request.protocolVersion == playerProtocolVersion else {
+                throw PlayerIPCError.unsupportedProtocol
+            }
+            try validateTranscriptionFile(at: request.audioPath)
+        } catch {
+            NSLog("SpeakEasy: rejected transcription IPC request: %@", error.localizedDescription)
+            Darwin.close(descriptor)
+            return
+        }
+
+        Task {
+            let response: TranscriptionCommandResponse
+            do {
+                let text = try await VoxListeningService.shared.transcribeFixture(
+                    url: URL(fileURLWithPath: request.audioPath)
+                )
+                response = TranscriptionCommandResponse(
+                    protocolVersion: playerProtocolVersion,
+                    requestId: request.requestId,
+                    ok: !text.isEmpty,
+                    text: text,
+                    engine: "parakeet",
+                    error: text.isEmpty ? "No speech detected" : nil
+                )
+            } catch {
+                response = TranscriptionCommandResponse(
+                    protocolVersion: playerProtocolVersion,
+                    requestId: request.requestId,
+                    ok: false,
+                    text: nil,
+                    engine: "parakeet",
+                    error: error.localizedDescription
+                )
+            }
+            self.write(response, to: descriptor)
+            Darwin.close(descriptor)
+        }
+    }
+
+    private func validateTranscriptionFile(at path: String) throws {
+        var info = stat()
+        guard lstat(path, &info) == 0 else {
+            throw PlayerIPCError.systemCall("lstat", errno)
+        }
+        guard info.st_uid == getuid(), info.st_mode & S_IFMT == S_IFREG else {
+            throw PlayerIPCError.invalidTranscriptionFile
+        }
+        guard info.st_size > 44, info.st_size <= 16 * 1_024 * 1_024 else {
+            throw PlayerIPCError.invalidTranscriptionFile
         }
     }
 
@@ -145,7 +207,7 @@ final class PlayerIPCServer {
         return nil
     }
 
-    private func write(_ response: PlayerCommandResponse, to descriptor: Int32) {
+    private func write<Response: Encodable>(_ response: Response, to descriptor: Int32) {
         guard var data = try? JSONEncoder().encode(response) else { return }
         data.append(0x0A)
 
@@ -210,6 +272,8 @@ enum PlayerIPCError: LocalizedError {
     case socketPathTooLong
     case refusingToReplaceSocket
     case alreadyRunning
+    case unsupportedProtocol
+    case invalidTranscriptionFile
     case systemCall(String, Int32)
 
     var errorDescription: String? {
@@ -220,6 +284,10 @@ enum PlayerIPCError: LocalizedError {
             return "Refusing to replace a player socket not owned by this user"
         case .alreadyRunning:
             return "Another SpeakEasy player is already running"
+        case .unsupportedProtocol:
+            return "Unsupported SpeakEasy IPC protocol"
+        case .invalidTranscriptionFile:
+            return "Transcription input must be a private, regular audio file owned by this user"
         case .systemCall(let name, let code):
             return "\(name) failed: \(String(cString: strerror(code)))"
         }

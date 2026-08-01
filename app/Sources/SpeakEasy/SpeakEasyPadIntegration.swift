@@ -484,7 +484,7 @@ struct SpeakEasyPadSettingsView: View {
     }
 }
 
-private struct SpeakEasyPadQRCodeView: View {
+struct SpeakEasyPadQRCodeView: View {
     let url: URL
 
     @ViewBuilder
@@ -502,7 +502,7 @@ private struct SpeakEasyPadQRCodeView: View {
                         .stroke(Color.black.opacity(0.08), lineWidth: 1)
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("SpeakEasy Pad pairing QR code")
+                .accessibilityLabel("SpeakEasy pairing QR code")
                 .accessibilityValue(url.absoluteString)
         } else {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -513,7 +513,7 @@ private struct SpeakEasyPadQRCodeView: View {
                         .foregroundStyle(HudPalette.muted)
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("SpeakEasy Pad pairing QR code unavailable")
+                .accessibilityLabel("SpeakEasy pairing QR code unavailable")
         }
     }
 

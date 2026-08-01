@@ -8,6 +8,7 @@ import AppKit
 /// written by `speakeasy deck`) and the data plane's `/api/snapshot`. Start and
 /// stop manage the CLI process the discovery file points at.
 final class DeckBridgeController: ObservableObject {
+    static let shared = DeckBridgeController()
 
     struct Discovery: Codable {
         let pid: Int
@@ -39,13 +40,17 @@ final class DeckBridgeController: ObservableObject {
         let id: String
         let cwd: String
         let snippet: String
+        let preview: String?
+        let project: String?
+        let isPinned: Bool?
         let at: Double
 
         var alias: String {
             String(id.replacingOccurrences(of: "-", with: "").suffix(8))
         }
-        var project: String {
-            URL(fileURLWithPath: cwd).lastPathComponent
+        var projectLabel: String {
+            if let project, !project.isEmpty { return project }
+            return URL(fileURLWithPath: cwd).lastPathComponent
         }
     }
 
@@ -69,6 +74,10 @@ final class DeckBridgeController: ObservableObject {
     /// True when the discovery pid is alive — the snapshot may still be loading.
     var running: Bool { pidAlive }
 
+    /// Release builds carry the complete deck runtime inside the app bundle.
+    /// Development builds can still fall back to SPEAKEASY_CLI or PATH.
+    var includesRuntime: Bool { bundledCLI != nil }
+
     /// Called synchronously before any start/restart, so unsaved bridge
     /// edits (pairing, port) are on disk before the CLI reads them.
     var onBeforeStart: (() -> Void)?
@@ -86,6 +95,19 @@ final class DeckBridgeController: ObservableObject {
     private var logFile: URL {
         configDir.appendingPathComponent("deck.log")
     }
+    private var bundledCLI: String? {
+        let path = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Helpers/speakeasy-runtime")
+            .path
+        return fm.isExecutableFile(atPath: path) ? path : nil
+    }
+    private var bundledDeckRoot: String? {
+        guard let path = Bundle.main.resourceURL?
+            .appendingPathComponent("Deck", isDirectory: true)
+            .path,
+              fm.fileExists(atPath: path) else { return nil }
+        return path
+    }
 
     // MARK: - Polling
 
@@ -102,6 +124,17 @@ final class DeckBridgeController: ObservableObject {
     func endUpdates() {
         timer?.invalidate()
         timer = nil
+    }
+
+    /// App-launch path for the persisted "start automatically" preference.
+    /// A live discovery pid wins, so relaunching the menu-bar app can never
+    /// start a second bridge beside an existing one.
+    func startIfNeeded() {
+        if let discovery = readDiscovery(), kill(Int32(discovery.pid), 0) == 0 {
+            poll()
+            return
+        }
+        start()
     }
 
     private func poll() {
@@ -291,18 +324,76 @@ final class DeckBridgeController: ObservableObject {
     // MARK: - Start / stop (serialized)
 
     private var resolvedCLI: String?
+    private var resolvedCodex: String?
+    private var resolvedLoginPath: String?
 
-    /// Resolve the speakeasy CLI once and cache it. GUI apps get a minimal
-    /// PATH, so resolution goes through a login shell (fnm/nvm/homebrew all
-    /// live there) — `command -v` prints just the path, and we take the first
-    /// line that is actually executable in case the user's rc files chatter
-    /// on stdout. SPEAKEASY_CLI overrides for development.
+    private func loginShellPath() -> String? {
+        if let resolvedLoginPath { return resolvedLoginPath }
+        let pipe = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-lic", "print -r -- $PATH"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        process.waitUntilExit()
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        guard let candidate = output
+            .split(separator: "\n")
+            .map({ $0.trimmingCharacters(in: .whitespaces) })
+            .last(where: { $0.contains(":") && !$0.contains(" ") }) else { return nil }
+        resolvedLoginPath = candidate
+        return candidate
+    }
+
+    /// Resolve Codex through the user's login shell once. GUI apps inherit a
+    /// minimal PATH, while fnm/nvm/Homebrew are usually initialized by shell
+    /// startup; passing CODEX_BIN gives the bundled runtime the exact result.
+    private func resolveCodexCLI() -> String? {
+        if let resolvedCodex { return resolvedCodex }
+        for key in ["SPEAKEASY_CODEX_BIN", "CODEX_BIN"] {
+            if let candidate = ProcessInfo.processInfo.environment[key],
+               fm.isExecutableFile(atPath: candidate) {
+                resolvedCodex = candidate
+                return candidate
+            }
+        }
+        for candidate in [
+            "/Applications/ChatGPT.app/Contents/Resources/codex",
+            "/Applications/Codex.app/Contents/Resources/codex"
+        ] where fm.isExecutableFile(atPath: candidate) {
+            resolvedCodex = candidate
+            return candidate
+        }
+        let pipe = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-lic", "command -v codex"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        process.waitUntilExit()
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        guard let candidate = output
+            .split(separator: "\n")
+            .map({ $0.trimmingCharacters(in: .whitespaces) })
+            .first(where: { fm.isExecutableFile(atPath: $0) }) else { return nil }
+        resolvedCodex = candidate
+        return candidate
+    }
+
+    /// Resolve the deck runtime once and cache it. A released app is
+    /// self-contained; SPEAKEASY_CLI and PATH remain development fallbacks.
     private func resolveCLI() -> String? {
         if let resolvedCLI { return resolvedCLI }
         if let override = ProcessInfo.processInfo.environment["SPEAKEASY_CLI"],
            fm.isExecutableFile(atPath: override) {
             resolvedCLI = override
             return override
+        }
+        if let bundledCLI {
+            resolvedCLI = bundledCLI
+            return bundledCLI
         }
         let pipe = Pipe()
         let process = Process()
@@ -331,7 +422,14 @@ final class DeckBridgeController: ObservableObject {
             guard let self else { return }
             guard let cli = self.resolveCLI() else {
                 DispatchQueue.main.async {
-                    self.actionError = "Couldn't find the speakeasy CLI on your PATH (looked through a login shell). Install it with npm, or set SPEAKEASY_CLI."
+                    self.actionError = "This development build doesn't include the deck runtime, and no speakeasy CLI was found on your PATH."
+                    self.actionInFlight = false
+                }
+                return
+            }
+            guard let codex = self.resolveCodexCLI() else {
+                DispatchQueue.main.async {
+                    self.actionError = "Codex CLI wasn't found. Make `codex` available in your login shell, then try Start again."
                     self.actionInFlight = false
                 }
                 return
@@ -352,7 +450,12 @@ final class DeckBridgeController: ObservableObject {
                 process.arguments = ["deck"]
                 var environment = ProcessInfo.processInfo.environment
                 let cliDir = URL(fileURLWithPath: cli).deletingLastPathComponent().path
-                environment["PATH"] = "\(cliDir):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+                let loginPath = self.loginShellPath() ?? ""
+                environment["PATH"] = "\(cliDir):\(loginPath):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+                environment["CODEX_BIN"] = codex
+                if cli == self.bundledCLI, let deckRoot = self.bundledDeckRoot {
+                    environment["SPEAKEASY_DECK_ROOT"] = deckRoot
+                }
                 process.environment = environment
                 process.standardOutput = logHandle
                 process.standardError = logHandle

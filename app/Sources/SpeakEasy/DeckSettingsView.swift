@@ -6,12 +6,15 @@ import AppKit
 struct DeckSettingsView: View {
     @EnvironmentObject var config: ConfigManager
     @Environment(\.theme) var theme
-    @StateObject private var bridge = DeckBridgeController()
+    @StateObject private var bridge = DeckBridgeController.shared
     @State private var portText: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             statusSection
+            if bridge.running, let deviceURL = bridge.deviceURLString, let url = URL(string: deviceURL) {
+                deviceSection(url: url)
+            }
             bridgeSection
             Spacer()
         }
@@ -132,7 +135,7 @@ struct DeckSettingsView: View {
                         bridge.assign(lane: index, threadId: thread.id)
                     } label: {
                         HStack {
-                            Text("\(String(thread.snippet.prefix(60))) · \(thread.project) · \(thread.alias)")
+                            Text("\(String(thread.snippet.prefix(60))) · \(thread.projectLabel) · \(thread.alias)")
                             if lane.threadId == thread.id {
                                 Image(systemName: "checkmark")
                             }
@@ -184,6 +187,41 @@ struct DeckSettingsView: View {
 
     // MARK: - Configure the bridge
 
+    private func deviceSection(url: URL) -> some View {
+        GlassSection(title: "Devices", icon: "ipad.and.iphone", color: .clear) {
+            HStack(alignment: .center, spacing: 20) {
+                SpeakEasyPadQRCodeView(url: url)
+                    .frame(width: 132, height: 132)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Open this deck from another device")
+                        .font(.headline)
+                        .foregroundColor(theme.text)
+                    Text("Scan with the iPad camera, or copy the link to any laptop on the same Wi-Fi. Add it to the Home Screen for an app-like deck.")
+                        .font(.caption)
+                        .foregroundColor(theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let host = bridge.discovery?.host {
+                        Text("This Mac appears as SpeakEasy Deck (\(host)).")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(theme.textTertiary)
+                    }
+
+                    HStack(spacing: 10) {
+                        Button("Open Deck") { NSWorkspace.shared.open(url) }
+                            .buttonStyle(.glassCompat)
+                        Button("Copy link") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                        }
+                        .buttonStyle(.glassCompat)
+                    }
+                }
+            }
+        }
+    }
+
     private var bridgeSection: some View {
         GlassSection(title: "Bridge", icon: "point.3.connected.trianglepath.dotted", color: .clear) {
             VStack(alignment: .leading, spacing: 14) {
@@ -201,14 +239,10 @@ struct DeckSettingsView: View {
                             .disabled(bridge.actionInFlight)
                     }
                     Spacer()
-                    if let deviceURL = bridge.deviceURLString, let url = URL(string: deviceURL) {
-                        Button("Open Deck") { NSWorkspace.shared.open(url) }
-                            .buttonStyle(.glassCompat)
-                        Button("Copy iPad URL") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(deviceURL, forType: .string)
-                        }
-                        .buttonStyle(.glassCompat)
+                    if bridge.includesRuntime {
+                        Label("Runtime included", systemImage: "checkmark.seal")
+                            .font(.caption)
+                            .foregroundColor(.green)
                     }
                 }
 
@@ -225,6 +259,19 @@ struct DeckSettingsView: View {
                 ))
                 .toggleStyle(.switch)
                 Text("When on, devices need the token URL (Copy iPad URL) to reach the bridge.")
+                .font(.caption)
+                .foregroundColor(theme.textSecondary)
+
+                Toggle("Start the deck with SpeakEasy", isOn: Binding(
+                    get: { config.deckAutoStart },
+                    set: {
+                        config.deckAutoStart = $0
+                        config.saveConfig()
+                        if $0 { bridge.startIfNeeded() }
+                    }
+                ))
+                .toggleStyle(.switch)
+                Text("Keeps the bridge ready whenever the menu-bar app is running.")
                     .font(.caption)
                     .foregroundColor(theme.textSecondary)
 

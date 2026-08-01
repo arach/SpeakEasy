@@ -36,6 +36,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // the menu-bar lifecycle starts it.
         SpeakEasyPadHostBootstrap.install()
 
+        let config = ConfigManager.shared
+        let deckBridge = DeckBridgeController.shared
+        deckBridge.onBeforeStart = { config.saveConfig() }
+        if config.deckAutoStart {
+            deckBridge.startIfNeeded()
+        }
+
         // Resident menu-bar shell + player IPC (no Dock icon via LSUIElement).
         MenuBarController.shared.start()
         if ProcessInfo.processInfo.arguments.contains("--settings") {

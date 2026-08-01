@@ -24,6 +24,7 @@ enum VoxListeningServiceError: LocalizedError {
 }
 
 actor VoxListeningService {
+    static let shared = VoxListeningService()
     static let modelID = "parakeet:v3"
 
     private enum ParakeetState {

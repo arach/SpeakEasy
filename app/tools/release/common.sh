@@ -19,6 +19,23 @@ speakeasy_default_version() {
     fi
 }
 
+speakeasy_build_deck_runtime() {
+    local app_root="$1"
+    local repo_root
+    repo_root="$(speakeasy_repo_root)"
+
+    if ! command -v bun >/dev/null 2>&1; then
+        echo "Bun is required to compile the bundled deck runtime." >&2
+        return 1
+    fi
+
+    echo "Compiling the self-contained deck runtime..."
+    bun build "$repo_root/src/bin/speakeasy-cli.ts" \
+        --compile \
+        --target=bun-darwin-arm64 \
+        --outfile "$app_root/.build/release/speakeasy-runtime"
+}
+
 speakeasy_default_sign_identity() {
     security find-identity -v -p codesigning 2>/dev/null \
         | sed -n 's/^[[:space:]]*[0-9]*)[[:space:]]*\([A-F0-9]\{40\}\)[[:space:]]*"Developer ID Application:[^"]*".*/\1/p' \
@@ -100,6 +117,7 @@ speakeasy_bundle_swiftpm_resources() {
 speakeasy_verify_bundle_layout() {
     local bundle_path="$1"
     local executable="$bundle_path/Contents/MacOS/SpeakEasy"
+    local deck_runtime="$bundle_path/Contents/Helpers/speakeasy-runtime"
     local frameworks_dir="$bundle_path/Contents/Frameworks"
     local resources_dir="$bundle_path/Contents/Resources"
     local info_plist="$bundle_path/Contents/Info.plist"
@@ -108,6 +126,16 @@ speakeasy_verify_bundle_layout() {
 
     if [ ! -x "$executable" ]; then
         echo "Bundle executable is missing or not executable: $executable" >&2
+        return 1
+    fi
+
+    if [ ! -x "$deck_runtime" ]; then
+        echo "Bundled deck runtime is missing or not executable: $deck_runtime" >&2
+        return 1
+    fi
+
+    if [ ! -s "$resources_dir/Deck/index.html" ]; then
+        echo "Bundled deck surface is missing: Contents/Resources/Deck/index.html" >&2
         return 1
     fi
 
@@ -178,6 +206,9 @@ speakeasy_bundle_app() {
     local bundle_path="$2"
     local build_dir="$app_root/.build/release"
     local executable_path="$bundle_path/Contents/MacOS/SpeakEasy"
+    local helper_path="$bundle_path/Contents/Helpers/speakeasy-runtime"
+    local repo_root
+    repo_root="$(speakeasy_repo_root)"
 
     if [[ -d "$build_dir" ]]; then
         build_dir="$(cd "$build_dir" && pwd -P)"
@@ -185,10 +216,14 @@ speakeasy_bundle_app() {
 
     rm -rf "$bundle_path"
     mkdir -p "$bundle_path/Contents/MacOS"
+    mkdir -p "$bundle_path/Contents/Helpers"
     mkdir -p "$bundle_path/Contents/Resources"
 
     cp "$build_dir/SpeakEasy" "$executable_path"
     chmod +x "$executable_path"
+
+    cp "$build_dir/speakeasy-runtime" "$helper_path"
+    chmod +x "$helper_path"
 
     echo "Bundling HudsonKit frameworks..."
     speakeasy_bundle_swiftpm_frameworks \
@@ -200,6 +235,11 @@ speakeasy_bundle_app() {
     speakeasy_bundle_swiftpm_resources \
         "$build_dir" \
         "$bundle_path/Contents/Resources"
+
+    mkdir -p "$bundle_path/Contents/Resources/Deck"
+    cp "$repo_root/deck/index.html" "$bundle_path/Contents/Resources/Deck/"
+    cp "$repo_root/deck/themes.json" "$bundle_path/Contents/Resources/Deck/"
+    ditto "$repo_root/deck/variants" "$bundle_path/Contents/Resources/Deck/variants"
 
     cp "$app_root/Resources/Info.plist" "$bundle_path/Contents/"
 

@@ -6,7 +6,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/tools/release/common.sh"
 
 BUNDLE_NAME="SpeakEasy.app"
-BUILD_DIR="$SCRIPT_DIR/.build/release"
 APP_DIR="$SCRIPT_DIR/$BUNDLE_NAME"
 INSTALL=false
 
@@ -30,8 +29,11 @@ done
 echo "Building SpeakEasy..."
 swift build -c release
 
+speakeasy_build_deck_runtime "$SCRIPT_DIR"
+
 echo "Creating app bundle..."
 speakeasy_bundle_app "$SCRIPT_DIR" "$APP_DIR"
+speakeasy_set_bundle_version "$APP_DIR" "$(speakeasy_default_version)"
 speakeasy_verify_bundle_layout "$APP_DIR"
 
 echo "Signing app..."

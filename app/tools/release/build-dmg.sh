@@ -43,6 +43,8 @@ if ! swift build -c release 2>&1 | tee "$build_log"; then
 fi
 rm -f "$build_log"
 
+speakeasy_build_deck_runtime "$APP_ROOT"
+
 echo "==> Creating app bundle..."
 mkdir -p "$DIST_DIR"
 speakeasy_bundle_app "$APP_ROOT" "$BUNDLE"
@@ -93,8 +95,12 @@ fi
 echo ""
 echo "==> Done: $DIST_DIR/$DMG_NAME"
 ls -lh "$DIST_DIR/$DMG_NAME"
-if [ "$SKIP_SIGN" != "1" ]; then
+if [ "$SKIP_SIGN" != "1" ] && [ "$SKIP_NOTARIZE" != "1" ]; then
     spctl --assess --type open --context context:primary-signature -v "$DIST_DIR/$DMG_NAME"
+elif [ "$SKIP_SIGN" != "1" ]; then
+    # Gatekeeper rejects every intentionally unnotarized --local artifact.
+    # Verify its Developer ID signature without pretending it was notarized.
+    codesign --verify --verbose=2 "$DIST_DIR/$DMG_NAME"
 fi
 
 echo ""
