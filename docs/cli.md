@@ -128,7 +128,7 @@ bound to its own codex thread, plus a deck-owned OVERVIEW lane (cheap, fast mode
 that answers questions about the whole system from a live status digest.
 
 ```bash
-# Start the deck (port-free URL when 80 is free, else 43211+)
+# Start the deck (43211+ for normal users; port 80 only when permitted)
 speakeasy deck
 
 # Pin a port and require a pairing token from devices
@@ -145,7 +145,8 @@ them from its Deck section, and CLI flags always win over config:
 {
   "deck": {
     "port": 43211,
-    "pair": false
+    "pair": false,
+    "autoStart": true
   }
 }
 ```
@@ -157,7 +158,10 @@ The Deck section of the Mac settings app shows live status (running host/port,
 connected devices, lane bindings, trace), manages lanes directly (each lane's
 menu binds a recent codex thread or resets to a fresh session — the same
 `lane.assign` intent the deck's own picker sends), and owns the bridge:
-start/stop/restart, pairing, and port. It discovers the running deck through
+start/stop/restart, auto-start, pairing, port, and a scannable device link. A
+release app includes both the runtime and Deck assets; Caddy is optional and
+adds local HTTPS, while the built-in server carries the same live WebSocket and
+HTTP control paths with no extra install. It discovers the running deck through
 `~/.config/speakeasy/deck-listener.json`, so it works no matter how the deck
 was started.
 
