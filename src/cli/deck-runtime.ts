@@ -47,7 +47,9 @@ export interface DeckLaneInfo {
   name: string;
   title: string;
   state: 'speaking' | 'working' | 'idle' | 'empty';
-  /** short codex thread id, shown once the lane's session has answered */
+  /** full codex thread id while bound — the mapper's identity for this lane */
+  threadId?: string;
+  /** short codex thread id, shown once the lane's session has answered (display only) */
   sessionAlias?: string;
 }
 
@@ -71,6 +73,8 @@ export interface DeckSnapshot {
   host: string;
   /** recent resumable codex threads — filled by the catalog.refresh intent */
   catalog: DeckThreadInfo[];
+  /** set when the last catalog scan failed and the list is stale */
+  catalogError: string | null;
 }
 
 const intentSchema = z.discriminatedUnion('name', [
@@ -102,7 +106,7 @@ const MAX_MESSAGES_PER_LANE = 50;
 const LANES_FILE = path.join(homedir(), '.config', 'speakeasy', 'deck-lanes.json');
 
 const CODEX_SESSIONS_DIR = path.join(homedir(), '.codex', 'sessions');
-const CATALOG_LIMIT = 12;
+const CATALOG_LIMIT = 25;
 
 /** Read at most `bytes` from the head of a file. */
 function readHead(file: string, bytes: number): string {
@@ -180,13 +184,15 @@ function findRollout(threadId: string): DeckThreadInfo | null {
   }
 }
 
-/** Recent codex threads from local rollout files, newest first. */
-function scanCodexThreads(): DeckThreadInfo[] {
+/** Recent codex threads from local rollout files, newest first. Returns null
+ * when the sessions dir is unreadable, so the caller can keep its stale list —
+ * a stale list the user can read beats an empty one. */
+function scanCodexThreads(): DeckThreadInfo[] | null {
   let names: string[];
   try {
     names = readdirSync(CODEX_SESSIONS_DIR, { recursive: true }) as string[];
   } catch {
-    return [];
+    return null;
   }
   const rollouts: { file: string; at: number }[] = [];
   for (const n of names) {
@@ -294,6 +300,7 @@ export class DeckRuntime extends EventEmitter {
   private trace: DeckTraceEntry[] = [];
   private host = hostname().replace(/\.(local|lan)$/, '');
   private catalog: DeckThreadInfo[] = [];
+  private catalogError: string | null = null;
   private ticker: NodeJS.Timeout | null = null;
   private busy = false;
   private destroyed = false;
@@ -316,8 +323,12 @@ export class DeckRuntime extends EventEmitter {
   }
 
   /** Rebuild lane labels for persisted thread bindings — the adapter resumes
-   * the thread on its own; this restores what the pad SAYS it is bound to. */
+   * the thread on its own; this restores what the pad SAYS it is bound to.
+   * Restores honor the one-thread-one-lane invariant too: legacy state from
+   * before dedupe can double-bind a thread, and the first lane keeps it. */
   private restoreLaneBindings(): void {
+    const claimed = new Set<string>();
+    let rotated = false;
     this.laneKeys.forEach((key, i) => {
       let threadId = '';
       try {
@@ -326,10 +337,20 @@ export class DeckRuntime extends EventEmitter {
         return; // unseeded lane — fresh session
       }
       if (!threadId) return;
+      if (claimed.has(threadId)) {
+        // double binding from an older build — rotate to a fresh key
+        this.laneKeys[i] = `speakeasy-deck-lane-${i}-${Date.now().toString(36)}`;
+        rotated = true;
+        this.log('LANE DEDUPED', `lane ${i + 1} → fresh session (thread already bound)`);
+        return;
+      }
+      claimed.add(threadId);
       const lane = this.lanes[i];
+      lane.threadId = threadId;
       lane.sessionAlias = threadId.replace(/-/g, '').slice(-8);
       lane.title = findRollout(threadId)?.snippet ?? 'codex thread';
     });
+    if (rotated) this.persistLaneKeys();
   }
 
   snapshot(): DeckSnapshot {
@@ -351,6 +372,7 @@ export class DeckRuntime extends EventEmitter {
       trace: this.trace,
       host: this.host,
       catalog: this.catalog,
+      catalogError: this.catalogError,
     };
   }
 
@@ -414,6 +436,18 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
+  /** The thread a lane's key currently points at, if one was recorded — the
+   * adapter writes this for fresh sessions too, so read it live rather than
+   * tracking it in memory. */
+  private laneThreadId(index: number): string | null {
+    try {
+      const id = readFileSync(path.join(laneRuntimeDir(this.laneKeys[index]), 'codex-thread-id.txt'), 'utf8').trim();
+      return id || null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Channel mapper: bind a pad to an existing codex thread, or to a fresh
    * session when threadId is null. Only ever called while no response is in
    * flight (apply() rejects lane.cycle/lane.assign when busy), so this never
@@ -454,10 +488,22 @@ export class DeckRuntime extends EventEmitter {
     if (threadId && bound) {
       const info = this.catalog.find((t) => t.id === threadId);
       lane.title = info?.snippet ?? 'codex thread';
+      lane.threadId = threadId;
       lane.sessionAlias = threadId.replace(/-/g, '').slice(-8);
       this.log('LANE ASSIGNED', `lane ${index + 1} → thread ${lane.sessionAlias}`);
+      // One exact thread occupies at most one lane: now that the destination
+      // seed has landed, clear every other lane holding this thread — the
+      // binding MOVES here. Doing this before the seed would let a failed
+      // write destroy the source binding for nothing.
+      for (let j = 0; j < LANE_COUNT; j++) {
+        if (j !== index && this.laneThreadId(j) === threadId) {
+          this.log('LANE MOVED', `thread left lane ${j + 1} for lane ${index + 1}`);
+          this.assignLane(j, null);
+        }
+      }
     } else {
       lane.title = 'new codex session on first ask';
+      lane.threadId = undefined;
       lane.sessionAlias = undefined;
       this.log(threadId ? 'ASSIGN FAILED' : 'LANE RESET', `lane ${index + 1} → fresh session`);
     }
@@ -657,7 +703,15 @@ export class DeckRuntime extends EventEmitter {
         return { ok: true, rev: this.rev };
       }
       case 'catalog.refresh': {
-        this.catalog = scanCodexThreads();
+        const scanned = scanCodexThreads();
+        if (scanned) {
+          this.catalog = scanned;
+          this.catalogError = null;
+        } else {
+          // keep whatever we last showed — a stale list beats an empty one
+          this.catalogError = 'Could not read the codex sessions dir — showing the last list.';
+          this.log('CATALOG FAILED', 'sessions dir unreadable · keeping stale list');
+        }
         this.changed();
         return { ok: true, rev: this.rev };
       }
@@ -799,7 +853,10 @@ export class DeckRuntime extends EventEmitter {
       const thread = result.session.nativeId;
       // codex thread ids are UUIDv7 — the leading bytes are a timestamp, so
       // alias from the random tail to tell threads apart
-      if (lane && thread) lane.sessionAlias = thread.replace(/-/g, '').slice(-8);
+      if (lane && thread) {
+        lane.threadId = thread;
+        lane.sessionAlias = thread.replace(/-/g, '').slice(-8);
+      }
       const text = result.text.trim();
       if (!text) throw new Error('empty reply from session');
       return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : text;
