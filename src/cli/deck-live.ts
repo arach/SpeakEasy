@@ -126,6 +126,47 @@ export async function startDataPlane(runtime: DeckRuntime, dataPort: number, tok
       return;
     }
 
+    // Management channel: the same intents the deck sends over the WS, for
+    // trusted local tools (the settings app's Deck tab). Bare intent objects,
+    // schema-validated by the same parseIntent as the socket path.
+    if (url.pathname === '/api/intent' && req.method === 'POST') {
+      if (!authorized(req, token)) {
+        res.writeHead(403).end();
+        return;
+      }
+      const chunks: Buffer[] = [];
+      let bytes = 0;
+      try {
+        for await (const chunk of req as AsyncIterable<Buffer>) {
+          bytes += chunk.length;
+          if (bytes > MAX_WS_PAYLOAD) {
+            res.writeHead(413).end();
+            return;
+          }
+          chunks.push(chunk);
+        }
+      } catch {
+        // client aborted mid-upload — nothing to parse, nothing to apply
+        res.writeHead(400).end();
+        return;
+      }
+      let raw: unknown;
+      try {
+        raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'bad json' }));
+        return;
+      }
+      const { intent, error } = parseIntent(raw);
+      const result = intent
+        ? await runtime.apply(intent)
+        : { ok: false as const, rev: runtime.snapshot().rev, error: error ?? 'invalid intent' };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
     if (url.pathname === '/api/speak' && req.method === 'POST') {
       if (!authorized(req, token)) {
         res.writeHead(403).end();
@@ -133,13 +174,18 @@ export async function startDataPlane(runtime: DeckRuntime, dataPort: number, tok
       }
       const chunks: Buffer[] = [];
       let bytes = 0;
-      for await (const chunk of req as AsyncIterable<Buffer>) {
-        bytes += chunk.length;
-        if (bytes > MAX_SPEAK_BYTES) {
-          res.writeHead(413).end();
-          return;
+      try {
+        for await (const chunk of req as AsyncIterable<Buffer>) {
+          bytes += chunk.length;
+          if (bytes > MAX_SPEAK_BYTES) {
+            res.writeHead(413).end();
+            return;
+          }
+          chunks.push(chunk);
         }
-        chunks.push(chunk);
+      } catch {
+        res.writeHead(400).end();
+        return;
       }
       try {
         const { text, lane, play } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {

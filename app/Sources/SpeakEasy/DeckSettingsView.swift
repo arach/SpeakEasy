@@ -20,6 +20,8 @@ struct DeckSettingsView: View {
             // bridge edits must be on disk before any CLI start reads them
             bridge.onBeforeStart = { config.saveConfig() }
             bridge.beginUpdates()
+            // the assign menus read the mapper catalog — load it once on appear
+            bridge.refreshCatalog()
         }
         .onDisappear { bridge.endUpdates() }
     }
@@ -76,7 +78,7 @@ struct DeckSettingsView: View {
             Text("LANES")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(theme.textTertiary)
-            ForEach(snapshot.lanes, id: \.num) { lane in
+            ForEach(Array(snapshot.lanes.enumerated()), id: \.element.num) { index, lane in
                 HStack(spacing: 10) {
                     Circle()
                         .fill(laneColor(lane.state))
@@ -96,6 +98,10 @@ struct DeckSettingsView: View {
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundColor(theme.textTertiary)
                     }
+                    // the overview lane is deck-owned — only worker lanes are mappable
+                    if index < 9 {
+                        laneMenu(lane: lane, index: index, catalog: snapshot.catalog ?? [])
+                    }
                 }
             }
             HStack(spacing: 8) {
@@ -106,6 +112,42 @@ struct DeckSettingsView: View {
             }
             .padding(.top, 2)
         }
+    }
+
+    /// Per-lane mapper: fresh session or any recent codex thread — the same
+    /// lane.assign intent the deck's own picker sends.
+    private func laneMenu(
+        lane: DeckBridgeController.Lane,
+        index: Int,
+        catalog: [DeckBridgeController.CatalogThread]
+    ) -> some View {
+        Menu {
+            Button("Fresh session") { bridge.assign(lane: index, threadId: nil) }
+            if catalog.isEmpty {
+                Button("Load recent threads…") { bridge.refreshCatalog() }
+            } else {
+                Divider()
+                ForEach(catalog, id: \.id) { thread in
+                    Button {
+                        bridge.assign(lane: index, threadId: thread.id)
+                    } label: {
+                        HStack {
+                            Text("\(String(thread.snippet.prefix(60))) · \(thread.project) · \(thread.alias)")
+                            if lane.threadId == thread.id {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 13))
+                .foregroundColor(theme.textTertiary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
     }
 
     private func traceRows(_ snapshot: DeckBridgeController.Snapshot) -> some View {

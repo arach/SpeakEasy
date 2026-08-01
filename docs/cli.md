@@ -154,8 +154,10 @@ A config `port` is a preference (falls back to auto when busy); an explicit
 `--port` must be bindable.
 
 The Deck section of the Mac settings app shows live status (running host/port,
-connected devices, lane bindings, trace) and owns the bridge: start/stop/restart,
-pairing, and port. It discovers the running deck through
+connected devices, lane bindings, trace), manages lanes directly (each lane's
+menu binds a recent codex thread or resets to a fresh session — the same
+`lane.assign` intent the deck's own picker sends), and owns the bridge:
+start/stop/restart, pairing, and port. It discovers the running deck through
 `~/.config/speakeasy/deck-listener.json`, so it works no matter how the deck
 was started.
 

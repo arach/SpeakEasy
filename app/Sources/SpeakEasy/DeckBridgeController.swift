@@ -24,6 +24,7 @@ final class DeckBridgeController: ObservableObject {
         let name: String
         let title: String
         let state: String
+        let threadId: String?
         let sessionAlias: String?
     }
 
@@ -33,6 +34,21 @@ final class DeckBridgeController: ObservableObject {
         let detail: String
     }
 
+    /// A resumable codex thread from the runtime's mapper catalog.
+    struct CatalogThread: Codable {
+        let id: String
+        let cwd: String
+        let snippet: String
+        let at: Double
+
+        var alias: String {
+            String(id.replacingOccurrences(of: "-", with: "").suffix(8))
+        }
+        var project: String {
+            URL(fileURLWithPath: cwd).lastPathComponent
+        }
+    }
+
     struct Snapshot: Codable {
         let host: String
         let clients: Int
@@ -40,6 +56,7 @@ final class DeckBridgeController: ObservableObject {
         let confirm: String
         let lanes: [Lane]
         let trace: [TraceEntry]
+        let catalog: [CatalogThread]?
     }
 
     @Published private(set) var discovery: Discovery?
@@ -185,6 +202,90 @@ final class DeckBridgeController: ObservableObject {
             return "\(url.absoluteString)#k=\(token)"
         }
         return url.absoluteString
+    }
+
+    // MARK: - Lane management (HTTP intent channel)
+
+    private struct IntentReply: Codable {
+        let ok: Bool
+        let error: String?
+    }
+
+    /// Refresh the mapper catalog, then repoll so the assign menus fill.
+    func refreshCatalog() {
+        postIntent(["name": "catalog.refresh"])
+    }
+
+    /// Bind a worker lane (0-8) to a thread, or to a fresh session when nil.
+    /// The overview lane is deck-owned and never assignable.
+    func assign(lane: Int, threadId: String?) {
+        guard (0..<9).contains(lane) else { return }
+        postIntent(["name": "lane.assign", "index": lane, "threadId": threadId ?? NSNull()])
+    }
+
+    // Management mutations go through one serial queue, and each one awaits
+    // its response before the next dequeues: rapid menu picks can't arrive —
+    // or clear errors — out of order. A timed-out request is cancelled and
+    // recorded as a failure, never mistaken for a success.
+    private let intentQueue = DispatchQueue(label: "speakeasy.deck.intents")
+
+    /// Lock-guarded slot for the response error — the timeout path and a late
+    /// completion can race, so every write goes through the lock.
+    private final class IntentErrorBox {
+        private let lock = NSLock()
+        private var value: String?
+        func store(_ error: String) {
+            lock.lock()
+            value = error
+            lock.unlock()
+        }
+        func read() -> String? {
+            lock.lock()
+            defer { lock.unlock() }
+            return value
+        }
+    }
+
+    private func postIntent(_ body: [String: Any]) {
+        intentQueue.async { [weak self] in
+            guard let self, let discovery = self.readDiscovery() else { return }
+            var urlString = "http://127.0.0.1:\(discovery.dataPort)/api/intent"
+            if let token = discovery.token, !token.isEmpty {
+                urlString += "?k=\(token)"
+            }
+            guard let url = URL(string: urlString),
+                  let payload = try? JSONSerialization.data(withJSONObject: body) else { return }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 10
+            request.setValue("application/json", forHTTPHeaderField: "content-type")
+            request.httpBody = payload
+            let sem = DispatchSemaphore(value: 0)
+            let box = IntentErrorBox()
+            let task = URLSession.shared.dataTask(with: request) { data, response, taskError in
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if status == 200, let data, let reply = try? JSONDecoder().decode(IntentReply.self, from: data) {
+                    if !reply.ok { box.store(reply.error ?? "The deck rejected that.") }
+                } else if taskError != nil {
+                    box.store("The deck didn't answer.")
+                } else {
+                    // a non-200 or non-decodable response is never a success
+                    box.store(status == 0 ? "The deck didn't answer." : "The deck answered with status \(status).")
+                }
+                sem.signal()
+            }
+            task.resume()
+            if sem.wait(timeout: .now() + 10) == .timedOut {
+                task.cancel()
+                box.store("The deck didn't answer in time.")
+            }
+            let error = box.read()
+            DispatchQueue.main.async {
+                // success clears an earlier failure — stale errors are lies
+                self.actionError = error
+                self.poll()
+            }
+        }
     }
 
     // MARK: - Start / stop (serialized)

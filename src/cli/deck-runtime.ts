@@ -511,6 +511,13 @@ export class DeckRuntime extends EventEmitter {
    * flight (apply() rejects lane.cycle/lane.assign when busy), so this never
    * touches another lane's turn. */
   private assignLane(index: number, threadId: string | null): void {
+    // re-affirming the current binding must be a no-op — rekeying would close
+    // the warm session and clear the visible thread for nothing
+    if (threadId && this.laneThreadId(index) === threadId) {
+      this.log('LANE UNCHANGED', `lane ${index + 1} already holds this thread`);
+      this.changed();
+      return;
+    }
     // never let the old session's audio keep playing under a new one
     if (this.playing?.startsWith(`${index}:`)) {
       this.stopPlayer();
