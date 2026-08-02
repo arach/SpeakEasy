@@ -1,7 +1,13 @@
 # Self-serve release test — second Mac
 
-Use this as the promotion gate for SpeakEasy 0.2.18. The test Mac should not
-have the SpeakEasy repository, Bun, Xcode, or a prior SpeakEasy installation.
+Use this first to validate the public SpeakEasy 0.2.18 core prerelease, then
+repeat it against the exact 0.2.19 launch candidate before promotion. The test
+Mac should not have the SpeakEasy repository, Bun, Node, Xcode, or a prior
+SpeakEasy installation.
+
+Do not promote 0.2.18 to **Latest**. It is the immutable core proof candidate;
+the first public launch is 0.2.19 after the observer/presenter gate in
+[`gtm.md`](gtm.md) also passes.
 
 ## Before starting
 
@@ -91,5 +97,6 @@ Record:
 - the first failing step, screenshot, and `~/.config/speakeasy/deck.log` if a
   step fails.
 
-Promote the GitHub prerelease to **Latest** only after all pass criteria above
-are satisfied on the second Mac.
+Record the 0.2.18 result as core evidence. Before promoting 0.2.19 to
+**Latest**, update the pinned version in this checklist and repeat every step
+against the downloaded public 0.2.19 assets.

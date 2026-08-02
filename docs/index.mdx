@@ -1,258 +1,89 @@
 ---
 title: SpeakEasy
-description: Unified text-to-speech library with multi-provider support
+description: Dual-mode voice for exact Codex Desktop tasks, plus a multi-provider TTS library
 ---
 
-A unified speech library for all your projects with support for multiple TTS providers and clean configuration structure.
+# SpeakEasy
 
-## Requirements
+SpeakEasy is the voice interface for the Codex task you are already using.
+It combines local speech recognition, exact-task routing, and controllable
+narration without creating a second conversation.
 
-- **Node.js >= 22.5** or **Bun >= 1.0** (built-in SQLite cache)
-- **macOS** for system voice and audio playback
+## Choose your path
 
-## Key Features
+### SpeakEasy for Codex
 
-### Intelligent Caching System
-- **16x faster** repeated playback with built-in SQLite (`node:sqlite` / `bun:sqlite`)
-- Automatic cache management with TTL and size limits
-- Content-aware deduplication prevents redundant API calls
-- Comprehensive analytics and cache inspection tools
+Use the native macOS app when you want to:
 
-### Centralized Configuration
-- **Single config file** at `~/.config/speakeasy/settings.json`
-- **No more scattered API keys** - configure once, use everywhere
-- Global defaults with per-call overrides
-- Environment variable integration
+- dictate into an exact Codex Desktop task from the Mac, browser, or iPad;
+- keep the complete transcript and tool activity in Codex;
+- hear the real response through a native player with queue, replay, speed,
+  volume, and provider controls;
+- map up to nine persistent voice lanes without relying on window focus.
 
-### Core Capabilities
-- **Multiple TTS Providers**: System (macOS), OpenAI, ElevenLabs, Groq
-- **Smart Fallbacks**: Automatic provider switching on failure
-- **Volume Control**: Precise control without affecting system volume
-- **Queue Management**: Priority-based speech queue with interruption
-- **TypeScript**: Full type safety and IntelliSense support
+Start with [Listening mode](listening-mode.mdx) or the
+[Codex installation page](https://speakeasy.arach.dev/codex/#codex-install).
 
-## Installation
+Requirements: an Apple silicon Mac running macOS 14 or newer and the current
+Codex Desktop app. The packaged app is self-contained; Bun, Node, Xcode, and a
+source checkout are not required.
+
+### TypeScript library and CLI
+
+Use `@arach/speakeasy` when an application, script, or agent hook needs
+provider-independent text-to-speech.
 
 ```bash
-npm install @arach/speakeasy
+bun add @arach/speakeasy
 ```
-
-## Quick Start
 
 ```typescript
 import { say } from '@arach/speakeasy';
 
-await say('Hello world!');                    // system voice
-await say('Hello!', 'openai');                // OpenAI TTS
-await say('Hello!', 'elevenlabs');            // ElevenLabs TTS
-await say('Hello!', 'groq');                  // Groq TTS
+await say('The build is ready.');
+await say('Use the configured OpenAI voice.', 'openai');
 ```
 
-## Performance Impact
+Library requirements: Node.js 22.12 or newer, or Bun 1.0 or newer. Native
+system playback is macOS-only; cloud providers require their own API keys.
 
-**Caching makes a dramatic difference:**
+## Product loop
 
-| Provider | Without Cache | With Cache | Speedup |
-|----------|---------------|------------|---------|
-| OpenAI | ~800ms | ~50ms | **16x faster** |
-| ElevenLabs | ~1200ms | ~50ms | **24x faster** |
-| Groq | ~400ms | ~50ms | **8x faster** |
+1. Choose the real Codex task that owns the work.
+2. SpeakEasy validates and locks that exact task ID.
+3. Hold to speak. Audio is transcribed locally on the Mac.
+4. SpeakEasy submits the final text exactly once to the locked task.
+5. The full response stays in Codex and is narrated through SpeakEasy.
 
-## Documentation Index
+If task identity, ownership, or turn correlation cannot be proven, SpeakEasy
+fails closed instead of selecting another task.
 
-### Quick Start
-- **[CLI Reference](cli.mdx)** - Complete command-line documentation
-- **[SDK Guide](sdk.mdx)** - TypeScript SDK usage and examples
+## Documentation
 
-### Configuration
-- **[Configuration Guide](configuration.mdx)** - Complete configuration options
-- **[Providers Guide](providers.mdx)** - Provider-specific setup and features
-- **[Custom Providers](custom-providers.md)** - Add bespoke TTS backends via TTSAdapter
-- **[Cache System](cache.mdx)** - Cache management and optimization
+- [Quickstart](quickstart.mdx) — install the app or library
+- [Listening mode](listening-mode.mdx) — exact-task voice turns and trust boundary
+- [CLI reference](cli.mdx) — speech and cache commands
+- [SDK guide](sdk.mdx) — TypeScript API
+- [Configuration](configuration.mdx) — providers and global settings
+- [Providers](providers.mdx) — System, OpenAI, ElevenLabs, Groq, and Gemini
+- [Custom providers](custom-providers.md) — add a TTS adapter
+- [Cache](cache.mdx) — local SQLite cache behavior
+- [Troubleshooting](troubleshooting.mdx) — diagnostics and common failures
 
-### Support
-- **[Troubleshooting](troubleshooting.mdx)** - Common issues and solutions
+## Release status
 
-## Quick Navigation
+The signed `0.2.18` build is a self-serve preview. It remains a prerelease
+until the clean second-Mac and device-path acceptance gate passes. The native
+iPad shell is a developer preview; the browser/PWA is the supported companion
+surface for the first public release.
 
-### For Developers
-1. **Start here:** [SDK Guide](sdk.mdx) - Learn the TypeScript API
-2. **Configuration:** [Configuration Guide](configuration.mdx) - Set up API keys and defaults
-3. **Providers:** [Providers Guide](providers.mdx) - Choose and configure TTS providers
+See [the GTM control plan](https://github.com/arach/SpeakEasy/blob/master/docs/release/gtm.md)
+for the launch sequence and
+[the second-Mac checklist](https://github.com/arach/SpeakEasy/blob/master/docs/release/self-serve-mac-test.md)
+for the proof gate.
 
-### For CLI Users
-1. **Start here:** [CLI Reference](cli.mdx) - Learn command-line usage
-2. **Setup:** [Configuration Guide](configuration.mdx) - Configure global settings
-3. **Troubleshooting:** [Troubleshooting](troubleshooting.mdx) - Fix common issues
+## Support
 
-### For System Administrators
-1. **Configuration:** [Configuration Guide](configuration.mdx) - Global deployment settings
-2. **Cache Management:** [Cache System](cache.mdx) - Optimize performance and storage
-3. **Provider Setup:** [Providers Guide](providers.mdx) - API key management
-
-## Feature Documentation
-
-### Core Features
-- **Multi-Provider Support** - System, OpenAI, ElevenLabs, Groq
-- **Smart Caching** - SQLite cache with metadata (no extra deps)
-- **Queue Management** - Priority-based speech queue
-- **Rate Control** - Customizable speech rate (WPM)
-- **Volume Control** - Precise volume without affecting system
-- **Auto Fallbacks** - Intelligent provider fallback on failure
-
-### CLI Features
-- **Global Configuration** - `~/.config/speakeasy/settings.json`
-- **Cache Management** - List, search, play, and clear cached audio
-- **Health Diagnostics** - `--doctor` and `--diagnose` commands
-- **Debug Mode** - Detailed logging with `--debug`
-
-### SDK Features
-- **TypeScript Support** - Full type safety and IntelliSense
-- **Convenience Functions** - `say()` and `speak()` for quick usage
-- **Class-based API** - `SpeakEasy` class for advanced control
-- **Event Handling** - Promise-based async operations
-- **Error Recovery** - Graceful fallback patterns
-
-## API Reference
-
-### CLI Commands Quick Reference
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `speakeasy "text"` | Basic speech | `speakeasy "Hello world"` |
-| `--provider <name>` | Choose provider | `--provider openai` |
-| `--voice <voice>` | Select voice | `--voice nova` |
-| `--rate <wpm>` | Set speech rate | `--rate 200` |
-| `--volume <0-1>` | Set volume | `--volume 0.8` |
-| `--cache` | Enable caching | `--cache` |
-| `--list` | List cache entries | `--list` |
-| `--stats` | Cache statistics | `--stats` |
-| `--doctor` | Health check | `--doctor` |
-
-### SDK Quick Reference
-
-```typescript
-// Quick functions
-await say('Hello world');                    // System voice
-await say('Hello world', 'openai');          // Specific provider
-
-// Class usage
-const speaker = new SpeakEasy({
-  provider: 'openai',
-  openaiVoice: 'nova',
-  rate: 180,
-  cache: { enabled: true }
-});
-
-await speaker.speak('Hello world');
-```
-
-## Configuration Quick Reference
-
-### Global Configuration File
-**Location:** `~/.config/speakeasy/settings.json`
-
-```json
-{
-  "providers": {
-    "openai": { "enabled": true, "voice": "nova", "apiKey": "sk-..." },
-    "elevenlabs": { "enabled": true, "voiceId": "...", "apiKey": "..." },
-    "system": { "enabled": true, "voice": "Samantha" },
-    "groq": { "enabled": true, "voice": "tara", "apiKey": "gsk_..." }
-  },
-  "defaults": {
-    "provider": "system",
-    "fallbackOrder": ["system", "openai", "elevenlabs"],
-    "rate": 180,
-    "volume": 0.7
-  },
-  "cache": {
-    "enabled": true,
-    "ttl": "7d",
-    "maxSize": "100mb"
-  }
-}
-```
-
-### Environment Variables
-```bash
-export OPENAI_API_KEY="sk-..."
-export ELEVENLABS_API_KEY="..."
-export GROQ_API_KEY="gsk_..."
-```
-
-## Use Case Examples
-
-### Development Notifications
-```bash
-# Build completion
-speakeasy "Build completed successfully" --provider system
-
-# Error alerts
-speakeasy "Build failed with errors" --provider openai --voice nova
-```
-
-### Claude Code Integration
-```typescript
-import { say } from '@arach/speakeasy';
-
-export async function speakNotification(message: string, project: string) {
-  await say(`In ${project}, ${message}`, 'openai');
-}
-```
-
-### Accessibility
-```typescript
-const speaker = new SpeakEasy({
-  provider: 'elevenlabs',
-  volume: 0.8,
-  cache: { enabled: true }
-});
-
-await speaker.speak('Screen reader text', { priority: 'high' });
-```
-
-## Troubleshooting Quick Fixes
-
-### Common Issues
-```bash
-# API key missing
-export OPENAI_API_KEY="your-key-here"
-
-# Cache not working
-speakeasy "test" --cache --provider openai
-
-# System voice not working (non-macOS)
-speakeasy "test" --provider openai
-
-# Network issues
-speakeasy "fallback" --provider system
-
-# Configuration errors
-speakeasy --doctor
-```
-
-## Performance Guide
-
-### Cache Performance
-- **OpenAI TTS:** ~800ms to ~50ms (16x faster with cache)
-- **ElevenLabs:** ~1200ms to ~50ms (24x faster with cache)
-- **System Voice:** ~100ms (no cache needed)
-
-### Best Practices
-- Enable caching for API providers
-- Use consistent text for better cache hits
-- Choose appropriate TTL for your use case
-- Monitor cache size with `--stats`
-
-## Contributing
-
-See the main [README](../README.md) for contribution guidelines.
-
-## License
-
-MIT License - see [LICENSE](../LICENSE) for details.
-
----
-
-**Need help?** Start with the [Troubleshooting Guide](troubleshooting.mdx) or run `speakeasy --doctor` for diagnostics.
+Run `speakeasy --doctor` for library and provider diagnostics. For the native
+app, open **SpeakEasy → Settings → Deck** and use **Open log** when a
+readiness check fails.
