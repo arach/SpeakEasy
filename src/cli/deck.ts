@@ -262,7 +262,16 @@ interface DeckHandle {
   exited: Promise<number | null>;
 }
 
-function findCaddy(): string | null {
+/** Prefer the release-bundled Caddy beside the compiled runtime, then fall
+ * back to PATH for source/development runs. */
+export function findCaddy(runtimeExecutable = process.execPath): string | null {
+  const bundled = path.join(path.dirname(runtimeExecutable), 'caddy');
+  try {
+    const stat = lstatSync(bundled);
+    if (stat.isFile() && (stat.mode & 0o111) !== 0) return bundled;
+  } catch {
+    // Not running from the signed app bundle; try the developer's PATH.
+  }
   const res = spawnSync('which', ['caddy'], { encoding: 'utf8' });
   return res.status === 0 ? res.stdout.trim() : null;
 }
@@ -451,8 +460,8 @@ function proxyDataRequest(req: IncomingMessage, res: ServerResponse, live: LiveP
   req.pipe(upstream);
 }
 
-/** Zero-dependency server and same-origin live-runtime proxy. Caddy remains an
- * optional HTTPS upgrade, not an installation requirement. */
+/** Zero-dependency server and same-origin live-runtime proxy. This is an
+ * explicit development fallback (`--no-tls`), not the production LAN path. */
 export async function startNodeServer(root: string, port: number, live: LiveProxy | null): Promise<DeckHandle> {
   const proxyWss = new WebSocketServer({ noServer: true });
   const server = createServer(async (req, res) => {
@@ -564,15 +573,15 @@ export async function startNodeServer(root: string, port: number, live: LiveProx
 
 /** Bridge defaults from ~/.config/speakeasy/settings.json — the settings app's
  * Deck tab writes these; CLI flags always win over config. */
-function deckConfigDefaults(): { port: number | null; pair: boolean } {
+export function deckConfigDefaults(configFile = CONFIG_FILE): { port: number | null; pair: boolean } {
   try {
-    const raw = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) as {
+    const raw = JSON.parse(readFileSync(configFile, 'utf8')) as {
       deck?: { port?: unknown; pair?: unknown };
     };
     const port = typeof raw.deck?.port === 'number' && raw.deck.port > 0 && raw.deck.port <= 65535 ? raw.deck.port : null;
-    return { port, pair: raw.deck?.pair === true };
+    return { port, pair: raw.deck?.pair !== false };
   } catch {
-    return { port: null, pair: false };
+    return { port: null, pair: true };
   }
 }
 
@@ -680,16 +689,25 @@ export async function runDeck(argv: string[]): Promise<void> {
   const { qr, host, mdns } = args;
   const caddy = args.caddy ? findCaddy() : null;
 
-  // HTTPS on :443 with Caddy's local CA when we can — browsers only grant mic
-  // (hold-to-speak) in a secure context. Independent of the HTTP port.
-  // Caddy can carry the platform-specific permission needed for 443 even when
-  // the embedded Node/Bun data plane must stay on an unprivileged port.
-  const tlsHost = args.tls && caddy && (await portAvailable(443, true)) ? host : null;
+  // HTTPS is a production invariant for browser/iPad voice: browsers only
+  // grant mic access in a secure context. Never silently downgrade a requested
+  // TLS launch to HTTP. `--no-tls` is the explicit local-development escape.
+  if (args.tls && !caddy) {
+    console.error('❌ Secure Deck startup requires the bundled Caddy helper.');
+    console.error('   Reinstall SpeakEasy, or use --no-tls --no-caddy for local development only.');
+    process.exit(1);
+  }
+  if (args.tls && !(await portAvailable(443, true))) {
+    console.error('❌ Secure Deck startup could not claim HTTPS port 443.');
+    console.error('   Stop the service using port 443, then start the Deck again.');
+    process.exit(1);
+  }
+  const tlsHost = args.tls ? host : null;
   const caCert = tlsHost ? (caddyRootCert(true) ?? null) : null;
 
   // The data plane runs loopback-only on port+1ish; Caddy proxies /ws and
-  // /api/* to it same-origin. Open on the local network by default; --pair
-  // gates both routes behind the persistent capability token.
+  // /api/* to it same-origin. Pairing is on by default and gates both routes
+  // behind a persistent capability token; --no-pair is an explicit override.
   const token = args.pair ? deckToken(args.rotateToken) : null;
   let dataPort: number | null = null;
   for (let candidate = port + 1; candidate <= Math.min(port + 5, 65535); candidate++) {
@@ -707,6 +725,11 @@ export async function runDeck(argv: string[]): Promise<void> {
   } catch (error) {
     if (!caddy) {
       console.error('❌ Could not start the deck server:', (error as Error).message);
+      process.exit(1);
+    }
+    if (args.tls) {
+      console.error('❌ Secure Deck startup failed:', (error as Error).message);
+      console.error('   SpeakEasy did not fall back to insecure HTTP.');
       process.exit(1);
     }
     console.error(`  ⚠️  Caddy failed (${(error as Error).message}) — falling back to the built-in live server.`);
@@ -746,7 +769,8 @@ export async function runDeck(argv: string[]): Promise<void> {
     : bonjour
       ? hostUrl(bonjour, port)
       : `http://${lan ?? 'your-macs-ip'}:${port}`);
-  // pair mode: the capability token travels in the URL fragment — never on the wire
+  // Pair mode bootstraps from a URL fragment (omitted from the initial request),
+  // then sends the capability only inside same-origin HTTPS API/WS requests.
   const padUrl = dataPlane && token ? `${padUrlBase}#k=${token}` : padUrlBase;
 
   // the settings app discovers the deck through this file — the canonical URL

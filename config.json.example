@@ -31,5 +31,9 @@
   "global": {
     "tempDir": "/tmp",
     "cleanup": true
+  },
+  "deck": {
+    "pair": true,
+    "autoStart": false
   }
 }

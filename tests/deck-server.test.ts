@@ -1,11 +1,11 @@
 import { afterEach, expect, test } from 'bun:test';
 import { createServer } from 'node:http';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 
-import { acquireDeckProcessLock, portAvailable, startNodeServer } from '../src/cli/deck';
+import { acquireDeckProcessLock, deckConfigDefaults, findCaddy, portAvailable, startNodeServer } from '../src/cli/deck';
 
 const cleanups: Array<() => Promise<void> | void> = [];
 
@@ -114,4 +114,29 @@ test('deck process lock rejects a second owner and releases safely', async () =>
   const third = acquireDeckProcessLock(lockFile);
   expect(third.acquired).toBe(true);
   third.release();
+});
+
+test('release runtime resolves the bundled Caddy helper before PATH', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'speakeasy-deck-caddy-test-'));
+  cleanups.push(() => rm(root, { recursive: true, force: true }));
+  const runtime = path.join(root, 'speakeasy-runtime');
+  const caddy = path.join(root, 'caddy');
+  await writeFile(runtime, 'runtime');
+  await writeFile(caddy, '#!/bin/sh\nexit 0\n');
+  await chmod(caddy, 0o755);
+
+  expect(findCaddy(runtime)).toBe(caddy);
+});
+
+test('pairing defaults on and preserves an explicit opt-out', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'speakeasy-deck-config-test-'));
+  cleanups.push(() => rm(root, { recursive: true, force: true }));
+  const missing = path.join(root, 'missing.json');
+  expect(deckConfigDefaults(missing)).toEqual({ port: null, pair: true });
+
+  const config = path.join(root, 'settings.json');
+  await writeFile(config, JSON.stringify({ deck: { port: 43211 } }));
+  expect(deckConfigDefaults(config)).toEqual({ port: 43211, pair: true });
+  await writeFile(config, JSON.stringify({ deck: { pair: false } }));
+  expect(deckConfigDefaults(config)).toEqual({ port: null, pair: false });
 });
