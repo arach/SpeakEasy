@@ -24,16 +24,16 @@ export default function DownloadSection() {
         <div className="grid items-end gap-12 lg:grid-cols-[1.08fr_0.92fr]">
           <div>
             <Badge variant="outline" className="rounded-xl border-emerald-400/25 bg-emerald-400/10 text-emerald-300">
-              Self-serve preview · {releaseVersion}
+              Dual-mode release · {releaseVersion}
             </Badge>
             <h2 className="mt-6 max-w-3xl font-display text-5xl font-extralight leading-[0.98] tracking-tight sm:text-6xl">
               Download the complete
               <span className="block bg-gradient-to-r from-emerald-300 to-blue-300 bg-clip-text text-transparent">
-                Mac core preview.
+                Codex voice companion.
               </span>
             </h2>
             <p className="mt-6 max-w-2xl text-lg font-light leading-8 text-white/58">
-              No repository, Bun, Xcode, or server setup. Give Codex one bounded installation task; it verifies and opens the notarized app, then tells you exactly which human permissions remain. The paired browser/iPad build begins with 0.2.19.
+              No repository, Bun, Xcode, or server setup. Give Codex one bounded installation task; it verifies and opens the notarized app, then tells you exactly which human permissions remain. The paired browser/iPad Deck is included.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">

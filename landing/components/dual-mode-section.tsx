@@ -27,7 +27,7 @@ export default function DualModeSection() {
       <div className="relative mx-auto max-w-6xl">
         <div className="mx-auto max-w-3xl text-center">
           <Badge variant="outline" className="mb-5 rounded-xl border-emerald-200 bg-white/80 text-emerald-700">
-            Two-way voice · self-serve preview
+            Two-way voice · available now
           </Badge>
           <h2 className="font-display text-4xl font-extralight leading-tight tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
             Speak to the task you’re already in.

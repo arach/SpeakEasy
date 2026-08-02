@@ -1,10 +1,24 @@
 # SpeakEasy plugin release checklist
 
-Last audited: July 24, 2026
+Last audited: August 2, 2026
 
 The submitted skill installs the latest GitHub release, so the native app release must land before
-the plugin is sent for review. Do not submit while `v0.2.16` is still latest: that release predates
-the permanent menu-bar player and live HUD.
+the plugin is sent for review. The `0.2.17` evidence below records the original native-player gate;
+the current dual-mode submission train is `0.2.19`.
+
+## 0.2.19 dual-mode release train
+
+- [x] Exact-task listening, paired HTTPS Deck, and the default-off observer/presenter are merged.
+- [x] A signed local app passed exact-task observer, durable-cursor, restart, and real Luna checks.
+- [x] A signed local `0.2.19` DMG passed the mounted-payload audit with bundled Caddy, Pad,
+      observer bridge, Luna presenter, and self-contained runtime.
+- [x] The npm tarball dry run reports `@arach/speakeasy@0.2.19`.
+- [x] The plugin runtime reports `0.2.19`; schema validation, isolated extraction, runtime help,
+      submission ZIP, and SHA-256 generation pass.
+- [ ] Notarize, staple, and publish the `0.2.19` DMG from the exact launch commit.
+- [ ] Run the downloaded public artifact on a clean second Mac and real browser/iPad.
+- [ ] Publish and reinstall-test npm `0.2.19` and the exact plugin ZIP from that commit.
+- [ ] Promote GitHub `0.2.19` to Latest before sending the plugin for OpenAI review.
 
 ## 1. Local source and skill bundle
 
