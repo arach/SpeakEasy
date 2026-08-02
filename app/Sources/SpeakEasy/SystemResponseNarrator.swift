@@ -27,6 +27,41 @@ struct SpeechNarrationConfiguration: Equatable, Sendable {
             rate: rate
         )
     }
+
+    static func configured(from config: ConfigManager, provider: String? = nil) -> Self {
+        switch (provider ?? config.defaultProvider).lowercased() {
+        case "openai":
+            return Self(
+                provider: "openai", voice: config.openaiVoice, model: config.openaiModel,
+                apiKey: config.openaiApiKey, instructions: config.openaiInstructions, rate: config.defaultRate
+            )
+        case "elevenlabs":
+            return Self(
+                provider: "elevenlabs", voice: config.elevenlabsVoiceId, model: config.elevenlabsModelId,
+                apiKey: config.elevenlabsApiKey, instructions: nil, rate: config.defaultRate
+            )
+        case "groq":
+            return Self(
+                provider: "groq", voice: config.groqVoice, model: config.groqModel,
+                apiKey: config.groqApiKey, instructions: nil, rate: config.defaultRate
+            )
+        case "gemini":
+            return Self(
+                provider: "gemini", voice: config.geminiVoice, model: config.geminiModel,
+                apiKey: config.geminiApiKey, instructions: nil, rate: config.defaultRate
+            )
+        case "system":
+            return Self(
+                provider: "system", voice: config.systemVoice, model: nil,
+                apiKey: "", instructions: nil, rate: config.defaultRate
+            )
+        default:
+            return Self(
+                provider: config.defaultProvider, voice: "", model: nil,
+                apiKey: "", instructions: nil, rate: config.defaultRate
+            )
+        }
+    }
 }
 
 enum ConfiguredResponseNarratorError: LocalizedError {
