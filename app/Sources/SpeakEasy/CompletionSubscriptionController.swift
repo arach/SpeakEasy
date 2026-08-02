@@ -32,9 +32,11 @@ final class CompletionSubscriptionController: ObservableObject {
     @Published private(set) var activities: [CompletionActivity]
     @Published private(set) var observerState: CompletionSubscriptionPresentationState = .off
     @Published private(set) var lastError: String?
+    @Published private(set) var isFeatureEnabled: Bool
 
     private let store: CompletionSubscriptionStore
     private let observer: CodexCompletionObserver
+    private let presenter: any CompletionPresenting
     private let narrator = ConfiguredResponseNarrator()
     private var playbackObservations: Set<AnyCancellable> = []
     private var processingTail: Task<Void, Never>?
@@ -42,16 +44,20 @@ final class CompletionSubscriptionController: ObservableObject {
 
     init(
         store: CompletionSubscriptionStore = CompletionSubscriptionStore(),
-        observer: CodexCompletionObserver? = nil
+        observer: CodexCompletionObserver? = nil,
+        presenter: (any CompletionPresenting)? = nil,
+        featureEnabled: Bool? = nil
     ) {
         self.store = store
         self.observer = observer ?? CodexCompletionObserver()
+        self.presenter = presenter ?? CodexLunaCompletionPresenter()
+        self.isFeatureEnabled = featureEnabled ?? ConfigManager.shared.observerPresenterEnabled
         do {
             let snapshot = try store.load()
             subscription = snapshot.subscription
             channel = snapshot.channel
             activities = snapshot.activities
-            observerState = subscription?.isEnabled == true ? .subscribed : .off
+            observerState = isFeatureEnabled && subscription?.isEnabled == true ? .subscribed : .off
         } catch {
             subscription = nil
             channel = .init()
@@ -73,6 +79,10 @@ final class CompletionSubscriptionController: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        guard isFeatureEnabled else {
+            observerState = .off
+            return
+        }
         guard subscription?.isEnabled == true else { return }
         startObservation()
         recoverPendingActivities()
@@ -91,6 +101,7 @@ final class CompletionSubscriptionController: ObservableObject {
     }
 
     func subscribe(to task: ListeningTaskLock) {
+        guard isFeatureEnabled else { return }
         observer.stop()
         subscription = CompletionSubscription(task: task)
         observerState = .subscribed
@@ -102,6 +113,7 @@ final class CompletionSubscriptionController: ObservableObject {
     }
 
     func setEnabled(_ enabled: Bool) {
+        guard isFeatureEnabled || !enabled else { return }
         guard var subscription else { return }
         subscription.isEnabled = enabled
         self.subscription = subscription
@@ -182,7 +194,7 @@ final class CompletionSubscriptionController: ObservableObject {
     }
 
     private func startObservation() {
-        guard let subscription, subscription.isEnabled else {
+        guard isFeatureEnabled, let subscription, subscription.isEnabled else {
             observerState = .off
             return
         }
@@ -268,7 +280,11 @@ final class CompletionSubscriptionController: ObservableObject {
     }
 
     private func process(_ event: CodexCompletionEvent) async {
-        guard var subscription, subscription.isEnabled, event.taskID == subscription.task.id else { return }
+        guard isFeatureEnabled,
+              var subscription,
+              subscription.isEnabled,
+              event.taskID == subscription.task.id
+        else { return }
 
         let key = subscription.dedupeKey(turnID: event.turnID)
         if subscription.enqueuedTurnIDs.contains(key) {
@@ -313,7 +329,7 @@ final class CompletionSubscriptionController: ObservableObject {
     }
 
     private func recoverPendingActivities() {
-        guard subscription?.isEnabled == true else { return }
+        guard isFeatureEnabled, subscription?.isEnabled == true else { return }
         for activity in activities {
             switch activity.state {
             case .detected:
@@ -355,7 +371,8 @@ final class CompletionSubscriptionController: ObservableObject {
     }
 
     private func synthesizeAndEnqueue(activityID: UUID, markDurable: Bool) async {
-        guard let activity = activities.first(where: { $0.id == activityID }),
+        guard isFeatureEnabled,
+              let activity = activities.first(where: { $0.id == activityID }),
               !activity.response.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { return }
         if let audioPath = activity.audioPath,
@@ -365,8 +382,34 @@ final class CompletionSubscriptionController: ObservableObject {
         }
 
         do {
+            let spokenText: String
+            if let existing = activity.spokenText?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !existing.isEmpty {
+                spokenText = existing
+            } else {
+                guard let task = subscription?.task, task.id == activity.taskID else { return }
+                let presentation = await presenter.present(CompletionPresentationRequest(
+                    taskID: activity.taskID,
+                    turnID: activity.turnID,
+                    taskTitle: task.title,
+                    projectPath: task.cwd,
+                    response: activity.response
+                ))
+                guard subscription?.task.id == activity.taskID,
+                      activities.contains(where: { $0.id == activityID && $0.turnID == activity.turnID })
+                else { return }
+                spokenText = presentation.spokenText
+                updateActivity(activityID) {
+                    $0.spokenText = presentation.spokenText
+                    $0.presentationSource = presentation.source
+                    $0.presentationModel = presentation.model
+                    $0.presentationFailure = presentation.fallbackReason
+                }
+                persist()
+            }
             let narration = channelNarrationConfiguration()
-            let audioURL = try await narrator.render(text: activity.response, configuration: narration)
+            let audioURL = try await narrator.render(text: spokenText, configuration: narration)
             guard subscription?.task.id == activity.taskID else {
                 try? FileManager.default.removeItem(at: audioURL)
                 return
@@ -391,6 +434,7 @@ final class CompletionSubscriptionController: ObservableObject {
               FileManager.default.fileExists(atPath: audioPath)
         else { return }
         let activity = activities[index]
+        let spokenText = activity.spokenText ?? CompletionSpeechProjector.project(activity.response)
         let narration = channelNarrationConfiguration()
         if markDurable, var subscription {
             let key = subscription.dedupeKey(turnID: activity.turnID)
@@ -406,7 +450,7 @@ final class CompletionSubscriptionController: ObservableObject {
             id: UUID(),
             audioPath: audioPath,
             title: subscription?.task.title ?? "Codex completion",
-            text: activity.response,
+            text: spokenText,
             provider: narration.provider,
             createdAt: ISO8601DateFormatter().string(from: Date()),
             synthesisRateWPM: narration.rate,

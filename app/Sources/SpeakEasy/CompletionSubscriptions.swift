@@ -146,6 +146,10 @@ struct CompletionActivity: Codable, Equatable, Identifiable, Sendable {
     var failure: String?
     var cursorOffset: Int64?
     var deduplicatedCount: Int
+    var spokenText: String?
+    var presentationSource: CompletionPresentationSource?
+    var presentationModel: String?
+    var presentationFailure: String?
 
     init(
         id: UUID = UUID(),
@@ -159,7 +163,11 @@ struct CompletionActivity: Codable, Equatable, Identifiable, Sendable {
         provider: String? = nil,
         failure: String? = nil,
         cursorOffset: Int64? = nil,
-        deduplicatedCount: Int = 0
+        deduplicatedCount: Int = 0,
+        spokenText: String? = nil,
+        presentationSource: CompletionPresentationSource? = nil,
+        presentationModel: String? = nil,
+        presentationFailure: String? = nil
     ) {
         self.id = id
         self.taskID = taskID
@@ -173,6 +181,10 @@ struct CompletionActivity: Codable, Equatable, Identifiable, Sendable {
         self.failure = failure
         self.cursorOffset = cursorOffset
         self.deduplicatedCount = deduplicatedCount
+        self.spokenText = spokenText
+        self.presentationSource = presentationSource
+        self.presentationModel = presentationModel
+        self.presentationFailure = presentationFailure
     }
 
     var dedupeKey: String { "\(taskID)::\(turnID)" }

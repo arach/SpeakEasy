@@ -207,7 +207,9 @@ struct ListeningPopoverSection: View {
                 .foregroundStyle(theme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            completionControls(for: lock)
+            if completions.isFeatureEnabled {
+                completionControls(for: lock)
+            }
 
             captureComposer
 
@@ -233,13 +235,13 @@ struct ListeningPopoverSection: View {
                 HStack(spacing: 6) {
                     Image(systemName: "speaker.wave.2.fill")
                         .font(.system(size: 10, weight: .semibold))
-                    Text("Announce completions")
+                    Text("Present completions")
                         .font(PopoverType.secondaryStrong)
                 }
             }
             .toggleStyle(.switch)
             .tint(accent)
-            .accessibilityHint("Watch only this exact Codex task for future completed turns")
+            .accessibilityHint("Observe only this exact Codex task and present future completions with Luna")
 
             if completions.isSubscribed(to: lock.id), completions.subscription?.isEnabled == true {
                 HStack(spacing: 7) {
