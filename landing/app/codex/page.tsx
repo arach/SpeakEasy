@@ -224,32 +224,30 @@ export default function CodexPage() {
         <div className="mx-auto max-w-6xl">
           <div className="mx-auto max-w-3xl text-center">
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">First run</span>
-            <h2 className="mt-4 font-display text-4xl font-extralight text-slate-900 sm:text-5xl">Let Codex handle the mechanical work.</h2>
+            <h2 className="mt-4 font-display text-4xl font-extralight text-slate-900 sm:text-5xl">One prompt. Codex does the rest.</h2>
             <p className="mt-5 text-base font-light leading-7 text-slate-600">
-              Installation is itself a Codex task: it can fetch the exact release, inspect the installer, verify every trust boundary, and open the guided setup. You stay in the loop for the permissions only macOS can ask you to approve.
+              Paste a pinned install task into Codex. Approve microphone and local-network access when macOS asks.
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+          <div className="mt-12 grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
             <CodexInstallPrompt />
 
-            <div>
-              <div className="mb-4 flex items-center justify-between px-1">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Manual fallback</span>
+            <div className="overflow-hidden rounded-3xl border border-slate-200/70 bg-slate-50/50">
+              <div className="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
+                <span className="text-xs font-medium text-slate-500">Prefer the DMG?</span>
                 <a href={releaseDownloadUrl} className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-600">
                   Download DMG <Download className="h-3.5 w-3.5" />
                 </a>
               </div>
-              <ol className="overflow-hidden rounded-3xl border border-slate-200/70 bg-slate-50/70 shadow-xl shadow-slate-900/5">
+              <ol>
               {[
                 ["1", "Install", "Open the DMG and drag SpeakEasy to Applications."],
                 ["2", "Allow", "Open the app and approve microphone and local-network access when macOS asks."],
-                ["3", "Verify", "In Settings → Deck, confirm the included runtime and Codex installation."],
-                ["4", "Start", "Press Start Deck. The live URL and QR appear only after the bridge is healthy."],
-                ["5", "Talk", "Choose a real Codex task, hold to speak, and hear that same task answer."],
+                ["3", "Start & talk", "In Settings → Deck, confirm Codex, start Deck, map a task, and hold to speak."],
               ].map(([number, title, body]) => (
-                <li key={number} className="flex gap-4 border-b border-slate-200/70 p-5 last:border-b-0 sm:p-6">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-white font-mono text-xs text-emerald-700">{number}</span>
+                <li key={number} className="flex gap-4 border-b border-slate-200/70 p-5 last:border-b-0">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white font-mono text-[11px] text-slate-500">{number}</span>
                   <div>
                     <div className="text-sm font-semibold text-slate-900">{title}</div>
                     <p className="mt-1 text-sm leading-6 text-slate-600">{body}</p>
