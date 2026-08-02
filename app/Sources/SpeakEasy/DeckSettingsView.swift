@@ -322,6 +322,24 @@ struct DeckSettingsView: View {
                         }
                         .buttonStyle(.glassCompat)
                     }
+
+                    if let trustURL = bridge.iPadTrustURL {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("FIRST IPAD CONNECTION")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundColor(theme.textTertiary)
+                            Text("Open the one-time trust link on the iPad, install the profile, then enable Caddy Local Authority in Settings → General → About → Certificate Trust Settings.")
+                                .font(.caption)
+                                .foregroundColor(theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("Copy iPad trust link") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(trustURL.absoluteString, forType: .string)
+                            }
+                            .buttonStyle(.glassCompat)
+                        }
+                        .padding(.top, 4)
+                    }
                 }
             }
         }

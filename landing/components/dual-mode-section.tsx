@@ -27,7 +27,7 @@ export default function DualModeSection() {
       <div className="relative mx-auto max-w-6xl">
         <div className="mx-auto max-w-3xl text-center">
           <Badge variant="outline" className="mb-5 rounded-xl border-emerald-200 bg-white/80 text-emerald-700">
-            Two-way voice · Codex technical preview
+            Two-way voice · self-serve preview
           </Badge>
           <h2 className="font-display text-4xl font-extralight leading-tight tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
             Speak to the task you’re already in.
@@ -65,7 +65,7 @@ export default function DualModeSection() {
                   <Mic2 className="h-5 w-5" />
                 </div>
                 <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                  Preview
+                  Available now
                 </span>
               </div>
               <h3 className="mt-5 font-display text-2xl font-medium text-slate-900">Listen · ASR</h3>

@@ -18,20 +18,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import SiteFooter from "@/components/site-footer"
 import SiteNav from "@/components/site-nav"
+import { releaseDownloadUrl, releaseRequirements, releaseVersion } from "@/lib/release"
 
 export const metadata: Metadata = {
   title: "SpeakEasy for Codex",
   description: "See how SpeakEasy maps your voice to an exact Codex Desktop task and brings its real response back through the native player.",
-}
-
-const releaseUrl = "https://github.com/arach/SpeakEasy/releases/latest/download/SpeakEasy.dmg"
-
-function CommandBlock({ children }: { children: string }) {
-  return (
-    <pre className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-900 p-4 font-mono text-xs leading-6 text-slate-200 shadow-inner">
-      <code>{children}</code>
-    </pre>
-  )
 }
 
 const loop = [
@@ -52,7 +43,7 @@ export default function CodexPage() {
         <div className="relative mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[1fr_0.92fr]">
           <div>
             <Badge variant="outline" className="rounded-xl border-emerald-200 bg-white/80 text-emerald-700">
-              Codex Desktop · technical preview
+              SpeakEasy {releaseVersion} · dual mode
             </Badge>
             <h1 className="mt-6 font-display text-5xl font-extralight leading-[0.98] tracking-tight text-slate-900 sm:text-6xl md:text-7xl">
               One voice.
@@ -65,20 +56,17 @@ export default function CodexPage() {
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="rounded-xl bg-slate-900 px-6 text-white hover:bg-slate-800">
-                <a href="#try">
-                  Try the Codex preview
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <a href={releaseDownloadUrl}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download for Mac
                 </a>
               </Button>
               <Button asChild size="lg" variant="outline" className="rounded-xl border-slate-300 bg-white px-6 text-slate-700">
-                <a href={releaseUrl}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download stable player
-                </a>
+                <a href="#setup">See first-run setup <ArrowRight className="ml-2 h-4 w-4" /></a>
               </Button>
             </div>
             <p className="mt-5 text-xs leading-5 text-slate-500">
-              Stable TTS player available now. Exact-task listening currently requires a source build.
+              Developer ID signed and Apple-notarized · {releaseRequirements.platform} · {releaseRequirements.os}
             </p>
           </div>
 
@@ -202,30 +190,67 @@ export default function CodexPage() {
           <article className="rounded-3xl border border-slate-200/70 bg-white/75 p-8 shadow-lg shadow-slate-900/5">
             <div className="flex items-center justify-between gap-4">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Headphones className="h-5 w-5" /></div>
-              <Badge variant="outline" className="rounded-xl border-emerald-200 bg-emerald-50 text-emerald-700">Available now</Badge>
+              <Badge variant="outline" className="rounded-xl border-emerald-200 bg-emerald-50 text-emerald-700">Included in {releaseVersion}</Badge>
             </div>
-            <h2 className="mt-7 font-display text-3xl font-medium text-slate-900">The stable player</h2>
+            <h2 className="mt-7 font-display text-3xl font-medium text-slate-900">Speak · native TTS</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Install the signed 0.2.17 app for TTS, menu-bar playback, queues, transport controls, speed, volume, and the live transcript HUD.
+              Responses return through the menu-bar player with queues, transport controls, speed, volume, provider voices, and the live transcript HUD.
             </p>
             <Button asChild className="mt-7 rounded-xl bg-slate-900 text-white hover:bg-slate-800">
-              <a href={releaseUrl}><Download className="mr-2 h-4 w-4" />Download SpeakEasy.dmg</a>
+              <a href={releaseDownloadUrl}><Download className="mr-2 h-4 w-4" />Download SpeakEasy.dmg</a>
             </Button>
           </article>
 
-          <article id="try" className="rounded-3xl border border-amber-200/70 bg-amber-50/45 p-8 shadow-lg shadow-amber-900/5">
+          <article className="rounded-3xl border border-emerald-200/70 bg-emerald-50/45 p-8 shadow-lg shadow-emerald-900/5">
             <div className="flex items-center justify-between gap-4">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><Mic2 className="h-5 w-5" /></div>
-              <Badge variant="outline" className="rounded-xl border-amber-200 bg-white/70 text-amber-700">Technical preview</Badge>
+              <Badge variant="outline" className="rounded-xl border border-emerald-200 bg-white/70 text-emerald-700">Included in {releaseVersion}</Badge>
             </div>
-            <h2 className="mt-7 font-display text-3xl font-medium text-slate-900">Exact-task listening</h2>
+            <h2 className="mt-7 font-display text-3xl font-medium text-slate-900">Listen · local ASR</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Listening is merged on master but postdates the signed release. Build current source to try local ASR and Codex task mapping.
+              Hold to speak from the Mac, browser, or iPad. SpeakEasy transcribes locally and sends the final dictation into the real Codex task assigned to that lane.
             </p>
-            <div className="mt-6">
-              <CommandBlock>{`git clone https://github.com/arach/SpeakEasy.git\ncd SpeakEasy/app\n./build-app.sh\nopen SpeakEasy.app`}</CommandBlock>
-            </div>
+            <ul className="mt-6 space-y-2 text-sm text-slate-600">
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-600" /> No source checkout or developer tools</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-600" /> Nine persistent exact-task lanes</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-600" /> Full transcript remains in Codex</li>
+            </ul>
           </article>
+        </div>
+      </section>
+
+      <section id="setup" className="border-y border-slate-200/60 bg-white px-4 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">First run</span>
+              <h2 className="mt-4 font-display text-4xl font-extralight text-slate-900 sm:text-5xl">From download to a live lane.</h2>
+              <p className="mt-5 text-base font-light leading-7 text-slate-600">
+                The release carries its own Deck runtime. Setup checks the real dependencies in order and never presents a device link before the data plane answers.
+              </p>
+              <Button asChild size="lg" className="mt-8 rounded-xl bg-slate-900 text-white hover:bg-slate-800">
+                <a href={releaseDownloadUrl}><Download className="mr-2 h-4 w-4" />Download {releaseVersion}</a>
+              </Button>
+            </div>
+
+            <ol className="overflow-hidden rounded-3xl border border-slate-200/70 bg-slate-50/70 shadow-xl shadow-slate-900/5">
+              {[
+                ["1", "Install", "Open the DMG and drag SpeakEasy to Applications."],
+                ["2", "Allow", "Open the app and approve microphone and local-network access when macOS asks."],
+                ["3", "Verify", "In Settings → Deck, confirm the included runtime and Codex installation."],
+                ["4", "Start", "Press Start Deck. The live URL and QR appear only after the bridge is healthy."],
+                ["5", "Talk", "Choose a real Codex task, hold to speak, and hear that same task answer."],
+              ].map(([number, title, body]) => (
+                <li key={number} className="flex gap-4 border-b border-slate-200/70 p-5 last:border-b-0 sm:p-6">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-white font-mono text-xs text-emerald-700">{number}</span>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">{title}</div>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">{body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </section>
 
@@ -249,14 +274,14 @@ export default function CodexPage() {
       <section className="px-4 py-20">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 rounded-3xl border border-slate-200/70 bg-white/80 p-8 shadow-xl shadow-slate-900/5 md:flex-row md:items-center md:p-10">
           <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Info className="h-4 w-4 text-emerald-600" /> Technical-preview boundary</div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Info className="h-4 w-4 text-emerald-600" /> Codex integration boundary</div>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
               The current bridge uses private, version-checked Codex Desktop IPC and fails closed on incompatibility. It is not presented as a supported public Codex API.
             </p>
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <Button asChild variant="outline" className="rounded-xl bg-white">
-              <Link href="/docs/listening-mode/">Read the listening guide <ExternalLink className="ml-2 h-4 w-4" /></Link>
+              <Link href="/docs/">Read the setup docs <ExternalLink className="ml-2 h-4 w-4" /></Link>
             </Button>
             <Button asChild variant="outline" className="rounded-xl bg-white">
               <a href="https://github.com/arach/SpeakEasy"><Github className="mr-2 h-4 w-4" />Source</a>

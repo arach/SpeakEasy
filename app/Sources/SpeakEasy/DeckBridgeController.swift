@@ -256,6 +256,14 @@ final class DeckBridgeController: ObservableObject {
         return URL(string: base)
     }
 
+    /// Caddy's one-time trust profile is deliberately served over plain HTTP:
+    /// an iPad cannot open the HTTPS Deck until it trusts this local CA.
+    var iPadTrustURL: URL? {
+        guard let discovery,
+              deckURL?.scheme == "https" else { return nil }
+        return URL(string: "http://\(discovery.host):\(discovery.port)/ca.crt")
+    }
+
     /// The iPad URL, including the pairing fragment when the bridge requires
     /// one. Copied, never displayed. Paired pages take the token as `#k=` —
     /// the query form is only for server-to-runtime calls.

@@ -1,89 +1,105 @@
-import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import { ArrowRight, Check, Download, ExternalLink, Laptop, ShieldCheck, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import { Download, Github, Star, Users } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  releaseChecksumUrl,
+  releaseDownloadUrl,
+  releasePageUrl,
+  releaseRequirements,
+  releaseVersion,
+} from "@/lib/release"
+
+const steps = [
+  ["1", "Drag to Applications", "The DMG contains the complete native app and Deck runtime."],
+  ["2", "Open SpeakEasy", "macOS verifies the Developer ID signature and notarization ticket."],
+  ["3", "Complete three checks", "Settings confirms the runtime, Codex, and live bridge before showing your device link."],
+]
 
 export default function DownloadSection() {
   return (
-    <section id="download" className="py-32 px-4 bg-gradient-to-b from-slate-50/50 to-white">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-20">
-          <Badge variant="outline" className="mb-6 border-slate-200 text-slate-600 bg-white/50 rounded-xl">
-            Ready to Start
-          </Badge>
-          <h2 className="font-display text-5xl md:text-6xl font-extralight text-slate-900 mb-6 leading-tight">
-            Get Started Today
-          </h2>
-          <p className="font-text text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed mb-12">
-            Join thousands of users who have transformed their note-taking workflow. Free download, no account required.
-          </p>
+    <section id="download" className="relative overflow-hidden border-y border-slate-200/60 bg-slate-950 px-4 py-24 text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(16,185,129,0.16),transparent_32%),radial-gradient(circle_at_82%_78%,rgba(59,130,246,0.11),transparent_28%)]" />
+      <div className="relative mx-auto max-w-6xl">
+        <div className="grid items-end gap-12 lg:grid-cols-[1.08fr_0.92fr]">
+          <div>
+            <Badge variant="outline" className="rounded-xl border-emerald-400/25 bg-emerald-400/10 text-emerald-300">
+              Self-serve preview · {releaseVersion}
+            </Badge>
+            <h2 className="mt-6 max-w-3xl font-display text-5xl font-extralight leading-[0.98] tracking-tight sm:text-6xl">
+              Download the complete
+              <span className="block bg-gradient-to-r from-emerald-300 to-blue-300 bg-clip-text text-transparent">
+                Codex voice loop.
+              </span>
+            </h2>
+            <p className="mt-6 max-w-2xl text-lg font-light leading-8 text-white/58">
+              No repository, Bun, Xcode, or server setup. Install one notarized Mac app, let its guided checklist find Codex, then speak into the exact task you choose.
+            </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Button
-              asChild
-              size="lg"
-              className="bg-slate-900 text-white hover:bg-slate-800 px-8 py-4 text-base font-medium rounded-xl shadow-lg"
-            >
-              <a href="https://github.com/arach/blink/releases/latest" target="_blank" rel="noopener noreferrer">
-                <Download className="mr-2 w-5 h-5" />
-                Download for macOS
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Button asChild size="lg" className="rounded-xl bg-emerald-300 px-6 font-semibold text-slate-950 hover:bg-emerald-200">
+                <a href={releaseDownloadUrl}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download SpeakEasy.dmg
+                </a>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="rounded-xl border-white/15 bg-white/[0.04] px-6 text-white hover:bg-white/[0.08] hover:text-white">
+                <Link href="/codex/#setup">
+                  See first-run setup
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/36">
+              <span>{releaseRequirements.platform}</span>
+              <span>{releaseRequirements.os}</span>
+              <span>Codex Desktop</span>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.045] shadow-2xl shadow-black/35 backdrop-blur-xl">
+            <div className="flex items-center justify-between border-b border-white/8 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-300/10 text-emerald-300">
+                  <Laptop className="h-4 w-4" />
+                </span>
+                <div>
+                  <div className="text-sm font-semibold">First conversation</div>
+                  <div className="mt-0.5 text-xs text-white/35">Usually three deliberate steps</div>
+                </div>
+              </div>
+              <ShieldCheck className="h-5 w-5 text-emerald-300" />
+            </div>
+
+            <ol className="divide-y divide-white/8">
+              {steps.map(([number, title, body]) => (
+                <li key={number} className="flex gap-4 px-6 py-5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] font-mono text-[11px] text-emerald-300">
+                    {number}
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      {title}
+                      <Check className="h-3.5 w-3.5 text-emerald-300" />
+                    </div>
+                    <p className="mt-1.5 text-xs leading-5 text-white/42">{body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/8 px-6 py-4 text-[11px] text-white/38">
+              <a href={releasePageUrl} className="inline-flex items-center gap-1.5 transition hover:text-white">
+                Release notes <ExternalLink className="h-3 w-3" />
               </a>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="border-slate-300 text-slate-700 hover:bg-slate-50 px-8 py-4 text-base bg-white rounded-xl"
-            >
-              <a href="https://github.com/arach/blink" target="_blank" rel="noopener noreferrer">
-                <Github className="mr-2 w-5 h-5" />
-                View on GitHub
+              <a href={releaseChecksumUrl} className="inline-flex items-center gap-1.5 transition hover:text-white">
+                SHA-256 <Sparkles className="h-3 w-3" />
               </a>
-            </Button>
+              <span>Signed + notarized</span>
+            </div>
           </div>
         </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          {[
-            { icon: Users, label: "Active Users", value: "12,000+" },
-            { icon: Star, label: "GitHub Stars", value: "2,400+" },
-            { icon: Download, label: "Downloads", value: "50,000+" },
-          ].map((stat, index) => (
-            <Card key={index} className="bg-white/60 backdrop-blur-xl border border-white/30 shadow-lg rounded-2xl">
-              <CardContent className="p-8 text-center">
-                <stat.icon className="w-8 h-8 text-slate-600 mx-auto mb-4" />
-                <div className="font-display text-3xl font-light text-slate-900 mb-2">{stat.value}</div>
-                <div className="font-text text-slate-600">{stat.label}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* System Requirements */}
-        <Card className="bg-white/40 backdrop-blur-xl border border-white/30 shadow-lg rounded-2xl">
-          <CardContent className="p-8">
-            <h3 className="font-display text-xl font-medium text-slate-900 mb-6 text-center">System Requirements</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <h4 className="font-text font-medium text-slate-700 mb-3">macOS</h4>
-                <ul className="font-text text-sm text-slate-600 space-y-1">
-                  <li>• macOS 11.0 or later</li>
-                  <li>• Apple Silicon or Intel processor</li>
-                  <li>• 50MB free disk space</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-text font-medium text-slate-700 mb-3">Features</h4>
-                <ul className="font-text text-sm text-slate-600 space-y-1">
-                  <li>• Global keyboard shortcuts</li>
-                  <li>• Always on top windows</li>
-                  <li>• Automatic updates</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </section>
   )

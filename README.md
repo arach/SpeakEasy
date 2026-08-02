@@ -126,7 +126,20 @@ comes online.
 
 ## Installation
 
-For the macOS menu-bar app and the easiest Deck setup:
+For the complete macOS app—local dictation, exact Codex task lanes, native
+narration, and the Deck—download the signed and notarized release:
+
+**[Download SpeakEasy 0.2.18 for macOS](https://github.com/arach/SpeakEasy/releases/download/v0.2.18/SpeakEasy.dmg)**
+
+1. Drag SpeakEasy to **Applications**.
+2. Open it and approve microphone and local-network access when macOS asks.
+3. Open **SpeakEasy → Settings → Deck** and complete the three readiness checks.
+
+The release is self-contained and requires an Apple silicon Mac running macOS
+14 or newer. Codex Desktop is required for exact-task voice lanes; the macOS
+system voice works without an API key.
+
+For a source build or release development:
 
 ```bash
 git clone https://github.com/arach/speakeasy.git
@@ -134,7 +147,7 @@ cd speakeasy
 ./app/install.sh
 ```
 
-The installer checks macOS, Bun, and Apple build tools; installs the pinned
+The source installer checks macOS, Bun, and Apple build tools; installs the pinned
 dependencies; builds and signs the app; safely replaces any running copy; and
 opens **SpeakEasy → Settings → Deck**. Its three-step checklist confirms the
 bundled runtime, finds Codex, and starts the live bridge. The device card and QR

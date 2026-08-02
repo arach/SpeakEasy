@@ -6,26 +6,23 @@ order: 3
 
 # Listening mode
 
-Listening mode is SpeakEasy's **ASR technical preview**. It turns one explicit
+Listening mode is SpeakEasy's explicit ASR input path. It turns one explicit
 utterance into the next turn of an exact Codex Desktop task, then narrates that
 task's real response through the native player.
 
-> This code is merged on `master` but postdates the signed 0.2.17 release. Build
-> current source to try it. The Codex Desktop integration uses private,
-> version-checked local IPC and is not a supported public Codex API.
+> The signed 0.2.18 self-serve preview includes listening, voice lanes, the
+> native player, and the Deck runtime. The Codex Desktop integration uses
+> private, version-checked local IPC and is not a supported public Codex API.
 
-## Build the preview
+## Install the preview
 
-```bash
-git clone https://github.com/arach/SpeakEasy.git
-cd SpeakEasy/app
-./build-app.sh
-open SpeakEasy.app
-```
+1. [Download SpeakEasy.dmg](https://github.com/arach/SpeakEasy/releases/download/v0.2.18/SpeakEasy.dmg).
+2. Drag SpeakEasy to Applications and open it.
+3. Approve microphone and local-network access when macOS asks.
+4. Open **Settings → Deck** and complete the three readiness checks.
 
-The build uses an ad-hoc signature when no development signing identity is
-available. macOS may ask for microphone and speech-recognition permission on
-first use.
+The release is Developer ID signed, Apple-notarized, and self-contained. It
+supports Apple silicon Macs running macOS 14 or newer.
 
 ## Start a conversation
 

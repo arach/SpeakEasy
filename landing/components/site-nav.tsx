@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { Github, Waves } from "lucide-react"
+import { Download, Github, Waves } from "lucide-react"
+import { releaseDownloadUrl } from "@/lib/release"
 
 export default function SiteNav() {
   return (
@@ -28,9 +29,10 @@ export default function SiteNav() {
           >
             <Github className="h-4 w-4" />
           </a>
-          <Link href="/codex/" className="rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-800">
-            Try Codex
-          </Link>
+          <a href={releaseDownloadUrl} className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-800">
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            Download
+          </a>
         </div>
       </div>
     </nav>
