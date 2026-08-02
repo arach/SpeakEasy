@@ -1823,22 +1823,15 @@ const ACTIONS = {
   setupassign: a => {
     if (S.setupPending) return;
     const index = S.setupLane;
-    const current = S.lanes && S.lanes[index] && S.lanes[index].threadId;
-    if (a && current === a) {
-      S.setupNotice = 'PAD ' + String(index + 1).padStart(2, '0') + ' ALREADY CONTINUES THIS TASK';
-      S.setupTone = 'ok';
-      paint();
-      return;
-    }
     const task = a ? (S.catalog || []).find(t => t.id === a) : null;
     const label = task ? task.snippet : 'Unassigned';
     S.setupPending = true;
     S.setupNotice = 'SETTING PAD ' + String(index + 1).padStart(2, '0') + '…';
     S.setupTone = 'ok';
-    const sent = sendIntent('lane.assign', { index: index, threadId: a || null }, ack => {
+    const sent = sendIntent('lane.assign', { index: index, threadId: a || null, activate: !!a }, ack => {
       S.setupPending = false;
       S.setupNotice = ack.ok
-        ? 'PAD ' + String(index + 1).padStart(2, '0') + ' → ' + label
+        ? 'PAD ' + String(index + 1).padStart(2, '0') + (a ? ' ACTIVE → ' : ' → ') + label
         : (ack.error || 'The lane could not be changed.');
       S.setupTone = ack.ok ? 'ok' : 'error';
       paint();

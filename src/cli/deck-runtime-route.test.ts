@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { resolveDeckTurnRoute } from './deck-runtime';
+import { parseIntent, resolveDeckTurnRoute } from './deck-runtime';
 
 describe('Deck turn authority', () => {
   test('routes a bound worker pad to its exact canonical Codex task', () => {
@@ -17,5 +17,19 @@ describe('Deck turn authority', () => {
 
   test('reserves the hidden model transport for the overview role', () => {
     expect(resolveDeckTurnRoute(9, 'ignored-worker-task')).toEqual({ kind: 'overview' });
+  });
+
+  test('accepts an atomic assign-and-activate intent from the Deck picker', () => {
+    expect(parseIntent({
+      name: 'lane.assign',
+      index: 0,
+      threadId: 'task-123',
+      activate: true,
+    }).intent).toEqual({
+      name: 'lane.assign',
+      index: 0,
+      threadId: 'task-123',
+      activate: true,
+    });
   });
 });

@@ -138,7 +138,13 @@ const intentSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('speak'), text: z.string().min(1).max(4000) }),
   z.object({ name: z.literal('lane.cycle'), index: z.number().int().min(0).max(8) }),
   z.object({ name: z.literal('catalog.refresh') }),
-  z.object({ name: z.literal('lane.assign'), index: z.number().int().min(0).max(8), threadId: z.string().max(64).nullable() }),
+  z.object({
+    name: z.literal('lane.assign'),
+    index: z.number().int().min(0).max(8),
+    threadId: z.string().max(64).nullable(),
+    /** The Deck picker activates what the operator just chose; Mac settings can map silently. */
+    activate: z.boolean().optional(),
+  }),
   z.object({ name: z.literal('playback.progress'), id: z.string().regex(/^\d:\d{1,3}$/), pos: z.number().min(0), dur: z.number().positive().optional() }),
   z.object({ name: z.literal('playback.ended'), id: z.string().regex(/^\d:\d{1,3}$/) }),
 ]);
@@ -681,6 +687,19 @@ export class DeckRuntime extends EventEmitter {
     return this.lanes[ix]?.name.toLowerCase() ?? `lane ${ix + 1}`;
   }
 
+  /** Change the conversation target and cancel work/audio owned by the old one. */
+  private selectLane(index: number): void {
+    this.gen++;
+    this.cancelAgentWork();
+    this.laneIx = index;
+    this.stopPlayer();
+    this.clearPlayback();
+    const label = index === MASTER_IX ? 'OVERVIEW' : `LANE ${String(index + 1).padStart(2, '0')}`;
+    this.setPhase(this.phase, `READY · ${label}`);
+    this.log('LANE SELECTED', index === MASTER_IX ? 'overview' : `lane ${index + 1}`);
+    this.changed();
+  }
+
   /** Live, compact picture of the whole deck — the overview lane's eyes. One
    * line per lane: binding, state, title, and the last exchange if there is one. */
   private systemDigest(): string {
@@ -764,15 +783,7 @@ export class DeckRuntime extends EventEmitter {
   async apply(intent: DeckIntent): Promise<{ ok: boolean; rev: number; error?: string }> {
     switch (intent.name) {
       case 'lane.select': {
-        this.gen++; // an in-flight response must not restart audio under a new lane
-        this.cancelAgentWork();
-        this.laneIx = intent.index;
-        this.stopPlayer();
-        this.clearPlayback();
-        const label = intent.index === MASTER_IX ? 'OVERVIEW' : `LANE ${String(intent.index + 1).padStart(2, '0')}`;
-        this.setPhase(this.phase, `READY · ${label}`);
-        this.log('LANE SELECTED', intent.index === MASTER_IX ? 'overview' : `lane ${intent.index + 1}`);
-        this.changed();
+        this.selectLane(intent.index);
         return { ok: true, rev: this.rev };
       }
       case 'playback.toggle': {
@@ -896,6 +907,16 @@ export class DeckRuntime extends EventEmitter {
           return { ok: false, rev: this.rev, error: 'that thread belongs to the overview lane' };
         }
         this.assignLane(intent.index, intent.threadId);
+        // Mapping from the Deck is also a destination choice. Do this only
+        // after the exact binding is visible, so a failed write cannot switch
+        // the microphone to a lane that merely looks assigned.
+        if (
+          intent.activate &&
+          intent.threadId &&
+          this.lanes[intent.index]?.threadId === intent.threadId
+        ) {
+          this.selectLane(intent.index);
+        }
         return { ok: true, rev: this.rev };
       }
       case 'playback.progress': {
