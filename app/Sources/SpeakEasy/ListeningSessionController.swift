@@ -665,6 +665,7 @@ final class ListeningSessionController: ObservableObject {
         lastTranscript = ""
         lastResponse = ""
         lastDelivery = nil
+        PlaybackEngine.shared.deferCurrentCompletion()
         PlaybackEngine.shared.setInteractiveBusy(true)
         PlaybackEngine.shared.stop()
         let startID = UUID()

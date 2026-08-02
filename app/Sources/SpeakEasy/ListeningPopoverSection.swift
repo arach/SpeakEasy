@@ -265,6 +265,9 @@ struct ListeningPopoverSection: View {
                     .foregroundColor(completions.channel.isMuted ? .orange : theme.textSecondary)
                     .help(completions.channel.isMuted ? "Unmute completion announcements" : "Mute completion announcements")
                     .accessibilityLabel(completions.channel.isMuted ? "Unmute Completions channel" : "Mute Completions channel")
+                    Button("Remove") { completions.unsubscribe() }
+                        .buttonStyle(.popoverTextTertiary)
+                        .help("Remove the exact-task completion subscription")
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Completions channel, (completions.state.label)")

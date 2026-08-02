@@ -168,7 +168,8 @@ final class CompletionSubscriptionTests: XCTestCase {
         )
         let interactive = PlaybackItem(
             id: UUID(), audioPath: audioPath, title: "Interactive", text: "Now",
-            provider: "system", createdAt: "2026-08-01T12:00:00Z", synthesisRateWPM: 180
+            provider: "system", createdAt: "2026-08-01T12:00:00Z", synthesisRateWPM: 180,
+            sourceThreadId: nil
         )
         try engine.enqueue(completion, priority: .normal, interrupt: false, autoplay: true)
         try engine.enqueue(interactive, priority: .high, interrupt: false, autoplay: false)

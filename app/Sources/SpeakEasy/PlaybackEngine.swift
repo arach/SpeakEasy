@@ -98,6 +98,14 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         stopCurrent(resetPosition: true)
     }
 
+    /// Temporarily yield a background completion to an interactive turn
+    /// without deleting its audio or activity record.
+    func deferCurrentCompletion() {
+        guard let item = currentItem, item.effectiveChannel == .completions else { return }
+        stopCurrent(resetPosition: true, removeAudio: false)
+        queue.insert(item, at: 0)
+    }
+
     func skip() throws {
         stopCurrent(resetPosition: true)
         try playNext()
@@ -335,15 +343,15 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
     }
 
-    private func stopCurrent(resetPosition: Bool) {
+    private func stopCurrent(resetPosition: Bool, removeAudio: Bool = true) {
         player?.stop()
         if resetPosition {
             player?.currentTime = 0
         }
-        finishCurrentItem(naturallyFinished: false)
+        finishCurrentItem(naturallyFinished: false, removeAudio: removeAudio)
     }
 
-    private func finishCurrentItem(naturallyFinished: Bool) {
+    private func finishCurrentItem(naturallyFinished: Bool, removeAudio: Bool = true) {
         let finishedItem = currentItem
         if naturallyFinished {
             lastFinishedItemID = finishedItem?.id
@@ -357,7 +365,7 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         duration = 0
         audioLevel = 0
         state = .idle
-        if finishedItem?.cleanupAfterPlayback == true {
+        if removeAudio, finishedItem?.cleanupAfterPlayback == true {
             try? FileManager.default.removeItem(atPath: finishedItem?.audioPath ?? "")
         }
     }
