@@ -12,9 +12,11 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var audioLevel: Float = 0
     @Published private(set) var lastError: String?
+    @Published private(set) var lastFinishedItemID: UUID?
     @Published var autoplayEnabled = true
     @Published private(set) var volume: Float = 0.8
     @Published private(set) var playbackRate: Float = 1
+    @Published private(set) var interactiveBusy = false
 
     private var player: AVAudioPlayer?
     private var progressTimer: Timer?
@@ -49,8 +51,21 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
             queue.append(item)
         }
 
-        if (autoplay ?? autoplayEnabled) && currentItem == nil {
+        if (autoplay ?? autoplayEnabled) && currentItem == nil && canStartNextItem {
             try playNext()
+        }
+    }
+
+    /// Completion narration is background work. It may remain queued while a
+    /// microphone turn or interactive response owns the player.
+    func setInteractiveBusy(_ busy: Bool) {
+        interactiveBusy = busy
+        guard !busy, currentItem == nil, autoplayEnabled else { return }
+        do {
+            try playNext()
+        } catch {
+            state = .failed
+            lastError = error.localizedDescription
         }
     }
 
@@ -94,6 +109,10 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     func removeQueueItem(id: UUID) {
         queue.removeAll { $0.id == id }
+    }
+
+    func removeQueuedCompletion(activityID: UUID) {
+        queue.removeAll { $0.completionActivityID == activityID }
     }
 
     func seek(to position: TimeInterval) {
@@ -140,6 +159,8 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
         volume = 0.8
         playbackRate = 1
+        interactiveBusy = false
+        lastFinishedItemID = nil
         autoplayEnabled = true
         lastError = nil
 
@@ -252,7 +273,7 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            self.finishCurrentItem()
+            self.finishCurrentItem(naturallyFinished: true)
             if self.autoplayEnabled {
                 do {
                     try self.playNext()
@@ -264,11 +285,21 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
     }
 
+    private var canStartNextItem: Bool {
+        guard let next = queue.first else { return false }
+        return next.effectiveChannel != .completions || !interactiveBusy
+    }
+
     private func playNext() throws {
         guard !queue.isEmpty else {
             if currentItem == nil {
                 state = .idle
             }
+            return
+        }
+
+        if queue[0].effectiveChannel == .completions && interactiveBusy {
+            state = .idle
             return
         }
 
@@ -309,11 +340,14 @@ final class PlaybackEngine: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if resetPosition {
             player?.currentTime = 0
         }
-        finishCurrentItem()
+        finishCurrentItem(naturallyFinished: false)
     }
 
-    private func finishCurrentItem() {
+    private func finishCurrentItem(naturallyFinished: Bool) {
         let finishedItem = currentItem
+        if naturallyFinished {
+            lastFinishedItemID = finishedItem?.id
+        }
         HUDWindowManager.shared.playbackDidFinish()
         progressTimer?.invalidate()
         progressTimer = nil

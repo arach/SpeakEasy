@@ -126,6 +126,7 @@ final class ListeningSessionController: ObservableObject {
                 } else if state == .idle, self.narrationDidStart {
                     self.pendingNarrationItemID = nil
                     self.narrationDidStart = false
+                    PlaybackEngine.shared.setInteractiveBusy(false)
                     self.phase = self.lockedTask == nil ? .unlocked : .ready
                     self.diagnostic("voice loop playback completed")
                 }
@@ -161,6 +162,7 @@ final class ListeningSessionController: ObservableObject {
         recordingStartID = nil
         recordingContext = nil
         stopAfterWarmupRequested = false
+        PlaybackEngine.shared.setInteractiveBusy(false)
         validationID = nil
         shortcut?.unregisterAll()
         shortcut = nil
@@ -358,6 +360,7 @@ final class ListeningSessionController: ObservableObject {
             return
         }
         if phase == .speaking { PlaybackEngine.shared.stop() }
+        PlaybackEngine.shared.setInteractiveBusy(false)
         activeLaneNumber = number
         persistLaneConfiguration()
         // Keep the destination visible in the HUD while its exact Desktop
@@ -379,6 +382,7 @@ final class ListeningSessionController: ObservableObject {
         }
         guard !isRoutingTurn, phase != .cueing, phase != .warmingUp else { return }
         if phase == .speaking { PlaybackEngine.shared.stop() }
+        PlaybackEngine.shared.setInteractiveBusy(false)
         validationID = nil
         lockedTask = nil
         activeLaneNumber = nil
@@ -418,6 +422,7 @@ final class ListeningSessionController: ObservableObject {
         stopAfterWarmupRequested = false
         Task {
             await vox.cancelRecording()
+            PlaybackEngine.shared.setInteractiveBusy(false)
             phase = lockedTask == nil ? .unlocked : .ready
             diagnostic("recording cancelled")
         }
@@ -660,6 +665,7 @@ final class ListeningSessionController: ObservableObject {
         lastTranscript = ""
         lastResponse = ""
         lastDelivery = nil
+        PlaybackEngine.shared.setInteractiveBusy(true)
         PlaybackEngine.shared.stop()
         let startID = UUID()
         recordingStartID = startID
@@ -1055,6 +1061,7 @@ final class ListeningSessionController: ObservableObject {
         stopAfterWarmupRequested = false
         pendingNarrationItemID = nil
         narrationDidStart = false
+        PlaybackEngine.shared.setInteractiveBusy(false)
         lastError = error.localizedDescription
         phase = lockedTask == nil ? .unlocked : .failed
         diagnostic("failed: \(error.localizedDescription)")

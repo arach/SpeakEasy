@@ -27,6 +27,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         observeActivityState()
         startIPCServer()
         ListeningSessionController.shared.start()
+        CompletionSubscriptionController.shared.start()
         SpeakEasyPadIntegration.shared.start()
     }
 
@@ -34,6 +35,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         closePopover()
         removeEventMonitor()
         SpeakEasyPadIntegration.shared.stop()
+        CompletionSubscriptionController.shared.stop()
         ListeningSessionController.shared.stop()
         PlayerIPCServer.shared.stop()
 

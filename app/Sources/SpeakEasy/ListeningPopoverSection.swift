@@ -12,6 +12,7 @@ struct ListeningPopoverSection: View {
     }
 
     @ObservedObject private var listening = ListeningSessionController.shared
+    @ObservedObject private var completions = CompletionSubscriptionController.shared
     @ObservedObject private var config = ConfigManager.shared
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -206,6 +207,8 @@ struct ListeningPopoverSection: View {
                 .foregroundStyle(theme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            completionControls(for: lock)
+
             captureComposer
 
             laneStrip(currentTask: lock)
@@ -213,6 +216,89 @@ struct ListeningPopoverSection: View {
             shortcutStatus
         }
         .onAppear { listening.refreshInputDevices() }
+    }
+
+    private func completionControls(for lock: ListeningTaskLock) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(
+                get: { completions.isSubscribed(to: lock.id) && completions.subscription?.isEnabled == true },
+                set: { enabled in
+                    if enabled {
+                        completions.subscribe(to: lock)
+                    } else if completions.isSubscribed(to: lock.id) {
+                        completions.setEnabled(false)
+                    }
+                }
+            )) {
+                HStack(spacing: 6) {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("Announce completions")
+                        .font(PopoverType.secondaryStrong)
+                }
+            }
+            .toggleStyle(.switch)
+            .tint(accent)
+            .accessibilityHint("Watch only this exact Codex task for future completed turns")
+
+            if completions.isSubscribed(to: lock.id), completions.subscription?.isEnabled == true {
+                HStack(spacing: 7) {
+                    Text("Channel: Completions")
+                        .font(PopoverType.caption)
+                        .foregroundColor(theme.textSecondary)
+                    Text(completions.state.label)
+                        .font(PopoverType.caption)
+                        .foregroundColor(completionStateColor)
+                    if completions.queueCount > 0 {
+                        Text("· (completions.queueCount) queued")
+                            .font(PopoverType.caption)
+                            .foregroundColor(theme.textTertiary)
+                    }
+                    Spacer(minLength: 0)
+                    Button {
+                        completions.setMuted(!completions.channel.isMuted)
+                    } label: {
+                        Image(systemName: completions.channel.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(completions.channel.isMuted ? .orange : theme.textSecondary)
+                    .help(completions.channel.isMuted ? "Unmute completion announcements" : "Mute completion announcements")
+                    .accessibilityLabel(completions.channel.isMuted ? "Unmute Completions channel" : "Mute Completions channel")
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Completions channel, (completions.state.label)")
+
+                if let activity = completions.mostRecentActivity, activity.taskID == lock.id {
+                    HStack(spacing: 6) {
+                        Image(systemName: activity.state == .failed ? "exclamationmark.triangle" : "checkmark.circle")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(activity.state == .failed ? .orange : theme.textTertiary)
+                        Text("Turn (activity.turnID.prefix(8)) · (activity.state.rawValue)")
+                            .font(PopoverType.caption)
+                            .foregroundColor(theme.textTertiary)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        if activity.state != .announced && activity.state != .dismissed {
+                            Button("Replay") { completions.replay(activity.id) }
+                                .buttonStyle(.popoverTextTertiary)
+                        }
+                        Button("Dismiss") { completions.dismiss(activity.id) }
+                            .buttonStyle(.popoverTextTertiary)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var completionStateColor: Color {
+        switch completions.state {
+        case .failed, .unavailable: .orange
+        case .muted: .orange
+        case .watching: accent
+        default: theme.textTertiary
+        }
     }
 
     /// Ready reads as a tinted, not filled, control. A second solid mint slab
@@ -418,7 +504,7 @@ struct ListeningPopoverSection: View {
                 .accessibilityLabel("Play active lane cue")
             }
 
-            HStack(spacing: 4) {
+                HStack(spacing: 4) {
                 ForEach(ListeningSessionController.laneRange, id: \.self) { number in
                     laneChip(number: number, currentTask: currentTask)
                 }
@@ -640,6 +726,12 @@ struct ListeningPopoverSection: View {
                     .lineLimit(1)
                 }
                 Spacer(minLength: 0)
+                if completions.isSubscribed(to: task.id) {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(accent)
+                        .accessibilityLabel("Completion announcements subscribed")
+                }
             }
             .padding(.horizontal, 7)
             .frame(height: 42)
