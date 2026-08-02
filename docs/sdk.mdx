@@ -292,7 +292,8 @@ const openai = await speaker.findByProvider('openai');
 await speaker.clearCache();
 ```
 
-Cache uses built-in SQLite on Node.js 22.5+ (`node:sqlite`) or Bun (`bun:sqlite`), with JSON fallback on older Node versions.
+Cache uses built-in SQLite on supported Node.js 22.12+ (`node:sqlite`) or
+Bun 1.0+ (`bun:sqlite`).
 
 ## Error Handling
 
