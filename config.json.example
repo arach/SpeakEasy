@@ -34,5 +34,9 @@
   },
   "features": {
     "observerPresenter": false
+  },
+  "deck": {
+    "pair": true,
+    "autoStart": false
   }
 }

@@ -202,9 +202,12 @@ opens **SpeakEasy → Settings → Deck**. Its three-step checklist confirms the
 bundled runtime, finds Codex, and starts the live bridge. The device card and QR
 appear only when the bridge is genuinely ready.
 
-There is no separate server package and Caddy is optional. SpeakEasy finds the
-native Codex binary from the desktop app or the `codex` command in your login
-shell. Re-running `./app/install.sh` is safe; use `--no-open` in automation.
+There is no separate server package or Caddy setup. Release and source builds
+bundle a pinned, checksum-verified Caddy helper so the browser/iPad Deck always
+starts on paired local HTTPS rather than silently losing microphone access on
+plain HTTP. SpeakEasy finds the native Codex binary from the desktop app or the
+`codex` command in your login shell. Re-running `./app/install.sh` is safe; use
+`--no-open` in automation.
 
 Enable **Start the deck with SpeakEasy** after the first successful launch to
 keep it ready whenever the menu-bar app runs.

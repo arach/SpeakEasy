@@ -36,6 +36,8 @@ Pass criteria:
   quarantine bypass, or right-click workaround.
 - SpeakEasy appears in the menu bar.
 - The app does not request Bun, Xcode, Node, a repository, or a terminal step.
+- The app bundle contains its signed Caddy helper; no Homebrew or separate
+  server install is requested.
 - Codex clearly separates completed machine checks from the microphone and
   local-network prompts that require the user.
 
@@ -55,6 +57,8 @@ Pass criteria:
 - A failure leaves an actionable message and **Open log** button.
 - The device URL is not shown until the runtime snapshot answers.
 - Restarting SpeakEasy does not create duplicate Deck or Caddy processes.
+- Pairing is on before the first start, and startup fails with an actionable
+  error instead of publishing an HTTP device link when HTTPS cannot start.
 
 ## Exercise one real voice turn
 
@@ -83,6 +87,9 @@ Pass criteria:
 Pass criteria:
 
 - the device sees the same live lane and activity state as the Mac app;
+- the device URL is `https://`, contains a pairing token in its fragment, and
+  hold-to-speak can obtain microphone permission in the secure context;
+- an unpaired copy of the URL cannot read snapshot, audio, or WebSocket data;
 - dictation and responses remain synchronized with the real Codex task;
 - reconnecting the page resumes the same lane rather than creating a new one.
 

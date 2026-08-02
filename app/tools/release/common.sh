@@ -19,6 +19,111 @@ speakeasy_default_version() {
     fi
 }
 
+speakeasy_caddy_version() {
+    echo "2.11.4"
+}
+
+speakeasy_verify_caddy_binary() {
+    local candidate="$1"
+    local expected_version="$2"
+    local actual_version
+
+    if [ ! -x "$candidate" ]; then
+        echo "Caddy is missing or not executable: $candidate" >&2
+        return 1
+    fi
+
+    actual_version="$("$candidate" version 2>/dev/null | awk '{ print $1 }')"
+    if [ "$actual_version" != "v$expected_version" ]; then
+        echo "Caddy $expected_version is required, found ${actual_version:-unknown}: $candidate" >&2
+        return 1
+    fi
+
+    if ! file "$candidate" | grep -q 'arm64'; then
+        echo "Caddy must contain an arm64 executable: $candidate" >&2
+        return 1
+    fi
+}
+
+# Resolve a reproducible arm64 Caddy helper for the release bundle. An explicit
+# path wins; otherwise use a matching PATH binary or fetch the pinned official
+# GitHub release and verify it against the publisher's checksum manifest.
+speakeasy_prepare_caddy() {
+    local app_root="$1"
+    local version="$(speakeasy_caddy_version)"
+    local override="${SPEAKEASY_CADDY_PATH:-}"
+    local candidate=""
+    local tools_dir="$app_root/.build/tools"
+    local cached
+    local archive_name
+    local release_url
+    local temp_dir
+    local checksum
+
+    version="${version#v}"
+    cached="$tools_dir/caddy-$version"
+    archive_name="caddy_${version}_mac_arm64.tar.gz"
+    release_url="https://github.com/caddyserver/caddy/releases/download/v${version}"
+
+    if [ -n "$override" ]; then
+        if ! speakeasy_verify_caddy_binary "$override" "$version"; then
+            echo "SPEAKEASY_CADDY_PATH must point to the pinned release helper." >&2
+            return 1
+        fi
+        echo "$override"
+        return 0
+    fi
+
+    candidate="$(command -v caddy 2>/dev/null || true)"
+    if [ -n "$candidate" ] && speakeasy_verify_caddy_binary "$candidate" "$version" >/dev/null 2>&1; then
+        echo "$candidate"
+        return 0
+    fi
+
+    if speakeasy_verify_caddy_binary "$cached" "$version" >/dev/null 2>&1; then
+        echo "$cached"
+        return 0
+    fi
+
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "curl is required to fetch the pinned Caddy helper." >&2
+        return 1
+    fi
+
+    mkdir -p "$tools_dir"
+    temp_dir="$(mktemp -d)"
+    echo "Fetching pinned Caddy v$version for the secure Deck..." >&2
+    if ! curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 \
+        "$release_url/$archive_name" -o "$temp_dir/$archive_name" \
+        || ! curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 \
+        "$release_url/caddy_${version}_checksums.txt" -o "$temp_dir/checksums.txt"; then
+        rm -rf "$temp_dir"
+        echo "Could not download the pinned Caddy release." >&2
+        return 1
+    fi
+
+    checksum="$(awk -v archive="$archive_name" '$2 == archive { print $1; exit }' "$temp_dir/checksums.txt")"
+    if [ -z "$checksum" ] || ! (cd "$temp_dir" && printf '%s  %s\n' "$checksum" "$archive_name" | shasum -a 256 -c - >/dev/null); then
+        rm -rf "$temp_dir"
+        echo "Caddy archive checksum verification failed." >&2
+        return 1
+    fi
+
+    if ! tar -xzf "$temp_dir/$archive_name" -C "$temp_dir" caddy; then
+        rm -rf "$temp_dir"
+        echo "Could not extract the Caddy release helper." >&2
+        return 1
+    fi
+    chmod +x "$temp_dir/caddy"
+    if ! speakeasy_verify_caddy_binary "$temp_dir/caddy" "$version"; then
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    mv "$temp_dir/caddy" "$cached"
+    rm -rf "$temp_dir"
+    echo "$cached"
+}
+
 speakeasy_build_deck_runtime() {
     local app_root="$1"
     local repo_root
@@ -118,6 +223,7 @@ speakeasy_verify_bundle_layout() {
     local bundle_path="$1"
     local executable="$bundle_path/Contents/MacOS/SpeakEasy"
     local deck_runtime="$bundle_path/Contents/Helpers/speakeasy-runtime"
+    local caddy_helper="$bundle_path/Contents/Helpers/caddy"
     local frameworks_dir="$bundle_path/Contents/Frameworks"
     local resources_dir="$bundle_path/Contents/Resources"
     local info_plist="$bundle_path/Contents/Info.plist"
@@ -134,8 +240,18 @@ speakeasy_verify_bundle_layout() {
         return 1
     fi
 
+    if ! speakeasy_verify_caddy_binary "$caddy_helper" "$(speakeasy_caddy_version)"; then
+        echo "Bundled secure Deck helper is invalid: $caddy_helper" >&2
+        return 1
+    fi
+
     if [ ! -s "$resources_dir/Deck/index.html" ]; then
         echo "Bundled deck surface is missing: Contents/Resources/Deck/index.html" >&2
+        return 1
+    fi
+
+    if [ ! -s "$resources_dir/ThirdPartyNotices/Caddy-LICENSE.txt" ]; then
+        echo "Bundled Caddy license notice is missing." >&2
         return 1
     fi
 
@@ -207,6 +323,8 @@ speakeasy_bundle_app() {
     local build_dir="$app_root/.build/release"
     local executable_path="$bundle_path/Contents/MacOS/SpeakEasy"
     local helper_path="$bundle_path/Contents/Helpers/speakeasy-runtime"
+    local caddy_path="$bundle_path/Contents/Helpers/caddy"
+    local caddy_source
     local repo_root
     repo_root="$(speakeasy_repo_root)"
 
@@ -225,6 +343,10 @@ speakeasy_bundle_app() {
     cp "$build_dir/speakeasy-runtime" "$helper_path"
     chmod +x "$helper_path"
 
+    caddy_source="$(speakeasy_prepare_caddy "$app_root")"
+    cp -L "$caddy_source" "$caddy_path"
+    chmod +x "$caddy_path"
+
     echo "Bundling HudsonKit frameworks..."
     speakeasy_bundle_swiftpm_frameworks \
         "$executable_path" \
@@ -242,6 +364,10 @@ speakeasy_bundle_app() {
     ditto "$repo_root/deck/variants" "$bundle_path/Contents/Resources/Deck/variants"
 
     cp "$app_root/Resources/Info.plist" "$bundle_path/Contents/"
+
+    if [ -d "$app_root/Resources/ThirdPartyNotices" ]; then
+        ditto "$app_root/Resources/ThirdPartyNotices" "$bundle_path/Contents/Resources/ThirdPartyNotices"
+    fi
 
     if [ -f "$app_root/Resources/hud-preview-sample.aiff" ]; then
         cp "$app_root/Resources/hud-preview-sample.aiff" "$bundle_path/Contents/Resources/"

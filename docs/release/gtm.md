@@ -28,10 +28,13 @@ or silently replacing the existing `v0.2.18` tag or assets.
 The launch order is:
 
 1. merge and deploy the core onboarding PR;
-2. prove `0.2.18` on a clean second Mac and browser/iPad device path;
+2. use `0.2.18` for core Mac proof only; its browser/PWA path predates the
+   bundled-TLS and pairing-default fix;
 3. validate observer/presenter in a signed `0.2.19` candidate;
-4. publish every `0.2.19` artifact from the same commit;
-5. run the clean-machine gate again against the public assets;
+4. verify the candidate bundles pinned Caddy, defaults pairing on, and fails
+   closed rather than downgrade a requested HTTPS launch;
+5. publish every `0.2.19` artifact from the same commit and run the full
+   clean-machine plus browser/iPad gate against those public assets;
 6. promote `0.2.19` to **Latest** and announce it.
 
 ## Product truth
@@ -145,6 +148,7 @@ narration across your Mac and iPad without creating a shadow conversation.
 | Signed/notarized `0.2.18` DMG | Public prerelease | Keep immutable; use as core proof candidate |
 | Pinned release installer and checksum | Public prerelease | Run from clean second Mac |
 | Native onboarding and Deck | In `0.2.18` prerelease | Complete human permission and device-path checks |
+| Secure browser/PWA transport | Implemented for `0.2.19` | Verify bundled Caddy, paired HTTPS, and mic access on a clean Mac/device |
 | Observer/presenter | Implemented, tested, default-off in draft PR #14 | Real Codex/Luna/signed-app acceptance; ship in `0.2.19` |
 | npm package | Public `latest` is `0.2.16` | Publish `0.2.19` from launch commit |
 | Codex plugin runtime | Bundled runtime reports `0.2.17` | Rebuild/package from `0.2.19`; rerun bundle audit |

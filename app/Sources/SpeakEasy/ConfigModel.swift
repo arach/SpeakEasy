@@ -527,7 +527,7 @@ class ConfigManager: ObservableObject {
 
     // Deck bridge — the CLI reads these as defaults for `speakeasy deck`
     var deckPair: Bool {
-        get { config.deck?.pair ?? false }
+        get { config.deck?.pair ?? true }
         set {
             ensureDeck()
             config.deck?.pair = newValue

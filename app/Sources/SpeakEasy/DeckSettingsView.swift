@@ -42,7 +42,7 @@ struct DeckSettingsView: View {
                     Text("Three checks, then talk to Codex")
                         .font(.headline)
                         .foregroundColor(theme.text)
-                    Text("The app carries the runtime. There are no server packages, URLs, or Caddy steps to configure.")
+                    Text("The app carries the runtime and secure bridge. There are no server packages or Caddy steps to configure.")
                         .font(.caption)
                         .foregroundColor(theme.textSecondary)
                 }

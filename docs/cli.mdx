@@ -137,8 +137,8 @@ that answers questions about the whole system from a live status digest.
 # Start the deck (43211+ for normal users; port 80 only when permitted)
 speakeasy deck
 
-# Pin a port and require a pairing token from devices
-speakeasy deck --port 43211 --pair
+# Pin the certificate-bootstrap port (pairing and HTTPS stay on by default)
+speakeasy deck --port 43211
 
 # Full option set
 speakeasy deck [--port <n>] [--host <name>] [--pair|--no-pair] [--no-qr] [--no-caddy] [--no-mdns] [--no-tls]
@@ -151,7 +151,7 @@ them from its Deck section, and CLI flags always win over config:
 {
   "deck": {
     "port": 43211,
-    "pair": false,
+    "pair": true,
     "autoStart": true
   }
 }
@@ -165,10 +165,12 @@ connected devices, lane bindings, trace), manages lanes directly (each lane's
 menu binds a recent codex thread or resets to a fresh session — the same
 `lane.assign` intent the deck's own picker sends), and owns the bridge:
 start/stop/restart, auto-start, pairing, port, and a scannable device link. A
-release app includes both the runtime and Deck assets; Caddy is optional and
-adds local HTTPS, while the built-in server carries the same live WebSocket and
-HTTP control paths with no extra install. It discovers the running deck through
-`~/.config/speakeasy/deck-listener.json`, so it works no matter how the deck
+release app includes the runtime, Deck assets, and a pinned Caddy helper, so the
+device path uses paired local HTTPS with no separate server install. A normal
+start fails closed rather than downgrade the microphone path to HTTP. The
+built-in HTTP server remains available only through the explicit development
+flags `--no-tls --no-caddy`. The app discovers the running deck through
+`~/.config/speakeasy/deck-listener.json`, so it works no matter how the Deck
 was started.
 
 ## Complete Examples

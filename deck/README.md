@@ -25,21 +25,26 @@ The installer opens the Deck settings checklist after it verifies and installs
 the bundled runtime. A device link appears only after Codex and the live data
 plane are ready, so a half-configured bridge is never presented as success.
 
-That serves the live deck on the local network (via Caddy when installed, the fully live built-in server otherwise),
-advertises **speak.\<your-mac\>.local** over Bonjour, and prints a QR code. It uses 43211 for a
-normal user install (or port 80 only when the process is permitted to bind it). On the iPad (same Wi-Fi):
+That serves the live deck on the local network through SpeakEasy's bundled
+Caddy helper, advertises **speak.\<your-mac\>.local** over Bonjour, and prints a
+paired HTTPS QR code. It uses 43211 for the certificate bootstrap endpoint and
+443 for the secure Deck. On the iPad (same Wi-Fi):
 
-1. Scan the code or open the printed URL (e.g. `http://speak.air.local`) in Safari.
-2. Share → **Add to Home Screen** for the full-screen deck.
-3. Pick a look: `?theme=paper|ember|flight`, or a variant like `?variant=oxide`.
+1. Open the printed trust link once, install the local profile, and enable it in
+   **Settings → General → About → Certificate Trust Settings**.
+2. Scan the code or open the printed URL (for example,
+   `https://speak.air.local#k=…`) in Safari.
+3. Share → **Add to Home Screen** for the full-screen deck.
 
-Options: `--port <n>`, `--host <name>` (default `speak.<device>.local`), `--no-qr`, `--no-caddy`,
-`--no-mdns`. The public server proxies the loopback runtime under same-origin `/ws`, `/api`, and
-`/audio` routes: hold-to-speak runs the real phase machine with real synthesis on the Mac, and
-`speakeasy "text"` from any shell mirrors into the open deck. Caddy is only the optional local-HTTPS
-upgrade; it is not required for live lanes. Without the runtime the page falls back to demo state. Is it running?
-`curl http://localhost:<port>/healthz` on the printed port. Prefer your own server?
-`caddy run` in this directory uses the shipped `Caddyfile`.
+Options: `--port <n>`, `--host <name>` (default `speak.<device>.local`),
+`--pair|--no-pair`, `--no-qr`, and `--no-mdns`. Pairing and TLS default on. The
+public server proxies the loopback runtime under same-origin `/ws`, `/api`, and
+`/audio` routes: hold-to-speak runs the real phase machine with real synthesis
+on the Mac, and `speakeasy "text"` from any shell mirrors into the open deck.
+Without the runtime the page falls back to demo state. `--no-tls --no-caddy`
+exists only for explicit local development; a normal start fails closed instead
+of presenting an insecure device link. Is it running? Use
+`curl http://localhost:<port>/healthz` on the printed bootstrap port.
 
 Run SpeakEasy on more Macs to add machines. Each advertises its own `SpeakEasy Deck (<host>)`
 Bonjour service; the native iPad shell lists them in a machine menu and remembers the last choice.
