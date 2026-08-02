@@ -28,7 +28,10 @@ final class CompletionSubscriptionTests: XCTestCase {
             response: "Done",
             completedAt: Date(timeIntervalSince1970: 1_700_000_010),
             state: .announced,
-            cursorOffset: 482
+            cursorOffset: 482,
+            spokenText: "The task is done.",
+            presentationSource: .luna,
+            presentationModel: "gpt-5.6-luna"
         )
 
         try store.save(CompletionSubscriptionSnapshot(
@@ -45,6 +48,9 @@ final class CompletionSubscriptionTests: XCTestCase {
         XCTAssertEqual(restored.activities.first?.id, activity.id)
         XCTAssertEqual(restored.activities.first?.dedupeKey, activity.dedupeKey)
         XCTAssertEqual(restored.activities.first?.state, .announced)
+        XCTAssertEqual(restored.activities.first?.spokenText, "The task is done.")
+        XCTAssertEqual(restored.activities.first?.presentationSource, .luna)
+        XCTAssertEqual(restored.activities.first?.presentationModel, "gpt-5.6-luna")
         XCTAssertTrue(restored.channel.isMuted)
     }
 
@@ -85,6 +91,46 @@ final class CompletionSubscriptionTests: XCTestCase {
         XCTAssertEqual(first.dedupeKey(turnID: "turn-7"), "\(task.id)::turn-7")
         XCTAssertNotEqual(first.dedupeKey(turnID: "turn-7"), second.dedupeKey(turnID: "turn-7"))
         XCTAssertNotEqual(first.dedupeKey(turnID: "turn-7"), first.dedupeKey(turnID: "turn-8"))
+    }
+
+    func testObserverPresenterFeatureIsDefaultOffWithEmergencyOverride() {
+        XCTAssertFalse(ObserverPresenterFeature.isEnabled(environment: [:], configured: nil))
+        XCTAssertTrue(ObserverPresenterFeature.isEnabled(environment: [:], configured: true))
+        XCTAssertFalse(ObserverPresenterFeature.isEnabled(
+            environment: [ObserverPresenterFeature.environmentKey: "0"],
+            configured: true
+        ))
+        XCTAssertTrue(ObserverPresenterFeature.isEnabled(
+            environment: [ObserverPresenterFeature.environmentKey: "yes"],
+            configured: false
+        ))
+    }
+
+    func testDeterministicProjectionRemovesSpeechHostileMarkupWithoutInventingASummary() {
+        let response = """
+        ## Completed
+        The observer is installed. See [the task](https://example.com/task).
+
+        ```swift
+        fatalError("This code must not be narrated")
+        ```
+
+        - Tests pass
+        - The full response remains in Codex
+        """
+        let spoken = CompletionSpeechProjector.project(response)
+
+        XCTAssertTrue(spoken.contains("The observer is installed"))
+        XCTAssertTrue(spoken.contains("Tests pass"))
+        XCTAssertFalse(spoken.contains("fatalError"))
+        XCTAssertFalse(spoken.contains("https://"))
+        XCTAssertFalse(spoken.contains("##"))
+    }
+
+    func testDeterministicProjectionBoundsLongSpeechAndPointsBackToCodex() {
+        let spoken = CompletionSpeechProjector.project(String(repeating: "result ", count: 500))
+        XCTAssertLessThanOrEqual(spoken.count, 960)
+        XCTAssertTrue(spoken.hasSuffix("The full response is available in Codex."))
     }
 
     func testBridgeParserAcceptsStructuredCompletionAndRejectsWrongProvenance() throws {
@@ -184,7 +230,8 @@ final class CompletionSubscriptionTests: XCTestCase {
             .appendingPathComponent("speakeasy-completions-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let controller = CompletionSubscriptionController(
-            store: CompletionSubscriptionStore(fileURL: directory.appendingPathComponent("subscriptions.json"))
+            store: CompletionSubscriptionStore(fileURL: directory.appendingPathComponent("subscriptions.json")),
+            featureEnabled: true
         )
 
         controller.subscribe(to: task)
@@ -203,6 +250,23 @@ final class CompletionSubscriptionTests: XCTestCase {
         XCTAssertTrue(controller.isSubscribed(to: task.id))
 
         controller.unsubscribe()
+        XCTAssertNil(controller.subscription)
+        XCTAssertEqual(controller.state, .off)
+    }
+
+    @MainActor
+    func testFeatureFlagOffPreventsCreatingAHiddenSubscription() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("speakeasy-completions-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let controller = CompletionSubscriptionController(
+            store: CompletionSubscriptionStore(fileURL: directory.appendingPathComponent("subscriptions.json")),
+            featureEnabled: false
+        )
+
+        controller.subscribe(to: task)
+
+        XCTAssertFalse(controller.isFeatureEnabled)
         XCTAssertNil(controller.subscription)
         XCTAssertEqual(controller.state, .off)
     }

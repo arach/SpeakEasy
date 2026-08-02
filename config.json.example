@@ -31,5 +31,8 @@
   "global": {
     "tempDir": "/tmp",
     "cleanup": true
+  },
+  "features": {
+    "observerPresenter": false
   }
 }

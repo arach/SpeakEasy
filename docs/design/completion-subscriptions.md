@@ -1,6 +1,6 @@
 # Completion subscriptions
 
-Status: proposed implementation brief
+Status: first-version implementation behind a default-off feature flag
 Date: 2026-08-01
 
 ## Product idea
@@ -154,24 +154,52 @@ does not delete the Codex task or its transcript.
 
 ## Speech projection
 
-The full final assistant response remains in Codex. The first slice may use the
-existing deterministic Markdown-to-speech projection before TTS. It should not
-send response text through a hidden conversational agent.
-
-If later responses are summarized for speech, summarization must be an optional
-channel policy with these constraints:
+The full final assistant response remains in Codex. The presenter receives that
+immutable response only after the Desktop-owned observer has proven the exact
+task and turn. It uses GPT-5.6 Luna to produce a short spoken rendering with
+these constraints:
 
 - it receives response text, never Codex routing authority
 - it cannot submit, resume, steer, or mutate a task
 - its output affects narration only, never the Codex transcript
 - failure falls back to deterministic projection
 
+Luna runs in a separate `codex app-server` process. Each presentation thread is
+started with `ephemeral: true`, low reasoning effort, a read-only sandbox, no
+approvals, and no supported dynamic tools. The bridge refuses output unless the
+app server confirms the ephemeral thread and returns the exact source task and
+turn IDs. Presenter sessions therefore do not become tasks, lanes, or resumable
+threads in Codex.
+
+The fallback removes fenced code and Markdown that is hostile to speech, then
+bounds the spoken excerpt and points the listener back to the complete response
+in Codex. It does not generate a second semantic summary.
+
+## Feature flag and rollback
+
+The observer and presenter are one default-off release slice:
+
+```json
+{
+  "features": {
+    "observerPresenter": true
+  }
+}
+```
+
+The setting lives in `~/.config/speakeasy/settings.json` and is read at app
+launch. `SPEAKEASY_OBSERVER_PRESENTER=0` is the emergency kill switch and wins
+over the file; `SPEAKEASY_OBSERVER_PRESENTER=1` enables a development launch
+without rewriting settings. When disabled, the app does not start the observer,
+does not expose subscription controls, and does not start a Luna app server.
+Existing durable subscription state remains inert so rollback is reversible.
+
 ## UI proposal
 
 Add subscription controls to the exact-task surface rather than to the
 microphone control:
 
-- **Announce completions** toggle on the selected task
+- **Present completions** toggle on the selected task
 - **Channel: Completions** picker or disclosure
 - channel mute control in the menu bar player and Deck
 - a small subscription badge on subscribed tasks
