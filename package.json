@@ -18,7 +18,8 @@
     "!dist/test.*",
     "deck/index.html",
     "deck/themes.json",
-    "deck/variants"
+    "deck/variants",
+    "app/Sources/SpeakEasy/Resources/codex-desktop-bridge.cjs"
   ],
   "exports": {
     ".": "./dist/index.js"
