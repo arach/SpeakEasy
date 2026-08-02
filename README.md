@@ -3,14 +3,18 @@
 **Speak to the Codex task you are already using. Hear its real answer come back.**
 
 SpeakEasy is a dual-mode voice companion for Codex Desktop on macOS. It
-transcribes an explicit utterance locally, routes the final text to the exact
-Codex task you chose, and narrates that task's real response through a
-controllable native player. The same live task lanes are available from the
+captures an explicit utterance on the surface you are holding, transcribes it
+with Apple Speech or the Mac's local Parakeet model, routes the final text to
+the exact Codex task you chose, and narrates that task's real response through
+a controllable native player. The same live task lanes are available from the
 Mac, a browser, or an iPad on your local network.
 
 - **No shadow conversation:** the full transcript remains in Codex.
 - **No focus guessing:** the exact task ID is the routing authority.
-- **Local speech boundary:** audio is captured and transcribed on your Mac.
+- **Local-network speech boundary:** Parakeet transcription stays on the Mac;
+  the Apple Speech fallback follows Apple's device settings and terms. Browser
+  and iPad fallback recordings travel only to the paired Mac and are deleted
+  after the request.
 - **One self-serve install:** Codex can verify and install the signed,
   Apple-notarized app without a source checkout or developer tools.
 
@@ -22,11 +26,12 @@ Paste this bounded task into Codex Desktop:
 > https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
 > source or bypass Gatekeeper. Tell me which human-only steps remain.
 
-The current `0.2.18` build is a self-serve preview. It stays a GitHub
-prerelease until the clean second-Mac and device-path acceptance run passes.
+The current `0.2.18` build is an immutable self-serve core preview. It remains
+a GitHub prerelease permanently; the first public **Latest** train is `0.2.19`
+after the clean second-Mac, device-path, and observer/presenter gates pass.
 See [SpeakEasy for Codex](https://speakeasy.arach.dev/codex/) for the product
 loop and [`docs/release/self-serve-mac-test.md`](docs/release/self-serve-mac-test.md)
-for the promotion gate.
+for the clean-machine proof.
 
 The TypeScript library and CLI remain available for applications and agent
 hooks that need provider-independent TTS. Jump to [Library and CLI](#library-and-cli)
