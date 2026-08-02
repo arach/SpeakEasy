@@ -30,12 +30,12 @@ export default function CodexInstallPrompt() {
     <section id="codex-install" className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-900/5">
       <header className="border-b border-slate-100 px-5 py-5 sm:px-7 sm:py-6">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Codex install</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Codex install · Mac core preview</span>
           <span className="font-mono text-[10px] text-slate-400">v{releaseVersion}</span>
         </div>
         <h3 className="mt-2 font-display text-2xl font-medium tracking-tight text-slate-900">Paste once.</h3>
         <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-500">
-          Codex downloads the pinned installer, inspects it, verifies every trust boundary, replaces the app safely, finishes setup, and launches SpeakEasy.
+          Codex downloads the pinned Mac preview, inspects it, verifies every trust boundary, replaces the app safely, finishes setup, and launches SpeakEasy. Use the signed 0.2.19 candidate for browser or iPad testing.
         </p>
       </header>
 

@@ -44,8 +44,9 @@ EXECUTABLE="$APP/Contents/MacOS/SpeakEasy"
 HELPER="$APP/Contents/Helpers/speakeasy-runtime"
 CADDY="$APP/Contents/Helpers/caddy"
 PLIST="$APP/Contents/Info.plist"
+CODEX_BRIDGE="$APP/Contents/Resources/SpeakEasy_SpeakEasy.bundle/codex-desktop-bridge.cjs"
 
-for path in "$APP" "$EXECUTABLE" "$HELPER" "$CADDY" "$PLIST"; do
+for path in "$APP" "$EXECUTABLE" "$HELPER" "$CADDY" "$PLIST" "$CODEX_BRIDGE"; do
     if [ ! -e "$path" ]; then
         echo "Error: Release payload is missing $path" >&2
         exit 1
@@ -84,7 +85,8 @@ case " $CADDY_ARCHS " in
     *) echo "Error: Caddy helper is missing arm64: $CADDY_ARCHS" >&2; exit 1 ;;
 esac
 
-speakeasy_verify_caddy_binary "$CADDY" "$(speakeasy_caddy_version)"
+speakeasy_verify_caddy_identity "$CADDY" "$(speakeasy_caddy_version)"
+codesign --verify --strict --verbose=2 "$CADDY"
 
 if otool -L "$EXECUTABLE" | awk 'NR > 1 { print $1 }' | grep -Ev '^(@rpath/|/System/Library/|/usr/lib/)' | grep -q .; then
     echo "Error: App contains a non-portable dynamic-library reference:" >&2

@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button"
 import CodexInstallPrompt from "@/components/codex-install-prompt"
 import SiteFooter from "@/components/site-footer"
 import SiteNav from "@/components/site-nav"
-import { releaseDownloadUrl, releaseRequirements, releaseVersion } from "@/lib/release"
+import { launchVersion, releaseDownloadUrl, releaseRequirements, releaseVersion } from "@/lib/release"
 
 export const metadata: Metadata = {
   title: "SpeakEasy for Codex",
@@ -44,7 +44,7 @@ export default function CodexPage() {
         <div className="relative mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[1fr_0.92fr]">
           <div>
             <Badge variant="outline" className="rounded-xl border-emerald-200 bg-white/80 text-emerald-700">
-              SpeakEasy {releaseVersion} · dual mode
+              SpeakEasy {launchVersion} launch candidate · dual mode
             </Badge>
             <h1 className="mt-6 font-display text-5xl font-extralight leading-[0.98] tracking-tight text-slate-900 sm:text-6xl md:text-7xl">
               One voice.
@@ -205,7 +205,7 @@ export default function CodexPage() {
           <article className="rounded-3xl border border-emerald-200/70 bg-emerald-50/45 p-8 shadow-lg shadow-emerald-900/5">
             <div className="flex items-center justify-between gap-4">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><Mic2 className="h-5 w-5" /></div>
-              <Badge variant="outline" className="rounded-xl border border-emerald-200 bg-white/70 text-emerald-700">Included in {releaseVersion}</Badge>
+              <Badge variant="outline" className="rounded-xl border border-emerald-200 bg-white/70 text-emerald-700">Mac in {releaseVersion} · secure devices in {launchVersion}</Badge>
             </div>
             <h2 className="mt-7 font-display text-3xl font-medium text-slate-900">Listen · local ASR</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
