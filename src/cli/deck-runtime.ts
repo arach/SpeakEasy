@@ -121,6 +121,11 @@ export interface DeckSnapshot {
   clients: number;
 }
 
+export interface DeckRuntimeOptions {
+  /** Skip the eager Codex catalog read in isolated runtime tests. */
+  warmCatalog?: boolean;
+}
+
 const intentSchema = z.discriminatedUnion('name', [
   // max 9: lanes 0-8 plus the deck-owned overview lane (MASTER_IX below —
   // a literal here because the schema initializes before the constants)
@@ -393,8 +398,11 @@ export class DeckRuntime extends EventEmitter {
   private ticker: NodeJS.Timeout | null = null;
   private busy = false;
   private destroyed = false;
-  /** bumped on stop/cancel — pending response work checks it before every phase */
+  /** Bumped for each accepted capture and teardown; async phases retain only
+   * the generation that created them. */
   private gen = 0;
+  /** A transport stop silences the current reply without detaching from Codex. */
+  private suppressAutoplayForGeneration: number | null = null;
   private player: ChildProcess | null = null;
   private playerRate = 1;
   private synthDir = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-synth-'));
@@ -406,12 +414,12 @@ export class DeckRuntime extends EventEmitter {
     return this.synthDir;
   }
 
-  constructor() {
+  constructor(options: DeckRuntimeOptions = {}) {
     super();
     this.restoreLaneBindings();
     // Warm the exact Codex task catalog before the user opens lane setup. The
     // explicit refresh action reuses this in-flight request if it is still busy.
-    void this.refreshThreadCatalog();
+    if (options.warmCatalog !== false) void this.refreshThreadCatalog();
   }
 
   /** Copy identity from the exact Codex catalog record used for the binding.
@@ -687,15 +695,17 @@ export class DeckRuntime extends EventEmitter {
     return this.lanes[ix]?.name.toLowerCase() ?? `lane ${ix + 1}`;
   }
 
-  /** Change the conversation target and cancel work/audio owned by the old one. */
+  /** Change only what the operator is viewing and targeting next.
+   *
+   * Canonical work and playback belong to their origin lane, not to the
+   * currently visible lane. Navigation must therefore never abort the Codex
+   * waiter, bump its generation, or stop its audio. */
   private selectLane(index: number): void {
-    this.gen++;
-    this.cancelAgentWork();
     this.laneIx = index;
-    this.stopPlayer();
-    this.clearPlayback();
     const label = index === MASTER_IX ? 'OVERVIEW' : `LANE ${String(index + 1).padStart(2, '0')}`;
-    this.setPhase(this.phase, `READY · ${label}`);
+    const state = this.lanes[index]?.state;
+    const status = state === 'working' ? 'WORKING' : state === 'speaking' ? 'SPEAKING' : 'READY';
+    this.setPhase(this.phase, `${status} · ${label}`);
     this.log('LANE SELECTED', index === MASTER_IX ? 'overview' : `lane ${index + 1}`);
     this.changed();
   }
@@ -830,13 +840,16 @@ export class DeckRuntime extends EventEmitter {
         this.changed();
         return { ok: true, rev: this.rev };
       case 'playback.stop':
-        this.gen++; // cancel any pending response work
-        this.cancelAgentWork();
+        // Transport control is intentionally not task control. Aborting the
+        // bridge here would leave Codex running while silently dropping its
+        // result from the Deck. Preserve the canonical waiter and merely keep
+        // this response from autoplaying when it lands.
+        if (this.busy) this.suppressAutoplayForGeneration = this.gen;
         this.stopPlayer();
         this.clearPlayback();
         this.listening = false;
-        this.setPhase('idle', 'CANCELLED');
-        this.log('PLAYBACK STOPPED', 'buffer cleared');
+        this.setPhase('idle', this.busy ? 'AUDIO STOPPED · TASK CONTINUES' : 'AUDIO STOPPED');
+        this.log('PLAYBACK STOPPED', this.busy ? 'audio cleared · canonical task continues' : 'buffer cleared');
         this.changed();
         return { ok: true, rev: this.rev };
       case 'playback.replay': {
@@ -859,8 +872,11 @@ export class DeckRuntime extends EventEmitter {
         return { ok: false, rev: this.rev, error: 'no replayable reply' };
       }
       case 'capture.start':
+        // Until one bridge can correlate multiple steering requests to a
+        // single terminal Codex turn, fail explicitly instead of detaching the
+        // response already in flight. The operator can still browse all lanes.
+        if (this.busy) return { ok: false, rev: this.rev, error: 'response already in flight' };
         this.gen++;
-        this.cancelAgentWork();
         this.stopPlayer();
         this.clearPlayback();
         this.listening = true;
@@ -979,13 +995,13 @@ export class DeckRuntime extends EventEmitter {
     const alive = () => this.gen === gen;
     this.setLaneState(lane, 'working');
     try {
-      this.setPhase('transcribing', 'TRANSCRIBING');
+      this.setPhase('transcribing', `TRANSCRIBING · LANE ${String(lane + 1).padStart(2, '0')}`);
       this.changed();
       await wait(600);
       if (!alive()) return;
 
       this.pushMessage(lane, { role: 'you', text: command, dur: estimateDuration(command) });
-      this.setPhase('submitting', 'SUBMITTING');
+      this.setPhase('submitting', `SUBMITTING · LANE ${String(lane + 1).padStart(2, '0')}`);
       this.log('AGENT ASKED', `${this.laneLabel(lane)} · ${command.slice(0, 40)}`);
       this.changed();
 
@@ -996,7 +1012,7 @@ export class DeckRuntime extends EventEmitter {
       this.pushMessage(lane, msg);
       const id = `${lane}:${this.threads[lane].length - 1}`;
 
-      this.setPhase('preparingSpeech', 'PREPARING SPEECH');
+      this.setPhase('preparingSpeech', `PREPARING SPEECH · LANE ${String(lane + 1).padStart(2, '0')}`);
       this.log('AGENT REPLY', `${msg.dur.toFixed(0)}s queued`);
       this.changed();
 
@@ -1012,18 +1028,18 @@ export class DeckRuntime extends EventEmitter {
       if (!file) {
         // synthesis failed — show the reply without audio, never fake playback
         msg.mirrored = true;
-        this.setPhase('idle', 'READY');
+        this.setPhase('idle', `READY · LANE ${String(lane + 1).padStart(2, '0')}`);
         this.log('NO AUDIO', 'synthesis unavailable · text-only reply');
         this.changed();
         return;
       }
       msg.file = file;
       msg.audioUrl = `/audio/${path.basename(file)}`;
-      if (this.autoplay) {
+      if (this.autoplay && this.suppressAutoplayForGeneration !== gen) {
         this.playing = id;
         this.paused = false;
         this.pos = 0;
-        this.setPhase('speaking', 'SPEAKING');
+        this.setPhase('speaking', `SPEAKING · LANE ${String(lane + 1).padStart(2, '0')}`);
         this.setLaneState(lane, 'speaking');
         this.ensureTicker();
         this.changed();
@@ -1031,11 +1047,12 @@ export class DeckRuntime extends EventEmitter {
         // when nobody is watching
         if (this.liveClients() === 0) this.playFile(file);
       } else {
-        this.setPhase('idle', 'READY');
+        this.setPhase('idle', `READY · LANE ${String(lane + 1).padStart(2, '0')}`);
         this.changed();
       }
     } finally {
       this.busy = false;
+      if (this.suppressAutoplayForGeneration === gen) this.suppressAutoplayForGeneration = null;
       if (this.lanes[lane]?.state !== 'speaking' && this.setLaneState(lane, 'idle')) this.changed();
     }
   }
@@ -1110,7 +1127,8 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** Interrupt any in-flight lane turn — called on stop, lane change, new capture, destroy. */
+  /** Detach from in-flight work during runtime teardown only. User-facing
+   * navigation and transport controls must preserve canonical task delivery. */
   private cancelAgentWork(): void {
     this.canonicalTurnAbort?.abort();
     this.canonicalTurnAbort = null;
