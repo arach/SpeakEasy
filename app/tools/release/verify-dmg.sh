@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=common.sh
+source "$SCRIPT_DIR/common.sh"
+
 DMG_PATH="${1:-}"
 EXPECTED_VERSION="${2:-}"
 EXPECT_NOTARIZED="${SPEAKEASY_EXPECT_NOTARIZED:-1}"
@@ -38,9 +42,10 @@ hdiutil attach "$DMG_PATH" -nobrowse -readonly -mountpoint "$MOUNT_POINT" -quiet
 APP="$MOUNT_POINT/SpeakEasy.app"
 EXECUTABLE="$APP/Contents/MacOS/SpeakEasy"
 HELPER="$APP/Contents/Helpers/speakeasy-runtime"
+CADDY="$APP/Contents/Helpers/caddy"
 PLIST="$APP/Contents/Info.plist"
 
-for path in "$APP" "$EXECUTABLE" "$HELPER" "$PLIST"; do
+for path in "$APP" "$EXECUTABLE" "$HELPER" "$CADDY" "$PLIST"; do
     if [ ! -e "$path" ]; then
         echo "Error: Release payload is missing $path" >&2
         exit 1
@@ -65,6 +70,7 @@ fi
 
 APP_ARCHS="$(lipo -archs "$EXECUTABLE")"
 HELPER_ARCHS="$(lipo -archs "$HELPER")"
+CADDY_ARCHS="$(lipo -archs "$CADDY")"
 case " $APP_ARCHS " in
     *" arm64 "*) ;;
     *) echo "Error: SpeakEasy executable is missing arm64: $APP_ARCHS" >&2; exit 1 ;;
@@ -73,6 +79,12 @@ case " $HELPER_ARCHS " in
     *" arm64 "*) ;;
     *) echo "Error: Deck runtime is missing arm64: $HELPER_ARCHS" >&2; exit 1 ;;
 esac
+case " $CADDY_ARCHS " in
+    *" arm64 "*) ;;
+    *) echo "Error: Caddy helper is missing arm64: $CADDY_ARCHS" >&2; exit 1 ;;
+esac
+
+speakeasy_verify_caddy_binary "$CADDY" "$(speakeasy_caddy_version)"
 
 if otool -L "$EXECUTABLE" | awk 'NR > 1 { print $1 }' | grep -Ev '^(@rpath/|/System/Library/|/usr/lib/)' | grep -q .; then
     echo "Error: App contains a non-portable dynamic-library reference:" >&2
@@ -80,4 +92,4 @@ if otool -L "$EXECUTABLE" | awk 'NR > 1 { print $1 }' | grep -Ev '^(@rpath/|/Sys
     exit 1
 fi
 
-echo "    Payload accepted: SpeakEasy $ACTUAL_VERSION · app $APP_ARCHS · runtime $HELPER_ARCHS"
+echo "    Payload accepted: SpeakEasy $ACTUAL_VERSION · app $APP_ARCHS · runtime $HELPER_ARCHS · Caddy $CADDY_ARCHS"

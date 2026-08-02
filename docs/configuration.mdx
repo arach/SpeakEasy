@@ -68,7 +68,7 @@ SpeakEasy uses a hierarchical configuration system with the following precedence
   },
   "deck": {
     "port": 43211,
-    "pair": false
+    "pair": true
   }
 }
 ```
@@ -80,7 +80,7 @@ Optional defaults for `speakeasy deck` (CLI flags always win):
 | Key | Type | Effect |
 |---|---|---|
 | `deck.port` | number | Preferred deck port. Falls back to auto (43211+ for normal users; port 80 only when permitted) when busy — unlike `--port`, which must be bindable. |
-| `deck.pair` | boolean | Require the persistent pairing token from devices, like `--pair`. Override per-run with `--no-pair`. |
+| `deck.pair` | boolean | Require the persistent pairing token from devices. Defaults to `true`; override per-run with `--no-pair` only on a trusted development network. |
 | `deck.autoStart` | boolean | Start the bundled Deck when the SpeakEasy menu-bar app launches. Enable this after the first guided setup succeeds. |
 
 The Mac settings app edits these from its Deck section, which also shows live
