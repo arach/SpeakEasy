@@ -194,7 +194,7 @@ actor CodexLunaCompletionPresenter: CompletionPresenting {
            FileManager.default.isReadableFile(atPath: override) {
             return URL(fileURLWithPath: override)
         }
-        return Bundle.module.url(forResource: "codex-luna-presenter", withExtension: "cjs")
+        return SpeakEasyResources.url(forResource: "codex-luna-presenter", withExtension: "cjs")
     }
 
     private static func resolveCodexExecutable() -> URL? {

@@ -289,6 +289,7 @@ speakeasy_verify_bundle_layout() {
 
     for resource in \
         "$resources_dir/SpeakEasy_SpeakEasy.bundle/codex-desktop-bridge.cjs" \
+        "$resources_dir/SpeakEasy_SpeakEasy.bundle/codex-luna-presenter.cjs" \
         "$resources_dir/SpeakEasy_SpeakEasy.bundle/Pad/index.html"; do
         if [ ! -s "$resource" ]; then
             echo "SwiftPM runtime resource is missing from Contents/Resources: $resource" >&2

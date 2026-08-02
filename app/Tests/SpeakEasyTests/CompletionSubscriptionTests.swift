@@ -2,6 +2,15 @@ import XCTest
 @testable import SpeakEasy
 
 final class CompletionSubscriptionTests: XCTestCase {
+    func testPackagedResourceResolverFindsTheLunaPresenter() {
+        let presenter = SpeakEasyResources.url(
+            forResource: "codex-luna-presenter",
+            withExtension: "cjs"
+        )
+        XCTAssertNotNil(presenter)
+        XCTAssertTrue(FileManager.default.isReadableFile(atPath: presenter?.path ?? ""))
+    }
+
     private let task = ListeningTaskLock(
         id: "019f99a4-7867-7c23-ac29-0c0eca7da603",
         title: "Completion task",
@@ -135,7 +144,7 @@ final class CompletionSubscriptionTests: XCTestCase {
 
     func testBridgeParserAcceptsStructuredCompletionAndRejectsWrongProvenance() throws {
         let line = """
-        {"ok":true,"type":"completion","taskID":"\(task.id)","turnID":"turn-9","response":"Final answer","completedAt":"2026-08-01T12:00:00Z","cursor":912,"provenance":{"owner":"codex-desktop","hostID":"local","protocolVersion":11,"rolloutPath":"/Users/arach/.codex/sessions/2026/turn-\(task.id).jsonl","rolloutIdentity":"1:2:abc"}}
+        {"ok":true,"type":"completion","taskID":"\(task.id)","turnID":"turn-9","response":"Final answer","completedAt":"2026-08-01T12:00:00.701Z","cursor":912,"provenance":{"owner":"codex-desktop","hostID":"local","protocolVersion":11,"rolloutPath":"/Users/arach/.codex/sessions/2026/turn-\(task.id).jsonl","rolloutIdentity":"1:2:abc"}}
         """
         guard case .completion(let event) = try CodexCompletionBridgeLineParser.parse(line, expectedTaskID: task.id) else {
             return XCTFail("Expected a completion event")

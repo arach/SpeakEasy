@@ -75,6 +75,12 @@ enum CodexCompletionBridgeLineParser {
         let provenance: CodexCompletionProvenance?
     }
 
+    private static func parseTimestamp(_ value: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    }
+
     static func parse(_ line: String, expectedTaskID: String) throws -> CodexCompletionBridgeMessage {
         guard let data = line.data(using: .utf8),
               let envelope = try? JSONDecoder().decode(Envelope.self, from: data)
@@ -105,7 +111,7 @@ enum CodexCompletionBridgeLineParser {
                   let response = envelope.response?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !response.isEmpty,
                   let completedAtValue = envelope.completedAt,
-                  let completedAt = ISO8601DateFormatter().date(from: completedAtValue),
+                  let completedAt = parseTimestamp(completedAtValue),
                   let provenance = envelope.provenance,
                   provenance.owner == "codex-desktop",
                   provenance.hostID == "local",

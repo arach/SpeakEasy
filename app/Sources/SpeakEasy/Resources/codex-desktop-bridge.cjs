@@ -176,6 +176,31 @@ function isTerminalRecord(record) {
     typeof payload.turn_id === 'string' && payload.turn_id.length > 0);
 }
 
+/** A narratable completion carries its own durable cursor and must be emitted
+ * before that cursor can be committed. Non-narratable terminal records may
+ * advance the cursor directly. This prevents a crash between two bridge lines
+ * from losing a completion forever. */
+function observationMessages(record, threadId, cursor, provenance) {
+  const completion = parseCompletionRecord(record, threadId);
+  if (completion) {
+    return [{
+      type: 'completion',
+      taskID: completion.taskID,
+      turnID: completion.turnID,
+      response: completion.response,
+      completedAt: completion.completedAt,
+      cursor,
+      provenance,
+    }];
+  }
+  return [{
+    type: 'cursor',
+    taskID: threadId,
+    turnID: record.payload.turn_id,
+    cursor,
+  }];
+}
+
 function frame(message) {
   const body = Buffer.from(JSON.stringify(message), 'utf8');
   if (body.length === 0 || body.length > MAX_FRAME_BYTES) fail('Desktop IPC message is too large.');
@@ -398,7 +423,6 @@ class DesktopIPCClient {
       ));
       return;
     }
-    if (!this.strictObservation && params?.change?.type !== 'snapshot') return;
     if (this.strictObservation && this.ownerClientId && message.sourceClientId !== this.ownerClientId) {
       this.failClosed(Object.assign(
         new Error('Codex Desktop task ownership changed while SpeakEasy was watching.'),
@@ -406,13 +430,10 @@ class DesktopIPCClient {
       ));
       return;
     }
-    if (this.strictObservation && params?.change?.type !== 'snapshot' && this.ownerClientId) {
-      this.failClosed(Object.assign(
-        new Error('Codex Desktop no longer proves ownership of the subscribed task.'),
-        { code: 'task-owner-lost' },
-      ));
-      return;
-    }
+    // Turn activity produces non-snapshot stream updates. They do not change
+    // ownership, so ignore them and keep the read-only follower attached. A
+    // later owner snapshot (or IPC close) remains the authority boundary.
+    if (params?.change?.type !== 'snapshot') return;
     const state = params?.change?.conversationState;
     if (this.strictObservation && this.ownerClientId && (
       state?.id !== this.threadId ||
@@ -572,32 +593,17 @@ async function observeRollout(client, rolloutPath, threadId, requestedOffset, re
           linePosition = lineEnd;
           continue;
         }
-        const payload = record?.payload;
         if (isTerminalRecord(record)) {
           const cursor = lineEnd;
-          const completion = parseCompletionRecord(record, threadId);
-          writeObservation({
-            type: 'cursor',
-            taskID: threadId,
-            turnID: payload.turn_id,
-            cursor,
-          });
-          if (completion) {
-            writeObservation({
-              type: 'completion',
-              taskID: completion.taskID,
-              turnID: completion.turnID,
-              response: completion.response,
-              completedAt: completion.completedAt,
-              cursor,
-              provenance: {
-                owner: 'codex-desktop',
-                hostID: 'local',
-                protocolVersion: STREAM_VERSION,
-                rolloutPath,
-                rolloutIdentity: identity,
-              },
-            });
+          const provenance = {
+            owner: 'codex-desktop',
+            hostID: 'local',
+            protocolVersion: STREAM_VERSION,
+            rolloutPath,
+            rolloutIdentity: identity,
+          };
+          for (const observation of observationMessages(record, threadId, cursor, provenance)) {
+            writeObservation(observation);
           }
         }
         linePosition = lineEnd;
@@ -689,4 +695,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseCompletionRecord, isTerminalRecord, assertRolloutPath };
+module.exports = { parseCompletionRecord, isTerminalRecord, observationMessages, assertRolloutPath };
