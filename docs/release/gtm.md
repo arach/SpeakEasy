@@ -102,8 +102,12 @@ narration across your Mac and iPad without creating a shadow conversation.
    folder, or recency, is the routing authority.
 2. **The transcript stays whole.** Dictations and real responses remain in the
    same Codex task; SpeakEasy owns voice and playback, not a second chat.
-3. **Local by design.** Audio capture and ASR stay on the Mac. The device Deck
-   is a control surface for that Mac, not a hosted agent.
+3. **Local-network by design.** Parakeet transcription stays on the Mac; the
+   Apple Speech fallback follows Apple's device capabilities, settings, and
+   terms. A browser records on that device and sends a bounded file over
+   paired local HTTPS to the Mac's Parakeet model. The native iPad shell can
+   use Apple Speech first and uploads its private fallback recording to that
+   same Mac. No Arach speech server sits in the path.
 4. **Codex installs the companion.** A bounded Codex task can inspect the
    installer and verify checksum, Gatekeeper, Developer ID, and exact version.
 5. **Completions are opt-in and quiet.** The observer is read-only; the
@@ -136,12 +140,12 @@ narration across your Mac and iPad without creating a shadow conversation.
 
 | Asset | State | Required action |
 | --- | --- | --- |
-| Dual-mode website and `/codex/` | Built and tested on PR branch; not public | Merge onboarding PR and verify Pages deployment |
-| Agent-readable installer guide | Present at `landing/public/agent.md` | Verify public 200 response after deployment |
+| Dual-mode website and `/codex/` | Live publicly from merged PR #13 | Keep the product and pinned release story aligned |
+| Agent-readable installer guide | Live publicly at `/agent.md` | Update only with the exact release train |
 | Signed/notarized `0.2.18` DMG | Public prerelease | Keep immutable; use as core proof candidate |
 | Pinned release installer and checksum | Public prerelease | Run from clean second Mac |
 | Native onboarding and Deck | In `0.2.18` prerelease | Complete human permission and device-path checks |
-| Observer/presenter | Implemented, tested, default-off on follow-on branch | Real Codex/Luna/signed-app acceptance; ship in `0.2.19` |
+| Observer/presenter | Implemented, tested, default-off in draft PR #14 | Real Codex/Luna/signed-app acceptance; ship in `0.2.19` |
 | npm package | Public `latest` is `0.2.16` | Publish `0.2.19` from launch commit |
 | Codex plugin runtime | Bundled runtime reports `0.2.17` | Rebuild/package from `0.2.19`; rerun bundle audit |
 | OpenAI plugin listing | Submission materials exist | User completes publisher verification and Apps Management Write |
@@ -189,6 +193,10 @@ All public `0.2.19` artifacts must be produced from one commit:
 - `package.json` and npm tarball;
 - bundled plugin runtime and submission ZIP;
 - release notes and documented requirements.
+
+Publish and verify the GitHub assets, npm package, and plugin bundle before
+promoting `0.2.19` to **Latest**. Installation from each public artifact must
+be part of the gate; successful local builds are not enough.
 
 Do not update or move `v0.2.18`. If a `0.2.19` candidate fails, fix forward to
 a new candidate or version rather than replacing an artifact people may have
