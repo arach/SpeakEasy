@@ -16,7 +16,10 @@ Usage:
 
 Preflight:
   security find-identity -v -p codesigning
-  xcrun notarytool history --keychain-profile notarytool-art | head
+  xcrun notarytool history --keychain-profile notarytool-air | head
+
+Verification:
+  ./tools/release/verify-dmg.sh dist/SpeakEasy.dmg <version>
 EOF
 }
 
