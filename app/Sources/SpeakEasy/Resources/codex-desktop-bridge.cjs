@@ -14,12 +14,27 @@ const FOLLOW_VERSION = 1;
 const STREAM_VERSION = 11;
 const START_TURN_VERSION = 1;
 const STEER_TURN_VERSION = 1;
-const SNAPSHOT_TIMEOUT_MS = 5_000;
+// Canonical Desktop snapshots include the task history currently held by the
+// owning window. Long-running tasks can legitimately be tens of megabytes; on
+// Node, receiving and parsing that private IPC frame can take longer than five
+// seconds even while the owner is healthy. Keep the wait bounded, but size the
+// default for real tasks instead of treating a large canonical history as a
+// missing owner.
+const DEFAULT_SNAPSHOT_TIMEOUT_MS = 30_000;
+const MIN_SNAPSHOT_TIMEOUT_MS = 5_000;
+const MAX_SNAPSHOT_TIMEOUT_MS = 120_000;
 const TURN_TIMEOUT_MS = 30 * 60_000;
 const OBSERVER_POLL_MS = 150;
 
 function codexHome() {
   return process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
+}
+
+function snapshotTimeoutMs(value = process.env.SPEAKEASY_CODEX_OWNER_TIMEOUT_MS) {
+  if (value === undefined || value === null || value === '') return DEFAULT_SNAPSHOT_TIMEOUT_MS;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_SNAPSHOT_TIMEOUT_MS;
+  return Math.max(MIN_SNAPSHOT_TIMEOUT_MS, Math.min(Math.trunc(parsed), MAX_SNAPSHOT_TIMEOUT_MS));
 }
 
 function writeResult(result) {
@@ -223,6 +238,7 @@ class DesktopIPCClient {
     this.snapshotWaiter = null;
     this.failure = null;
     this.ownerRolloutPath = null;
+    this.snapshotTimeoutMs = snapshotTimeoutMs();
   }
 
   async connect() {
@@ -238,7 +254,7 @@ class DesktopIPCClient {
     const initialized = await this.request('initialize', { clientType: 'speakeasy' }, {
       allowUninitialized: true,
       version: 0,
-      timeoutMs: SNAPSHOT_TIMEOUT_MS,
+      timeoutMs: MIN_SNAPSHOT_TIMEOUT_MS,
     });
     if (initialized.resultType !== 'success' || typeof initialized.result?.clientId !== 'string') {
       fail('Codex Desktop rejected the SpeakEasy bridge.', 'desktop-unavailable');
@@ -254,7 +270,7 @@ class DesktopIPCClient {
           new Error('Open the locked task in Codex Desktop, then try the hotkey again.'),
           { code: 'task-owner-unavailable' },
         ));
-      }, SNAPSHOT_TIMEOUT_MS);
+      }, this.snapshotTimeoutMs);
       this.snapshotWaiter = {
         resolve: (snapshot) => {
           clearTimeout(timer);
@@ -695,4 +711,10 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseCompletionRecord, isTerminalRecord, observationMessages, assertRolloutPath };
+module.exports = {
+  parseCompletionRecord,
+  isTerminalRecord,
+  observationMessages,
+  assertRolloutPath,
+  snapshotTimeoutMs,
+};

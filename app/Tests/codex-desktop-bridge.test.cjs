@@ -6,6 +6,7 @@ const {
   parseCompletionRecord,
   isTerminalRecord,
   observationMessages,
+  snapshotTimeoutMs,
 } = require('../Sources/SpeakEasy/Resources/codex-desktop-bridge.cjs');
 
 const taskID = '019f99a4-7867-7c23-ac29-0c0eca7da603';
@@ -61,4 +62,12 @@ test('completion observation commits its cursor atomically with the event', () =
     turnID: 'turn-4',
     cursor: 950,
   }]);
+});
+
+test('owner discovery allows large canonical task snapshots without becoming unbounded', () => {
+  assert.equal(snapshotTimeoutMs(), 30_000);
+  assert.equal(snapshotTimeoutMs('not-a-number'), 30_000);
+  assert.equal(snapshotTimeoutMs('1000'), 5_000);
+  assert.equal(snapshotTimeoutMs('45000'), 45_000);
+  assert.equal(snapshotTimeoutMs('999999'), 120_000);
 });
