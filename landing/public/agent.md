@@ -38,7 +38,7 @@ ready and which human-only steps remain. The user—not the agent—approves
 microphone and local-network permissions. Do not bypass Gatekeeper, remove
 quarantine attributes, install a floating `latest` build, or build from source.
 
-## Path B — TTS CLI only (any agent, any host with Node 18+)
+## Path B — TTS CLI only (Node.js 22.12+ or Bun 1.0+)
 
 Install ad hoc, nothing written to the project (preferred):
 
