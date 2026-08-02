@@ -88,7 +88,7 @@ export default function AgentVoiceSection() {
               </span>
             </h2>
             <p className="font-text text-lg text-slate-600 max-w-2xl mx-auto font-light">
-              You don't wire anything up — your coding agent does. The current signed preview proves the Mac loop; paired browser and iPad setup joins the signed 0.2.19 candidate.
+              You don't wire anything up — your coding agent does. The signed 0.2.19 release includes the Mac voice loop and paired browser/iPad setup.
             </p>
           </div>
 
@@ -181,7 +181,7 @@ export default function AgentVoiceSection() {
                   <div className="min-w-0">
                     <span>Codex reads the public runbook and inspects the pinned installer before running it:</span>
                     <code className="block text-[11px] font-mono bg-slate-900 text-teal-300 rounded-lg px-3 py-2 mt-1.5 whitespace-pre-wrap break-all">
-                      agent.md · Path A · v0.2.18
+                      agent.md · Path A · v0.2.19
                     </code>
                   </div>
                 </li>

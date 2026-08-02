@@ -44,7 +44,7 @@ export default function CodexPage() {
         <div className="relative mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[1fr_0.92fr]">
           <div>
             <Badge variant="outline" className="rounded-xl border-emerald-200 bg-white/80 text-emerald-700">
-              SpeakEasy {launchVersion} launch candidate · dual mode
+              SpeakEasy {launchVersion} · dual mode
             </Badge>
             <h1 className="mt-6 font-display text-5xl font-extralight leading-[0.98] tracking-tight text-slate-900 sm:text-6xl md:text-7xl">
               One voice.

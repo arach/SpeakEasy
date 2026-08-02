@@ -25,7 +25,8 @@ acceptance run. This preserves the product commitment that opt-in completion
 announcements are part of the first version we actively launch, without moving
 or silently replacing the existing `v0.2.18` tag or assets.
 
-The launch order is:
+Steps 1–4 are complete on `master`; steps 5–6 are the remaining public-release
+gate. The launch order is:
 
 1. merge and deploy the core onboarding PR;
 2. use `0.2.18` for core Mac proof only; its browser/PWA path predates the
@@ -143,15 +144,15 @@ narration across your Mac and iPad without creating a shadow conversation.
 
 | Asset | State | Required action |
 | --- | --- | --- |
-| Dual-mode website and `/codex/` | Live publicly from merged PR #13 | Keep the product and pinned release story aligned |
-| Agent-readable installer guide | Live publicly at `/agent.md` | Update only with the exact release train |
+| Dual-mode website and `/codex/` | Live publicly from merged PRs #13 and #18 | Promote the staged `0.2.19` pointers with the launch commit |
+| Agent-readable installer guide | Live publicly at `/agent.md` | Promote the staged `0.2.19` runbook with the launch commit |
 | Signed/notarized `0.2.18` DMG | Public prerelease | Keep immutable; use as core proof candidate |
 | Pinned release installer and checksum | Public prerelease | Run from clean second Mac |
 | Native onboarding and Deck | In `0.2.18` prerelease | Complete human permission and device-path checks |
-| Secure browser/PWA transport | Implemented for `0.2.19` | Verify bundled Caddy, paired HTTPS, and mic access on a clean Mac/device |
-| Observer/presenter | Implemented, tested, default-off in draft PR #14 | Real Codex/Luna/signed-app acceptance; ship in `0.2.19` |
-| npm package | Public `latest` is `0.2.16` | Publish `0.2.19` from launch commit |
-| Codex plugin runtime | Bundled runtime reports `0.2.17` | Rebuild/package from `0.2.19`; rerun bundle audit |
+| Secure browser/PWA transport | Merged; signed local app passed paired HTTPS and fail-closed checks | Repeat certificate, pairing, mic, and reconnect on a clean Mac/device |
+| Observer/presenter | Merged in PR #14, default-off; signed exact-task/Luna/restart acceptance passed | Complete queue, replay, and invalidation checks on the clean-device candidate |
+| npm package | Public `latest` is `0.2.16`; `0.2.19` package source staged | Publish and reinstall-test from the exact launch commit |
+| Codex plugin runtime | Rebuilt and isolated-bundle verified as `0.2.19` | Package, publish, and reinstall-test from the exact launch commit |
 | OpenAI plugin listing | Submission materials exist | User completes publisher verification and Apps Management Write |
 | Native iPad distribution | No TestFlight/App Store artifact | Label developer preview; do not block browser/PWA launch |
 
@@ -186,6 +187,12 @@ enabled:
 
 The kill switch is `SPEAKEASY_OBSERVER_PRESENTER=0`. A presenter failure must
 fall back to the deterministic speech projection, never to a second task.
+
+Local signed acceptance on 2026-08-02 proved exact-task observation, one
+durable muted activity with matching task/turn provenance, no duplicate after
+restart, a real ephemeral `gpt-5.6-luna` presentation, and mounted-DMG resource
+integrity. The clean-device run still owns the interactive-priority, manual
+replay, task-invalidation, and public-artifact repetitions above.
 
 ### Artifact integrity gate
 
@@ -254,11 +261,11 @@ privacy-preserving measurement design is approved.
 
 | Work | Owner | Blocker or next action |
 | --- | --- | --- |
-| Core website/onboarding deploy | Maintainer/Codex | Merge onboarding PR; verify Pages |
+| Core website/onboarding deploy | Maintainer/Codex | Merged and verified publicly |
 | Clean second-Mac and iPad/browser run | Human tester + Codex | Requires physical clean machine and permissions |
-| Observer/presenter candidate | Maintainer/Codex | Signed `0.2.19` build and real-environment evidence |
+| Observer/presenter candidate | Maintainer/Codex | Merged default-off; local signed acceptance complete, repeat remaining checks on clean device |
 | npm publication | Maintainer | Requires npm publish credentials and launch commit |
-| Plugin bundle | Maintainer/Codex | Rebuild runtime and verify ZIP from launch commit |
+| Plugin bundle | Maintainer/Codex | Candidate rebuilt and verified; publish and reinstall-test from launch commit |
 | OpenAI listing | Account owner | Publisher identity and Apps Management Write |
 | Native iPad public distribution | Maintainer | TestFlight/App Store work; intentionally post-launch |
 

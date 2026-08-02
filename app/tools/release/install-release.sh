@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-DEFAULT_VERSION="0.2.18"
+DEFAULT_VERSION="0.2.19"
 VERSION="${SPEAKEASY_VERSION:-$DEFAULT_VERSION}"
 RELEASE_REPO="${SPEAKEASY_RELEASE_REPO:-arach/SpeakEasy}"
 RELEASE_ROOT="https://github.com/$RELEASE_REPO/releases/download/v$VERSION"
