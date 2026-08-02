@@ -56,8 +56,8 @@ workspace keeps all nine pads visible and groups recent tasks under the same pro
 user-facing titles shown by the Codex app. Search matches task titles, projects, previews, paths,
 and full thread IDs; for example, a renamed Codex task such as `spk-web` appears as `spk-web`, not
 as the rollout prompt that originally created it. Choosing a task moves its binding to that pad
-without deleting or modifying the Codex task. **Fresh session** clears the pad so its next spoken
-request starts a new Codex task.
+without deleting or modifying the Codex task. **Clear assignment** leaves the pad unassigned;
+speaking to it will not create a shadow task. Assign an existing Codex task before using the pad.
 
 ## Boot options
 

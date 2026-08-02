@@ -288,7 +288,7 @@ final class DeckBridgeController: ObservableObject {
         postIntent(["name": "catalog.refresh"])
     }
 
-    /// Bind a worker lane (0-8) to a thread, or to a fresh session when nil.
+    /// Bind a worker lane (0-8) to a task, or clear its assignment when nil.
     /// The overview lane is deck-owned and never assignable.
     func assign(lane: Int, threadId: String?) {
         guard (0..<9).contains(lane) else { return }
