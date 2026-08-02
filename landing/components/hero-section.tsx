@@ -239,6 +239,11 @@ export default function HeroSection() {
               <span className="font-silkscreen text-slate-900 text-lg">SpeakEasy</span>
             </div>
             <div className="flex items-center gap-3">
+              <Link href="/codex/">
+                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900 text-xs">
+                  Codex
+                </Button>
+              </Link>
               <Link href="/docs/quickstart/">
                 <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900 text-xs">
                   <BookOpen className="w-3 h-3 mr-1" />
@@ -275,14 +280,14 @@ export default function HeroSection() {
           <span className="font-silkscreen">SpeakEasy</span>
           <br />
           <span className="font-display font-light bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
-            Unified TTS
+            Voice for Codex
           </span>
         </h1>
 
         <div className="font-text text-sm sm:text-base md:text-lg mb-3 md:mb-4 max-w-4xl mx-auto leading-relaxed font-light px-4">
           <div className="text-center">
             {/* First line: say("tagline") */}
-            <div className="flex items-baseline justify-center whitespace-nowrap">
+            <div className="flex items-baseline justify-center">
               {/* Code prefix */}
               <span className={`font-mono text-emerald-600 font-medium tracking-tight transition-opacity duration-300 ${
                 isHeroPlaying ? 'opacity-100' : 'opacity-0'
@@ -291,7 +296,7 @@ export default function HeroSection() {
               </span>
               {/* Main tagline text */}
               <span className="text-slate-700 font-light">
-                Simple text-to-speech for all your projects. Multiple providers, smart caching, and volume control.
+                Speak to the task you’re already in. Hear its real answer come back.
               </span>
               {/* Close quote */}
               <span className={`font-mono text-emerald-600 font-medium tracking-tight transition-opacity duration-300 ${
@@ -306,7 +311,7 @@ export default function HeroSection() {
               <span className={`font-mono text-emerald-600 font-medium tracking-tight text-sm transition-opacity duration-300 ${
                 isHeroPlaying ? 'opacity-100' : 'opacity-0'
               }`}>
-                &#123;&nbsp;provider:&nbsp;'openai',&nbsp;voice:&nbsp;'nova'&nbsp;&#125;)
+                &#123;&nbsp;mode:&nbsp;'speak',&nbsp;task:&nbsp;'locked'&nbsp;&#125;)
               </span>
             </div>
           </div>
@@ -318,7 +323,7 @@ export default function HeroSection() {
             <div className="flex items-center gap-3">
               <div className="flex items-center text-sm text-slate-600">
                 <Volume2 className="w-4 h-4 mr-2 text-emerald-600" />
-                Try it now:
+                Hear the TTS side:
               </div>
               <HeroAudioPlayer onPlayingChange={setIsHeroPlaying} />
             </div>

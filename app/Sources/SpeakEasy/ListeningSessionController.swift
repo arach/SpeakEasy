@@ -90,7 +90,7 @@ final class ListeningSessionController: ObservableObject {
     @Published private(set) var lastDelivery: CodexTurnDelivery?
     @Published private(set) var lastError: String?
 
-    private let vox = VoxListeningService()
+    private let vox = VoxListeningService.shared
     private let router = CodexThreadRouter()
     private let narrator = ConfiguredResponseNarrator()
     private let laneCueStore = LaneCueStore()

@@ -6,13 +6,20 @@ import AppKit
 struct DeckSettingsView: View {
     @EnvironmentObject var config: ConfigManager
     @Environment(\.theme) var theme
-    @StateObject private var bridge = DeckBridgeController()
+    @StateObject private var bridge = DeckBridgeController.shared
     @State private var portText: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            statusSection
-            bridgeSection
+            if !bridge.onboardingComplete {
+                setupSection
+            } else {
+                statusSection
+                if bridge.running, let deviceURL = bridge.deviceURLString, let url = URL(string: deviceURL) {
+                    deviceSection(url: url)
+                }
+                bridgeSection
+            }
             Spacer()
         }
         .onAppear {
@@ -27,6 +34,107 @@ struct DeckSettingsView: View {
     }
 
     // MARK: - Understand
+
+    private var setupSection: some View {
+        GlassSection(title: "Get Started", icon: "checklist", color: .clear) {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Three checks, then talk to Codex")
+                        .font(.headline)
+                        .foregroundColor(theme.text)
+                    Text("The app carries the runtime. There are no server packages, URLs, or Caddy steps to configure.")
+                        .font(.caption)
+                        .foregroundColor(theme.textSecondary)
+                }
+
+                setupRow(
+                    number: 1,
+                    title: "SpeakEasy runtime",
+                    detail: bridge.includesRuntime ? "Included in this app" : "Build or install the release app",
+                    ready: bridge.includesRuntime
+                )
+
+                setupRow(
+                    number: 2,
+                    title: "Codex",
+                    detail: codexReadinessDetail,
+                    ready: bridge.codexPath != nil,
+                    buttonTitle: bridge.readinessChecked && bridge.codexPath == nil ? "Check Again" : nil,
+                    action: bridge.checkReadiness
+                )
+
+                setupRow(
+                    number: 3,
+                    title: "Deck bridge",
+                    detail: deckReadinessDetail,
+                    ready: bridge.running && bridge.snapshot != nil && !bridge.unreachable,
+                    buttonTitle: bridge.running ? nil : "Start Deck",
+                    action: bridge.start,
+                    buttonDisabled: bridge.codexPath == nil || bridge.actionInFlight
+                )
+
+                if let error = bridge.actionError {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button("Open log") { bridge.openLog() }
+                            .buttonStyle(.glassCompat)
+                    }
+                }
+            }
+        }
+    }
+
+    private var codexReadinessDetail: String {
+        if let path = bridge.codexPath {
+            return "Found \(URL(fileURLWithPath: path).lastPathComponent)"
+        }
+        return bridge.readinessChecked
+            ? "Open the Codex desktop app or add codex to your login shell"
+            : "Checking your login shell…"
+    }
+
+    private var deckReadinessDetail: String {
+        if bridge.running && bridge.snapshot != nil && !bridge.unreachable { return "Ready for browser and iPad" }
+        if bridge.running { return "Starting the live data plane…" }
+        return "Starts locally and publishes the device link"
+    }
+
+    private func setupRow(
+        number: Int,
+        title: String,
+        detail: String,
+        ready: Bool,
+        buttonTitle: String? = nil,
+        action: (() -> Void)? = nil,
+        buttonDisabled: Bool = false
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: ready ? "checkmark.circle.fill" : "\(number).circle")
+                .foregroundColor(ready ? .green : theme.textTertiary)
+                .font(.system(size: 17, weight: .medium))
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(theme.text)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundColor(theme.textSecondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            if let buttonTitle, let action {
+                Button(buttonTitle, action: action)
+                    .buttonStyle(.glassProminentCompat)
+                    .disabled(buttonDisabled)
+            }
+        }
+        .padding(.vertical, 2)
+    }
 
     private var statusSection: some View {
         GlassSection(title: "Status", icon: "dot.radiowaves.left.and.right", color: .clear) {
@@ -132,7 +240,7 @@ struct DeckSettingsView: View {
                         bridge.assign(lane: index, threadId: thread.id)
                     } label: {
                         HStack {
-                            Text("\(String(thread.snippet.prefix(60))) · \(thread.project) · \(thread.alias)")
+                            Text("\(String(thread.snippet.prefix(60))) · \(thread.projectLabel) · \(thread.alias)")
                             if lane.threadId == thread.id {
                                 Image(systemName: "checkmark")
                             }
@@ -184,6 +292,59 @@ struct DeckSettingsView: View {
 
     // MARK: - Configure the bridge
 
+    private func deviceSection(url: URL) -> some View {
+        GlassSection(title: "Devices", icon: "ipad.and.iphone", color: .clear) {
+            HStack(alignment: .center, spacing: 20) {
+                SpeakEasyPadQRCodeView(url: url)
+                    .frame(width: 132, height: 132)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Open this deck from another device")
+                        .font(.headline)
+                        .foregroundColor(theme.text)
+                    Text("Scan with the iPad camera, or copy the link to any laptop on the same Wi-Fi. Add it to the Home Screen for an app-like deck.")
+                        .font(.caption)
+                        .foregroundColor(theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let host = bridge.discovery?.host {
+                        Text("This Mac appears as SpeakEasy Deck (\(host)).")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(theme.textTertiary)
+                    }
+
+                    HStack(spacing: 10) {
+                        Button("Open Deck") { NSWorkspace.shared.open(url) }
+                            .buttonStyle(.glassCompat)
+                        Button("Copy link") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                        }
+                        .buttonStyle(.glassCompat)
+                    }
+
+                    if let trustURL = bridge.iPadTrustURL {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("FIRST IPAD CONNECTION")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundColor(theme.textTertiary)
+                            Text("Open the one-time trust link on the iPad, install the profile, then enable Caddy Local Authority in Settings → General → About → Certificate Trust Settings.")
+                                .font(.caption)
+                                .foregroundColor(theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("Copy iPad trust link") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(trustURL.absoluteString, forType: .string)
+                            }
+                            .buttonStyle(.glassCompat)
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+            }
+        }
+    }
+
     private var bridgeSection: some View {
         GlassSection(title: "Bridge", icon: "point.3.connected.trianglepath.dotted", color: .clear) {
             VStack(alignment: .leading, spacing: 14) {
@@ -201,14 +362,10 @@ struct DeckSettingsView: View {
                             .disabled(bridge.actionInFlight)
                     }
                     Spacer()
-                    if let deviceURL = bridge.deviceURLString, let url = URL(string: deviceURL) {
-                        Button("Open Deck") { NSWorkspace.shared.open(url) }
-                            .buttonStyle(.glassCompat)
-                        Button("Copy iPad URL") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(deviceURL, forType: .string)
-                        }
-                        .buttonStyle(.glassCompat)
+                    if bridge.includesRuntime {
+                        Label("Runtime included", systemImage: "checkmark.seal")
+                            .font(.caption)
+                            .foregroundColor(.green)
                     }
                 }
 
@@ -225,6 +382,19 @@ struct DeckSettingsView: View {
                 ))
                 .toggleStyle(.switch)
                 Text("When on, devices need the token URL (Copy iPad URL) to reach the bridge.")
+                .font(.caption)
+                .foregroundColor(theme.textSecondary)
+
+                Toggle("Start the deck with SpeakEasy", isOn: Binding(
+                    get: { config.deckAutoStart },
+                    set: {
+                        config.deckAutoStart = $0
+                        config.saveConfig()
+                        if $0 { bridge.startIfNeeded() }
+                    }
+                ))
+                .toggleStyle(.switch)
+                Text("Keeps the bridge ready whenever the menu-bar app is running.")
                     .font(.caption)
                     .foregroundColor(theme.textSecondary)
 
@@ -237,7 +407,7 @@ struct DeckSettingsView: View {
                         .frame(width: 90)
                         .onSubmit { commitPort() }
                         .onChange(of: portText) { commitPort() }
-                    Text("empty = auto (80 when free, else 43211+)")
+                    Text("empty = 43211+ (port 80 only when permitted)")
                         .font(.caption)
                         .foregroundColor(theme.textSecondary)
                 }

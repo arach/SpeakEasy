@@ -13,6 +13,7 @@ struct GlobalConfig: Codable {
     struct Deck: Codable {
         var pair: Bool?
         var port: Int?
+        var autoStart: Bool?
     }
 
     struct Providers: Codable {
@@ -523,6 +524,15 @@ class ConfigManager: ObservableObject {
         set {
             ensureDeck()
             config.deck?.port = newValue
+            markUnsaved()
+        }
+    }
+
+    var deckAutoStart: Bool {
+        get { config.deck?.autoStart ?? false }
+        set {
+            ensureDeck()
+            config.deck?.autoStart = newValue
             markUnsaved()
         }
     }

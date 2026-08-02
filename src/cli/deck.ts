@@ -1,11 +1,12 @@
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, lstatSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, lstatSync, renameSync, openSync, closeSync, unlinkSync } from 'node:fs';
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import chalk from 'chalk';
+import { WebSocket, WebSocketServer } from 'ws';
 import { DeckRuntime } from './deck-runtime';
 import { startDataPlane, writeDiscovery, clearDiscovery, type DataPlane } from './deck-live';
 import { CONFIG_FILE } from './constants';
@@ -21,9 +22,75 @@ const TYPES: Record<string, string> = {
 };
 
 const DEFAULT_PORT = 43211;
+const DECK_LOCK_FILE = path.join(os.homedir(), '.config', 'speakeasy', 'deck-runtime.lock');
+
+export interface DeckProcessLock {
+  acquired: boolean;
+  existingPid: number | null;
+  release: () => void;
+}
+
+/** One deck runtime owns a Mac at a time. The discovery file is intentionally
+ * transient, so it cannot double as the ownership primitive: another test or
+ * CLI run can replace and later clear it while the original runtime is still
+ * alive. This small atomic pid lock survives that sequence and self-heals after
+ * crashes by replacing locks whose process no longer exists. */
+export function acquireDeckProcessLock(lockFile = DECK_LOCK_FILE): DeckProcessLock {
+  mkdirSync(path.dirname(lockFile), { recursive: true });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const nonce = randomBytes(8).toString('hex');
+    try {
+      const fd = openSync(lockFile, 'wx', 0o600);
+      try {
+        writeFileSync(fd, JSON.stringify({ pid: process.pid, nonce }));
+      } finally {
+        closeSync(fd);
+      }
+      chmodSync(lockFile, 0o600);
+      let released = false;
+      return {
+        acquired: true,
+        existingPid: null,
+        release: () => {
+          if (released) return;
+          released = true;
+          try {
+            const owner = JSON.parse(readFileSync(lockFile, 'utf8')) as { pid?: unknown; nonce?: unknown };
+            if (owner.pid === process.pid && owner.nonce === nonce) unlinkSync(lockFile);
+          } catch {
+            // The lock was already replaced or removed; never delete blindly.
+          }
+        },
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      let existingPid = 0;
+      try {
+        const owner = JSON.parse(readFileSync(lockFile, 'utf8')) as { pid?: unknown };
+        existingPid = Number(owner.pid);
+      } catch {
+        // malformed means stale
+      }
+      if (Number.isInteger(existingPid) && existingPid > 1) {
+        try {
+          process.kill(existingPid, 0);
+          return { acquired: false, existingPid, release: () => {} };
+        } catch (signalError) {
+          if ((signalError as NodeJS.ErrnoException).code === 'EPERM') {
+            return { acquired: false, existingPid, release: () => {} };
+          }
+        }
+      }
+      try { unlinkSync(lockFile); } catch { /* another starter won the race */ }
+    }
+  }
+  return { acquired: false, existingPid: null, release: () => {} };
+}
 
 /** The built CLI lives at dist/bin/speakeasy-cli.js; deck assets ship at the package root. */
 function deckRoot(): string {
+  const bundledRoot = process.env.SPEAKEASY_DECK_ROOT?.trim();
+  if (bundledRoot) return path.resolve(bundledRoot);
   return path.resolve(__dirname, '..', '..', 'deck');
 }
 
@@ -94,12 +161,31 @@ function hostUrl(host: string, port: number): string {
 }
 
 /** True when we can bind the port (macOS allows unprivileged low ports). */
-async function portAvailable(port: number): Promise<boolean> {
-  const { createServer } = await import('node:net');
+export async function portAvailable(port: number, allowPrivileged = false): Promise<boolean> {
+  // Bun's node:net compatibility layer can successfully probe a privileged
+  // port that Bun.serve / node:http is then forbidden to bind. Treat low ports
+  // as unavailable for a normal user before the misleading probe runs.
+  if (!allowPrivileged && port < 1024 && typeof process.getuid === 'function' && process.getuid() !== 0) return false;
+  const { createConnection, createServer } = await import('node:net');
+  const accepts = async (host: string): Promise<boolean> => new Promise((resolve) => {
+    const socket = createConnection({ host, port });
+    const done = (value: boolean) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(value);
+    };
+    socket.once('connect', () => done(true));
+    socket.once('error', () => done(false));
+    socket.setTimeout(250, () => done(false));
+  });
+  // On macOS a wildcard probe can sometimes bind beside an existing loopback
+  // listener. A connection probe first prevents the two servers from receiving
+  // traffic nondeterministically on the same numeric port.
+  if ((await accepts('127.0.0.1')) || (await accepts('::1'))) return false;
   return new Promise((resolve) => {
     const probe = createServer();
     probe.once('error', () => resolve(false));
-    probe.listen(port, '0.0.0.0', () => probe.close(() => resolve(true)));
+    probe.listen({ port, host: '0.0.0.0', exclusive: true }, () => probe.close(() => resolve(true)));
   });
 }
 
@@ -343,9 +429,32 @@ async function startCaddy(caddy: string, root: string, port: number, tlsHost: st
   };
 }
 
-/** Zero-dependency fallback when Caddy is not installed. Demo mode only — the
- * live data plane needs Caddy's same-origin proxy. */
-async function startNodeServer(root: string, port: number): Promise<DeckHandle> {
+type LiveProxy = { dataPort: number; token: string | null };
+
+function proxyDataRequest(req: IncomingMessage, res: ServerResponse, live: LiveProxy): void {
+  const upstream = httpRequest({
+    hostname: '127.0.0.1',
+    port: live.dataPort,
+    method: req.method,
+    path: req.url,
+    // Preserve Host and Origin. The loopback data plane uses them to enforce
+    // same-origin access from the public deck server.
+    headers: req.headers,
+  }, (upstreamResponse) => {
+    res.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.headers);
+    upstreamResponse.pipe(res);
+  });
+  upstream.once('error', () => {
+    if (!res.headersSent) res.writeHead(502);
+    res.end('Deck runtime unavailable');
+  });
+  req.pipe(upstream);
+}
+
+/** Zero-dependency server and same-origin live-runtime proxy. Caddy remains an
+ * optional HTTPS upgrade, not an installation requirement. */
+export async function startNodeServer(root: string, port: number, live: LiveProxy | null): Promise<DeckHandle> {
+  const proxyWss = new WebSocketServer({ noServer: true });
   const server = createServer(async (req, res) => {
     let pathname: string;
     try {
@@ -358,6 +467,10 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
     if (pathname === '/healthz') {
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       res.end(JSON.stringify({ ok: true, service: 'speakeasy-deck', port }));
+      return;
+    }
+    if (live && (pathname.startsWith('/api/') || pathname.startsWith('/audio/'))) {
+      proxyDataRequest(req, res, live);
       return;
     }
     if (pathname === '/ca.crt') {
@@ -386,6 +499,53 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
     }
   });
 
+  server.on('upgrade', (req, socket, head) => {
+    let pathname = '';
+    try {
+      pathname = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`).pathname;
+    } catch {
+      // handled by the rejection below
+    }
+    if (!live || pathname !== '/ws') {
+      socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+      return;
+    }
+
+    const requested = new URL(req.url ?? '/ws', `http://${req.headers.host ?? 'localhost'}`);
+    if (live.token && requested.searchParams.get('k') !== live.token) {
+      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      return;
+    }
+    if (req.headers.origin) {
+      try {
+        if (new URL(req.headers.origin).host !== req.headers.host) {
+          socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+          return;
+        }
+      } catch {
+        socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+        return;
+      }
+    }
+
+    proxyWss.handleUpgrade(req, socket, head, (client) => {
+      const upstream = new WebSocket(`ws://127.0.0.1:${live.dataPort}${req.url ?? '/ws'}`, {
+        headers: { host: req.headers.host ?? `127.0.0.1:${port}` },
+        ...(req.headers.origin ? { origin: req.headers.origin } : {}),
+      });
+      client.on('message', (data, isBinary) => {
+        if (upstream.readyState === WebSocket.OPEN) upstream.send(data, { binary: isBinary });
+      });
+      upstream.on('message', (data, isBinary) => {
+        if (client.readyState === WebSocket.OPEN) client.send(data, { binary: isBinary });
+      });
+      client.once('close', () => upstream.close());
+      upstream.once('close', () => client.close());
+      client.once('error', () => upstream.terminate());
+      upstream.once('error', () => client.terminate());
+    });
+  });
+
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '0.0.0.0', () => resolve());
@@ -393,7 +553,11 @@ async function startNodeServer(root: string, port: number): Promise<DeckHandle> 
 
   return {
     engine: 'built-in server',
-    stop: () => server.close(),
+    stop: () => {
+      for (const client of proxyWss.clients) client.terminate();
+      proxyWss.close();
+      server.close();
+    },
     exited: new Promise((resolve) => server.once('close', () => resolve(0))),
   };
 }
@@ -414,7 +578,7 @@ function deckConfigDefaults(): { port: number | null; pair: boolean } {
 
 function parseDeckArgs(argv: string[]): { port: number | null; portFromFlag: boolean; host: string; qr: boolean; caddy: boolean; mdns: boolean; tls: boolean; rotateToken: boolean; pair: boolean } {
   const defaults = deckConfigDefaults();
-  let port: number | null = defaults.port; // null = auto: 80 if free (port-free URL), else 43211
+  let port: number | null = defaults.port; // null = auto: 80 only when permitted, else 43211
   let portFromFlag = false;
   let host = `speak.${deviceSlug()}.local`;
   let qr = true;
@@ -476,11 +640,19 @@ export async function runDeck(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
+  const processLock = acquireDeckProcessLock();
+  if (!processLock.acquired) {
+    const owner = processLock.existingPid ? ` (pid ${processLock.existingPid})` : '';
+    console.log(`SpeakEasy Deck is already running on this Mac${owner}.`);
+    return;
+  }
+  process.once('exit', processLock.release);
+
   // Port selection. An explicit --port must be bindable — double-binding a busy
   // port routes traffic nondeterministically between the two servers. A port
   // from config is only a preference: if it's busy, fall through to auto mode,
-  // which claims 80 for a port-free URL when free (macOS allows unprivileged
-  // low ports), then scans 43211+ for the first verified-free port.
+  // which claims 80 for a port-free URL only when this process may bind it,
+  // then scans 43211+ for the first verified-free port.
   let port: number;
   if (args.port !== null && args.portFromFlag) {
     if (!(await portAvailable(args.port))) {
@@ -510,7 +682,9 @@ export async function runDeck(argv: string[]): Promise<void> {
 
   // HTTPS on :443 with Caddy's local CA when we can — browsers only grant mic
   // (hold-to-speak) in a secure context. Independent of the HTTP port.
-  const tlsHost = args.tls && caddy && (await portAvailable(443)) ? host : null;
+  // Caddy can carry the platform-specific permission needed for 443 even when
+  // the embedded Node/Bun data plane must stay on an unprivileged port.
+  const tlsHost = args.tls && caddy && (await portAvailable(443, true)) ? host : null;
   const caCert = tlsHost ? (caddyRootCert(true) ?? null) : null;
 
   // The data plane runs loopback-only on port+1ish; Caddy proxies /ws and
@@ -529,23 +703,23 @@ export async function runDeck(argv: string[]): Promise<void> {
   try {
     handle = caddy
       ? await startCaddy(caddy, root, port, tlsHost, caCert, dataPort ? { dataPort, token } : null)
-      : await startNodeServer(root, port);
+      : await startNodeServer(root, port, dataPort ? { dataPort, token } : null);
   } catch (error) {
     if (!caddy) {
       console.error('❌ Could not start the deck server:', (error as Error).message);
       process.exit(1);
     }
-    console.error(`  ⚠️  Caddy failed (${(error as Error).message}) — falling back to the built-in server (demo mode only).`);
+    console.error(`  ⚠️  Caddy failed (${(error as Error).message}) — falling back to the built-in live server.`);
     try {
-      handle = await startNodeServer(root, port);
+      handle = await startNodeServer(root, port, dataPort ? { dataPort, token } : null);
     } catch (fallbackError) {
       console.error('❌ Built-in server also failed:', (fallbackError as Error).message);
       process.exit(1);
     }
   }
 
-  // Live runtime — the deck reaches it through the Caddy proxy; the CLI mirror
-  // uses the discovery file. Without it the deck is demo-only.
+  // Live runtime — the deck reaches it through either server's same-origin
+  // proxy; the CLI mirror uses the discovery file. Without it the deck is demo-only.
   let runtime: DeckRuntime | null = null;
   let dataPlane: DataPlane | null = null;
   if (dataPort) {
@@ -573,7 +747,7 @@ export async function runDeck(argv: string[]): Promise<void> {
       ? hostUrl(bonjour, port)
       : `http://${lan ?? 'your-macs-ip'}:${port}`);
   // pair mode: the capability token travels in the URL fragment — never on the wire
-  const padUrl = dataPlane && token && handle.engine === 'caddy' ? `${padUrlBase}#k=${token}` : padUrlBase;
+  const padUrl = dataPlane && token ? `${padUrlBase}#k=${token}` : padUrlBase;
 
   // the settings app discovers the deck through this file — the canonical URL
   // (https/vanity aware, token in the fragment) travels with it
@@ -614,11 +788,10 @@ export async function runDeck(argv: string[]): Promise<void> {
     console.log(`  ${chalk.dim(`  1. Open ${stopEdge ? `http://${host}` : hostUrl(host, port)}/ca.crt and install the profile`)}`);
     console.log(`  ${chalk.dim('  2. Settings → General → About → Certificate Trust Settings → enable "Caddy Local Authority"')}`);
   }
-  console.log(`  ${chalk.dim('The deck runs its built-in demo state. Press Ctrl+C to stop.')}`);
   if (dataPlane) {
-    console.log(`  ${chalk.green('✓')} ${chalk.dim(`Live runtime on :${dataPlane.dataPort} — the deck drives real synthesis; speaks from other shells mirror in.`)}`);
+    console.log(`  ${chalk.green('✓')} ${chalk.dim(`Live runtime connected — the deck drives real agents and synthesis. Press Ctrl+C to stop.`)}`);
   } else {
-    console.log(`  ${chalk.dim('Live runtime unavailable — deck runs demo state only.')}`);
+    console.log(`  ${chalk.dim('Live runtime unavailable — deck runs demo state only. Press Ctrl+C to stop.')}`);
   }
   console.log('');
 

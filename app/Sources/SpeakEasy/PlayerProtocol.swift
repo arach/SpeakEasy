@@ -87,6 +87,29 @@ struct PlayerCommandRequest: Codable {
     let arguments: PlayerCommandArguments?
 }
 
+/// The player socket also carries small local services owned by the native
+/// app. A string discriminator lets older playback clients keep using their
+/// existing request shape while the Deck asks Parakeet to transcribe a file.
+struct IPCCommandEnvelope: Codable {
+    let command: String
+}
+
+struct TranscriptionCommandRequest: Codable {
+    let protocolVersion: Int
+    let requestId: UUID
+    let command: String
+    let audioPath: String
+}
+
+struct TranscriptionCommandResponse: Codable {
+    let protocolVersion: Int
+    let requestId: UUID
+    let ok: Bool
+    let text: String?
+    let engine: String
+    let error: String?
+}
+
 struct PlayerSnapshot: Codable {
     let state: PlaybackState
     let currentItem: PlaybackItem?

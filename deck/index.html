@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <title>Speakeasy · Micro Deck</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23bd4722'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='monospace' font-size='20' font-weight='700' fill='white'%3ESE%3C/text%3E%3C/svg%3E">
 
 <!-- The file's only external request. Remove it for a hermetic bundle — both families
      have local fallbacks in the type tokens below. -->
@@ -158,13 +159,49 @@ body{
 @keyframes se-listen{0%{transform:scaleY(.35)}50%{transform:scaleY(1)}100%{transform:scaleY(.35)}}
 
 .se-scroll{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-.se-scroll::-webkit-scrollbar{width:8px;height:8px}
+.se-scroll::-webkit-scrollbar{width:6px;height:6px}
 .se-scroll::-webkit-scrollbar-track{background:transparent}
-.se-scroll::-webkit-scrollbar-thumb{background:currentColor;opacity:.25;border-radius:4px}
+.se-scroll::-webkit-scrollbar-thumb{background:var(--se-line);border-radius:4px}
 
 .se-hoverink:hover{color:var(--se-accent-ink)!important}
 .se-press{transition:transform .09s ease,filter .09s ease}
 .se-press:active{transform:scale(.97);filter:brightness(1.04)}
+
+/* The task title answers “which task?”; this compact identity block answers
+   the more consequential “which project and checkout?” on web and iPad. */
+.se-lane-head{flex:none;padding:14px 20px 12px;border-bottom:1px solid var(--se-line-soft);background:var(--se-panel-head)}
+.se-lane-head-main{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-width:0}
+.se-lane-title{font:600 19px/1.12 var(--se-title);letter-spacing:-.015em;color:var(--se-ink);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.se-lane-thread{font:500 8.5px var(--se-mono);letter-spacing:.16em;color:var(--se-accent-ink);white-space:nowrap;padding-top:5px}
+.se-lane-identity{display:grid;grid-template-columns:minmax(100px,.7fr) minmax(150px,1.2fr) minmax(180px,1.4fr);border:1px solid var(--se-line-soft);border-radius:var(--se-radius-sm);overflow:hidden;margin-top:11px;background:var(--se-cell)}
+.se-lane-fact{min-width:0;padding:7px 10px 8px;border-right:1px solid var(--se-line-soft)}
+.se-lane-fact:last-child{border-right:0}
+.se-lane-fact-label{font:500 7px var(--se-mono);letter-spacing:.18em;color:var(--se-ink-4)}
+.se-lane-fact-value{font:600 9.5px/1.25 var(--se-mono);color:var(--se-ink-2);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.se-lane-recent{display:flex;align-items:baseline;gap:10px;min-width:0;margin-top:8px;color:var(--se-ink-3)}
+.se-lane-recent-label{font:600 7px var(--se-mono);letter-spacing:.18em;color:var(--se-accent-ink);flex:none}
+.se-lane-recent-value{font:400 8.5px/1.35 var(--se-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+
+/* Lane setup is a shared workspace, not a buried modal. It is deliberately
+   roomy enough for fingers and keeps all nine pads visible while the thread
+   catalog scrolls independently. The native iPad app renders this exact UI. */
+.se-setup-backdrop{
+  position:fixed;inset:0;z-index:80;
+  display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+  background:rgba(24,18,10,.48);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)
+}
+.se-setup{
+  width:min(1120px,100%);height:min(820px,100%);min-height:0;
+  display:flex;flex-direction:column;overflow:hidden;
+  background:var(--se-panel);border:1px solid var(--se-line);border-radius:14px;
+  box-shadow:0 24px 70px -24px rgba(0,0,0,.5),var(--se-panel-shadow)
+}
+.se-setup-body{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);flex:1;min-height:0}
+.se-setup-lanes{overflow-y:auto;border-right:1px solid var(--se-line-soft);background:var(--se-panel-head)}
+.se-setup-catalog{display:flex;flex-direction:column;min-width:0;min-height:0}
+.se-setup-lane-grid{display:flex;flex-direction:column;gap:7px;padding:12px}
+.se-setup-results{overflow-y:auto;padding:10px 14px 16px;display:flex;flex-direction:column;gap:8px}
 
 /* Design is authored at desk width. Below that the two plates stack rather than
    forcing a horizontal scrollbar inside a panel-sized web view — and the surface
@@ -179,6 +216,17 @@ body{
   .se-pads{overflow:visible!important;flex:0 0 auto!important}
   .se-conv{max-height:none!important}
 }
+@media (max-width:760px){
+  .se-setup-backdrop{padding:0}
+  .se-setup{width:100%;height:100%;border:0;border-radius:0}
+  .se-setup-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .se-setup-lanes{overflow:visible;border-right:0;border-bottom:1px solid var(--se-line-soft)}
+  .se-setup-lane-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:9px;gap:6px}
+  .se-setup-results{padding:8px 10px 14px}
+  .se-lane-identity{grid-template-columns:1fr 1fr}
+  .se-lane-fact:nth-child(2){border-right:0}
+  .se-lane-fact:last-child{grid-column:1/-1;border-top:1px solid var(--se-line-soft)}
+}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
@@ -190,6 +238,15 @@ body{
 <script>
 "use strict";
 (function () {
+
+// A direct file open cannot reach the Mac runtime. It used to silently fall
+// back to canned lanes and replies, making a dead connection look real.
+// Redirect normal file opens to the live Deck; the showcase is opt-in only.
+const DEMO_MODE = new URLSearchParams(location.search).get('demo') === '1';
+if (location.protocol === 'file:' && !DEMO_MODE) {
+  location.replace('https://speak.air.local/');
+  return;
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Content
@@ -430,13 +487,17 @@ applyOverrides(overridesFromQuery(Q));
 const S = {
   lane: 1,
   lanes: null,
-  assign: false,
   host: null,
   catalog: [],
   catalogError: null,
-  picker: null,
-  pickerQuery: '',
-  threads: LANES.map(l => l.thread.map(m => Object.assign({}, m))),
+  setupOpen: false,
+  setupLane: 0,
+  setupQuery: '',
+  setupPending: false,
+  setupNotice: '',
+  setupTone: 'ok',
+  setupExpanded: {},
+  threads: DEMO_MODE ? LANES.map(l => l.thread.map(m => Object.assign({}, m))) : LANES.map(() => []),
   playing: null,
   paused: false,
   pos: 0,
@@ -445,13 +506,13 @@ const S = {
   autoplay: true,
   listening: false,
   expanded: {},
-  confirm: 'READY · LANE 02',
-  trace: [
+  confirm: DEMO_MODE ? 'DEMO · LANE 02' : 'CONNECTING TO MAC',
+  trace: DEMO_MODE ? [
     { at: '19:49:40', kind: 'TASK CONTEXT', detail: 'Secure companion transport' },
     { at: '19:49:06', kind: 'LANE SELECTED', detail: '02 · Hudson' },
     { at: '19:49:06', kind: 'ROUTE CHANGE', detail: 'link ok · mac state simulated' },
     { at: '19:49:06', kind: 'SESSION OPENED', detail: 'local deck · simulated route' }
-  ]
+  ] : [{ at: clock(), kind: 'LINK', detail: 'waiting for the SpeakEasy runtime' }]
 };
 
 const lane = () => laneMeta(S.lane);
@@ -464,7 +525,22 @@ function laneMeta(i) {
       num: l.num, name: l.name, title: l.title, state: l.state,
       task: l.title,
       rev: thread ? 'THREAD ' + thread.toUpperCase() : 'NEW SESSION',
-      voice: l.name + ' Voice', thread: LANES[i] ? LANES[i].thread : []
+      voice: l.name + ' Voice', thread: LANES[i] ? LANES[i].thread : [],
+      project: l.project || baseName(l.cwd) || 'Codex',
+      cwd: l.cwd || '', branch: l.branch || '', updatedAt: l.updatedAt || 0
+    };
+  }
+  if (!DEMO_MODE) {
+    return {
+      num: String(i + 1).padStart(2, '0'),
+      name: 'LANE ' + (i + 1),
+      title: 'Not connected',
+      state: 'empty',
+      task: 'Waiting for the Mac runtime',
+      rev: 'OFFLINE',
+      voice: 'Local voice',
+      project: 'Codex', cwd: '', branch: '', updatedAt: 0,
+      thread: []
     };
   }
   return LANES[i];
@@ -500,6 +576,11 @@ function ago(ms) {
 }
 function baseName(p) {
   return (p || '').split('/').filter(Boolean).pop() || '';
+}
+function compact(text, limit) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (clean.length <= limit) return clean;
+  return clean.slice(0, Math.max(1, limit - 1)).replace(/\s+\S*$/, '') + '…';
 }
 function sentences(text) {
   return (text.match(/[^.;]+[.;]?/g) || [text]).map(t => t.trim()).filter(Boolean);
@@ -552,11 +633,14 @@ function spark(seed, active) {
 let live = null;
 let liveRev = -1;
 let intentId = 0;
+const intentAcks = new Map();
 const liveToken = (location.hash.match(/(?:^|#|&)k=([a-f0-9]{8,})/) || [])[1] || '';
 
-function sendIntent(name, args) {
+function sendIntent(name, args, onAck) {
   if (!live || live.readyState !== 1) return false;
-  live.send(JSON.stringify(Object.assign({ type: 'intent', id: ++intentId, name: name }, args || {})));
+  const id = ++intentId;
+  if (onAck) intentAcks.set(id, onAck);
+  live.send(JSON.stringify(Object.assign({ type: 'intent', id: id, name: name }, args || {})));
   return true;
 }
 
@@ -671,13 +755,14 @@ function demoRestore() {
   paint();
 }
 
-// Speech recognition lives in the browser (HTTPS required). Recognition may
-// use the browser vendor's speech service; the Mac only ever receives text.
-// Each hold gets its own state record — an old recognizer can never leak
-// results into a new capture, and `settling` blocks a new hold until the
-// previous one has fully finalized.
+// Each device owns its microphone. Browsers record mono PCM WAV and hand the
+// short recording to the paired Mac's local Parakeet engine. Native shells
+// can use Apple Speech as a fast path and fall back through the same endpoint.
+// Web Speech remains a compatibility fallback for older browsers.
 let recog = null;
+let webCapture = null;
 let settling = false;
+let arming = false;
 // only the input that admitted the hold may end or cancel it — pointer id or
 // 'kbd:<code>'; a rejected overlapping press owns nothing
 let holdOwner = null;
@@ -690,33 +775,146 @@ const nativeSpeech = () =>
   !!(window.speakeasyNativeTranscription ||
     (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.speakeasyDeck));
 
-function startTranscription() {
-  if (nativeSpeech()) {
-    // a native shell (the iPad app) owns the mic; results arrive via nativeTranscript
-    nativeState = { transcript: '', failed: false };
-    return;
-  }
+function startWebSpeechTranscription() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    S.confirm = 'MIC TRANSCRIPTION UNSUPPORTED';
-    paint();
-    return;
-  }
-  if (recog || settling) return;
-  const state = { transcript: '', failed: false };
+  if (!SR) return false;
+  if (recog || settling) return false;
+  const state = { transcript: '', failed: false, reason: '' };
   const r = new SR();
   recog = { r, state };
   r.lang = 'en-US';
   r.interimResults = true;
   r.continuous = false;
   r.onresult = e => {
-    // ignore stragglers from a recognizer that is no longer current
     if (!recog || recog.r !== r) return;
     state.transcript = Array.from(e.results).map(x => x[0].transcript).join(' ').trim();
     if (S.listening && state.transcript) { S.confirm = state.transcript.toUpperCase().slice(0, 40); paint(); }
   };
-  r.onerror = () => { state.failed = true; };
-  try { r.start(); } catch (_) { recog = null; state.failed = true; }
+  r.onerror = e => {
+    state.failed = true;
+    const code = String(e && e.error || 'failed');
+    state.reason = code === 'not-allowed' || code === 'service-not-allowed'
+      ? 'MICROPHONE PERMISSION REQUIRED'
+      : code === 'audio-capture'
+        ? 'MICROPHONE INPUT UNAVAILABLE'
+        : 'SPEECH RECOGNITION FAILED';
+    if (S.listening) { S.confirm = state.reason; paint(); }
+  };
+  try {
+    r.start();
+    return true;
+  } catch (_) {
+    recog = null;
+    return false;
+  }
+}
+
+async function startTranscription() {
+  if (nativeSpeech()) {
+    // a native shell (the iPad app) owns the mic; results arrive via nativeTranscript
+    nativeState = { transcript: '', failed: false, reason: '', final: false };
+    return true;
+  }
+  if (webCapture || recog || settling) {
+    S.confirm = 'MICROPHONE BUSY · TRY AGAIN';
+    paint();
+    return false;
+  }
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && AudioContext) {
+    let context = null;
+    let stream = null;
+    try {
+      context = new AudioContext();
+      await context.resume();
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+      const source = context.createMediaStreamSource(stream);
+      const processor = context.createScriptProcessor(4096, 1, 1);
+      const mute = context.createGain();
+      const frames = [];
+      mute.gain.value = 0;
+      processor.onaudioprocess = event => {
+        frames.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+      };
+      source.connect(processor);
+      processor.connect(mute);
+      mute.connect(context.destination);
+      webCapture = { context, stream, source, processor, mute, frames, sampleRate: context.sampleRate };
+      return true;
+    } catch (error) {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      if (context) try { await context.close(); } catch (_) {}
+      const name = String(error && error.name || '');
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        S.confirm = 'MICROPHONE PERMISSION REQUIRED';
+        paint();
+        return false;
+      }
+    }
+  }
+
+  if (startWebSpeechTranscription()) return true;
+  S.confirm = 'MIC UNSUPPORTED · USE SAFARI, CHROME, OR THE IPAD APP';
+  paint();
+  return false;
+}
+
+function encodeWav(frames, sampleRate) {
+  const samples = frames.reduce((total, frame) => total + frame.length, 0);
+  const buffer = new ArrayBuffer(44 + samples * 2);
+  const view = new DataView(buffer);
+  const ascii = (offset, text) => { for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i)); };
+  ascii(0, 'RIFF');
+  view.setUint32(4, 36 + samples * 2, true);
+  ascii(8, 'WAVE'); ascii(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true); ascii(36, 'data');
+  view.setUint32(40, samples * 2, true);
+  let offset = 44;
+  for (const frame of frames) {
+    for (let i = 0; i < frame.length; i++) {
+      const value = Math.max(-1, Math.min(1, frame[i]));
+      view.setInt16(offset, value < 0 ? value * 0x8000 : value * 0x7fff, true);
+      offset += 2;
+    }
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+async function finishWebCapture(abort, done) {
+  const capture = webCapture;
+  webCapture = null;
+  capture.processor.onaudioprocess = null;
+  try { capture.source.disconnect(); capture.processor.disconnect(); capture.mute.disconnect(); } catch (_) {}
+  capture.stream.getTracks().forEach(track => track.stop());
+  try { await capture.context.close(); } catch (_) {}
+  if (abort) { done({ transcript: '', failed: false, reason: '' }); return; }
+  if (!capture.frames.length) { done({ transcript: '', failed: true, reason: 'NO AUDIO CAPTURED · TRY AGAIN' }); return; }
+
+  S.confirm = 'TRANSCRIBING LOCALLY';
+  paint();
+  try {
+    const query = liveToken ? '?k=' + encodeURIComponent(liveToken) : '';
+    const response = await fetch('/api/transcribe' + query, {
+      method: 'POST',
+      headers: { 'content-type': 'audio/wav' },
+      body: encodeWav(capture.frames, capture.sampleRate)
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok || !result.text) throw new Error(result.error || 'LOCAL TRANSCRIPTION FAILED');
+    done({ transcript: String(result.text).trim(), failed: false, reason: '' });
+  } catch (error) {
+    done({
+      transcript: '',
+      failed: true,
+      reason: String(error && error.message || 'LOCAL TRANSCRIPTION FAILED').toUpperCase().slice(0, 60)
+    });
+  }
 }
 
 // stop() delivers final results asynchronously — the recognizer stays current
@@ -724,6 +922,7 @@ function startTranscription() {
 function stopTranscription(abort, done) {
   if (nativeSpeech()) {
     if (abort) { done({ transcript: '', failed: false }); return; }
+    if (nativeState.final) { done(nativeState); return; }
     // the native shell posts its final result via nativeTranscript; settle on
     // that, or quickly on the latest partial so release never feels sticky
     nativeFinish = done;
@@ -733,7 +932,11 @@ function stopTranscription(abort, done) {
         nativeFinish = null;
         f(nativeState);
       }
-    }, 800);
+    }, 180000);
+    return;
+  }
+  if (webCapture) {
+    void finishWebCapture(abort, done);
     return;
   }
   if (!recog) { done({ transcript: '', failed: true }); return; }
@@ -753,7 +956,7 @@ function stopTranscription(abort, done) {
 
 // Native transcription channel — the iPad app pushes partial and final
 // transcripts here (see deck/ipad/Sources/SpeechCapture.swift).
-let nativeState = { transcript: '', failed: false };
+let nativeState = { transcript: '', failed: false, reason: '', final: false };
 let nativeFinish = null;
 
 let everEstablished = false; // once live, keep trying to come back
@@ -766,15 +969,31 @@ function bootLive() {
     let msg;
     try { msg = JSON.parse(e.data); } catch (_) { return; }
     if (msg.type === 'snapshot') applySnapshot(msg);
-    else if (msg.type === 'ack' && msg.ok === false) {
-      S.confirm = (msg.error || 'rejected').toUpperCase().slice(0, 40);
-      paint();
+    else if (msg.type === 'ack') {
+      const onAck = intentAcks.get(msg.id);
+      if (onAck) {
+        intentAcks.delete(msg.id);
+        onAck(msg);
+      }
+      if (msg.ok === false) {
+        S.confirm = (msg.error || 'rejected').toUpperCase().slice(0, 40);
+        paint();
+      }
     }
   };
   ws.onclose = () => {
     const wasLive = live === ws;
     live = null;
-    if (wasLive) demoRestore();
+    intentAcks.clear();
+    S.setupPending = false;
+    if (wasLive) {
+      if (DEMO_MODE) demoRestore();
+      else {
+        S.listening = false;
+        S.confirm = 'CONNECTION LOST · RETRYING';
+        paint();
+      }
+    }
     // only retry a link that once worked — a demo surface stays quiet
     if (everEstablished) setTimeout(bootLive, 3000);
   };
@@ -820,22 +1039,42 @@ function setVol(clientX, rect) {
   logEvent('NARRATION VOLUME', Math.round(S.vol * 100) + '%');
 }
 
-function holdStart(owner) {
+async function holdStart(owner) {
+  if (!live && !DEMO_MODE) {
+    S.confirm = 'MAC OFFLINE · OPEN SPEAKEASY';
+    paint();
+    return;
+  }
   if (lane().state === 'empty') return;
-  if (settling || holdOwner !== null) return; // never overlap captures
+  if (settling || arming || holdOwner !== null) return; // never overlap captures
+  holdOwner = owner;
+  if (live && live.readyState === 1) {
+    arming = true;
+    S.confirm = 'MICROPHONE STARTING';
+    paint();
+    const ready = await startTranscription();
+    arming = false;
+    // A quick release while permission/audio was starting owns no capture.
+    if (holdOwner !== owner) {
+      if (ready) stopTranscription(true, () => {});
+      return;
+    }
+    if (!ready) {
+      holdOwner = null;
+      return;
+    }
+  }
   if (sendIntent('capture.start')) {
-    holdOwner = owner;
-    startTranscription();
     host.post('capture', { phase: 'start', lane: lane().num }); // native shells listen too
     return;
   }
-  holdOwner = owner;
   S.listening = true; S.playing = null; S.confirm = 'LISTENING';
   host.post('capture', { phase: 'start', lane: lane().num });
 }
 function holdCancel(owner) {
   if (holdOwner === null || owner !== holdOwner) return;
   holdOwner = null;
+  if (arming) return;
   if (settling) return;
   settling = true;
   stopTranscription(true, () => { settling = false; });
@@ -850,17 +1089,23 @@ function holdCancel(owner) {
 function holdEnd(owner) {
   if (holdOwner === null || owner !== holdOwner) return;
   holdOwner = null;
+  if (arming) return;
   if (live) {
+    const usesNativeCapture = nativeSpeech();
+    // Native owns the recorder, so release it before waiting for the final
+    // transcript. Posting this after the transcript creates a deadlock: the
+    // shell cannot finalize until it receives the release phase.
+    if (usesNativeCapture) host.post('capture', { phase: 'end', lane: lane().num });
     settling = true;
     stopTranscription(false, (state) => {
       settling = false;
       if (state.transcript && !state.failed) {
         sendIntent('capture.end', { text: state.transcript });
-        host.post('capture', { phase: 'end', lane: lane().num });
+        if (!usesNativeCapture) host.post('capture', { phase: 'end', lane: lane().num });
       } else {
         // never silently run a fallback prompt — the reason reaches the runtime
-        sendIntent('capture.cancel', { reason: state.failed ? 'SPEECH ERROR · TRY AGAIN' : 'NO SPEECH · TRY AGAIN' });
-        host.post('capture', { phase: 'cancel', lane: lane().num });
+        sendIntent('capture.cancel', { reason: state.failed ? (state.reason || 'SPEECH ERROR · TRY AGAIN') : 'NO SPEECH · TRY AGAIN' });
+        if (!usesNativeCapture) host.post('capture', { phase: 'cancel', lane: lane().num });
       }
     });
     return;
@@ -1005,24 +1250,65 @@ function view() {
     };
   });
 
-  // ── mapper catalog: bound-lane state + term-wise search (Talkie-style) ──
-  // identity is the full thread id — the 8-char alias is display-only.
-  // only the nine worker lanes are mappable; the overview lane is deck-owned.
+  // ── lane setup: all nine bindings + term-wise thread search ──
+  // Identity is the full thread id — the 8-char alias is display-only. Only
+  // the nine worker lanes are configurable; overview remains deck-owned.
   const laneThreads = (S.lanes || []).slice(0, 9).map(l => l.threadId || null);
-  const pTerms = (S.pickerQuery || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const setupTerms = (S.setupQuery || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   const allRows = (S.catalog || []).map(t => {
     const alias = String(t.id).replace(/-/g, '').slice(-8);
+    const project = t.project || baseName(t.cwd) || 'Codex';
     return {
       id: t.id,
       snippet: t.snippet,
+      preview: t.preview || '',
+      project: project,
+      pinned: !!t.isPinned,
       boundLane: laneThreads.indexOf(t.id),
-      meta: (baseName(t.cwd) || 'codex') + ' · ' + ago(t.at) + (t.originator === 'openscout-agent-sessions' ? ' · deck' : '') + ' · ' + alias,
-      hay: (t.snippet + '\n' + (t.cwd || '') + '\n' + t.id).toLowerCase()
+      meta: ago(t.at) + ' · ' + alias,
+      hay: (project + '\n' + t.snippet + '\n' + (t.preview || '') + '\n' + (t.cwd || '') + '\n' + t.id).toLowerCase()
     };
   });
-  const catalogRows = pTerms.length ? allRows.filter(r => pTerms.every(term => r.hay.indexOf(term) !== -1)) : allRows;
-  const currentThread = S.picker != null ? laneThreads[S.picker] : null;
-  const currentRow = currentThread ? allRows.find(r => r.id === currentThread) : null;
+  const matchedRows = setupTerms.length ? allRows.filter(r => setupTerms.every(term => r.hay.indexOf(term) !== -1)) : allRows;
+  // Mirror the Codex sidebar: project folders in recency order, then their
+  // task titles in recency order. The first occurrence defines project order.
+  const projectOrder = [];
+  matchedRows.forEach(row => { if (projectOrder.indexOf(row.project) === -1) projectOrder.push(row.project); });
+  const catalogRows = projectOrder.flatMap(project => {
+    const rows = matchedRows.filter(row => row.project === project);
+    const visible = setupTerms.length || S.setupExpanded[project] || rows.length <= 5 ? rows : rows.slice(0, 5);
+    const output = visible.map((row, i) => Object.assign({}, row, { showProject: i === 0 }));
+    if (visible.length < rows.length) {
+      output.push({
+        kind: 'more', project: project, remaining: rows.length - visible.length,
+        id: '', snippet: '', preview: '', pinned: false, boundLane: -1, meta: '', hay: '', showProject: false
+      });
+    }
+    return output;
+  });
+  const setupLane = Math.max(0, Math.min(8, Number(S.setupLane) || 0));
+  const setupCurrentThread = laneThreads[setupLane];
+  const setupCurrentLane = S.lanes && S.lanes[setupLane];
+  const setupLaneRows = Array.from({ length: 9 }, (_, i) => {
+    const ln = S.lanes && S.lanes[i];
+    const threadId = laneThreads[i];
+    const alias = threadId ? String(threadId).replace(/-/g, '').slice(-8).toUpperCase() : '';
+    return {
+      i: i,
+      num: String(i + 1).padStart(2, '0'),
+      selected: i === setupLane,
+      bound: !!threadId,
+      title: ln && ln.title ? ln.title : 'New Codex session on first ask',
+      status: threadId ? 'THREAD ' + alias : 'FRESH SESSION'
+    };
+  });
+
+  const recentMessage = thread().length ? thread()[thread().length - 1] : null;
+  const recentActivity = recentMessage
+    ? (recentMessage.role === 'you' ? 'YOU ASKED · ' : 'CODEX REPLIED · ') + compact(recentMessage.text, 112)
+    : l.updatedAt
+      ? 'TASK UPDATED ' + ago(l.updatedAt).toUpperCase()
+      : 'NO TURNS ON THIS LANE YET';
 
   return {
     pads: pads, messages: messages, traceOn: PROPS.showTrace,
@@ -1036,6 +1322,10 @@ function view() {
     laneNum: l.num,
     laneTitle: l.title,
     laneRev: l.rev,
+    laneProject: l.project || 'Codex',
+    lanePath: l.cwd || 'Assigned when this lane starts',
+    laneBranch: l.branch || (l.cwd ? 'Not a Git checkout' : 'Unassigned'),
+    recentActivity: recentActivity,
     volPct: Math.round(S.vol * 100) + '%',
     volLabel: Math.round(S.vol * 100) + '%',
     speedLabel: speed.toFixed(2) + '×',
@@ -1047,9 +1337,16 @@ function view() {
     micEdge: S.listening ? T('mic-edge') : T('mic-a'),
     confirmLine: S.confirm,
     overviewActive: live && S.lane === 9,
-    pickerLane: S.picker,
-    pickerQuery: S.pickerQuery,
-    pickerCurrent: currentRow ? currentRow.snippet : (currentThread ? 'thread ' + String(currentThread).replace(/-/g, '').slice(-8) : null),
+    setupOpen: S.setupOpen,
+    setupLane: setupLane,
+    setupLaneRows: setupLaneRows,
+    setupQuery: S.setupQuery,
+    setupCurrentThread: setupCurrentThread,
+    setupCurrent: setupCurrentLane && setupCurrentThread ? setupCurrentLane.title : 'Fresh session on first ask',
+    setupPending: S.setupPending,
+    setupNotice: S.setupNotice,
+    setupTone: S.setupTone,
+    catalogMatchTotal: matchedRows.length,
     catalogTotal: allRows.length,
     catalogError: S.catalogError,
     catalogRows: catalogRows
@@ -1096,6 +1393,13 @@ function tpl(v) {
           '<div style="font:400 9px var(--se-mono);letter-spacing:0.18em;color:var(--se-ink-3);margin-top:2px;">' + (live ? 'SPEAKEASY' : 'LOCAL DEMO') + '</div>' +
         '</div>' +
       '</div>' +
+      '<div style="display:flex;align-items:center;gap:9px;">' +
+        '<span style="display:flex;align-items:center;gap:7px;font:500 8px var(--se-mono);letter-spacing:0.14em;color:var(--se-ink-3);">' +
+          '<span style="width:6px;height:6px;border-radius:50%;background:' + (live ? 'var(--se-accent)' : 'var(--se-ink-4)') + ';box-shadow:' + (live ? '0 0 7px var(--se-accent-ring)' : 'none') + ';"></span>' +
+          (live ? 'MAC LIVE' : 'DEMO') +
+        '</span>' +
+        '<button type="button" class="se-press" data-act="setup" style="border:1px solid var(--se-accent-edge);border-radius:8px;background:var(--se-chip-bg);padding:10px 13px;font:600 9px var(--se-mono);letter-spacing:0.14em;color:var(--se-accent-ink);cursor:pointer;">SET LANES</button>' +
+      '</div>' +
     '</div>' +
 
     // ─────────── two plates ───────────
@@ -1111,10 +1415,10 @@ function tpl(v) {
         // plate masthead · mirrors the console header
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:2px 6px 12px;border-bottom:1px solid var(--se-plate-rule);flex:none;">' +
           '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.2em;color:var(--se-plate-ink-3);padding-top:4px;">PAD SURFACE</div>' +
-          '<div style="text-align:right;">' +
+          '<button type="button" data-act="setup" aria-label="Set lane assignments" style="text-align:right;border:0;background:none;cursor:pointer;">' +
             '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-pad-accent);">' + esc(v.boundLabel) + '</div>' +
             '<div style="font:400 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-plate-ink-3);margin-top:4px;">9 KEYS · USB-C</div>' +
-          '</div>' +
+          '</button>' +
         '</div>' +
 
         // encoder strip
@@ -1140,7 +1444,7 @@ function tpl(v) {
         // pads
         '<div class="se-scroll se-pads" style="display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:minmax(136px,1fr);gap:9px;flex:1;min-height:0;overflow-y:auto;padding-right:2px;color:var(--se-plate-ink-3);">' +
           v.pads.map(p =>
-            '<button type="button" class="se-press" data-act="lane" data-arg="' + p.i + '" aria-pressed="' + (p.i === S.lane) + '" aria-label="Lane ' + p.num + ', ' + esc(p.name) + ', ' + esc(p.status) + '" style="text-align:left;border-radius:9px;padding:11px 12px;display:flex;flex-direction:column;min-height:0;overflow:hidden;cursor:pointer;background:' + p.face + ';border:1.5px solid ' + p.edge + ';box-shadow:' + (S.assign ? '0 0 0 2px var(--se-accent-ring), ' : '') + p.shadow + ';">' +
+            '<button type="button" class="se-press" data-act="lane" data-arg="' + p.i + '" aria-pressed="' + (p.i === S.lane) + '" aria-label="Lane ' + p.num + ', ' + esc(p.name) + ', ' + esc(p.status) + '" style="text-align:left;border-radius:9px;padding:11px 12px;display:flex;flex-direction:column;min-height:0;overflow:hidden;cursor:pointer;background:' + p.face + ';border:1.5px solid ' + p.edge + ';box-shadow:' + p.shadow + ';">' +
               '<div style="display:flex;align-items:flex-start;justify-content:space-between;">' +
                 '<span style="font:600 17px var(--se-sans);line-height:1;color:' + p.numColor + ';">' + p.num + '</span>' +
                 '<span style="width:6px;height:6px;border-radius:50%;margin-top:4px;background:' + p.led + ';box-shadow:' + p.ledGlow + ';animation:' + p.ledAnim + ';"></span>' +
@@ -1170,7 +1474,7 @@ function tpl(v) {
             '<div style="display:flex;align-items:flex-end;gap:3px;height:28px;">' + barsHtml(12, v.listening ? T('mic-ink') : T('mic-sub-ink'), v.listening) + '</div>' +
           '</button>' +
           '<div style="display:flex;flex-direction:column;gap:6px;width:80px;flex:none;">' +
-            '<button type="button" class="se-press" data-act="ping" style="flex:1;border:1px solid var(--se-btn-edge);border-radius:8px;background:var(--se-btn-face);display:flex;align-items:center;justify-content:center;font:600 9.5px var(--se-mono);letter-spacing:0.12em;color:var(--se-btn-ink);cursor:pointer;box-shadow:var(--se-btn-sheen);">LINK</button>' +
+            '<button type="button" class="se-press" data-act="setup" style="flex:1;border:1px solid var(--se-btn-edge);border-radius:8px;background:var(--se-btn-face);display:flex;align-items:center;justify-content:center;font:600 9.5px var(--se-mono);letter-spacing:0.12em;color:var(--se-btn-ink);cursor:pointer;box-shadow:var(--se-btn-sheen);">LANES</button>' +
             '<button type="button" class="se-press" data-act="stop" style="flex:1;border:1px solid var(--se-btn-edge);border-radius:8px;background:var(--se-btn-face);display:flex;align-items:center;justify-content:center;font:600 9.5px var(--se-mono);letter-spacing:0.12em;color:var(--se-btn-ink);cursor:pointer;box-shadow:var(--se-btn-sheen);">STOP</button>' +
           '</div>' +
         '</div>' +
@@ -1178,7 +1482,7 @@ function tpl(v) {
         // action row — OVERVIEW selects the deck-owned luna lane (whole-deck view)
         '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px;flex:none;">' +
           '<button type="button" class="se-press" data-act="overview" style="' + plainBtn + (v.overviewActive ? 'border-color:var(--se-accent-edge);color:var(--se-accent-ink);background:var(--se-chip-bg);' : '') + '">OVERVIEW</button>' +
-          '<button type="button" class="se-press" data-act="ping" style="' + plainBtn + '">PING MAC</button>' +
+          '<button type="button" class="se-press" data-act="setup" style="' + plainBtn + '">SET LANES</button>' +
           '<button type="button" class="se-press" data-act="stop" style="' + plainBtn + '">CANCEL</button>' +
           '<button type="button" class="se-press" data-act="replay" style="' + plainBtn + '">REPLAY</button>' +
           '<button type="button" class="se-press" data-act="announce" style="' + plainBtn + '">ANNOUNCE</button>' +
@@ -1190,16 +1494,20 @@ function tpl(v) {
       '<div style="flex:1;min-width:0;min-height:0;background:var(--se-panel);border:1px solid var(--se-line);border-radius:var(--se-radius);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--se-panel-shadow);">' +
 
         // lane header
-        '<div style="flex:none;padding:16px 20px 14px;border-bottom:1px solid var(--se-line-soft);display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px 20px;background:var(--se-panel-head);">' +
-          '<div style="display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 14px;min-width:0;flex:1 1 260px;">' +
-            '<div>' +
-              '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.2em;color:var(--se-ink-3);">ACTIVE LANE</div>' +
-              '<div style="font-weight:600;font-size:19px;font-family:var(--se-title);line-height:1.1;letter-spacing:-0.015em;color:var(--se-ink);margin-top:3px;">' + esc(v.laneTitle) + '</div>' +
+        '<div class="se-lane-head">' +
+          '<div class="se-lane-head-main">' +
+            '<div style="min-width:0;flex:1;">' +
+              '<div style="font:500 8px var(--se-mono);letter-spacing:0.2em;color:var(--se-ink-3);">ACTIVE LANE ' + esc(v.laneNum) + '</div>' +
+              '<div class="se-lane-title">' + esc(v.laneTitle) + '</div>' +
             '</div>' +
+            '<div class="se-lane-thread">' + esc(v.laneRev) + '</div>' +
           '</div>' +
-          '<div style="text-align:right;flex:0 1 auto;min-width:0;">' +
-            '<div style="font:500 8.5px var(--se-mono);letter-spacing:0.16em;color:var(--se-accent-ink);align-self:center;padding-top:6px;display:inline-block;">' + esc(v.laneRev) + '</div>' +
+          '<div class="se-lane-identity">' +
+            '<div class="se-lane-fact"><div class="se-lane-fact-label">PROJECT</div><div class="se-lane-fact-value">' + esc(v.laneProject) + '</div></div>' +
+            '<div class="se-lane-fact"><div class="se-lane-fact-label">BRANCH</div><div class="se-lane-fact-value">' + esc(v.laneBranch) + '</div></div>' +
+            '<div class="se-lane-fact"><div class="se-lane-fact-label">PATH</div><div class="se-lane-fact-value se-sel" title="' + esc(v.lanePath) + '">' + esc(v.lanePath) + '</div></div>' +
           '</div>' +
+          '<div class="se-lane-recent"><span class="se-lane-recent-label">RECENT</span><span class="se-lane-recent-value">' + esc(v.recentActivity) + '</span></div>' +
         '</div>' +
 
         // conversation
@@ -1293,39 +1601,73 @@ function tpl(v) {
       '</div>' +
     '</div>' +
 
-    // ─────────── thread picker overlay ───────────
-    (v.pickerLane != null ?
-    '<div data-act="pickerclose" style="position:fixed;inset:0;background:rgba(24,18,10,0.42);display:flex;align-items:center;justify-content:center;z-index:60;">' +
-      '<div data-act="pickernoop" style="width:min(540px,92%);max-height:72%;background:var(--se-panel);border:1px solid var(--se-line);border-radius:12px;box-shadow:var(--se-panel-shadow);display:flex;flex-direction:column;overflow:hidden;">' +
-        '<div style="flex:none;padding:13px 18px;border-bottom:1px solid var(--se-line-soft);display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
-          '<span style="font:600 10px var(--se-mono);letter-spacing:0.16em;color:var(--se-ink);">MAP LANE ' + String(v.pickerLane + 1).padStart(2, '0') + ' TO A THREAD</span>' +
-          '<span style="font:500 8.5px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink-3);flex:none;">' + (v.pickerQuery ? v.catalogRows.length + ' / ' + v.catalogTotal + ' MATCH' : v.catalogTotal + ' RECENT') + '</span>' +
+    // ─────────── lane setup workspace ───────────
+    (v.setupOpen ?
+    '<div class="se-setup-backdrop" data-act="setupclose">' +
+      '<div class="se-setup" data-act="setupnoop" role="dialog" aria-modal="true" aria-labelledby="se-setup-title">' +
+        '<div style="flex:none;padding:17px 20px;border-bottom:1px solid var(--se-line-soft);display:flex;align-items:center;justify-content:space-between;gap:18px;background:var(--se-panel-head);">' +
+          '<div style="min-width:0;">' +
+            '<div id="se-setup-title" style="font:600 22px/1.1 var(--se-title);letter-spacing:-0.015em;color:var(--se-ink);">Set lanes</div>' +
+            '<div style="font:400 9px/1.45 var(--se-mono);letter-spacing:0.08em;color:var(--se-ink-3);margin-top:5px;">Choose a pad, then choose the Codex task it should continue.</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;flex:none;">' +
+            '<span style="font:500 8.5px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink-3);">' + esc(v.boundLabel) + '</span>' +
+            '<button type="button" class="se-press" data-act="setupclose" style="min-width:68px;border:1px solid var(--se-accent-edge);border-radius:8px;background:var(--se-chip-bg);padding:10px 13px;font:600 9px var(--se-mono);letter-spacing:0.14em;color:var(--se-accent-ink);cursor:pointer;">DONE</button>' +
+          '</div>' +
         '</div>' +
-        // current binding — one honest line about what the lane holds now
-        '<div style="flex:none;padding:8px 18px;border-bottom:1px solid var(--se-line-soft);font:500 8.5px var(--se-mono);letter-spacing:0.1em;color:' + (v.pickerCurrent ? 'var(--se-accent-ink)' : 'var(--se-ink-3)') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
-          (v.pickerCurrent ? 'CURRENT · ' + esc(v.pickerCurrent) : 'LANE ' + String(v.pickerLane + 1) + ' IS OPEN — PICK A THREAD BELOW') +
-        '</div>' +
-        '<div style="flex:none;padding:10px 18px 6px;">' +
-          '<input type="search" data-picker-search="1" placeholder="Search titles, paths, ids" autocomplete="off" style="width:100%;box-sizing:border-box;border:1px solid var(--se-line);border-radius:8px;background:var(--se-cell);padding:9px 12px;font:500 11px var(--se-sans);color:var(--se-ink);outline:none;" />' +
-        '</div>' +
-        (v.catalogError ?
-        '<div style="flex:none;padding:4px 18px 2px;font:500 8.5px var(--se-mono);letter-spacing:0.08em;color:var(--se-warn-ink,#b25e09);">' + esc(v.catalogError) + '</div>' : '') +
-        '<div class="se-scroll" style="overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:7px;">' +
-          '<button type="button" data-act="pick" data-arg="" style="text-align:left;border:1.5px dashed var(--se-accent-edge);border-radius:9px;background:var(--se-chip-bg);padding:11px 14px;cursor:pointer;font:600 10px var(--se-mono);letter-spacing:0.14em;color:var(--se-accent-ink);">+ FRESH SESSION</button>' +
-          v.catalogRows.map(t =>
-            '<button type="button" data-act="pick" data-arg="' + esc(t.id) + '" style="text-align:left;border:1px solid ' + (t.boundLane === v.pickerLane ? 'var(--se-accent-edge)' : 'var(--se-line)') + ';border-radius:9px;background:' + (t.boundLane === v.pickerLane ? 'var(--se-chip-bg)' : 'var(--se-cell)') + ';padding:10px 14px;cursor:pointer;">' +
-              '<div style="font:500 11.5px var(--se-sans);color:var(--se-ink);line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + esc(t.snippet) + '</div>' +
-              '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:5px;">' +
-                '<span style="font:500 8px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(t.meta) + '</span>' +
-                (t.boundLane === v.pickerLane
-                  ? '<span style="flex:none;font:700 8px var(--se-mono);letter-spacing:0.12em;color:var(--se-accent-ink);border:1px solid var(--se-accent-edge);border-radius:5px;padding:2px 6px;background:var(--se-chip-bg);">CURRENT</span>'
-                  : (t.boundLane != null && t.boundLane >= 0
-                    ? '<span style="flex:none;font:700 8px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink-3);border:1px solid var(--se-line);border-radius:5px;padding:2px 6px;">LANE ' + (t.boundLane + 1) + ' · TAP TO MOVE</span>'
-                    : '')) +
+        '<div class="se-setup-body">' +
+          '<div class="se-scroll se-setup-lanes">' +
+            '<div style="padding:13px 15px 0;font:600 8px var(--se-mono);letter-spacing:0.2em;color:var(--se-ink-4);">YOUR NINE PADS</div>' +
+            '<div class="se-setup-lane-grid">' +
+              v.setupLaneRows.map(row =>
+                '<button type="button" class="se-press" data-act="setuplane" data-arg="' + row.i + '" aria-pressed="' + row.selected + '" style="min-height:58px;text-align:left;border:1px solid ' + (row.selected ? 'var(--se-accent)' : 'var(--se-line)') + ';border-radius:9px;background:' + (row.selected ? 'var(--se-chip-bg)' : 'var(--se-cell)') + ';padding:10px 11px;display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:10px;cursor:pointer;box-shadow:' + (row.selected ? '0 0 0 3px var(--se-accent-ring)' : 'var(--se-card-shadow)') + ';">' +
+                  '<span style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:' + (row.selected ? 'var(--se-accent)' : 'var(--se-player-bg)') + ';color:' + (row.selected ? 'var(--se-accent-contrast)' : 'var(--se-ink-2)') + ';font:600 12px var(--se-mono);">' + row.num + '</span>' +
+                  '<span class="se-setup-lane-copy" style="display:block;min-width:0;">' +
+                    '<span style="display:block;font:600 8px var(--se-mono);letter-spacing:0.12em;color:' + (row.bound ? 'var(--se-accent-ink)' : 'var(--se-ink-3)') + ';">' + esc(row.status) + '</span>' +
+                    '<span style="display:block;margin-top:4px;font:400 10.5px/1.25 var(--se-sans);color:var(--se-ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(row.title) + '</span>' +
+                  '</span>' +
+                '</button>').join('') +
+            '</div>' +
+            '<div class="se-setup-lane-copy" style="padding:2px 16px 16px;font:400 9px/1.55 var(--se-sans);color:var(--se-ink-3);">A task can occupy one pad. Choosing it here moves the binding; it never deletes the Codex task.</div>' +
+          '</div>' +
+          '<div class="se-setup-catalog">' +
+            '<div style="flex:none;padding:15px 17px 12px;border-bottom:1px solid var(--se-line-soft);">' +
+              '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;">' +
+                '<div style="min-width:0;">' +
+                  '<div style="font:600 9px var(--se-mono);letter-spacing:0.17em;color:var(--se-accent-ink);">PAD ' + String(v.setupLane + 1).padStart(2, '0') + '</div>' +
+                  '<div style="font:500 14px/1.35 var(--se-sans);color:var(--se-ink);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(v.setupCurrent) + '</div>' +
+                '</div>' +
+                '<span style="font:500 8px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);flex:none;padding-top:2px;">' + (v.setupQuery ? v.catalogMatchTotal + ' / ' + v.catalogTotal + ' MATCH' : v.catalogTotal + ' CODEX TASKS') + '</span>' +
               '</div>' +
-            '</button>').join('') +
-          (v.catalogRows.length === 0 ?
-          '<div style="padding:18px 8px;text-align:center;font:500 9px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink-3);">' + (v.pickerQuery ? 'NO THREADS MATCH THAT SEARCH' : 'NO RECENT CODEX THREADS YET') + '</div>' : '') +
+              '<div style="margin-top:11px;position:relative;">' +
+                '<input type="search" data-setup-search="1" placeholder="Search Codex task titles or projects" autocomplete="off" style="width:100%;box-sizing:border-box;border:1px solid var(--se-line);border-radius:9px;background:var(--se-cell);padding:11px 13px;font:500 12px var(--se-sans);color:var(--se-ink);outline:none;" />' +
+              '</div>' +
+              (v.setupNotice ? '<div role="status" style="margin-top:9px;border-radius:7px;padding:8px 10px;background:' + (v.setupTone === 'error' ? 'rgba(181,66,28,.09)' : 'var(--se-chip-bg)') + ';font:600 8.5px var(--se-mono);letter-spacing:0.08em;color:' + (v.setupTone === 'error' ? 'var(--se-accent)' : 'var(--se-accent-ink)') + ';">' + esc(v.setupNotice) + '</div>' : '') +
+              (v.catalogError ? '<div style="margin-top:8px;font:500 8px var(--se-mono);letter-spacing:0.07em;color:var(--se-accent-ink);">' + esc(v.catalogError) + '</div>' : '') +
+            '</div>' +
+            '<div class="se-scroll se-setup-results">' +
+              '<button type="button" data-act="setupassign" data-arg="" ' + (v.setupPending ? 'disabled ' : '') + 'style="min-height:62px;text-align:left;border:1.5px dashed var(--se-accent-edge);border-radius:10px;background:var(--se-chip-bg);padding:11px 14px;cursor:' + (v.setupPending ? 'wait' : 'pointer') + ';opacity:' + (v.setupPending ? '.55' : '1') + ';">' +
+                '<span style="display:block;font:600 10px var(--se-mono);letter-spacing:0.14em;color:var(--se-accent-ink);">+ FRESH SESSION</span>' +
+                '<span style="display:block;margin-top:5px;font:400 9.5px var(--se-sans);color:var(--se-ink-3);">Start a clean Codex task when you first speak to this pad.</span>' +
+              '</button>' +
+              v.catalogRows.map(t =>
+                t.kind === 'more'
+                ? '<button type="button" data-act="setupmore" data-arg="' + esc(t.project) + '" style="width:100%;border:0;background:none;padding:7px 12px 10px;text-align:left;font:600 8.5px var(--se-mono);letter-spacing:0.1em;color:var(--se-accent-ink);cursor:pointer;">SHOW ' + t.remaining + ' MORE IN ' + esc(String(t.project).toUpperCase()) + ' ↓</button>'
+                : (t.showProject ? '<div style="display:flex;align-items:center;gap:9px;padding:11px 4px 2px;font:600 9px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink-3);"><span aria-hidden="true">▱</span>' + esc(t.project) + '<span style="height:1px;background:var(--se-line-soft);flex:1;"></span></div>' : '') +
+                '<button type="button" data-act="setupassign" data-arg="' + esc(t.id) + '" ' + (v.setupPending ? 'disabled ' : '') + 'style="width:100%;min-width:0;min-height:62px;overflow:hidden;text-align:left;border:1px solid ' + (t.boundLane === v.setupLane ? 'var(--se-accent-edge)' : 'var(--se-line)') + ';border-radius:10px;background:' + (t.boundLane === v.setupLane ? 'var(--se-chip-bg)' : 'var(--se-cell)') + ';padding:11px 14px;cursor:' + (v.setupPending ? 'wait' : 'pointer') + ';opacity:' + (v.setupPending ? '.55' : '1') + ';box-shadow:var(--se-card-shadow);">' +
+                  '<span title="' + esc(t.snippet) + '" style="display:block;min-width:0;font:500 12.5px/1.35 var(--se-sans);color:var(--se-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(t.snippet) + '</span>' +
+                  '<span style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px;">' +
+                    '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 8px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);">' + (t.pinned ? 'PINNED · ' : '') + esc(t.meta) + '</span>' +
+                    (t.boundLane === v.setupLane
+                      ? '<span style="flex:none;font:700 8px var(--se-mono);letter-spacing:0.12em;color:var(--se-accent-ink);border:1px solid var(--se-accent-edge);border-radius:5px;padding:3px 7px;">CURRENT</span>'
+                      : (t.boundLane != null && t.boundLane >= 0
+                        ? '<span style="flex:none;font:700 8px var(--se-mono);letter-spacing:0.1em;color:var(--se-ink-3);border:1px solid var(--se-line);border-radius:5px;padding:3px 7px;">LANE ' + (t.boundLane + 1) + ' · MOVE</span>'
+                        : '<span style="flex:none;font:600 8px var(--se-mono);letter-spacing:0.1em;color:var(--se-accent-ink);">CHOOSE →</span>')) +
+                  '</span>' +
+                '</button>').join('') +
+              (v.catalogRows.length === 0 ? '<div style="padding:28px 8px;text-align:center;font:500 9px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink-3);">' + (v.setupQuery ? 'NO CODEX TASKS MATCH THAT SEARCH' : 'NO CODEX TASKS YET') + '</div>' : '') +
+            '</div>' +
+          '</div>' +
         '</div>' +
       '</div>' +
     '</div>' : '') +
@@ -1432,16 +1774,7 @@ window.addEventListener('pagehide', () => { if (timer !== null) { clearInterval(
 // ────────────────────────────────────────────────────────────────────────────
 
 const ACTIONS = {
-  // in map mode, a pad tap opens the thread picker for that pad
-  lane: a => {
-    if (S.assign) {
-      S.picker = Number(a);
-      S.pickerQuery = '';
-      paint();
-      return;
-    }
-    selectLane(Number(a));
-  },
+  lane: a => selectLane(Number(a)),
   play: a => togglePlay(a),
   expand: a => toggleExpand(a),
   speed: () => cycleSpeed(),
@@ -1449,39 +1782,79 @@ const ACTIONS = {
   stop: () => stopAll(),
   replay: () => replayLast(),
   announce: () => announce(),
-  // pick a thread for the pad whose picker is open ('' = fresh session)
-  pick: a => {
-    const ix = S.picker;
-    S.picker = null;
-    S.assign = false;
-    S.pickerQuery = '';
-    if (ix == null) { paint(); return; }
-    // re-affirming the lane's own binding is a no-op — no new session needed
-    const cur = live && S.lanes && S.lanes[ix] && S.lanes[ix].threadId;
-    if (a && cur && a === cur) { paint(); return; }
-    sendIntent('lane.assign', { index: ix, threadId: a || null });
-  },
-  pickerclose: () => { S.picker = null; S.pickerQuery = ''; paint(); },
-  // taps inside the dialog body (search field, padding) must not close it
-  pickernoop: () => {},
-  // LINK arms the thread mapper in live mode; a simulated ping in demo
-  ping: () => {
-    if (live) {
-      S.assign = !S.assign;
-      S.picker = null;
-      if (S.assign) sendIntent('catalog.refresh');
-      S.confirm = S.assign ? 'TAP A PAD TO MAP A THREAD' : 'READY';
+  setup: () => {
+    if (!live) {
+      S.confirm = 'SET LANES NEEDS A LIVE MAC';
       paint();
-    } else {
-      pingMac();
+      return;
     }
+    S.setupOpen = true;
+    S.setupLane = S.lane >= 0 && S.lane < 9 ? S.lane : 0;
+    S.setupQuery = '';
+    S.setupNotice = 'SYNCING WITH CODEX…';
+    S.setupTone = 'ok';
+    sendIntent('catalog.refresh', {}, ack => {
+      if (!S.setupOpen) return;
+      S.setupNotice = ack.ok ? '' : (ack.error || 'Could not refresh Codex tasks.');
+      S.setupTone = ack.ok ? 'ok' : 'error';
+      paint();
+    });
+    paint();
+  },
+  setupclose: () => {
+    S.setupOpen = false;
+    S.setupQuery = '';
+    S.setupNotice = '';
+    paint();
+  },
+  // Taps inside the setup workspace must not bubble to its backdrop action.
+  setupnoop: () => {},
+  setuplane: a => {
+    const index = Number(a);
+    if (!Number.isInteger(index) || index < 0 || index > 8) return;
+    S.setupLane = index;
+    S.setupNotice = '';
+    paint();
+  },
+  setupmore: a => {
+    S.setupExpanded[a] = true;
+    paint();
+  },
+  setupassign: a => {
+    if (S.setupPending) return;
+    const index = S.setupLane;
+    const current = S.lanes && S.lanes[index] && S.lanes[index].threadId;
+    if (a && current === a) {
+      S.setupNotice = 'PAD ' + String(index + 1).padStart(2, '0') + ' ALREADY CONTINUES THIS TASK';
+      S.setupTone = 'ok';
+      paint();
+      return;
+    }
+    const task = a ? (S.catalog || []).find(t => t.id === a) : null;
+    const label = task ? task.snippet : 'Fresh session on first ask';
+    S.setupPending = true;
+    S.setupNotice = 'SETTING PAD ' + String(index + 1).padStart(2, '0') + '…';
+    S.setupTone = 'ok';
+    const sent = sendIntent('lane.assign', { index: index, threadId: a || null }, ack => {
+      S.setupPending = false;
+      S.setupNotice = ack.ok
+        ? 'PAD ' + String(index + 1).padStart(2, '0') + ' → ' + label
+        : (ack.error || 'The lane could not be changed.');
+      S.setupTone = ack.ok ? 'ok' : 'error';
+      paint();
+    });
+    if (!sent) {
+      S.setupPending = false;
+      S.setupNotice = 'THE MAC CONNECTION WAS LOST';
+      S.setupTone = 'error';
+    }
+    paint();
   },
   openmac: () => openMac(),
   // the deck-owned overview lane (index 9): fast luna answers about the whole system
   overview: () => {
     if (live) {
-      S.assign = false;
-      S.picker = null;
+      S.setupOpen = false;
       sendIntent('lane.select', { index: 9 });
     } else {
       S.confirm = 'OVERVIEW NEEDS A LIVE LINK';
@@ -1495,6 +1868,11 @@ root.addEventListener('click', e => {
   if (!el) return;
   const act = el.dataset.act;
   const arg = el.dataset.arg;
+  if (!live && !DEMO_MODE && act !== 'setupclose' && act !== 'setupnoop') {
+    S.confirm = 'MAC OFFLINE · OPEN SPEAKEASY';
+    paint();
+    return;
+  }
   const keyboard = e.detail === 0; // keyboard activation carries no pointer coordinates
   if (act === 'scrub') {
     if (keyboard) { if (!sendIntent('playback.scrub', { id: arg, frac: 0 })) { S.pos = 0; S.playing = arg; } }
@@ -1514,12 +1892,12 @@ root.addEventListener('click', e => {
   paint();
 });
 
-// Picker search: keyed input updates the query and repaints. The morph keeps
+// Setup search: keyed input updates the query and repaints. The morph keeps
 // the input node (attrs unchanged), so value and focus survive the repaint.
 root.addEventListener('input', e => {
-  const el = e.target.closest ? e.target.closest('[data-picker-search]') : null;
+  const el = e.target.closest ? e.target.closest('[data-setup-search]') : null;
   if (!el) return;
-  S.pickerQuery = el.value;
+  S.setupQuery = el.value;
   paint();
 });
 
@@ -1570,7 +1948,16 @@ root.addEventListener('keyup', e => {
   paint();
 });
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && holdOwner !== null) { holdCancel(holdOwner); paint(); }
+  if (e.key !== 'Escape') return;
+  if (S.setupOpen) {
+    S.setupOpen = false;
+    S.setupQuery = '';
+    S.setupNotice = '';
+    paint();
+  } else if (holdOwner !== null) {
+    holdCancel(holdOwner);
+    paint();
+  }
 });
 
 // Back/forward navigation gestures are on by default in HudWebView; nothing in
@@ -1586,8 +1973,12 @@ window.speakeasyDeck = {
   state: () => ({ lane: S.lane, playing: S.playing, confirm: S.confirm, theme: seedName, overrides: seedOverrides }),
   // native shells (the iPad app) push transcripts here: partial updates paint
   // the confirm bar, final ones settle the pending capture
-  nativeTranscript: (text, isFinal) => {
+  nativeTranscript: (text, isFinal, failure) => {
     nativeState.transcript = String(text || '');
+    nativeState.failed = !!failure;
+    nativeState.reason = failure ? String(failure) : '';
+    nativeState.final = !!isFinal;
+    if (S.listening && nativeState.failed) { S.confirm = nativeState.reason; paint(); }
     if (S.listening && nativeState.transcript) { S.confirm = nativeState.transcript.toUpperCase().slice(0, 40); paint(); }
     if (isFinal && nativeFinish) {
       const f = nativeFinish;

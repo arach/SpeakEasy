@@ -12,10 +12,17 @@ BUNDLE_NAME="SpeakEasy.app"
 DMG_NAME="SpeakEasy.dmg"
 BUNDLE="$DIST_DIR/$BUNDLE_NAME"
 VERSION="${1:-$(speakeasy_default_version)}"
+DMG_PATH="$DIST_DIR/$DMG_NAME"
+DMG_BUILD_PATH="$DIST_DIR/.SpeakEasy-$VERSION.build.dmg"
 
 SKIP_SIGN="${SPEAKEASY_SKIP_SIGN:-0}"
 SKIP_NOTARIZE="${SPEAKEASY_SKIP_NOTARIZE:-0}"
 NOTARY_PROFILE="${SPEAKEASY_NOTARY_PROFILE:-notarytool-air}"
+
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Error: Release version must be numeric (for example 0.2.18): $VERSION" >&2
+    exit 1
+fi
 
 if [ "$SKIP_SIGN" != "1" ]; then
     if [ -z "${SPEAKEASY_SIGN_IDENTITY:-}" ] && [ -z "$(speakeasy_default_sign_identity || true)" ]; then
@@ -43,6 +50,8 @@ if ! swift build -c release 2>&1 | tee "$build_log"; then
 fi
 rm -f "$build_log"
 
+speakeasy_build_deck_runtime "$APP_ROOT"
+
 echo "==> Creating app bundle..."
 mkdir -p "$DIST_DIR"
 speakeasy_bundle_app "$APP_ROOT" "$BUNDLE"
@@ -57,45 +66,56 @@ fi
 
 echo "==> Creating DMG..."
 DMG_STAGING="$(mktemp -d)"
-cp -R "$BUNDLE" "$DMG_STAGING/"
+cleanup() {
+    rm -rf "$DMG_STAGING"
+    rm -f "$DMG_BUILD_PATH"
+}
+trap cleanup EXIT
+
+ditto "$BUNDLE" "$DMG_STAGING/$BUNDLE_NAME"
 ln -s /Applications "$DMG_STAGING/Applications"
 
+rm -f "$DMG_PATH" "$DMG_BUILD_PATH"
 hdiutil create \
     -volname "SpeakEasy" \
     -srcfolder "$DMG_STAGING" \
     -ov \
     -format UDZO \
-    "$DIST_DIR/$DMG_NAME"
+    "$DMG_BUILD_PATH"
 
-rm -rf "$DMG_STAGING"
+mv "$DMG_BUILD_PATH" "$DMG_PATH"
 
 if [ "$SKIP_SIGN" = "1" ]; then
     echo "==> Skipping DMG signing because SPEAKEASY_SKIP_SIGN=1"
 elif [ -n "${SPEAKEASY_SIGN_IDENTITY:-$(speakeasy_default_sign_identity || true)}" ]; then
     SIGN_IDENTITY="${SPEAKEASY_SIGN_IDENTITY:-$(speakeasy_default_sign_identity)}"
     echo "==> Signing DMG..."
-    codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DIST_DIR/$DMG_NAME"
+    codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_PATH"
 fi
 
 if [ "$SKIP_NOTARIZE" = "1" ] || [ "$SKIP_SIGN" = "1" ]; then
     echo "==> Skipping notarization"
 else
     echo "==> Submitting for notarization..."
-    xcrun notarytool submit "$DIST_DIR/$DMG_NAME" \
+    xcrun notarytool submit "$DMG_PATH" \
         --keychain-profile "$NOTARY_PROFILE" \
         --wait
 
     echo "==> Stapling notarization ticket..."
-    xcrun stapler staple "$DIST_DIR/$DMG_NAME"
-    xcrun stapler validate "$DIST_DIR/$DMG_NAME"
+    xcrun stapler staple "$DMG_PATH"
+    xcrun stapler validate "$DMG_PATH"
 fi
 
 echo ""
-echo "==> Done: $DIST_DIR/$DMG_NAME"
-ls -lh "$DIST_DIR/$DMG_NAME"
-if [ "$SKIP_SIGN" != "1" ]; then
-    spctl --assess --type open --context context:primary-signature -v "$DIST_DIR/$DMG_NAME"
-fi
+echo "==> Verifying release artifact..."
+SPEAKEASY_EXPECT_NOTARIZED="$([ "$SKIP_SIGN" != "1" ] && [ "$SKIP_NOTARIZE" != "1" ] && echo 1 || echo 0)" \
+    "$SCRIPT_DIR/verify-dmg.sh" "$DMG_PATH" "$VERSION"
+
+shasum -a 256 "$DMG_PATH" | sed "s#  .*#  $DMG_NAME#" > "$DIST_DIR/SpeakEasy.sha256"
+
+echo ""
+echo "==> Done: $DMG_PATH"
+ls -lh "$DMG_PATH" "$DIST_DIR/SpeakEasy.sha256"
 
 echo ""
 echo "To ship:"

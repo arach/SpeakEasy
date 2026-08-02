@@ -1,9 +1,16 @@
 import { EventEmitter } from 'node:events';
-import { spawn, execFile, type ChildProcess } from 'node:child_process';
+import { spawn, execFile, execFileSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, existsSync, copyFileSync, readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, openSync, readSync, closeSync } from 'node:fs';
 import { tmpdir, homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+import {
+  createDeckAgentClient,
+  deckAgentRuntimeDir,
+  type DeckAgentClient,
+  type DeckAgentClientOptions,
+} from './deck-agent-client.js';
+import { displayCodexThreadTitle, listCodexThreadReferences } from './codex-thread-catalog.js';
 
 /** execFile as a promise, capturing stdout, with a hard timeout. */
 function run(cmd: string, args: string[], timeout: number): Promise<string> {
@@ -13,6 +20,28 @@ function run(cmd: string, args: string[], timeout: number): Promise<string> {
       else resolve(stdout);
     });
   });
+}
+
+/** Best-effort branch identity for a task workspace. A detached checkout is
+ * still useful identity, so fall back to its short commit instead of hiding it. */
+function gitBranchFor(cwd: string): string {
+  if (!cwd) return '';
+  try {
+    const branch = execFileSync('git', ['-C', cwd, 'branch', '--show-current'], {
+      encoding: 'utf8',
+      timeout: 1_500,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (branch) return branch;
+    const commit = execFileSync('git', ['-C', cwd, 'rev-parse', '--short', 'HEAD'], {
+      encoding: 'utf8',
+      timeout: 1_500,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return commit ? `detached @ ${commit}` : '';
+  } catch {
+    return '';
+  }
 }
 
 export interface DeckMessage {
@@ -37,9 +66,15 @@ export interface DeckTraceEntry {
 export interface DeckThreadInfo {
   id: string;
   cwd: string;
+  /** Exact user-facing task title from Codex app-server. */
   snippet: string;
+  /** Original first-message preview; useful for search without replacing title. */
+  preview?: string;
+  /** Exact project label from the Codex app when available. */
+  project?: string;
   at: number;
   originator: string;
+  isPinned?: boolean;
 }
 
 export interface DeckLaneInfo {
@@ -51,6 +86,12 @@ export interface DeckLaneInfo {
   threadId?: string;
   /** short codex thread id, shown once the lane's session has answered (display only) */
   sessionAlias?: string;
+  /** Codex project and checkout identity, repeated on the active-lane console. */
+  project?: string;
+  cwd?: string;
+  branch?: string;
+  /** Last known task timestamp from the Codex catalog. */
+  updatedAt?: number;
 }
 
 export interface DeckSnapshot {
@@ -172,12 +213,20 @@ function parseRollout(file: string, at: number): DeckThreadInfo | null {
     if (id && snippet) break;
   }
   if (!id) return null;
-  return { id, cwd, snippet: snippet || `${path.basename(cwd)} thread`, at, originator };
+  return {
+    id,
+    cwd,
+    snippet: displayCodexThreadTitle(snippet || `${path.basename(cwd)} thread`),
+    preview: snippet,
+    project: path.basename(cwd) || 'Codex',
+    at,
+    originator,
+  };
 }
 
 /** The adapter's per-key runtime dir (mirrors codexLocalSessionPaths). */
 function laneRuntimeDir(key: string): string {
-  return path.join(homedir(), '.scout', 'local', 'codex', key.replace(/[^A-Za-z0-9._-]+/g, '_'), 'runtime');
+  return deckAgentRuntimeDir(key);
 }
 
 /** Locate and parse the rollout for a thread id — filenames carry the id. */
@@ -201,7 +250,7 @@ function findRollout(threadId: string): DeckThreadInfo | null {
 /** Recent codex threads from local rollout files, newest first. Returns null
  * when the sessions dir is unreadable, so the caller can keep its stale list —
  * a stale list the user can read beats an empty one. */
-function scanCodexThreads(): DeckThreadInfo[] | null {
+function scanCodexThreadsFallback(): DeckThreadInfo[] | null {
   let names: string[];
   try {
     names = readdirSync(CODEX_SESSIONS_DIR, { recursive: true }) as string[];
@@ -257,28 +306,10 @@ const OVERVIEW_SYSTEM_PROMPT =
   'Do not use tools, do not read or write files, do not access the network. ' +
   'Plain spoken words, no lists, no code: one or two sentences for a status question, a few plain sentences for a summary.';
 
-/** Kept in a variable so the bundler leaves a native import() — the package is ESM-only. */
-const AGENT_SESSIONS_SPEC = '@openscout/agent-sessions/local';
-
-/** Minimal structural type for the agent-sessions local client, declared here
- * so the CJS build never has to resolve the ESM-only package's types. */
-interface LaneAgentClient {
-  turn(input: { input: string; timeoutMs?: number }): Promise<{ text: string; session: { id: string; nativeId?: string } }>;
-  close(): Promise<void>;
-  interrupt?(): void;
-}
-
 /** Options for the lane session factory — model/effort select a cheaper,
  * faster brain for the overview lane while workers keep the default. */
-interface LaneClientOptions {
-  harness: 'codex';
-  cwd: string;
-  reuseKey: string;
-  warmth: 'lazy';
-  systemPrompt: string;
-  model?: string;
-  effort?: string;
-}
+type LaneClientOptions = DeckAgentClientOptions;
+type LaneAgentClient = DeckAgentClient;
 
 function clock(): string {
   const d = new Date();
@@ -343,6 +374,7 @@ export class DeckRuntime extends EventEmitter {
   private host = hostname().replace(/\.(local|lan)$/, '');
   private catalog: DeckThreadInfo[] = [];
   private catalogError: string | null = null;
+  private catalogRefresh: Promise<void> | null = null;
   private ticker: NodeJS.Timeout | null = null;
   private busy = false;
   private destroyed = false;
@@ -362,6 +394,69 @@ export class DeckRuntime extends EventEmitter {
   constructor() {
     super();
     this.restoreLaneBindings();
+    // Warm the exact Codex task catalog before the user opens lane setup. The
+    // explicit refresh action reuses this in-flight request if it is still busy.
+    void this.refreshThreadCatalog();
+  }
+
+  /** Copy identity from the exact Codex catalog record used for the binding.
+   * This keeps the web/iPad surface from inferring a project from task copy or
+   * accidentally showing the runtime's own checkout. */
+  private applyThreadIdentity(lane: DeckLaneInfo, info: DeckThreadInfo): void {
+    lane.title = info.snippet;
+    lane.project = info.project || path.basename(info.cwd) || 'Codex';
+    lane.cwd = info.cwd || undefined;
+    lane.branch = info.cwd ? gitBranchFor(info.cwd) || undefined : undefined;
+    lane.updatedAt = info.at;
+  }
+
+  private refreshThreadCatalog(): Promise<void> {
+    if (this.catalogRefresh) return this.catalogRefresh;
+    this.catalogRefresh = (async () => {
+      let next: DeckThreadInfo[] | null = null;
+      let fallback = false;
+      try {
+        const refs = await listCodexThreadReferences(process.cwd());
+        next = refs.map((thread) => ({
+          id: thread.id,
+          cwd: thread.cwd,
+          snippet: thread.title,
+          preview: thread.preview,
+          project: thread.project,
+          at: thread.at,
+          originator: thread.source,
+          isPinned: thread.isPinned,
+        }));
+      } catch {
+        // Older Codex builds may not have thread/list. Preserve a useful, if
+        // less polished, catalog instead of making lane setup unusable.
+        next = scanCodexThreadsFallback();
+        fallback = next !== null;
+      }
+      if (this.destroyed) return;
+      if (next) {
+        const master = this.masterThreadId();
+        this.catalog = master ? next.filter((thread) => thread.id !== master) : next;
+        this.catalogError = fallback
+          ? 'Codex task titles are unavailable — showing rollout references.'
+          : null;
+        // A catalog refresh also upgrades restored lane labels from a rollout
+        // snippet to the exact title currently shown by the Codex app.
+        for (let i = 0; i < LANE_COUNT; i++) {
+          const id = this.laneThreadId(i);
+          const match = id ? this.catalog.find((thread) => thread.id === id) : undefined;
+          if (match) this.applyThreadIdentity(this.lanes[i], match);
+        }
+      } else {
+        // Keep whatever was already visible — a stale list beats an empty one.
+        this.catalogError = 'Could not read Codex tasks — showing the last list.';
+        this.log('CATALOG FAILED', 'Codex app-server and rollout catalog unavailable');
+      }
+      this.changed();
+    })().finally(() => {
+      this.catalogRefresh = null;
+    });
+    return this.catalogRefresh;
   }
 
   /** Rebuild lane labels for persisted thread bindings — the adapter resumes
@@ -390,7 +485,9 @@ export class DeckRuntime extends EventEmitter {
       const lane = this.lanes[i];
       lane.threadId = threadId;
       lane.sessionAlias = threadId.replace(/-/g, '').slice(-8);
-      lane.title = findRollout(threadId)?.snippet ?? 'codex thread';
+      const info = findRollout(threadId);
+      if (info) this.applyThreadIdentity(lane, info);
+      else lane.title = 'codex thread';
     });
     if (rotated) this.persistLaneKeys();
   }
@@ -443,9 +540,6 @@ export class DeckRuntime extends EventEmitter {
       this.laneClients.delete(ix);
       void existing.client.close().catch(() => undefined);
     }
-    const { createLocalAgentClient } = (await import(AGENT_SESSIONS_SPEC)) as {
-      createLocalAgentClient(options: LaneClientOptions): Promise<LaneAgentClient>;
-    };
     const options: LaneClientOptions = {
       harness: 'codex',
       cwd: process.cwd(),
@@ -457,7 +551,7 @@ export class DeckRuntime extends EventEmitter {
       options.model = OVERVIEW_MODEL;
       options.effort = OVERVIEW_EFFORT;
     }
-    const client = await createLocalAgentClient(options);
+    const client = await createDeckAgentClient(options);
     // a reset or destroy during creation must not install a stale client
     const currentKey = ix === MASTER_IX ? MASTER_REUSE_KEY : this.laneKeys[ix];
     if (this.destroyed || currentKey !== key) {
@@ -552,7 +646,8 @@ export class DeckRuntime extends EventEmitter {
     lane.state = 'idle';
     if (threadId && bound) {
       const info = this.catalog.find((t) => t.id === threadId);
-      lane.title = info?.snippet ?? 'codex thread';
+      if (info) this.applyThreadIdentity(lane, info);
+      else lane.title = 'codex thread';
       lane.threadId = threadId;
       lane.sessionAlias = threadId.replace(/-/g, '').slice(-8);
       this.log('LANE ASSIGNED', `lane ${index + 1} → thread ${lane.sessionAlias}`);
@@ -570,6 +665,10 @@ export class DeckRuntime extends EventEmitter {
       lane.title = 'new codex session on first ask';
       lane.threadId = undefined;
       lane.sessionAlias = undefined;
+      lane.project = undefined;
+      lane.cwd = undefined;
+      lane.branch = undefined;
+      lane.updatedAt = undefined;
       this.log(threadId ? 'ASSIGN FAILED' : 'LANE RESET', `lane ${index + 1} → fresh session`);
     }
     this.changed();
@@ -785,18 +884,7 @@ export class DeckRuntime extends EventEmitter {
         return { ok: true, rev: this.rev };
       }
       case 'catalog.refresh': {
-        const scanned = scanCodexThreads();
-        if (scanned) {
-          // the overview lane's own thread is deck-owned — never offer it for mapping
-          const master = this.masterThreadId();
-          this.catalog = master ? scanned.filter((t) => t.id !== master) : scanned;
-          this.catalogError = null;
-        } else {
-          // keep whatever we last showed — a stale list beats an empty one
-          this.catalogError = 'Could not read the codex sessions dir — showing the last list.';
-          this.log('CATALOG FAILED', 'sessions dir unreadable · keeping stale list');
-        }
-        this.changed();
+        await this.refreshThreadCatalog();
         return { ok: true, rev: this.rev };
       }
       case 'lane.assign': {
@@ -948,6 +1036,12 @@ export class DeckRuntime extends EventEmitter {
       if (lane && thread) {
         lane.threadId = thread;
         lane.sessionAlias = thread.replace(/-/g, '').slice(-8);
+        if (!lane.cwd) {
+          lane.cwd = process.cwd();
+          lane.project = path.basename(lane.cwd) || 'Codex';
+          lane.branch = gitBranchFor(lane.cwd) || undefined;
+        }
+        lane.updatedAt = Date.now();
       }
       const text = result.text.trim();
       if (!text) throw new Error('empty reply from session');

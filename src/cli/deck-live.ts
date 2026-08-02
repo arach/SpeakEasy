@@ -1,5 +1,8 @@
 import { createServer, type IncomingMessage } from 'node:http';
-import { mkdirSync, writeFileSync, renameSync, rmSync, existsSync, chmodSync, readFileSync, statSync, createReadStream, openSync, readSync, closeSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, mkdtempSync, writeFileSync, renameSync, rmSync, existsSync, chmodSync, readFileSync, statSync, lstatSync, createReadStream, openSync, readSync, closeSync } from 'node:fs';
+import { createConnection } from 'node:net';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { CONFIG_DIR } from './constants';
@@ -7,8 +10,74 @@ import { DeckRuntime, parseIntent, type DeckSnapshot } from './deck-runtime';
 
 const DISCOVERY_FILE = path.join(CONFIG_DIR, 'deck-listener.json');
 const MAX_SPEAK_BYTES = 64 * 1024;
+const MAX_TRANSCRIBE_BYTES = 16 * 1024 * 1024;
 const MAX_WS_PAYLOAD = 16 * 1024;
 const MAX_BUFFERED = 256 * 1024;
+const PLAYER_SOCKET_PATH = '/tmp/speakeasy-player.sock';
+
+interface TranscriptionResponse {
+  protocolVersion?: number;
+  requestId?: string;
+  ok?: boolean;
+  text?: string | null;
+  engine?: string;
+  error?: string | null;
+}
+
+function requestLocalTranscription(audioPath: string): Promise<TranscriptionResponse> {
+  return new Promise((resolve, reject) => {
+    try {
+      const socketInfo = lstatSync(PLAYER_SOCKET_PATH);
+      if (!socketInfo.isSocket() || socketInfo.uid !== process.getuid?.() || (socketInfo.mode & 0o077) !== 0) {
+        reject(new Error('LOCAL TRANSCRIBER UNAVAILABLE · OPEN SPEAKEASY'));
+        return;
+      }
+    } catch {
+      reject(new Error('LOCAL TRANSCRIBER UNAVAILABLE · OPEN SPEAKEASY'));
+      return;
+    }
+
+    const requestId = randomUUID();
+    const socket = createConnection(PLAYER_SOCKET_PATH);
+    let settled = false;
+    let body = '';
+    const finish = (error?: Error, response?: TranscriptionResponse) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      socket.destroy();
+      if (error) reject(error);
+      else resolve(response ?? { ok: false, error: 'LOCAL TRANSCRIPTION FAILED' });
+    };
+    const timeout = setTimeout(() => finish(new Error('LOCAL TRANSCRIPTION TIMED OUT')), 180_000);
+
+    socket.setEncoding('utf8');
+    socket.on('connect', () => {
+      socket.write(JSON.stringify({ protocolVersion: 1, requestId, command: 'transcribe', audioPath }) + '\n');
+    });
+    socket.on('data', (chunk: string) => {
+      body += chunk;
+      if (body.length > 64 * 1024) {
+        finish(new Error('INVALID LOCAL TRANSCRIBER RESPONSE'));
+        return;
+      }
+      const newline = body.indexOf('\n');
+      if (newline < 0) return;
+      try {
+        const response = JSON.parse(body.slice(0, newline)) as TranscriptionResponse;
+        if (response.requestId?.toLowerCase() !== requestId.toLowerCase() || response.protocolVersion !== 1) {
+          finish(new Error('INVALID LOCAL TRANSCRIBER RESPONSE'));
+          return;
+        }
+        finish(undefined, response);
+      } catch {
+        finish(new Error('INVALID LOCAL TRANSCRIBER RESPONSE'));
+      }
+    });
+    socket.on('error', () => finish(new Error('LOCAL TRANSCRIBER UNAVAILABLE · OPEN SPEAKEASY')));
+    socket.on('end', () => finish(new Error('LOCAL TRANSCRIBER CLOSED EARLY')));
+  });
+}
 
 export interface DataPlane {
   dataPort: number;
@@ -123,6 +192,75 @@ export async function startDataPlane(runtime: DeckRuntime, dataPort: number, tok
       }
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       res.end(JSON.stringify(runtime.snapshot()));
+      return;
+    }
+
+    // Devices capture their own microphone as PCM WAV, then the native Mac
+    // app runs the existing local Parakeet model. The bounded upload and its
+    // owner-only temporary file are removed immediately after transcription.
+    if (url.pathname === '/api/transcribe' && req.method === 'POST') {
+      if (!authorized(req, token)) {
+        res.writeHead(403).end();
+        return;
+      }
+      const contentType = String(req.headers['content-type'] ?? '').split(';', 1)[0].toLowerCase();
+      const extensions: Record<string, string> = {
+        'audio/wav': '.wav',
+        'audio/x-wav': '.wav',
+        'audio/aiff': '.aiff',
+        'audio/x-aiff': '.aiff',
+        'audio/mp4': '.m4a',
+        'audio/m4a': '.m4a',
+      };
+      const extension = extensions[contentType];
+      if (!extension) {
+        res.writeHead(415, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'PCM WAV AUDIO REQUIRED' }));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      let bytes = 0;
+      try {
+        for await (const chunk of req as AsyncIterable<Buffer>) {
+          bytes += chunk.length;
+          if (bytes > MAX_TRANSCRIBE_BYTES) {
+            res.writeHead(413, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'RECORDING TOO LONG' }));
+            return;
+          }
+          chunks.push(chunk);
+        }
+      } catch {
+        res.writeHead(400).end();
+        return;
+      }
+      if (bytes <= 44) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'EMPTY RECORDING' }));
+        return;
+      }
+
+      const directory = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-transcribe-'));
+      const audioPath = path.join(directory, `capture${extension}`);
+      try {
+        chmodSync(directory, 0o700);
+        writeFileSync(audioPath, Buffer.concat(chunks), { mode: 0o600 });
+        chmodSync(audioPath, 0o600);
+        const response = await requestLocalTranscription(audioPath);
+        const ok = response.ok === true && typeof response.text === 'string' && response.text.trim().length > 0;
+        res.writeHead(ok ? 200 : 422, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({
+          ok,
+          text: ok ? response.text!.trim() : undefined,
+          engine: response.engine ?? 'parakeet',
+          error: ok ? undefined : (response.error || 'NO SPEECH DETECTED'),
+        }));
+      } catch (error) {
+        res.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'LOCAL TRANSCRIPTION FAILED' }));
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
       return;
     }
 

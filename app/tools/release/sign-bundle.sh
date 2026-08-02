@@ -90,6 +90,7 @@ sign_bundle_with_identity() {
     local identity="$1"
     local label="$2"
     local executable="$BUNDLE_PATH/Contents/MacOS/SpeakEasy"
+    local deck_runtime="$BUNDLE_PATH/Contents/Helpers/speakeasy-runtime"
     local framework_path
 
     echo "==> Signing ($label)..."
@@ -101,6 +102,7 @@ sign_bundle_with_identity() {
         sign_framework "$framework_path" "$identity"
     done
 
+    sign_path "$deck_runtime" "$identity" 0
     sign_path "$executable" "$identity" 1
 
     local bundle_args=(--force --options runtime --timestamp --sign "$identity" --identifier "$BUNDLE_ID")

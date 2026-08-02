@@ -29,6 +29,29 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertNil(request.arguments)
     }
 
+    func testParakeetRequestDecodesFromDeckRuntimeWireShape() throws {
+        let json = #"{"protocolVersion":1,"requestId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","command":"transcribe","audioPath":"/tmp/private-capture.wav"}"#
+        let request = try JSONDecoder().decode(TranscriptionCommandRequest.self, from: Data(json.utf8))
+
+        XCTAssertEqual(request.protocolVersion, playerProtocolVersion)
+        XCTAssertEqual(request.command, "transcribe")
+        XCTAssertEqual(request.audioPath, "/tmp/private-capture.wav")
+
+        let response = TranscriptionCommandResponse(
+            protocolVersion: playerProtocolVersion,
+            requestId: request.requestId,
+            ok: true,
+            text: "Local transcription",
+            engine: "parakeet",
+            error: nil
+        )
+        let object = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(response)) as? [String: Any]
+        )
+        XCTAssertEqual(object["requestId"] as? String, "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE")
+        XCTAssertEqual(object["engine"] as? String, "parakeet")
+    }
+
     func testEnqueueItemRoundTripsWithoutDateDecoderCoupling() throws {
         let item = PlaybackItem(
             id: UUID(),

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Check, Copy, ExternalLink, MonitorSpeaker, Terminal } from "lucide-react"
 
 const agentPrompt = `Read https://speakeasy.arach.dev/agent.md and follow it.`
-const codexPrompt = `Install SpeakEasy for Codex: read https://speakeasy.arach.dev/agent.md and follow Path B.`
+const codexPrompt = `Install SpeakEasy 0.2.18 on this Mac. Read https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from source or bypass Gatekeeper. Tell me which human-only steps remain.`
 
 function CopyPrompt({
   payload,
@@ -157,20 +157,19 @@ export default function AgentVoiceSection() {
               <CopyPrompt payload={agentPrompt} label="Copy prompt for your agent" accent="emerald" />
             </div>
 
-            {/* Right: the Codex skill — one step further */}
+            {/* Right: the complete Codex voice loop */}
             <div className="bg-white rounded-3xl shadow-lg shadow-slate-200/40 p-6 sm:p-8 flex flex-col">
               <div className="flex items-center gap-3 mb-5">
                 <div className="p-2 rounded-lg bg-gradient-to-br from-teal-50 to-teal-100">
                   <MonitorSpeaker className="w-5 h-5 text-teal-600" />
                 </div>
-                <h3 className="text-base font-semibold text-slate-900">Codex — one step further</h3>
+                <h3 className="text-base font-semibold text-slate-900">Codex — the complete voice loop</h3>
               </div>
 
               <p className="text-sm text-slate-600 font-light leading-relaxed mb-4">
-                For Codex on macOS 14+, SpeakEasy ships as a{" "}
-                <span className="font-medium text-slate-800">native skill</span>, not just a CLI — narration
-                plays through the signed menu-bar player with a word-synced HUD. This is exactly what the
-                prompt asks your agent to do:
+                For Codex on macOS 14+, SpeakEasy ships as one signed native app: local dictation goes into
+                an exact task and that task&apos;s real response returns through the player. The install is itself
+                a transparent Codex task:
               </p>
 
               <ol className="space-y-3 text-sm text-slate-600 font-light mb-6 list-none">
@@ -179,9 +178,9 @@ export default function AgentVoiceSection() {
                     1
                   </span>
                   <div className="min-w-0">
-                    <span>One command downloads the skill and runs a health check:</span>
+                    <span>Codex reads the public runbook and inspects the pinned installer before running it:</span>
                     <code className="block text-[11px] font-mono bg-slate-900 text-teal-300 rounded-lg px-3 py-2 mt-1.5 whitespace-pre-wrap break-all">
-                      npx @arach/speakeasy plugin codex
+                      agent.md · Path A · v0.2.18
                     </code>
                   </div>
                 </li>
@@ -189,15 +188,14 @@ export default function AgentVoiceSection() {
                   <span className="flex-none w-4 h-4 rounded-full bg-teal-100 text-teal-700 text-[10px] font-mono flex items-center justify-center mt-0.5">
                     2
                   </span>
-                  <span>Start a new Codex session — it scans the skill automatically.</span>
+                  <span>Checksum, Gatekeeper, Developer ID, and exact version must all pass before Applications changes.</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="flex-none w-4 h-4 rounded-full bg-teal-100 text-teal-700 text-[10px] font-mono flex items-center justify-center mt-0.5">
                     3
                   </span>
                   <span>
-                    First speech downloads the signed, notarized app from the official GitHub release.
-                    Try it: “Read this summary aloud in SpeakEasy.”
+                    SpeakEasy opens its guided Deck setup. You approve the microphone and local-network prompts; Codex reports what remains.
                   </span>
                 </li>
               </ol>
@@ -206,12 +204,12 @@ export default function AgentVoiceSection() {
 
               <div className="mt-4">
                 <a
-                  href="https://github.com/arach/SpeakEasy/tree/master/plugins/speakeasy"
+                  href="https://github.com/arach/SpeakEasy/blob/master/app/tools/release/install-release.sh"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-teal-600 transition-colors"
                 >
-                  Skill source and submission notes on GitHub
+                  Inspect the release installer on GitHub
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>

@@ -15,20 +15,44 @@ The deck ships inside the SpeakEasy CLI package. On the Mac:
 npx @arach/speakeasy deck
 ```
 
-That serves the deck on the local network (via Caddy when installed, built-in server otherwise),
-advertises **speak.\<your-mac\>.local** over Bonjour, and prints a QR code. When port 80 is free it
-claims it for a port-free URL; otherwise it uses 43211. On the iPad (same Wi-Fi):
+For the native menu-bar app, the recommended first run is simply:
+
+```bash
+./app/install.sh
+```
+
+The installer opens the Deck settings checklist after it verifies and installs
+the bundled runtime. A device link appears only after Codex and the live data
+plane are ready, so a half-configured bridge is never presented as success.
+
+That serves the live deck on the local network (via Caddy when installed, the fully live built-in server otherwise),
+advertises **speak.\<your-mac\>.local** over Bonjour, and prints a QR code. It uses 43211 for a
+normal user install (or port 80 only when the process is permitted to bind it). On the iPad (same Wi-Fi):
 
 1. Scan the code or open the printed URL (e.g. `http://speak.air.local`) in Safari.
 2. Share → **Add to Home Screen** for the full-screen deck.
 3. Pick a look: `?theme=paper|ember|flight`, or a variant like `?variant=oxide`.
 
 Options: `--port <n>`, `--host <name>` (default `speak.<device>.local`), `--no-qr`, `--no-caddy`,
-`--no-mdns`. The deck connects to a **live runtime** (WebSocket on port+1): hold-to-speak runs the
-real phase machine with real synthesis on the Mac, and `speakeasy "text"` from any shell mirrors
-into the open deck. Without the runtime it falls back to its built-in demo state. Is it running?
+`--no-mdns`. The public server proxies the loopback runtime under same-origin `/ws`, `/api`, and
+`/audio` routes: hold-to-speak runs the real phase machine with real synthesis on the Mac, and
+`speakeasy "text"` from any shell mirrors into the open deck. Caddy is only the optional local-HTTPS
+upgrade; it is not required for live lanes. Without the runtime the page falls back to demo state. Is it running?
 `curl http://localhost:<port>/healthz` on the printed port. Prefer your own server?
 `caddy run` in this directory uses the shipped `Caddyfile`.
+
+Run SpeakEasy on more Macs to add machines. Each advertises its own `SpeakEasy Deck (<host>)`
+Bonjour service; the native iPad shell lists them in a machine menu and remembers the last choice.
+
+## Set lanes from the deck
+
+Choose **Set lanes** from the deck header on the website or in the iPad app. The shared setup
+workspace keeps all nine pads visible and groups recent tasks under the same project labels and
+user-facing titles shown by the Codex app. Search matches task titles, projects, previews, paths,
+and full thread IDs; for example, a renamed Codex task such as `spk-web` appears as `spk-web`, not
+as the rollout prompt that originally created it. Choosing a task moves its binding to that pad
+without deleting or modifying the Codex task. **Fresh session** clears the pad so its next spoken
+request starts a new Codex task.
 
 ## Boot options
 

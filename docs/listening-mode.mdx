@@ -1,0 +1,102 @@
+---
+title: Listening mode
+description: Speak to an exact Codex Desktop task and hear its response
+order: 3
+---
+
+# Listening mode
+
+Listening mode is SpeakEasy's explicit ASR input path. It turns one explicit
+utterance into the next turn of an exact Codex Desktop task, then narrates that
+task's real response through the native player.
+
+> The signed 0.2.18 self-serve preview includes listening, voice lanes, the
+> native player, and the Deck runtime. The Codex Desktop integration uses
+> private, version-checked local IPC and is not a supported public Codex API.
+
+## Install the preview
+
+The recommended path is to give Codex this bounded task:
+
+> Install SpeakEasy 0.2.18 on this Mac. Read
+> https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
+> source or bypass Gatekeeper. Tell me which human-only steps remain.
+
+Codex inspects the pinned installer before running it and reports the checksum,
+Gatekeeper, Developer ID, and exact-version checks. For a manual fallback:
+
+1. [Download SpeakEasy.dmg](https://github.com/arach/SpeakEasy/releases/download/v0.2.18/SpeakEasy.dmg).
+2. Drag SpeakEasy to Applications and open it.
+3. Approve microphone and local-network access when macOS asks.
+4. Open **Settings → Deck** and complete the three readiness checks.
+
+The release is Developer ID signed, Apple-notarized, and self-contained. It
+supports Apple silicon Macs running macOS 14 or newer.
+
+## Start a conversation
+
+1. Open the Codex Desktop task you want to control.
+2. Open SpeakEasy's menu-bar popover.
+3. Choose that task and lock it. SpeakEasy accepts the lock only after the
+   Desktop window owning the exact task answers its validation handshake.
+4. Press `Control-Option-Space` to start recording.
+5. Speak one utterance, then press `Control-Option-Space` again to stop and
+   send.
+6. SpeakEasy transcribes locally, submits once to the locked task, waits for the
+   correlated response, and plays it with the configured voice.
+
+Starting another utterance while SpeakEasy is narrating stops its own playback
+first, preventing the app from transcribing itself.
+
+## Voice lanes
+
+Nine persistent lanes make exact tasks addressable from anywhere on the Mac.
+
+| Shortcut | Action |
+| --- | --- |
+| `Command-Option-1...9` | Activate the assigned task and begin listening |
+| `Control-Option-Space` | Toggle listening for the current exact task |
+| `Command-Option-X` | Announce the active lane on demand |
+
+Assign a lane from the popover by choosing a recent Codex task. Every
+activation reopens and revalidates the exact task. An unassigned lane never
+guesses, and a failed validation leaves SpeakEasy unlocked rather than routing
+to another task.
+
+Each lane can also carry its own narration voice and a compact spoken cue.
+
+## Privacy and routing
+
+- Listening begins only from the explicit hotkey or control. There is no wake
+  word, ambient listening, or automatic re-engagement.
+- Capture stops on the second press or at a 120-second safety ceiling.
+- Vox/Parakeet transcription runs locally on the Mac.
+- Temporary microphone audio is deleted after transcription or cancellation.
+- Raw input and transcripts are not added to SpeakEasy narration history.
+- Cloud TTS is used only when you explicitly configure that provider.
+- Task ID—not title, recency, directory, or window focus—is routing authority.
+
+## Codex compatibility boundary
+
+SpeakEasy connects to Codex Desktop's current-user-only local IPC socket. It
+verifies protocol versions, socket ownership, task ownership, returned task and
+turn identifiers, and the response rollout associated with that exact turn.
+
+If those checks fail, SpeakEasy stops with a visible error. It does not launch
+`codex app-server`, edit Codex state, paste through Accessibility, or fall back
+to a different task.
+
+Because the seam is private, a future Codex Desktop update can require a
+SpeakEasy compatibility update. The long-term release should move to a
+supported extension or API when one becomes available while retaining the same
+exact-lock behavior.
+
+## Current non-goals
+
+- ambient meeting transcription;
+- wake words or voice activity auto-submit;
+- inferred task selection from focus;
+- a general-purpose voice assistant;
+- a shadow Codex conversation;
+- arbitrary tool or shell execution from speech;
+- two-way Claude conversation.

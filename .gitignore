@@ -14,6 +14,12 @@ build/
 out/
 .next/
 *.tsbuildinfo
+.playwright-cli/
+/output/
+*.app.zip
+
+# Local QA media
+app/Sources/SpeakEasy/Resources/Pad/demo-response.*
 
 # Environment variables
 .env

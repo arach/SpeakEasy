@@ -1,8 +1,40 @@
-# SpeakEasy 🎤
+# SpeakEasy
 
-A unified speech library for all your projects with support for multiple TTS providers and clean configuration structure.
+**Speak to the Codex task you are already using. Hear its real answer come back.**
 
-## 🎉 Welcome Experience
+SpeakEasy is a dual-mode voice companion for Codex Desktop on macOS. It
+transcribes an explicit utterance locally, routes the final text to the exact
+Codex task you chose, and narrates that task's real response through a
+controllable native player. The same live task lanes are available from the
+Mac, a browser, or an iPad on your local network.
+
+- **No shadow conversation:** the full transcript remains in Codex.
+- **No focus guessing:** the exact task ID is the routing authority.
+- **Local speech boundary:** audio is captured and transcribed on your Mac.
+- **One self-serve install:** Codex can verify and install the signed,
+  Apple-notarized app without a source checkout or developer tools.
+
+## Start with Codex
+
+Paste this bounded task into Codex Desktop:
+
+> Install SpeakEasy 0.2.18 on this Mac. Read
+> https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
+> source or bypass Gatekeeper. Tell me which human-only steps remain.
+
+The current `0.2.18` build is a self-serve preview. It stays a GitHub
+prerelease until the clean second-Mac and device-path acceptance run passes.
+See [SpeakEasy for Codex](https://speakeasy.arach.dev/codex/) for the product
+loop and [`docs/release/self-serve-mac-test.md`](docs/release/self-serve-mac-test.md)
+for the promotion gate.
+
+The TypeScript library and CLI remain available for applications and agent
+hooks that need provider-independent TTS. Jump to [Library and CLI](#library-and-cli)
+if that is what you are installing.
+
+## Library and CLI
+
+### Welcome experience
 
 When you first run SpeakEasy CLI, you're greeted with a professional welcome screen:
 
@@ -126,19 +158,51 @@ comes online.
 
 ## Installation
 
-For the macOS menu-bar app and the easiest Deck setup:
+For the complete macOS app—local dictation, exact Codex task lanes, native
+narration, and the Deck—the recommended installation flow is a bounded Codex
+task. Paste this into Codex:
+
+> Install SpeakEasy 0.2.18 on this Mac. Read
+> https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
+> source or bypass Gatekeeper. Tell me which human-only steps remain.
+
+Codex downloads and inspects the pinned installer, verifies the published
+checksum, Gatekeeper acceptance, Developer ID, and exact version, safely
+replaces the app, and opens **Settings → Deck**. You only approve the microphone
+and local-network prompts that macOS requires a person to handle.
+
+For a manual install, download the same signed and notarized release:
+
+**[Download SpeakEasy 0.2.18 for macOS](https://github.com/arach/SpeakEasy/releases/download/v0.2.18/SpeakEasy.dmg)**
+
+1. Drag SpeakEasy to **Applications**.
+2. Open it and approve microphone and local-network access when macOS asks.
+3. Open **SpeakEasy → Settings → Deck** and complete the three readiness checks.
+
+The release is self-contained and requires an Apple silicon Mac running macOS
+14 or newer. Codex Desktop is required for exact-task voice lanes; the macOS
+system voice works without an API key.
+
+For a source build or release development:
 
 ```bash
 git clone https://github.com/arach/speakeasy.git
 cd speakeasy
-bun install
 ./app/install.sh
 ```
 
-Open **SpeakEasy → Settings → Deck**, click **Start Deck**, then scan the device
-card. Enable **Start the deck with SpeakEasy** to keep it ready whenever the app
-runs. The app includes the Deck runtime and web surface; it finds the native
-Codex binary from the desktop app or the `codex` command from your login shell.
+The source installer checks macOS, Bun, and Apple build tools; installs the pinned
+dependencies; builds and signs the app; safely replaces any running copy; and
+opens **SpeakEasy → Settings → Deck**. Its three-step checklist confirms the
+bundled runtime, finds Codex, and starts the live bridge. The device card and QR
+appear only when the bridge is genuinely ready.
+
+There is no separate server package and Caddy is optional. SpeakEasy finds the
+native Codex binary from the desktop app or the `codex` command in your login
+shell. Re-running `./app/install.sh` is safe; use `--no-open` in automation.
+
+Enable **Start the deck with SpeakEasy** after the first successful launch to
+keep it ready whenever the menu-bar app runs.
 
 Repeat the install on another Mac and it advertises itself separately. The
 native iPad shell shows every available Mac in its machine menu and remembers

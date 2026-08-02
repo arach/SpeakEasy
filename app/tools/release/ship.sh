@@ -5,12 +5,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 REPO_ROOT="$(cd "$APP_ROOT/.." && pwd)"
 DIST_DIR="$APP_ROOT/dist"
+INSTALLER_SOURCE="$SCRIPT_DIR/install-release.sh"
 RELEASE_REPO="${SPEAKEASY_RELEASE_REPO:-arach/SpeakEasy}"
-RELEASE_TARGET="${SPEAKEASY_RELEASE_TARGET:-master}"
+RELEASE_TARGET="${SPEAKEASY_RELEASE_TARGET:-$(git -C "$REPO_ROOT" rev-parse HEAD)}"
 VERSION="${SPEAKEASY_VERSION:-$(node -p "require(process.argv[1]).version" "$REPO_ROOT/package.json" 2>/dev/null || echo '0.0.0')}"
 TAG="v${VERSION}"
 MODE="dmg"
 DRY_RUN=0
+SKIP_BUILD=0
+PRERELEASE=0
+DRAFT=0
 UPLOAD_TMP=""
 
 cleanup() {
@@ -22,9 +26,13 @@ trap cleanup EXIT
 
 usage() {
     cat <<'EOF'
-Usage: ./tools/release/ship.sh [dmg] [--dry-run]
+Usage: ./tools/release/ship.sh [dmg] [--skip-build] [--prerelease|--draft] [--dry-run]
 
 Build the signed/notarized DMG and upload it to the public GitHub release.
+
+  --skip-build   Upload the already verified dist/SpeakEasy.dmg
+  --prerelease   Publish as a test release without replacing Latest
+  --draft        Create a private draft release
 EOF
 }
 
@@ -51,7 +59,27 @@ release_notes_file() {
     cat > "$notes_path" <<EOF
 Release $VERSION
 
-Download \`SpeakEasy.dmg\` for the macOS companion app, or run \`speakeasy --app\` / \`speakeasy --update-app\` to install automatically.
+SpeakEasy is now a dual-mode voice companion for Codex: explicit local dictation
+goes to the exact task you choose, and the real response returns through the
+native player.
+
+### Install
+
+**Recommended:** ask Codex to download and inspect \`install-speakeasy.sh\`
+from this release, then run it. The installer verifies the published checksum,
+Gatekeeper acceptance, Developer ID team, and exact app version before changing
+Applications. It opens **Settings → Deck** when the mechanical work is done.
+
+Or install manually:
+
+1. Download \`SpeakEasy.dmg\`.
+2. Drag SpeakEasy to Applications.
+3. Open SpeakEasy and choose **Settings → Deck**.
+4. Complete the three readiness checks, then open the device link.
+
+The app is Developer ID signed, Apple-notarized, and self-contained. This build
+supports Apple silicon Macs running macOS 14 or newer. Codex Desktop is required
+for exact-task voice lanes; the system narration voice works without an API key.
 EOF
 }
 
@@ -62,6 +90,15 @@ while [ $# -gt 0 ]; do
             ;;
         --dry-run)
             DRY_RUN=1
+            ;;
+        --skip-build)
+            SKIP_BUILD=1
+            ;;
+        --prerelease)
+            PRERELEASE=1
+            ;;
+        --draft)
+            DRAFT=1
             ;;
         -h|--help)
             usage
@@ -77,12 +114,18 @@ while [ $# -gt 0 ]; do
 done
 
 need_cmd gh
+bash -n "$INSTALLER_SOURCE"
 
 case "$MODE" in
     dmg)
         ASSET_PATH="$DIST_DIR/SpeakEasy.dmg"
-        echo "==> Building DMG release asset..."
-        run bash "$SCRIPT_DIR/build-dmg.sh" "$VERSION"
+        if [ "$SKIP_BUILD" -eq 1 ]; then
+            echo "==> Verifying existing DMG release asset..."
+            run env SPEAKEASY_EXPECT_NOTARIZED=1 bash "$SCRIPT_DIR/verify-dmg.sh" "$ASSET_PATH" "$VERSION"
+        else
+            echo "==> Building DMG release asset..."
+            run bash "$SCRIPT_DIR/build-dmg.sh" "$VERSION"
+        fi
         ;;
 esac
 
@@ -102,21 +145,39 @@ fi
 
 UPLOAD_PATHS=("$ASSET_PATH")
 VERSIONED_DMG_PATH="${UPLOAD_TMP:-$DIST_DIR}/SpeakEasy-$VERSION.dmg"
+CHECKSUM_PATH="${UPLOAD_TMP:-$DIST_DIR}/SpeakEasy-$VERSION.sha256"
+INSTALLER_PATH="${UPLOAD_TMP:-$DIST_DIR}/install-speakeasy.sh"
 if [ "$DRY_RUN" -eq 0 ]; then
     cp "$ASSET_PATH" "$VERSIONED_DMG_PATH"
+    sed "s/^DEFAULT_VERSION=.*/DEFAULT_VERSION=\"$VERSION\"/" "$INSTALLER_SOURCE" > "$INSTALLER_PATH"
+    chmod 755 "$INSTALLER_PATH"
+    checksum="$(shasum -a 256 "$ASSET_PATH" | awk '{print $1}')"
+    installer_checksum="$(shasum -a 256 "$INSTALLER_PATH" | awk '{print $1}')"
+    printf '%s  %s\n%s  %s\n%s  %s\n' \
+        "$checksum" "SpeakEasy.dmg" \
+        "$checksum" "SpeakEasy-$VERSION.dmg" \
+        "$installer_checksum" "install-speakeasy.sh" > "$CHECKSUM_PATH"
 else
     run cp "$ASSET_PATH" "$VERSIONED_DMG_PATH"
+    run sed "s/^DEFAULT_VERSION=.*/DEFAULT_VERSION=\"$VERSION\"/" "$INSTALLER_SOURCE" '>' "$INSTALLER_PATH"
 fi
-UPLOAD_PATHS+=("$VERSIONED_DMG_PATH")
+UPLOAD_PATHS+=("$VERSIONED_DMG_PATH" "$CHECKSUM_PATH" "$INSTALLER_PATH")
+
+release_flags=()
+[ "$PRERELEASE" -eq 0 ] || release_flags+=(--prerelease)
+[ "$DRAFT" -eq 0 ] || release_flags+=(--draft)
 
 if [ "$DRY_RUN" -eq 1 ]; then
     echo "==> DRY RUN: would create or update GitHub release $TAG in $RELEASE_REPO"
 elif gh release view "$TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
     echo "==> Updating GitHub release $TAG in $RELEASE_REPO..."
-    run gh release edit "$TAG" --repo "$RELEASE_REPO" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH"
+    edit_flags=()
+    [ "$PRERELEASE" -eq 0 ] || edit_flags+=(--prerelease=true)
+    [ "$DRAFT" -eq 0 ] || edit_flags+=(--draft=true)
+    run gh release edit "$TAG" --repo "$RELEASE_REPO" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" "${edit_flags[@]}"
 else
     echo "==> Creating GitHub release $TAG in $RELEASE_REPO..."
-    run gh release create "$TAG" --repo "$RELEASE_REPO" --target "$RELEASE_TARGET" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH"
+    run gh release create "$TAG" --repo "$RELEASE_REPO" --target "$RELEASE_TARGET" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" "${release_flags[@]}"
 fi
 
 echo "==> Uploading release asset(s)..."
