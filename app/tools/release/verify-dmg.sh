@@ -45,8 +45,9 @@ HELPER="$APP/Contents/Helpers/speakeasy-runtime"
 CADDY="$APP/Contents/Helpers/caddy"
 PLIST="$APP/Contents/Info.plist"
 CODEX_BRIDGE="$APP/Contents/Resources/SpeakEasy_SpeakEasy.bundle/codex-desktop-bridge.cjs"
+LUNA_PRESENTER="$APP/Contents/Resources/SpeakEasy_SpeakEasy.bundle/codex-luna-presenter.cjs"
 
-for path in "$APP" "$EXECUTABLE" "$HELPER" "$CADDY" "$PLIST" "$CODEX_BRIDGE"; do
+for path in "$APP" "$EXECUTABLE" "$HELPER" "$CADDY" "$PLIST" "$CODEX_BRIDGE" "$LUNA_PRESENTER"; do
     if [ ! -e "$path" ]; then
         echo "Error: Release payload is missing $path" >&2
         exit 1

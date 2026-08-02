@@ -32,6 +32,9 @@
     "tempDir": "/tmp",
     "cleanup": true
   },
+  "features": {
+    "observerPresenter": false
+  },
   "deck": {
     "pair": true,
     "autoStart": false

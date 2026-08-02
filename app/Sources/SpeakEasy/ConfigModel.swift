@@ -7,6 +7,13 @@ struct GlobalConfig: Codable {
     var cache: Cache?
     var hud: HUD?
     var deck: Deck?
+    var features: Features?
+
+    /// Experimental product slices remain opt-in until their failure and
+    /// privacy boundaries have been exercised in release builds.
+    struct Features: Codable {
+        var observerPresenter: Bool?
+    }
 
     /// Bridge settings for `speakeasy deck` — the CLI reads these as defaults,
     /// the Deck section in this app writes them.
@@ -220,6 +227,15 @@ class ConfigManager: ObservableObject {
             config.defaults?.volume = newValue
             markUnsaved()
         }
+    }
+
+    /// The environment value is an emergency override: `0` always disables
+    /// the experiment and `1` enables it without rewriting user settings.
+    var observerPresenterEnabled: Bool {
+        ObserverPresenterFeature.isEnabled(
+            environment: ProcessInfo.processInfo.environment,
+            configured: config.features?.observerPresenter
+        )
     }
 
     // OpenAI

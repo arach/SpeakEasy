@@ -17,6 +17,11 @@ enum QueuePriority: String, Codable {
     case low
 }
 
+enum PlaybackChannel: String, Codable {
+    case interactive
+    case completions
+}
+
 enum PlayerCommand: String, Codable {
     case enqueue
     case pause
@@ -43,6 +48,10 @@ struct PlaybackItem: Codable, Identifiable, Equatable {
     let sourceThreadId: String?
     let cleanupAfterPlayback: Bool?
     let playbackRate: Float?
+    /// Optional keeps older CLI/Deck playback items wire-compatible. A nil
+    /// channel is treated as interactive playback.
+    let channel: PlaybackChannel?
+    let completionActivityID: UUID?
 
     init(
         id: UUID,
@@ -54,7 +63,9 @@ struct PlaybackItem: Codable, Identifiable, Equatable {
         synthesisRateWPM: Int?,
         sourceThreadId: String?,
         cleanupAfterPlayback: Bool? = nil,
-        playbackRate: Float? = nil
+        playbackRate: Float? = nil,
+        channel: PlaybackChannel? = nil,
+        completionActivityID: UUID? = nil
     ) {
         self.id = id
         self.audioPath = audioPath
@@ -66,7 +77,11 @@ struct PlaybackItem: Codable, Identifiable, Equatable {
         self.sourceThreadId = sourceThreadId
         self.cleanupAfterPlayback = cleanupAfterPlayback
         self.playbackRate = playbackRate
+        self.channel = channel
+        self.completionActivityID = completionActivityID
     }
+
+    var effectiveChannel: PlaybackChannel { channel ?? .interactive }
 }
 
 struct PlayerCommandArguments: Codable {

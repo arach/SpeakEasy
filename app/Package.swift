@@ -31,6 +31,7 @@ let package = Package(
             path: "Sources/SpeakEasy",
             resources: [
                 .copy("Resources/codex-desktop-bridge.cjs"),
+                .copy("Resources/codex-luna-presenter.cjs"),
                 .copy("Resources/Pad")
             ]
         ),

@@ -190,7 +190,10 @@ actor CodexThreadRouter {
         )
     }
 
-    private static func resolveBridgeScript() -> URL? {
+    /// Shared by the interactive conduit and the independent completion
+    /// observer. Keeping resolution here avoids the observer inventing a
+    /// second runtime or bridge path.
+    static func resolveBridgeScript() -> URL? {
         let environment = ProcessInfo.processInfo.environment
         if let override = environment["SPEAKEASY_CODEX_BRIDGE_PATH"],
            FileManager.default.isReadableFile(atPath: override) {
@@ -199,7 +202,7 @@ actor CodexThreadRouter {
         return SpeakEasyResources.url(forResource: "codex-desktop-bridge", withExtension: "cjs")
     }
 
-    private static func resolveJavaScriptRuntime() -> URL? {
+    static func resolveJavaScriptRuntime() -> URL? {
         let environment = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let candidates = [

@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
 const MAX_FRAME_BYTES = 256 * 1024 * 1024;
@@ -16,6 +16,7 @@ const START_TURN_VERSION = 1;
 const STEER_TURN_VERSION = 1;
 const SNAPSHOT_TIMEOUT_MS = 5_000;
 const TURN_TIMEOUT_MS = 30 * 60_000;
+const OBSERVER_POLL_MS = 150;
 
 function codexHome() {
   return process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
@@ -91,6 +92,18 @@ function assertRolloutPath(rolloutPath, threadId) {
   return resolved;
 }
 
+function rolloutIdentity(rolloutPath) {
+  const info = fs.statSync(rolloutPath);
+  const descriptor = fs.openSync(rolloutPath, 'r');
+  const prefix = Buffer.allocUnsafe(Math.min(info.size, 4096));
+  try {
+    if (prefix.length > 0) fs.readSync(descriptor, prefix, 0, prefix.length, 0);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  return `${info.dev}:${info.ino}:${createHash('sha256').update(prefix).digest('hex')}`;
+}
+
 function latestActiveTurnId(rolloutPath) {
   const size = fs.statSync(rolloutPath).size;
   const maximumScan = 32 * 1024 * 1024;
@@ -124,6 +137,70 @@ function latestActiveTurnId(rolloutPath) {
   return activeTurnId;
 }
 
+function eventTimestamp(record) {
+  const candidate = record?.timestamp || record?.payload?.timestamp || record?.payload?.completed_at;
+  if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+    return new Date(candidate > 10_000_000_000 ? candidate : candidate * 1000).toISOString();
+  }
+  if (typeof candidate === 'string' && !Number.isNaN(Date.parse(candidate))) {
+    return new Date(candidate).toISOString();
+  }
+  return new Date().toISOString();
+}
+
+/**
+ * Parse only terminal assistant completion records. The rollout path has
+ * already been proven to belong to the exact Desktop-owned task before this
+ * helper is called, so task identity is never inferred from text or titles.
+ */
+function parseCompletionRecord(record, threadId) {
+  if (record?.type !== 'event_msg' || !record.payload) return null;
+  const payload = record.payload;
+  const terminal = ['task_complete', 'turn_complete', 'turn_completed'].includes(payload.type);
+  if (!terminal || typeof payload.turn_id !== 'string' || payload.turn_id.length === 0) return null;
+  const response = String(
+    payload.last_agent_message ?? payload.last_agent_response ?? payload.final_response ?? payload.message ?? ''
+  ).trim();
+  return {
+    taskID: threadId,
+    turnID: payload.turn_id,
+    response,
+    completedAt: eventTimestamp(record),
+  };
+}
+
+function isTerminalRecord(record) {
+  const payload = record?.type === 'event_msg' ? record.payload : null;
+  return Boolean(payload &&
+    ['task_complete', 'turn_complete', 'turn_completed', 'task_failed', 'turn_aborted'].includes(payload.type) &&
+    typeof payload.turn_id === 'string' && payload.turn_id.length > 0);
+}
+
+/** A narratable completion carries its own durable cursor and must be emitted
+ * before that cursor can be committed. Non-narratable terminal records may
+ * advance the cursor directly. This prevents a crash between two bridge lines
+ * from losing a completion forever. */
+function observationMessages(record, threadId, cursor, provenance) {
+  const completion = parseCompletionRecord(record, threadId);
+  if (completion) {
+    return [{
+      type: 'completion',
+      taskID: completion.taskID,
+      turnID: completion.turnID,
+      response: completion.response,
+      completedAt: completion.completedAt,
+      cursor,
+      provenance,
+    }];
+  }
+  return [{
+    type: 'cursor',
+    taskID: threadId,
+    turnID: record.payload.turn_id,
+    cursor,
+  }];
+}
+
 function frame(message) {
   const body = Buffer.from(JSON.stringify(message), 'utf8');
   if (body.length === 0 || body.length > MAX_FRAME_BYTES) fail('Desktop IPC message is too large.');
@@ -134,8 +211,9 @@ function frame(message) {
 }
 
 class DesktopIPCClient {
-  constructor(threadId) {
+  constructor(threadId, strictObservation = false) {
     this.threadId = threadId;
+    this.strictObservation = strictObservation;
     this.socketPath = path.join(codexHome(), 'ipc', 'ipc.sock');
     this.clientId = 'initializing-client';
     this.ownerClientId = null;
@@ -143,14 +221,16 @@ class DesktopIPCClient {
     this.buffer = Buffer.alloc(0);
     this.pending = new Map();
     this.snapshotWaiter = null;
+    this.failure = null;
+    this.ownerRolloutPath = null;
   }
 
   async connect() {
     assertPrivateCodexSocket(this.socketPath);
     this.socket = net.connect(this.socketPath);
     this.socket.on('data', (chunk) => this.onData(chunk));
-    this.socket.on('error', (error) => this.rejectAll(error));
-    this.socket.on('close', () => this.rejectAll(new Error('Codex Desktop IPC connection closed.')));
+    this.socket.on('error', (error) => this.failClosed(error));
+    this.socket.on('close', () => this.failClosed(new Error('Codex Desktop IPC connection closed.')));
     await new Promise((resolve, reject) => {
       this.socket.once('connect', resolve);
       this.socket.once('error', reject);
@@ -301,7 +381,16 @@ class DesktopIPCClient {
         return;
       }
       if (this.buffer.length < length + 4) return;
-      const message = JSON.parse(this.buffer.subarray(4, length + 4).toString('utf8'));
+      let message;
+      try {
+        message = JSON.parse(this.buffer.subarray(4, length + 4).toString('utf8'));
+      } catch {
+        this.failClosed(Object.assign(
+          new Error('Codex Desktop returned malformed IPC JSON.'),
+          { code: 'protocol-mismatch' },
+        ));
+        return;
+      }
       this.buffer = this.buffer.subarray(length + 4);
       this.onMessage(message);
     }
@@ -319,24 +408,57 @@ class DesktopIPCClient {
     }
     if (message.type !== 'broadcast' || message.method !== 'thread-stream-state-changed') return;
     if (message.version !== STREAM_VERSION) {
-      this.snapshotWaiter?.reject(Object.assign(
+      this.failClosed(Object.assign(
         new Error('Codex Desktop task streaming protocol changed; update SpeakEasy.'),
         { code: 'protocol-mismatch' },
       ));
-      this.snapshotWaiter = null;
       return;
     }
     const { params } = message;
-    if (
-      params?.hostId !== 'local' ||
-      params?.conversationId !== this.threadId ||
-      params?.change?.type !== 'snapshot'
-    ) return;
+    if (params?.conversationId !== this.threadId) return;
+    if (this.strictObservation && params?.hostId !== 'local') {
+      this.failClosed(Object.assign(
+        new Error('Codex Desktop returned a completion stream without local ownership.'),
+        { code: 'task-owner-unavailable' },
+      ));
+      return;
+    }
+    if (this.strictObservation && this.ownerClientId && message.sourceClientId !== this.ownerClientId) {
+      this.failClosed(Object.assign(
+        new Error('Codex Desktop task ownership changed while SpeakEasy was watching.'),
+        { code: 'task-owner-lost' },
+      ));
+      return;
+    }
+    // Turn activity produces non-snapshot stream updates. They do not change
+    // ownership, so ignore them and keep the read-only follower attached. A
+    // later owner snapshot (or IPC close) remains the authority boundary.
+    if (params?.change?.type !== 'snapshot') return;
+    const state = params?.change?.conversationState;
+    if (this.strictObservation && this.ownerClientId && (
+      state?.id !== this.threadId ||
+      typeof state?.rolloutPath !== 'string' ||
+      state.rolloutPath !== this.ownerRolloutPath
+    )) {
+      this.failClosed(Object.assign(
+        new Error('Codex Desktop changed the exact task rollout while SpeakEasy was watching.'),
+        { code: 'task-owner-lost' },
+      ));
+      return;
+    }
+    if (typeof state?.rolloutPath === 'string') this.ownerRolloutPath = state.rolloutPath;
     this.ownerClientId = message.sourceClientId;
     this.snapshotWaiter?.resolve({
       ownerClientId: message.sourceClientId,
-      state: params.change.conversationState,
+      state,
     });
+  }
+
+  failClosed(error) {
+    if (this.failure) return;
+    this.failure = error;
+    this.rejectAll(error);
+    this.socket?.destroy();
   }
 
   rejectAll(error) {
@@ -413,8 +535,99 @@ async function waitForTurn(rolloutPath, offset, turnId) {
   fail('Timed out waiting for the Codex response.', 'turn-timeout');
 }
 
-async function withClient(threadId, action) {
-  const client = new DesktopIPCClient(threadId);
+function writeObservation(result) {
+  writeResult({ ok: true, ...result });
+}
+
+/**
+ * Read-only, long-lived observation of one already-owned Desktop task. The
+ * first line is a baseline cursor; no existing rollout records are emitted.
+ * Resumed observers start at the durable byte cursor supplied by SpeakEasy.
+ */
+async function observeRollout(client, rolloutPath, threadId, requestedOffset, requestedIdentity) {
+  const initialSize = fs.statSync(rolloutPath).size;
+  const identity = rolloutIdentity(rolloutPath);
+  if (requestedIdentity && requestedIdentity !== identity) {
+    fail('The Codex task rollout identity changed; SpeakEasy will not guess continuity.', 'cursor-mismatch');
+  }
+  let offset;
+  if (requestedOffset === undefined || requestedOffset === null || requestedOffset === '') {
+    offset = initialSize;
+  } else {
+    offset = Number(requestedOffset);
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > initialSize) {
+      fail('The Codex task rollout cursor cannot be proven continuous.', 'cursor-mismatch');
+    }
+  }
+  writeObservation({ type: 'baseline', taskID: threadId, cursor: offset, rolloutIdentity: identity });
+
+  const descriptor = fs.openSync(rolloutPath, 'r');
+  let pending = '';
+  let pendingStart = offset;
+  let position = offset;
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    fs.closeSync(descriptor);
+  };
+  const readAvailable = () => {
+    const size = fs.fstatSync(descriptor).size;
+    while (size > position) {
+      const chunk = Buffer.allocUnsafe(Math.min(size - position, 1024 * 1024));
+      const count = fs.readSync(descriptor, chunk, 0, chunk.length, position);
+      if (count <= 0) break;
+      position += count;
+      pending += chunk.subarray(0, count).toString('utf8');
+      const lines = pending.split('\n');
+      pending = lines.pop() || '';
+      let linePosition = pendingStart;
+      for (const line of lines) {
+        const lineEnd = linePosition + Buffer.byteLength(line, 'utf8') + 1;
+        if (!line) {
+          linePosition = lineEnd;
+          continue;
+        }
+        let record;
+        try { record = JSON.parse(line); } catch {
+          linePosition = lineEnd;
+          continue;
+        }
+        if (isTerminalRecord(record)) {
+          const cursor = lineEnd;
+          const provenance = {
+            owner: 'codex-desktop',
+            hostID: 'local',
+            protocolVersion: STREAM_VERSION,
+            rolloutPath,
+            rolloutIdentity: identity,
+          };
+          for (const observation of observationMessages(record, threadId, cursor, provenance)) {
+            writeObservation(observation);
+          }
+        }
+        linePosition = lineEnd;
+      }
+      pendingStart = position - Buffer.byteLength(pending, 'utf8');
+    }
+  };
+
+  try {
+    while (true) {
+      if (client.failure) throw client.failure;
+      if (rolloutIdentity(rolloutPath) !== identity) {
+        fail('The Codex task rollout identity changed while SpeakEasy was watching.', 'cursor-mismatch');
+      }
+      readAvailable();
+      await sleep(OBSERVER_POLL_MS);
+    }
+  } finally {
+    close();
+  }
+}
+
+async function withClient(threadId, action, strictObservation = false) {
+  const client = new DesktopIPCClient(threadId, strictObservation);
   try {
     await client.connect();
     const snapshot = await client.follow();
@@ -430,7 +643,7 @@ async function main() {
     writeResult({ ok: true, tasks: listTasks(argument) });
     return;
   }
-  if ((command === 'validate' || command === 'submit') && argument) {
+  if ((command === 'validate' || command === 'submit' || command === 'observe') && argument) {
     const result = await withClient(argument, async (client, snapshot) => {
       const state = snapshot.state || {};
       const rolloutPath = assertRolloutPath(state.rolloutPath, argument);
@@ -440,6 +653,9 @@ async function main() {
           ok: true,
           task: { id: state.id, title: state.title || 'Untitled task', cwd: state.cwd || '' },
         };
+      }
+      if (command === 'observe') {
+        return await observeRollout(client, rolloutPath, argument, process.argv[4], process.argv[5]);
       }
       const text = (await readStdin()).trim();
       if (!text) fail('The transcript is empty.', 'empty-transcript');
@@ -461,18 +677,22 @@ async function main() {
       }
       const response = await waitForTurn(rolloutPath, offset, turnId);
       return { ok: true, threadId: argument, turnId, delivery, response };
-    });
+    }, command === 'observe');
     writeResult(result);
     return;
   }
-  fail('Usage: codex-desktop-bridge.cjs list [limit] | validate <task-id> | submit <task-id>', 'usage');
+  fail('Usage: codex-desktop-bridge.cjs list [limit] | validate <task-id> | submit <task-id> | observe <task-id> [cursor]', 'usage');
 }
 
-main().catch((error) => {
-  writeResult({
-    ok: false,
-    code: error?.code || 'bridge-failed',
-    error: error instanceof Error ? error.message : String(error),
+if (require.main === module) {
+  main().catch((error) => {
+    writeResult({
+      ok: false,
+      code: error?.code || 'bridge-failed',
+      error: error instanceof Error ? error.message : String(error),
+    });
+    process.exitCode = 1;
   });
-  process.exitCode = 1;
-});
+}
+
+module.exports = { parseCompletionRecord, isTerminalRecord, observationMessages, assertRolloutPath };
