@@ -1,4 +1,5 @@
 export const releaseVersion = "0.2.18"
+export const launchVersion = "0.2.19"
 
 const releaseRoot = `https://github.com/arach/SpeakEasy/releases/download/v${releaseVersion}`
 
