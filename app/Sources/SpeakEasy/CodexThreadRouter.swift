@@ -199,7 +199,7 @@ actor CodexThreadRouter {
            FileManager.default.isReadableFile(atPath: override) {
             return URL(fileURLWithPath: override)
         }
-        return Bundle.module.url(forResource: "codex-desktop-bridge", withExtension: "cjs")
+        return SpeakEasyResources.url(forResource: "codex-desktop-bridge", withExtension: "cjs")
     }
 
     static func resolveJavaScriptRuntime() -> URL? {

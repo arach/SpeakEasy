@@ -189,7 +189,7 @@ final class SpeakEasyPadLANRuntime {
         if let override = ProcessInfo.processInfo.environment["SPEAKEASY_PAD_WEB_ROOT"] {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
-        return Bundle.module.resourceURL?.appendingPathComponent("Pad", isDirectory: true)
+        return SpeakEasyResources.resourceURL?.appendingPathComponent("Pad", isDirectory: true)
     }
 
     private static func makeLiveCoordinator() -> SpeakEasyPadRemoteCoordinator {

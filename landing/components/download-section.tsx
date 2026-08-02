@@ -29,11 +29,11 @@ export default function DownloadSection() {
             <h2 className="mt-6 max-w-3xl font-display text-5xl font-extralight leading-[0.98] tracking-tight sm:text-6xl">
               Download the complete
               <span className="block bg-gradient-to-r from-emerald-300 to-blue-300 bg-clip-text text-transparent">
-                Codex voice loop.
+                Mac core preview.
               </span>
             </h2>
             <p className="mt-6 max-w-2xl text-lg font-light leading-8 text-white/58">
-              No repository, Bun, Xcode, or server setup. Give Codex one bounded installation task; it verifies and opens the notarized app, then tells you exactly which human permissions remain.
+              No repository, Bun, Xcode, or server setup. Give Codex one bounded installation task; it verifies and opens the notarized app, then tells you exactly which human permissions remain. The paired browser/iPad build begins with 0.2.19.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">

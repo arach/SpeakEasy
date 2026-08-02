@@ -76,13 +76,18 @@ Pass criteria:
 - narration comes from the configured system/OpenAI/ElevenLabs voice;
 - replay, stop, speed, and volume operate on the returned audio.
 
-## Exercise the device path
+## Exercise the device path (`0.2.19` only)
 
-1. Open the QR/device link from another Mac on the same Wi-Fi.
-2. Select the same lane and confirm its project, branch, and recent activity.
-3. Complete another hold-to-speak turn.
-4. If using an iPad, install and trust the local Caddy certificate once, then
-   add the Deck to the Home Screen.
+Do not run this section against `0.2.18`; its device path predates the bundled
+TLS and pairing-default fix.
+
+1. From the Mac's Deck settings, copy the one-time certificate trust link.
+2. On the iPad, open that HTTP bootstrap link, install the local Caddy profile,
+   then enable **Caddy Local Authority** in **Settings → General → About →
+   Certificate Trust Settings**.
+3. Only after trust is enabled, scan or open the paired HTTPS Deck link.
+4. Select the same lane and confirm its project, branch, and recent activity.
+5. Complete another hold-to-speak turn, then add the Deck to the Home Screen.
 
 Pass criteria:
 

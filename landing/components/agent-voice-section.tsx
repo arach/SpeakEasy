@@ -4,9 +4,10 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Check, Copy, ExternalLink, MonitorSpeaker, Terminal } from "lucide-react"
+import { releaseVersion } from "@/lib/release"
 
 const agentPrompt = `Read https://speakeasy.arach.dev/agent.md and follow it.`
-const codexPrompt = `Install SpeakEasy 0.2.18 on this Mac. Read https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from source or bypass Gatekeeper. Tell me which human-only steps remain.`
+const codexPrompt = `Install SpeakEasy ${releaseVersion} on this Mac. Read https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from source or bypass Gatekeeper. Tell me which human-only steps remain.`
 
 function CopyPrompt({
   payload,
@@ -87,7 +88,7 @@ export default function AgentVoiceSection() {
               </span>
             </h2>
             <p className="font-text text-lg text-slate-600 max-w-2xl mx-auto font-light">
-              You don't wire anything up — your coding agent does. Copy a prompt, paste it in, then listen from the deck on your iPad.
+              You don't wire anything up — your coding agent does. The current signed preview proves the Mac loop; paired browser and iPad setup joins the signed 0.2.19 candidate.
             </p>
           </div>
 

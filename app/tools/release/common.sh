@@ -23,7 +23,28 @@ speakeasy_caddy_version() {
     echo "2.11.4"
 }
 
-speakeasy_verify_caddy_binary() {
+speakeasy_caddy_archive_sha256() {
+    echo "9efb0af2d6cf09cfb5053c0e51721b9b3d4956d346234f39368d943d25a3c9a7"
+}
+
+speakeasy_caddy_binary_sha256() {
+    echo "e9ebf99dfd4b72259debe1830c83e86c63fb89a88e28b4e7c5e78a35fa76c92d"
+}
+
+speakeasy_verify_sha256() {
+    local file_path="$1"
+    local expected="$2"
+    local label="$3"
+    local actual
+
+    actual="$(shasum -a 256 "$file_path" | awk '{ print $1 }')"
+    if [ "$actual" != "$expected" ]; then
+        echo "$label SHA-256 mismatch: expected $expected, found $actual" >&2
+        return 1
+    fi
+}
+
+speakeasy_verify_caddy_identity() {
     local candidate="$1"
     local expected_version="$2"
     local actual_version
@@ -45,9 +66,21 @@ speakeasy_verify_caddy_binary() {
     fi
 }
 
+speakeasy_verify_caddy_source() {
+    local candidate="$1"
+    local expected_version="$2"
+
+    speakeasy_verify_caddy_identity "$candidate" "$expected_version"
+    speakeasy_verify_sha256 \
+        "$candidate" \
+        "$(speakeasy_caddy_binary_sha256)" \
+        "Caddy $expected_version binary"
+}
+
 # Resolve a reproducible arm64 Caddy helper for the release bundle. An explicit
 # path wins; otherwise use a matching PATH binary or fetch the pinned official
-# GitHub release and verify it against the publisher's checksum manifest.
+# GitHub release and verify both the archive and extracted binary against
+# immutable SHA-256 digests pinned in this source tree.
 speakeasy_prepare_caddy() {
     local app_root="$1"
     local version="$(speakeasy_caddy_version)"
@@ -58,7 +91,6 @@ speakeasy_prepare_caddy() {
     local archive_name
     local release_url
     local temp_dir
-    local checksum
 
     version="${version#v}"
     cached="$tools_dir/caddy-$version"
@@ -66,7 +98,7 @@ speakeasy_prepare_caddy() {
     release_url="https://github.com/caddyserver/caddy/releases/download/v${version}"
 
     if [ -n "$override" ]; then
-        if ! speakeasy_verify_caddy_binary "$override" "$version"; then
+        if ! speakeasy_verify_caddy_source "$override" "$version"; then
             echo "SPEAKEASY_CADDY_PATH must point to the pinned release helper." >&2
             return 1
         fi
@@ -75,12 +107,12 @@ speakeasy_prepare_caddy() {
     fi
 
     candidate="$(command -v caddy 2>/dev/null || true)"
-    if [ -n "$candidate" ] && speakeasy_verify_caddy_binary "$candidate" "$version" >/dev/null 2>&1; then
+    if [ -n "$candidate" ] && speakeasy_verify_caddy_source "$candidate" "$version" >/dev/null 2>&1; then
         echo "$candidate"
         return 0
     fi
 
-    if speakeasy_verify_caddy_binary "$cached" "$version" >/dev/null 2>&1; then
+    if speakeasy_verify_caddy_source "$cached" "$version" >/dev/null 2>&1; then
         echo "$cached"
         return 0
     fi
@@ -94,16 +126,16 @@ speakeasy_prepare_caddy() {
     temp_dir="$(mktemp -d)"
     echo "Fetching pinned Caddy v$version for the secure Deck..." >&2
     if ! curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 \
-        "$release_url/$archive_name" -o "$temp_dir/$archive_name" \
-        || ! curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 \
-        "$release_url/caddy_${version}_checksums.txt" -o "$temp_dir/checksums.txt"; then
+        "$release_url/$archive_name" -o "$temp_dir/$archive_name"; then
         rm -rf "$temp_dir"
         echo "Could not download the pinned Caddy release." >&2
         return 1
     fi
 
-    checksum="$(awk -v archive="$archive_name" '$2 == archive { print $1; exit }' "$temp_dir/checksums.txt")"
-    if [ -z "$checksum" ] || ! (cd "$temp_dir" && printf '%s  %s\n' "$checksum" "$archive_name" | shasum -a 256 -c - >/dev/null); then
+    if ! speakeasy_verify_sha256 \
+        "$temp_dir/$archive_name" \
+        "$(speakeasy_caddy_archive_sha256)" \
+        "Caddy $version archive"; then
         rm -rf "$temp_dir"
         echo "Caddy archive checksum verification failed." >&2
         return 1
@@ -115,7 +147,7 @@ speakeasy_prepare_caddy() {
         return 1
     fi
     chmod +x "$temp_dir/caddy"
-    if ! speakeasy_verify_caddy_binary "$temp_dir/caddy" "$version"; then
+    if ! speakeasy_verify_caddy_source "$temp_dir/caddy" "$version"; then
         rm -rf "$temp_dir"
         return 1
     fi
@@ -240,7 +272,7 @@ speakeasy_verify_bundle_layout() {
         return 1
     fi
 
-    if ! speakeasy_verify_caddy_binary "$caddy_helper" "$(speakeasy_caddy_version)"; then
+    if ! speakeasy_verify_caddy_source "$caddy_helper" "$(speakeasy_caddy_version)"; then
         echo "Bundled secure Deck helper is invalid: $caddy_helper" >&2
         return 1
     fi
@@ -254,6 +286,15 @@ speakeasy_verify_bundle_layout() {
         echo "Bundled Caddy license notice is missing." >&2
         return 1
     fi
+
+    for resource in \
+        "$resources_dir/SpeakEasy_SpeakEasy.bundle/codex-desktop-bridge.cjs" \
+        "$resources_dir/SpeakEasy_SpeakEasy.bundle/Pad/index.html"; do
+        if [ ! -s "$resource" ]; then
+            echo "SwiftPM runtime resource is missing from Contents/Resources: $resource" >&2
+            return 1
+        fi
+    done
 
     if find "$bundle_path/Contents/MacOS" -maxdepth 1 -type d -name '*.framework' -print -quit \
         | grep -q .; then

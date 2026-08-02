@@ -8,9 +8,11 @@
 
 ## Path A — full Codex voice loop (recommended on Apple silicon Macs)
 
-Use this when the user asks to install the native app, use dictation, connect an
-iPad/browser Deck, or speak with a real Codex task. Release `0.2.18` requires an
-Apple silicon Mac running macOS 14 or newer.
+Use this when the user asks to install the native app, use Mac dictation, or
+speak with a real Codex task. Release `0.2.18` is an immutable core preview for
+an Apple silicon Mac running macOS 14 or newer. **Do not present its browser or
+iPad Deck as the supported device path.** That path begins with `0.2.19`, whose
+bundled paired-HTTPS transport must pass the public clean-device gate first.
 
 Download the pinned installer to a temporary file. **Inspect it before running;
 do not pipe a network response directly into a shell.**
@@ -34,9 +36,10 @@ The installer must pass all of these before it changes `/Applications`:
 - exact app version `0.2.18`.
 
 It then opens **SpeakEasy Settings → Deck**. Report which checklist rows are
-ready and which human-only steps remain. The user—not the agent—approves
-microphone and local-network permissions. Do not bypass Gatekeeper, remove
-quarantine attributes, install a floating `latest` build, or build from source.
+ready and which human-only steps remain, but keep the `0.2.18` acceptance run on
+the Mac. The user—not the agent—approves microphone and local-network
+permissions. Do not bypass Gatekeeper, remove quarantine attributes, install a
+floating `latest` build, or build from source.
 
 ## Path B — TTS CLI only (Node.js 22.12+ or Bun 1.0+)
 
@@ -86,16 +89,17 @@ session so it scans the skill, and follow the SKILL.md. Use Path A for the
 full dual-mode app instead of relying on the older CLI app bootstrap.
 (`speakeasy plugin claude` installs the same skill for Claude Code.)
 
-## The deck (only when the user asks)
+## The Deck (developer/source use until 0.2.19)
 
 ```bash
 npx @arach/speakeasy deck
 ```
 
-Leave the process running. It serves the SpeakEasy control surface on the local
-network and prints a QR code — the user scans it with an iPad and pins the page
-to their Home Screen. Ctrl+C stops the server. Themes ride in the URL:
-`?theme=paper|ember|flight`.
+Do not use the `0.2.18` packaged app for this path. In current source or the
+signed `0.2.19` candidate, leave the process running. It serves the paired
+HTTPS control surface on the local network and prints the certificate-bootstrap
+link plus QR code. Trust the local CA on the iPad first, then scan the HTTPS QR
+and pin the page to the Home Screen. Ctrl+C stops the server.
 
 ## Boundaries
 
