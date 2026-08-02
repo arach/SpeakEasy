@@ -1,5 +1,7 @@
 import SwiftUI
 import WebKit
+import Security
+import OSLog
 
 /// The deck's web surface with the native speech bridge attached.
 ///
@@ -10,6 +12,7 @@ import WebKit
 final class DeckWebController: NSObject, ObservableObject, WKNavigationDelegate, WKScriptMessageHandler {
     let webView: WKWebView
     let capture = SpeechCapture()
+    private let logger = Logger(subsystem: "dev.arach.speakeasy.deck", category: "web-surface")
 
     var deckURL: URL? {
         didSet { loadIfNeeded() }
@@ -46,6 +49,38 @@ final class DeckWebController: NSObject, ObservableObject, WKNavigationDelegate,
         // the deck page ships with the server build — never let a stale
         // WKWebView cache hold an old copy
         webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+    }
+
+    /// A direct Xcode install carries this Mac's public CA anchor in the app's
+    /// Keychain. Trust remains scoped to this WKWebView and this paired host;
+    /// it never changes the iPad's system trust settings.
+    func webView(
+        _ webView: WKWebView,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust,
+              let pairedHost = deckURL?.host,
+              challenge.protectionSpace.host.caseInsensitiveCompare(pairedHost) == .orderedSame,
+              let anchor = DeckProvisioning.trustAnchor else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        SecTrustSetAnchorCertificates(trust, [anchor] as CFArray)
+        SecTrustSetAnchorCertificatesOnly(trust, true)
+        var error: CFError?
+        guard SecTrustEvaluateWithError(trust, &error) else {
+            logger.error("Rejected paired Deck certificate: \(error?.localizedDescription ?? "unknown trust error", privacy: .public)")
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+        completionHandler(.useCredential, URLCredential(trust: trust))
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        logger.error("Deck navigation failed: \(error.localizedDescription, privacy: .public)")
     }
 
     // JS → native: capture phases from the page's host bridge
