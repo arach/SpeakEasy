@@ -10,19 +10,31 @@ have the SpeakEasy repository, Bun, Xcode, or a prior SpeakEasy installation.
 - both Macs and the iPad/browser on the same Wi-Fi for Deck testing
 - no SpeakEasy process running and no `/Applications/SpeakEasy.app`
 
-## Install without developer tools
+## Install with Codex, without developer tools
 
-1. Open the SpeakEasy website and download `SpeakEasy.dmg`.
-2. Confirm Safari or the browser completes the download without a warning.
-3. Open the DMG and drag SpeakEasy to Applications.
-4. Launch SpeakEasy from Applications.
+1. Open the SpeakEasy website at `/codex/#codex-install`.
+2. Copy the pinned installation prompt into a new Codex task on the test Mac.
+3. Let Codex download and inspect `install-speakeasy.sh`, then approve running
+   the inspected local file.
+4. Watch Codex report the checksum, Gatekeeper, Developer ID, version, and
+   `/Applications` replacement checks.
+5. Confirm SpeakEasy opens directly to **Settings → Deck**.
 
 Pass criteria:
 
-- Gatekeeper opens the app normally—no **unidentified developer** warning and
-  no right-click workaround.
+- Codex uses the exact `0.2.18` asset—not a floating latest release—and does not
+  use a `curl | sh` shortcut.
+- The published SHA-256, Gatekeeper assessment, bundle ID, Developer ID team,
+  and exact app version all pass before `/Applications` changes.
+- Gatekeeper accepts the app normally—no **unidentified developer** warning,
+  quarantine bypass, or right-click workaround.
 - SpeakEasy appears in the menu bar.
 - The app does not request Bun, Xcode, Node, a repository, or a terminal step.
+- Codex clearly separates completed machine checks from the microphone and
+  local-network prompts that require the user.
+
+If the Codex path fails, record the exact failing check before using the manual
+fallback: download `SpeakEasy.dmg`, drag it to Applications, and open the app.
 
 ## Complete guided setup
 

@@ -1,12 +1,44 @@
 # SpeakEasy — instructions for coding agents
 
-> SpeakEasy gives agents a voice: spoken summaries through a text-to-speech CLI,
-> and on macOS a native menu-bar player with a word-synced HUD. This page is a
-> runbook. Two installs are below — pick the one that matches your host, follow it
-> exactly, and verify before speaking. No API keys are required; the macOS system
-> voice is the default.
+> SpeakEasy is a dual-mode voice companion: spoken agent responses through its
+> native player, and local dictation routed into an exact Codex Desktop task.
+> This page is an agent runbook. Pick the smallest path that satisfies the user's
+> request, follow it exactly, and report every check. No API keys are required;
+> the macOS system voice is the default.
 
-## Path A — npm CLI (any agent, any host with Node 18+)
+## Path A — full Codex voice loop (recommended on Apple silicon Macs)
+
+Use this when the user asks to install the native app, use dictation, connect an
+iPad/browser Deck, or speak with a real Codex task. Release `0.2.18` requires an
+Apple silicon Mac running macOS 14 or newer.
+
+Download the pinned installer to a temporary file. **Inspect it before running;
+do not pipe a network response directly into a shell.**
+
+```bash
+installer="$(mktemp "${TMPDIR:-/tmp}/install-speakeasy.XXXXXX")"
+curl --fail --location --proto '=https' --tlsv1.2 \
+  https://github.com/arach/SpeakEasy/releases/download/v0.2.18/install-speakeasy.sh \
+  --output "$installer"
+sed -n '1,260p' "$installer"
+bash -n "$installer"
+bash "$installer"
+rm -f "$installer"
+```
+
+The installer must pass all of these before it changes `/Applications`:
+
+- published SHA-256 for the exact `0.2.18` DMG;
+- Gatekeeper acceptance of the signed, notarized DMG and app;
+- bundle ID `com.speakeasy.config` and Developer ID team `2U83JFPW66`;
+- exact app version `0.2.18`.
+
+It then opens **SpeakEasy Settings → Deck**. Report which checklist rows are
+ready and which human-only steps remain. The user—not the agent—approves
+microphone and local-network permissions. Do not bypass Gatekeeper, remove
+quarantine attributes, install a floating `latest` build, or build from source.
+
+## Path B — TTS CLI only (any agent, any host with Node 18+)
 
 Install ad hoc, nothing written to the project (preferred):
 
@@ -39,7 +71,7 @@ npx @arach/speakeasy --provider system "<one sentence, plain words>"
 Summary rules: under ~15 words, spoken style, no emoji, no code, no file paths.
 Say what changed, e.g. "Done, the login form now validates email addresses."
 
-## Path B — Codex skill (macOS 14+, Bun)
+## Path C — Codex skill and native playback controls (macOS 14+, Bun)
 
 The native skill plays through the signed SpeakEasy menu-bar player: autoplay,
 queue, transport controls, playback speed, and a word-synced HUD. Install it:
@@ -50,11 +82,9 @@ npx @arach/speakeasy plugin codex
 
 This downloads the skill from the latest GitHub release into
 `~/.codex/skills/speakeasy` and runs a health check. Then start a new Codex
-session so it scans the skill, and follow the SKILL.md. If the SpeakEasy app is
-missing, the runtime downloads the signed, notarized app from the official
-GitHub release — run that install only when the user has asked to use or
-install SpeakEasy. (`speakeasy plugin claude` installs the same skill for
-Claude Code.)
+session so it scans the skill, and follow the SKILL.md. Use Path A for the
+full dual-mode app instead of relying on the older CLI app bootstrap.
+(`speakeasy plugin claude` installs the same skill for Claude Code.)
 
 ## The deck (only when the user asks)
 
@@ -69,11 +99,12 @@ to their Home Screen. Ctrl+C stops the server. Themes ride in the URL:
 
 ## Boundaries
 
-- Always: verify with the silent check (Path A) or `--doctor` (Path B) before
-  the first real summary; use `--provider system` unless the user has configured
-  another provider.
+- Always: preserve the exact release pin and trust checks in Path A. For the TTS
+  CLI, verify with the silent check or `--doctor` before the first real summary;
+  use `--provider system` unless the user has configured another provider.
 - Ask first: before installing into the project instead of `npx`; before
-  downloading the native app; before starting the deck server.
+  downloading the native app when the user's request did not already authorize
+  installation; before starting the deck server.
 - Never: speak secrets, tokens, keys, or credentials; ask the user for API keys
   or write keys to config yourself. If a cloud voice is wanted, point the user
   to `npx @arach/speakeasy --doctor`.

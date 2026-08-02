@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, Check, Download, ExternalLink, Laptop, ShieldCheck, Sparkles } from "lucide-react"
+import { Check, Download, ExternalLink, Laptop, ShieldCheck, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,9 +11,9 @@ import {
 } from "@/lib/release"
 
 const steps = [
-  ["1", "Drag to Applications", "The DMG contains the complete native app and Deck runtime."],
-  ["2", "Open SpeakEasy", "macOS verifies the Developer ID signature and notarization ticket."],
-  ["3", "Complete three checks", "Settings confirms the runtime, Codex, and live bridge before showing your device link."],
+  ["1", "Give Codex the prompt", "It downloads and inspects the pinned release installer—never a floating latest build."],
+  ["2", "Let it verify everything", "Checksum, Gatekeeper, Developer ID, version, and safe app replacement are checked in order."],
+  ["3", "Approve the human steps", "You grant microphone and local-network access; Settings verifies Codex and the live bridge."],
 ]
 
 export default function DownloadSection() {
@@ -33,21 +33,21 @@ export default function DownloadSection() {
               </span>
             </h2>
             <p className="mt-6 max-w-2xl text-lg font-light leading-8 text-white/58">
-              No repository, Bun, Xcode, or server setup. Install one notarized Mac app, let its guided checklist find Codex, then speak into the exact task you choose.
+              No repository, Bun, Xcode, or server setup. Give Codex one bounded installation task; it verifies and opens the notarized app, then tells you exactly which human permissions remain.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="rounded-xl bg-emerald-300 px-6 font-semibold text-slate-950 hover:bg-emerald-200">
-                <a href={releaseDownloadUrl}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download SpeakEasy.dmg
-                </a>
+                <Link href="/codex/#codex-install">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Install with Codex
+                </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="rounded-xl border-white/15 bg-white/[0.04] px-6 text-white hover:bg-white/[0.08] hover:text-white">
-                <Link href="/codex/#setup">
-                  See first-run setup
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
+                <a href={releaseDownloadUrl}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download DMG
+                </a>
               </Button>
             </div>
 
@@ -65,8 +65,8 @@ export default function DownloadSection() {
                   <Laptop className="h-4 w-4" />
                 </span>
                 <div>
-                  <div className="text-sm font-semibold">First conversation</div>
-                  <div className="mt-0.5 text-xs text-white/35">Usually three deliberate steps</div>
+                  <div className="text-sm font-semibold">Codex-assisted setup</div>
+                  <div className="mt-0.5 text-xs text-white/35">Automation with explicit trust checks</div>
                 </div>
               </div>
               <ShieldCheck className="h-5 w-5 text-emerald-300" />

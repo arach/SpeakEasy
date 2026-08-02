@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import CodexInstallPrompt from "@/components/codex-install-prompt"
 import SiteFooter from "@/components/site-footer"
 import SiteNav from "@/components/site-nav"
 import { releaseDownloadUrl, releaseRequirements, releaseVersion } from "@/lib/release"
@@ -56,13 +57,13 @@ export default function CodexPage() {
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="rounded-xl bg-slate-900 px-6 text-white hover:bg-slate-800">
-                <a href={releaseDownloadUrl}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download for Mac
+                <a href="#codex-install">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Install with Codex
                 </a>
               </Button>
               <Button asChild size="lg" variant="outline" className="rounded-xl border-slate-300 bg-white px-6 text-slate-700">
-                <a href="#setup">See first-run setup <ArrowRight className="ml-2 h-4 w-4" /></a>
+                <a href={releaseDownloadUrl}><Download className="mr-2 h-4 w-4" />Download DMG</a>
               </Button>
             </div>
             <p className="mt-5 text-xs leading-5 text-slate-500">
@@ -221,19 +222,25 @@ export default function CodexPage() {
 
       <section id="setup" className="border-y border-slate-200/60 bg-white px-4 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">First run</span>
-              <h2 className="mt-4 font-display text-4xl font-extralight text-slate-900 sm:text-5xl">From download to a live lane.</h2>
-              <p className="mt-5 text-base font-light leading-7 text-slate-600">
-                The release carries its own Deck runtime. Setup checks the real dependencies in order and never presents a device link before the data plane answers.
-              </p>
-              <Button asChild size="lg" className="mt-8 rounded-xl bg-slate-900 text-white hover:bg-slate-800">
-                <a href={releaseDownloadUrl}><Download className="mr-2 h-4 w-4" />Download {releaseVersion}</a>
-              </Button>
-            </div>
+          <div className="mx-auto max-w-3xl text-center">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">First run</span>
+            <h2 className="mt-4 font-display text-4xl font-extralight text-slate-900 sm:text-5xl">Let Codex handle the mechanical work.</h2>
+            <p className="mt-5 text-base font-light leading-7 text-slate-600">
+              Installation is itself a Codex task: it can fetch the exact release, inspect the installer, verify every trust boundary, and open the guided setup. You stay in the loop for the permissions only macOS can ask you to approve.
+            </p>
+          </div>
 
-            <ol className="overflow-hidden rounded-3xl border border-slate-200/70 bg-slate-50/70 shadow-xl shadow-slate-900/5">
+          <div className="mt-12 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+            <CodexInstallPrompt />
+
+            <div>
+              <div className="mb-4 flex items-center justify-between px-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Manual fallback</span>
+                <a href={releaseDownloadUrl} className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-600">
+                  Download DMG <Download className="h-3.5 w-3.5" />
+                </a>
+              </div>
+              <ol className="overflow-hidden rounded-3xl border border-slate-200/70 bg-slate-50/70 shadow-xl shadow-slate-900/5">
               {[
                 ["1", "Install", "Open the DMG and drag SpeakEasy to Applications."],
                 ["2", "Allow", "Open the app and approve microphone and local-network access when macOS asks."],
@@ -249,7 +256,8 @@ export default function CodexPage() {
                   </div>
                 </li>
               ))}
-            </ol>
+              </ol>
+            </div>
           </div>
         </div>
       </section>

@@ -16,6 +16,15 @@ task's real response through the native player.
 
 ## Install the preview
 
+The recommended path is to give Codex this bounded task:
+
+> Install SpeakEasy 0.2.18 on this Mac. Read
+> https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
+> source or bypass Gatekeeper. Tell me which human-only steps remain.
+
+Codex inspects the pinned installer before running it and reports the checksum,
+Gatekeeper, Developer ID, and exact-version checks. For a manual fallback:
+
 1. [Download SpeakEasy.dmg](https://github.com/arach/SpeakEasy/releases/download/v0.2.18/SpeakEasy.dmg).
 2. Drag SpeakEasy to Applications and open it.
 3. Approve microphone and local-network access when macOS asks.

@@ -127,7 +127,19 @@ comes online.
 ## Installation
 
 For the complete macOS app—local dictation, exact Codex task lanes, native
-narration, and the Deck—download the signed and notarized release:
+narration, and the Deck—the recommended installation flow is a bounded Codex
+task. Paste this into Codex:
+
+> Install SpeakEasy 0.2.18 on this Mac. Read
+> https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
+> source or bypass Gatekeeper. Tell me which human-only steps remain.
+
+Codex downloads and inspects the pinned installer, verifies the published
+checksum, Gatekeeper acceptance, Developer ID, and exact version, safely
+replaces the app, and opens **Settings → Deck**. You only approve the microphone
+and local-network prompts that macOS requires a person to handle.
+
+For a manual install, download the same signed and notarized release:
 
 **[Download SpeakEasy 0.2.18 for macOS](https://github.com/arach/SpeakEasy/releases/download/v0.2.18/SpeakEasy.dmg)**
 
