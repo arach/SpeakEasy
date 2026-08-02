@@ -3,15 +3,15 @@ import { LegalPage } from "@/components/legal-page"
 
 export const metadata: Metadata = {
   title: "Privacy Policy - SpeakEasy",
-  description: "How SpeakEasy handles text, audio, provider credentials, and website analytics.",
+  description: "How SpeakEasy handles microphone capture, transcription, narration, provider credentials, and website analytics.",
 }
 
 export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      summary="SpeakEasy is a local-first text-to-speech tool. This policy describes the data the app and plugin use to create and play speech."
-      updated="July 24, 2026"
+      summary="SpeakEasy is a local-network voice companion and text-to-speech tool. This policy describes how its Mac, browser, and iPad surfaces handle microphone audio, transcripts, narration, and credentials."
+      updated="August 2, 2026"
     >
       <section>
         <h2>What SpeakEasy processes</h2>
@@ -19,6 +19,57 @@ export default function PrivacyPage() {
           SpeakEasy processes the text you choose to narrate, audio generated from that text, player
           state, and local configuration such as your preferred provider and voice. Its playback queue,
           cache, and history are stored on your Mac.
+        </p>
+      </section>
+
+      <section>
+        <h2>Microphone capture and transcription</h2>
+        <p>
+          SpeakEasy opens a microphone only after you explicitly start a voice turn and stops when
+          you finish or cancel it. A voice turn can begin on the Mac, in the paired browser Deck, or
+          in the native iPad developer preview.
+        </p>
+        <p>
+          On the Mac, SpeakEasy prefers its bundled Parakeet model, which performs transcription on
+          that Mac. It can use Apple Speech while Parakeet warms or as a fallback. SpeakEasy requests
+          on-device Apple recognition when the operating system reports support; otherwise Apple&apos;s
+          handling is governed by the Mac&apos;s capabilities, settings, and Apple&apos;s privacy terms.
+          Audio is not sent to Arach.
+        </p>
+        <p>
+          The browser Deck records on the browser device, then sends a bounded audio file over the
+          paired local-network HTTPS connection to the selected Mac. The native iPad shell first
+          tries Apple Speech; Apple&apos;s handling of that request is governed by the device&apos;s
+          capabilities, settings, and Apple&apos;s privacy terms. If Apple Speech is unavailable or does
+          not return a final transcript, the shell sends its fallback recording to the paired Mac
+          for Parakeet transcription.
+        </p>
+        <p>
+          Mac-side upload directories are owner-only and recordings are mode <code>0600</code>. The
+          temporary upload is deleted immediately after the transcription request finishes, whether
+          it succeeds or fails. The native iPad shell also deletes its temporary recording after the
+          Apple Speech or Mac fallback path completes. SpeakEasy does not retain voice-turn audio as
+          narration history or upload it to an Arach server.
+        </p>
+      </section>
+
+      <section>
+        <h2>Local-network Deck</h2>
+        <p>
+          The Deck connects directly to a Mac on the same local network. Paired sessions use a
+          temporary secret and local HTTPS. The Deck exchanges task display state, explicit control
+          commands, transcripts, narration state, and—only for device microphone turns—the bounded
+          recording described above. SpeakEasy does not relay this traffic through an Arach service.
+        </p>
+      </section>
+
+      <section>
+        <h2>Codex tasks and transcripts</h2>
+        <p>
+          When you send a voice turn, SpeakEasy submits the final transcript to the exact Codex
+          Desktop task you selected. The transcript, Codex response, tool activity, and task history
+          remain in Codex and are governed by your Codex account, application, and retention settings.
+          SpeakEasy does not create an Arach-hosted copy of that conversation.
         </p>
       </section>
 
@@ -43,11 +94,13 @@ export default function PrivacyPage() {
       <section>
         <h2>Retention and deletion</h2>
         <p>
-          Arach does not retain your narration text, generated audio, queue, history, or provider
-          credentials on an Arach server. Local settings remain in <code>~/.config/speakeasy</code>
-          until you edit or remove them. Cached audio remains until its configured time-to-live or
-          size policy removes it, or until you clear it manually. Local narration history remains
-          until you remove it. Audio files saved to a path you selected remain until you delete them.
+          Arach does not retain your microphone audio, transcripts, narration text, generated audio,
+          queue, history, or provider credentials on an Arach server. Voice-turn recordings are
+          temporary and are deleted as described above. Local settings remain in
+          <code>~/.config/speakeasy</code> until you edit or remove them. Cached narration audio
+          remains until its configured time-to-live or size policy removes it, or until you clear it
+          manually. Local narration history remains until you remove it. Audio files saved to a path
+          you selected remain until you delete them.
         </p>
         <p>
           You can clear the CLI cache with <code>speakeasy --clear-cache</code>, remove local history
@@ -61,8 +114,9 @@ export default function PrivacyPage() {
         <h2>Collection by SpeakEasy</h2>
         <p>
           The SpeakEasy app, CLI, and plugin do not operate an Arach account service and do not send
-          narration text, generated audio, queue contents, or provider credentials to Arach. App
-          installation checks GitHub Releases to download the signed macOS application.
+          microphone audio, transcripts, narration text, generated audio, queue contents, or
+          provider credentials to Arach. App installation checks GitHub Releases to download the
+          signed macOS application.
         </p>
       </section>
 
@@ -81,6 +135,8 @@ export default function PrivacyPage() {
       <section>
         <h2>Your choices</h2>
         <ul>
+          <li>Use only the Mac microphone path to keep capture and transcription on the Mac.</li>
+          <li>Use the browser or iPad Deck only on a local network you trust.</li>
           <li>Use the macOS system provider to keep speech synthesis on-device.</li>
           <li>Remove cached audio, history, or configuration from your local SpeakEasy directories.</li>
           <li>Revoke provider credentials with the provider that issued them.</li>
