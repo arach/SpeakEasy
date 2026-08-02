@@ -445,6 +445,15 @@ final class PlayerProtocolTests: XCTestCase {
         XCTAssertNil(CodexTaskLink.url(threadId: ""))
     }
 
+    func testPackagedResourceResolverFindsTheCodexBridge() {
+        let bridge = SpeakEasyResources.url(
+            forResource: "codex-desktop-bridge",
+            withExtension: "cjs"
+        )
+        XCTAssertNotNil(bridge)
+        XCTAssertTrue(FileManager.default.isReadableFile(atPath: bridge?.path ?? ""))
+    }
+
     @MainActor
     func testPlayerSettingsClampToSupportedRanges() {
         let engine = PlaybackEngine.shared
