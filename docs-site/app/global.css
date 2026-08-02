@@ -1,0 +1,490 @@
+/**
+ * SpeakEasy Docs - Dewey Warm Theme
+ * Based on @arach/dewey warm color preset
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..700&family=Space+Grotesk:wght@300..700&display=swap');
+@import 'tailwindcss';
+@import 'fumadocs-ui/style.css';
+
+/* ============================================
+   Fumadocs Color Overrides - Warm Theme
+   ============================================ */
+
+:root {
+  /* Core Fumadocs color variables - Warm palette */
+  --color-fd-background: #f7f3ec;
+  --color-fd-foreground: #101518;
+  --color-fd-muted: rgba(16, 21, 24, 0.04);
+  --color-fd-muted-foreground: #5c676c;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #101518;
+  --color-fd-card: rgba(255, 255, 255, 0.75);
+  --color-fd-card-foreground: #101518;
+  --color-fd-border: rgba(16, 21, 24, 0.12);
+  --color-fd-primary: #1f7a65;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: rgba(255, 255, 255, 0.75);
+  --color-fd-secondary-foreground: #101518;
+  --color-fd-accent: rgba(31, 122, 101, 0.12);
+  --color-fd-accent-foreground: #1f7a65;
+  --color-fd-ring: #1f7a65;
+
+  /* Layout dimensions */
+  --fd-sidebar-width: 260px;
+  --fd-toc-width: 200px;
+
+  /* Custom tokens */
+  --dw-background: #f7f3ec;
+  --dw-foreground: #101518;
+  --dw-primary: #1f7a65;
+  --dw-muted: #5c676c;
+  --dw-border: rgba(16, 21, 24, 0.12);
+  --dw-sidebar-active: #1f7a65;
+  --dw-sidebar-active-bg: rgba(31, 122, 101, 0.12);
+
+  /* Fonts */
+  --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Fraunces', ui-serif, Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+.dark {
+  --color-fd-background: #0f1418;
+  --color-fd-foreground: #e5e7eb;
+  --color-fd-muted: rgba(255, 255, 255, 0.05);
+  --color-fd-muted-foreground: #6b7280;
+  --color-fd-popover: #1a1d21;
+  --color-fd-popover-foreground: #e5e7eb;
+  --color-fd-card: rgba(255, 255, 255, 0.03);
+  --color-fd-card-foreground: #e5e7eb;
+  --color-fd-border: rgba(255, 255, 255, 0.08);
+  --color-fd-primary: #34d399;
+  --color-fd-primary-foreground: #0f1418;
+  --color-fd-secondary: rgba(255, 255, 255, 0.03);
+  --color-fd-secondary-foreground: #e5e7eb;
+  --color-fd-accent: rgba(52, 211, 153, 0.15);
+  --color-fd-accent-foreground: #34d399;
+  --color-fd-ring: #34d399;
+
+  --dw-background: #0f1418;
+  --dw-foreground: #e5e7eb;
+  --dw-primary: #34d399;
+  --dw-muted: #6b7280;
+  --dw-border: rgba(255, 255, 255, 0.08);
+  --dw-sidebar-active: #34d399;
+  --dw-sidebar-active-bg: rgba(52, 211, 153, 0.15);
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--dw-background);
+  color: var(--dw-foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   Layout Container
+   ============================================ */
+
+#nd-docs-layout {
+  background: var(--dw-background);
+}
+
+/* ============================================
+   Navbar / Header
+   ============================================ */
+
+nav {
+  background: color-mix(in srgb, var(--dw-background) 90%, transparent) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--dw-border) !important;
+}
+
+/* Brand styling */
+nav a[href="/docs"] {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ============================================
+   Sidebar
+   ============================================ */
+
+#nd-sidebar {
+  background: color-mix(in srgb, var(--dw-background) 95%, transparent) !important;
+  border-right: 1px solid var(--dw-border) !important;
+  padding: 8px 8px 8px 0 !important;
+}
+
+/* Reset excessive padding from Fumadocs */
+#nd-sidebar > div {
+  padding: 0 !important;
+}
+
+#nd-sidebar nav,
+#nd-sidebar ul,
+#nd-sidebar li {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+/* Sidebar navigation links */
+#nd-sidebar a {
+  border-radius: 6px;
+  font-size: 14px;
+  padding: 6px 10px !important;
+  margin: 1px 0 !important;
+  margin-left: 0 !important;
+  color: var(--dw-muted);
+  transition: all 150ms ease;
+}
+
+#nd-sidebar a:hover {
+  background: rgba(31, 122, 101, 0.06);
+  color: var(--dw-foreground);
+}
+
+#nd-sidebar a[data-active="true"],
+#nd-sidebar a[aria-current="page"] {
+  background: var(--dw-sidebar-active-bg) !important;
+  color: var(--dw-sidebar-active) !important;
+  font-weight: 500;
+}
+
+/* Sidebar group titles / separators */
+#nd-sidebar p,
+#nd-sidebar [data-separator],
+#nd-sidebar span[class*="text-fd-muted"] {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dw-muted) !important;
+  padding: 12px 0 4px 0 !important;
+  margin: 4px 0 0 0 !important;
+}
+
+/* Sidebar folder buttons */
+#nd-sidebar button {
+  font-size: 14px;
+  color: var(--dw-muted);
+  border-radius: 6px;
+  padding: 6px 10px !important;
+  margin: 1px 0 !important;
+  margin-left: 0 !important;
+}
+
+#nd-sidebar button:hover {
+  background: rgba(31, 122, 101, 0.06);
+  color: var(--dw-foreground);
+}
+
+/* Remove all nested padding */
+#nd-sidebar * {
+  padding-left: revert;
+}
+
+#nd-sidebar div[class*="flex"],
+#nd-sidebar div[class*="pl-"] {
+  padding-left: 0 !important;
+}
+
+/* ============================================
+   Table of Contents (Right Sidebar)
+   ============================================ */
+
+/* TOC container */
+aside[class*="toc"],
+div[class*="toc"] {
+  font-size: 13px;
+  padding-left: 16px !important;
+}
+
+/* TOC title */
+aside[class*="toc"] p:first-child,
+div[class*="toc"] p:first-child {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--dw-muted) !important;
+  margin-bottom: 12px;
+  padding-left: 0 !important;
+}
+
+/* TOC links */
+aside[class*="toc"] a,
+div[class*="toc"] a {
+  font-size: 12px;
+  color: var(--dw-muted);
+  padding: 3px 0 3px 12px !important;
+  margin-left: 0 !important;
+  line-height: 1.4;
+  transition: color 150ms ease;
+  display: block;
+  border-left: 2px solid transparent;
+}
+
+aside[class*="toc"] a:hover,
+div[class*="toc"] a:hover {
+  color: var(--dw-foreground);
+}
+
+aside[class*="toc"] a[data-active="true"],
+div[class*="toc"] a[data-active="true"] {
+  color: var(--dw-primary) !important;
+  font-weight: 500;
+  border-left-color: var(--dw-primary) !important;
+}
+
+/* ============================================
+   Main Content Area
+   ============================================ */
+
+/* Page container with card styling */
+article,
+main > div > div {
+  max-width: 80ch;
+}
+
+/* Page title */
+h1 {
+  font-family: var(--font-serif);
+  font-size: 2.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--dw-foreground);
+  margin-bottom: 0.5rem;
+}
+
+/* Page description (first paragraph after title) */
+article > p:first-of-type,
+.prose > p:first-of-type {
+  font-size: 1.125rem;
+  color: var(--dw-muted);
+  line-height: 1.6;
+}
+
+/* Section headings */
+h2 {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--dw-border);
+  color: var(--dw-foreground);
+}
+
+h2:first-of-type {
+  margin-top: 2rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+h3 {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: var(--dw-foreground);
+}
+
+h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Paragraphs */
+p {
+  margin-bottom: 1rem;
+  line-height: 1.7;
+}
+
+/* Links in content */
+article a:not([class]),
+.prose a:not([class]) {
+  color: var(--dw-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+article a:not([class]):hover,
+.prose a:not([class]):hover {
+  text-decoration: underline;
+}
+
+/* Lists */
+ul, ol {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+li {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+li::marker {
+  color: var(--dw-primary);
+}
+
+/* Strong text */
+strong {
+  font-weight: 600;
+  color: var(--dw-foreground);
+}
+
+/* ============================================
+   Code Blocks
+   ============================================ */
+
+pre {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid var(--dw-border) !important;
+  border-radius: 12px !important;
+  padding: 1rem !important;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.dark pre {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Inline code */
+code:not(pre code) {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--dw-foreground);
+}
+
+.dark code:not(pre code) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   Tables
+   ============================================ */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 14px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--dw-border);
+}
+
+th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dw-muted);
+  background: rgba(0, 0, 0, 0.02);
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--dw-border);
+}
+
+.dark th {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--dw-border);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* ============================================
+   Blockquotes & Callouts
+   ============================================ */
+
+blockquote {
+  border-left: 3px solid var(--dw-primary);
+  padding-left: 1rem;
+  margin: 1.5rem 0;
+  color: var(--dw-muted);
+  font-style: italic;
+}
+
+/* ============================================
+   Horizontal Rules
+   ============================================ */
+
+hr {
+  border: none;
+  border-top: 1px solid var(--dw-border);
+  margin: 2.5rem 0;
+}
+
+/* ============================================
+   Search
+   ============================================ */
+
+[data-search] {
+  border-radius: 10px;
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+
+@media (max-width: 1280px) {
+  :root {
+    --fd-toc-width: 180px;
+  }
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --fd-toc-width: 0px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --fd-sidebar-width: 280px;
+  }
+
+  h1 {
+    font-size: 1.875rem;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  pre {
+    border-radius: 8px !important;
+    font-size: 12px;
+  }
+}

@@ -752,7 +752,14 @@ export async function runDeck(argv: string[]): Promise<void> {
   // the settings app discovers the deck through this file — the canonical URL
   // (https/vanity aware, token in the fragment) travels with it
   if (dataPlane) {
-    writeDiscovery({ pid: process.pid, port, dataPort, host, token, url: padUrl });
+    writeDiscovery({
+      pid: process.pid,
+      port,
+      dataPort: dataPlane.dataPort,
+      host,
+      token,
+      url: padUrl,
+    });
   }
 
   console.log('');

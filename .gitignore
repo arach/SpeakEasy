@@ -1,5 +1,9 @@
 # Dependencies
 node_modules/
+package-lock.json
+docs-site/node_modules/
+docs-site/.next/
+docs-site/.source/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -41,16 +45,53 @@ Thumbs.db
 # Config files with secrets
 config.json
 config.local.json
+.npmrc
 
 # Claude files
 .claude/
 .settings.json
 .settings.local.json
 
+# Agent skill symlinks (created by dewey/skills installers)
+.agent/
+.agents/*
+!.agents/plugins/
+.agents/plugins/*
+!.agents/plugins/marketplace.json
+.cline/
+.codebuddy/
+.codex/
+.commandcode/
+.continue/
+.crush/
+.cursor/
+.factory/
+.gemini/
+.github/skills/
+.goose/
+.kilocode/
+.kiro/
+.mcpjam/
+.mux/
+.neovate/
+.opencode/
+.openhands/
+.pi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+.zencoder/
+skills/
+!plugins/speakeasy/skills/
+!plugins/speakeasy/skills/**
+
 # Test files
 test-*.js
 test-*.json
 gemini-*
 test-request.json
+
 # OpenScout local state
 .openscout/project.json

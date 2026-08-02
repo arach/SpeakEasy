@@ -1,0 +1,4 @@
+interface:
+  display_name: "SpeakEasy"
+  short_description: "Narrate through the native menu-bar player"
+  default_prompt: "Use $speakeasy to read this summary aloud."

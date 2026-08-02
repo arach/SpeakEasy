@@ -1,23 +1,18 @@
 {
   "name": "@arach/speakeasy",
   "version": "0.2.18",
-  "description": "SpeakEasy - Unified text-to-speech service with provider abstraction",
+  "description": "Convenient TTS CLI for Mac \u2014 centralized credentials + configurable caching so all your apps and agents can speak.",
+  "homepage": "https://speakeasy.arach.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arach/SpeakEasy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/arach/SpeakEasy/issues"
+  },
   "private": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": {
-    ".": "./dist/index.js"
-  },
-  "scripts": {
-    "build": "tsup src/index.ts src/bin/speakeasy-cli.ts --dts --format cjs",
-    "dev": "tsc --watch",
-    "test": "node dist/test.js",
-    "example": "npm run build && node examples/basic-usage.js",
-    "cli": "npm run build && node dist/bin/speakeasy-cli.js"
-  },
-  "bin": {
-    "speakeasy": "dist/bin/speakeasy-cli.js"
-  },
   "files": [
     "dist",
     "!dist/test.*",
@@ -25,6 +20,30 @@
     "deck/themes.json",
     "deck/variants"
   ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/bin/speakeasy-cli.ts --dts --format cjs --external node:sqlite --external bun:sqlite",
+    "build:plugin-runtime": "bun build src/bin/speakeasy-cli.ts --target=bun --outfile plugins/speakeasy/skills/speakeasy/runtime/speakeasy-cli.js",
+    "package:plugin-submission": "plugins/speakeasy/tools/build-submission.sh",
+    "verify:plugin-bundle": "plugins/speakeasy/tools/verify-skill-bundle.sh",
+    "prepublishOnly": "pnpm run build && rm -f dist/test.js dist/test.d.ts dist/test.js.map dist/test.d.ts.map",
+    "dev": "tsc --watch",
+    "test": "node dist/test.js",
+    "test:privacy": "bun test src/privacy-permissions.test.ts",
+    "test:cache": "pnpm run build && node scripts/cache-test.js",
+    "example": "pnpm run build && node examples/basic-usage.js",
+    "cli": "pnpm run build && node dist/bin/speakeasy-cli.js",
+    "docs": "cd docs-site && pnpm dev",
+    "docs:build": "cd docs-site && pnpm build"
+  },
+  "bin": {
+    "speakeasy": "dist/bin/speakeasy-cli.js"
+  },
   "keywords": [
     "tts",
     "speech",
@@ -38,31 +57,37 @@
   ],
   "author": "arach",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0",
+    "bun": ">=1.0.0"
+  },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@openscout/agent-sessions": "^0.2.64",
-    "@types/uuid": "^10.0.0",
-    "better-sqlite3": "^12.2.0",
     "bonjour-service": "^1.4.4",
-    "chalk": "^4.1.2",
-    "commander": "^11.1.0",
-    "fluent-ffmpeg": "^2.1.3",
-    "keyv": "^5.3.4",
-    "node-fetch": "^3.3.2",
+    "chalk": "^5.6.2",
+    "commander": "^15.0.0",
     "qrcode": "^1.5.4",
-    "uuid": "^11.1.1",
+    "uuid": "^14.0.1",
     "ws": "^8.21.1",
-    "zod": "^3.23.8"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@arach/dewey": "^0.2.0",
+    "@types/node": "^22.0.0",
     "@types/qrcode": "^1.5.6",
     "@types/ws": "^8.18.1",
-    "playwright": "^1.54.2",
-    "tsup": "^7.0.0",
-    "typescript": "^5.0.0"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
   },
   "overrides": {
     "tar-fs": "^2.1.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "rollup": ">=4.59.0",
+      "esbuild": ">=0.28.1",
+      "yaml": ">=2.8.3",
+      "picomatch@>=4": ">=4.0.4"
+    }
   }
 }

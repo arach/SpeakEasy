@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { SpeakEasy, SpeakEasyConfig } from '../index';
+import { SpeakEasy, SpeakEasyConfig, getAvailableVoices, getBestVoice } from '../index';
 import { showHelp as showHelpUI, showWelcome } from '../cli/ui';
 import { hasConfig as hasConfigFile, showConfig as showConfigCmd, diagnoseConfig as diagnoseConfigCmd, setApiKey as setApiKeyCmd, setDefaultProvider as setDefaultProviderCmd } from '../cli/config';
 import { runDoctor as runDoctorCmd } from '../cli/doctor';
@@ -62,6 +62,8 @@ interface CLIOptions {
   setDefault?: string;
   app?: boolean;
   updateApp?: boolean;
+  premium?: boolean;
+  listVoices?: boolean;
 }
 
 async function run(): Promise<void> {
@@ -116,8 +118,10 @@ async function run(): Promise<void> {
     .option('-s, --silent')
     .option('--set-key <provider>')
     .option('--set-default <provider>')
-    .option('--app', 'open settings app (downloads on first use)')
-    .option('--update-app', 'update the settings app');
+    .option('--app', 'open settings app (downloads on first use; prints version + path)')
+    .option('--update-app', 'update the settings app (prints version + path)')
+    .option('--premium', 'use best available system voice (Premium > Enhanced > Standard)')
+    .option('--list-voices', 'list available macOS system voices');
 
   program.parse(process.argv);
   const parsed = program.opts();
@@ -130,8 +134,54 @@ async function run(): Promise<void> {
     return;
   }
 
+  if (options.listVoices) {
+    const voices = getAvailableVoices();
+    const bestVoice = getBestVoice();
+    console.log('Available macOS System Voices:\n');
+
+    // Group voices by quality
+    const premium = voices.filter(v => v.includes('(Premium)'));
+    const enhanced = voices.filter(v => v.includes('(Enhanced)'));
+    const standard = voices.filter(v => !v.includes('(Premium)') && !v.includes('(Enhanced)'));
+
+    if (premium.length > 0) {
+      console.log('⭐ Premium Voices:');
+      premium.forEach(v => console.log(`   ${v === bestVoice ? '→ ' : '  '}${v}`));
+      console.log('');
+    }
+
+    if (enhanced.length > 0) {
+      console.log('✨ Enhanced Voices:');
+      enhanced.forEach(v => console.log(`   ${v === bestVoice ? '→ ' : '  '}${v}`));
+      console.log('');
+    }
+
+    console.log(`📢 Standard Voices: ${standard.length} available`);
+    console.log(`   (Use "say -v '?'" for full list)`);
+    console.log('');
+    console.log(`🎯 Best available: ${bestVoice}`);
+    console.log('');
+    console.log('Usage:');
+    console.log('   speakeasy "text" --premium           # Use best voice');
+    console.log(`   speakeasy "text" --voice "${bestVoice}"   # Use specific voice`);
+    return;
+  }
+
   // Show welcome screen if no config exists or --welcome flag is used
-  if (((!hasConfigFile() && !options.config && !options.help && !options.diagnose && !options.doctor) || options.welcome) && !options.help) {
+  if (
+    (
+      (!hasConfigFile()
+        && !text
+        && !options.config
+        && !options.help
+        && !options.diagnose
+        && !options.doctor
+        && !options.app
+        && !options.updateApp)
+      || options.welcome
+    )
+    && !options.help
+  ) {
     showWelcome();
     return;
   }
@@ -193,8 +243,9 @@ async function run(): Promise<void> {
       }
     }
 
-    console.log('🚀 Opening SpeakEasy settings...');
-    launchApp();
+    if (!launchApp(console.log)) {
+      process.exit(1);
+    }
     return;
   }
 
@@ -225,16 +276,22 @@ async function run(): Promise<void> {
 
   try {
     const config: SpeakEasyConfig = {
-      provider: (options.provider as any) || 'system',
-      rate: options.rate || 180,
+      ...(options.provider && { provider: options.provider }),
+      ...(options.rate !== undefined && { rate: options.rate }),
       volume: options.volume !== undefined ? options.volume : undefined,
       instructions: options.instructions,
       debug: options.debug || false,
       ...((options.cache || options.out) && { cache: { enabled: true } }),
     };
 
+    // Handle --premium flag for best system voice
+    if (options.premium) {
+      config.provider = 'system';
+      config.systemVoice = getBestVoice();
+    }
+
     if (options.voice) {
-      switch (options.provider) {
+      switch (config.provider) {
         case 'system':
           config.systemVoice = options.voice;
           break;
@@ -243,6 +300,9 @@ async function run(): Promise<void> {
           break;
         case 'elevenlabs':
           config.elevenlabsVoiceId = options.voice;
+          break;
+        case 'groq':
+          config.groqVoice = options.voice;
           break;
         case 'gemini':
           config.geminiModel = options.voice;
@@ -271,6 +331,7 @@ async function run(): Promise<void> {
 
             if (fs.existsSync(latestEntry.filePath)) {
               fs.copyFileSync(latestEntry.filePath, options.out);
+              fs.chmodSync(options.out, 0o600);
               const stats = fs.statSync(options.out);
               console.log(`💾 Audio saved to: ${options.out} (${(stats.size / 1024).toFixed(1)} KB)`);
             } else {
@@ -347,5 +408,3 @@ async function run(): Promise<void> {
 if (require.main === module) {
   run().catch(console.error);
 }
-
-

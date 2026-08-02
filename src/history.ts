@@ -22,26 +22,28 @@ function getWeekNumber(date: Date): { year: number; week: number } {
   return { year: d.getUTCFullYear(), week };
 }
 
-function getHistoryFile(date: Date = new Date()): string {
+function getHistoryFile(historyDir: string, date: Date = new Date()): string {
   const { year, week } = getWeekNumber(date);
   const weekStr = week.toString().padStart(2, '0');
-  return path.join(HISTORY_DIR, `history-${year}-W${weekStr}.json`);
+  return path.join(historyDir, `history-${year}-W${weekStr}.json`);
 }
 
 export class NotificationHistory {
   private entries: HistoryEntry[] = [];
   private currentFile: string;
+  private readonly maxEntries = 1000;
+  private readonly historyDir: string;
 
-  constructor() {
-    this.currentFile = getHistoryFile();
+  constructor(historyDir: string = HISTORY_DIR) {
+    this.historyDir = historyDir;
+    this.currentFile = getHistoryFile(this.historyDir);
     this.ensureDir();
     this.load();
   }
 
   private ensureDir(): void {
-    if (!fs.existsSync(HISTORY_DIR)) {
-      fs.mkdirSync(HISTORY_DIR, { recursive: true });
-    }
+    fs.mkdirSync(this.historyDir, { recursive: true, mode: 0o700 });
+    fs.chmodSync(this.historyDir, 0o700);
   }
 
   private load(): void {
@@ -58,7 +60,7 @@ export class NotificationHistory {
 
   private save(): void {
     // Check if we've crossed into a new week
-    const newFile = getHistoryFile();
+    const newFile = getHistoryFile(this.historyDir);
     if (newFile !== this.currentFile) {
       this.currentFile = newFile;
       this.entries = []; // Start fresh for new week
@@ -66,7 +68,8 @@ export class NotificationHistory {
 
     try {
       this.ensureDir();
-      fs.writeFileSync(this.currentFile, JSON.stringify(this.entries, null, 2));
+      fs.writeFileSync(this.currentFile, JSON.stringify(this.entries, null, 2), { mode: 0o600 });
+      fs.chmodSync(this.currentFile, 0o600);
     } catch (error) {
       console.warn('Failed to save history:', error);
     }
@@ -110,16 +113,16 @@ export class NotificationHistory {
     const allEntries: HistoryEntry[] = [];
 
     try {
-      if (!fs.existsSync(HISTORY_DIR)) return allEntries;
+      if (!fs.existsSync(this.historyDir)) return allEntries;
 
-      const files = fs.readdirSync(HISTORY_DIR)
+      const files = fs.readdirSync(this.historyDir)
         .filter(f => f.startsWith('history-') && f.endsWith('.json'))
         .sort()
         .reverse(); // Most recent weeks first
 
       for (const file of files) {
         try {
-          const data = fs.readFileSync(path.join(HISTORY_DIR, file), 'utf8');
+          const data = fs.readFileSync(path.join(this.historyDir, file), 'utf8');
           const entries: HistoryEntry[] = JSON.parse(data);
           allEntries.push(...entries);
         } catch {
@@ -135,7 +138,7 @@ export class NotificationHistory {
   }
 
   getHistoryDir(): string {
-    return HISTORY_DIR;
+    return this.historyDir;
   }
 }
 

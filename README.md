@@ -364,7 +364,7 @@ UUID = SHA1(text|provider|voice|rate + namespace) → UUID v5
 ## Examples
 
 ```bash
-npm run example
+bun run example
 ```
 
 ## Declarative Caching Configuration
@@ -543,9 +543,9 @@ $ speakeasy --doctor
 ## Testing
 
 ```bash
-npm run build
+bun run build
 npm test
 npm test cache  # Test caching specifically
-npm run cli -- --help  # Test CLI
-npm run cli -- --doctor  # Test health check
+bun run cli -- --help  # Test CLI
+bun run cli -- --doctor  # Test health check
 ```
