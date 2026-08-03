@@ -5,7 +5,7 @@ import path from 'node:path';
 import type {
   Adapter,
   AdapterConfig,
-  PairingEvent,
+  AgentSessionStreamEvent,
 } from '@openscout/agent-sessions';
 import {
   createDeckAgentClient,
@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 function fakeAdapter(config: AdapterConfig): Adapter {
-  const eventListeners = new Set<(event: PairingEvent) => void>();
+  const eventListeners = new Set<(event: AgentSessionStreamEvent) => void>();
   const errorListeners = new Set<(error: Error) => void>();
   const nativeId = String(config.options?.threadId ?? 'fresh-thread-id');
   const session = {
@@ -40,7 +40,7 @@ function fakeAdapter(config: AdapterConfig): Adapter {
     send() {
       queueMicrotask(() => {
         const turnId = 'turn-1';
-        const emit = (event: PairingEvent) => eventListeners.forEach((listener) => listener(event));
+        const emit = (event: AgentSessionStreamEvent) => eventListeners.forEach((listener) => listener(event));
         emit({
           event: 'turn:start',
           sessionId: config.sessionId,
@@ -60,12 +60,12 @@ function fakeAdapter(config: AdapterConfig): Adapter {
     async shutdown() {
       session.status = 'closed' as never;
     },
-    on(event: 'event' | 'error', listener: ((event: PairingEvent) => void) | ((error: Error) => void)) {
-      if (event === 'event') eventListeners.add(listener as (event: PairingEvent) => void);
+    on(event: 'event' | 'error', listener: ((event: AgentSessionStreamEvent) => void) | ((error: Error) => void)) {
+      if (event === 'event') eventListeners.add(listener as (event: AgentSessionStreamEvent) => void);
       else errorListeners.add(listener as (error: Error) => void);
     },
-    off(event: 'event' | 'error', listener: ((event: PairingEvent) => void) | ((error: Error) => void)) {
-      if (event === 'event') eventListeners.delete(listener as (event: PairingEvent) => void);
+    off(event: 'event' | 'error', listener: ((event: AgentSessionStreamEvent) => void) | ((error: Error) => void)) {
+      if (event === 'event') eventListeners.delete(listener as (event: AgentSessionStreamEvent) => void);
       else errorListeners.delete(listener as (error: Error) => void);
     },
   } as Adapter;
