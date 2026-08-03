@@ -25,7 +25,11 @@ protocol CompletionPresenting: Sendable {
 }
 
 enum CompletionSpeechProjector {
-    private static let maximumCharacters = 900
+    /// The deterministic fallback reads the real response rather than a summary,
+    /// so clipping it is silent loss. The bound exists only because this text is
+    /// still rendered in a single provider request, and OpenAI's speech endpoint
+    /// accepts 4096 characters; keep margin under that until this path chunks.
+    private static let maximumCharacters = 3_500
 
     /// A model-independent safety net. It removes material that is actively
     /// hostile to speech, but never invents a summary of the canonical answer.
