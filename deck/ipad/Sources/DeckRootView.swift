@@ -1,25 +1,36 @@
 import SwiftUI
 
-/// The whole app: the deck web surface, discovered on the LAN and hosted
-/// full-screen with the native speech bridge attached. The page itself owns
-/// the WebSocket to the Mac runtime.
+/// The hybrid deck: native controls on the left, WebKit lane presentation on
+/// the right, both synchronized through the Mac runtime.
 struct DeckRootView: View {
     @StateObject private var discovery = DeckDiscovery()
-    @StateObject private var controller = DeckWebController()
+    @StateObject private var connection = DeckConnection()
+    @StateObject private var laneViewer = DeckLaneViewerController()
+    @AppStorage(DeckThemeSelection.defaultsKey) private var selectedThemeRaw = DeckThemeID.flight.rawValue
 
     var body: some View {
         Group {
             if let deck = discovery.selectedDeck {
-                ZStack(alignment: .topTrailing) {
-                    DeckWebView(controller: controller)
-                        .ignoresSafeArea()
-                        .onAppear { controller.deckURL = deck.url }
-                        .onChange(of: deck.url) { _, newValue in controller.deckURL = newValue }
+                ZStack(alignment: .bottomTrailing) {
+                    NativeDeckView(
+                        connection: connection,
+                        laneViewer: laneViewer,
+                        selectedDeck: deck,
+                        onFindDecks: { discovery.refresh() }
+                    )
+                        .onAppear {
+                            connection.connect(to: deck.url)
+                            laneViewer.deckURL = deck.url
+                        }
+                        .onChange(of: deck.url) { _, newValue in
+                            connection.connect(to: newValue)
+                            laneViewer.deckURL = newValue
+                        }
 
                     if discovery.decks.count > 1 {
                         machineMenu(selected: deck)
-                            .padding(.top, 12)
-                            .padding(.trailing, 14)
+                            .padding(.bottom, 20)
+                            .padding(.trailing, 20)
                     }
                 }
             } else {
@@ -40,6 +51,7 @@ struct DeckRootView: View {
                 .background(Color(.systemBackground))
             }
         }
+        .onDisappear { connection.disconnect() }
     }
 
     private func machineMenu(selected: DiscoveredDeck) -> some View {
@@ -60,8 +72,9 @@ struct DeckRootView: View {
                 .font(.system(.caption, design: .monospaced, weight: .semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay { Capsule().stroke(.white.opacity(0.16), lineWidth: 1) }
+                .foregroundStyle(DeckPalette.accent)
+                .background(DeckPalette.accentDark.opacity(0.94), in: Capsule())
+                .overlay { Capsule().stroke(DeckPalette.accentEdge, lineWidth: 1) }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Current SpeakEasy Mac: \(selected.displayName)")

@@ -32,11 +32,13 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>SpeakEasy Deck finds and drives your Mac over your local network.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Hold to Speak transcribes your voice on this iPad so your Mac can answer.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Hold to Speak transcribes your voice on this iPad so your Mac can answer.</string>
+	<string>Hold to Speak transcribes your voice on this device so your Mac can answer.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

@@ -11,19 +11,31 @@ enum DeckProvisioning {
     private static let urlAccount = "paired-url-v1"
     private static let rootAccount = "paired-root-der-v1"
 
-    static func importLaunchEnvironment() {
-        let environment = ProcessInfo.processInfo.environment
-        guard let rawURL = environment["SPEAKEASY_DECK_URL"],
+    /// Keep launch provisioning usable even if Keychain has not become
+    /// available yet (notably during the first frame of Simulator launches).
+    private static var launchURL: URL? {
+        guard let rawURL = ProcessInfo.processInfo.environment["SPEAKEASY_DECK_URL"],
               let url = URL(string: rawURL),
               url.scheme == "https",
-              url.host != nil,
-              let root = environment["SPEAKEASY_DECK_ROOT_DER"],
-              Data(base64Encoded: root) != nil else { return }
-        save(rawURL, account: urlAccount)
+              url.host != nil else { return nil }
+        return url
+    }
+
+    private static var launchRootData: Data? {
+        guard let encoded = ProcessInfo.processInfo.environment["SPEAKEASY_DECK_ROOT_DER"] else { return nil }
+        return Data(base64Encoded: encoded)
+    }
+
+    static func importLaunchEnvironment() {
+        guard let url = launchURL,
+              let root = ProcessInfo.processInfo.environment["SPEAKEASY_DECK_ROOT_DER"],
+              launchRootData != nil else { return }
+        save(url.absoluteString, account: urlAccount)
         save(root, account: rootAccount)
     }
 
     static var pairedURL: URL? {
+        if let launchURL { return launchURL }
         guard let raw = load(account: urlAccount),
               let url = URL(string: raw),
               url.scheme == "https",
@@ -32,8 +44,8 @@ enum DeckProvisioning {
     }
 
     static var trustAnchor: SecCertificate? {
-        guard let encoded = load(account: rootAccount),
-              let data = Data(base64Encoded: encoded) else { return nil }
+        let data = launchRootData ?? load(account: rootAccount).flatMap { Data(base64Encoded: $0) }
+        guard let data else { return nil }
         return SecCertificateCreateWithData(nil, data as CFData)
     }
 

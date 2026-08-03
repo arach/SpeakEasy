@@ -230,6 +230,34 @@ body{
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
+
+/* The iPad shell owns the latency-sensitive left plate. In console mode this
+   document becomes only the presentation-heavy lane viewer; it keeps its own
+   runtime socket so native lane intents flow through the same authoritative
+   snapshot instead of an iOS/JavaScript state bridge. */
+html[data-se-surface="console"],
+html[data-se-surface="console"] body,
+html[data-se-surface="console"] #deck{
+  height:100%!important;min-height:100%!important;
+  background:transparent!important;overflow:hidden!important
+}
+html[data-se-surface="console"] .se-shell{
+  height:100%!important;min-height:0!important;overflow:hidden!important;
+  padding:0!important;gap:0!important;background:transparent!important
+}
+html[data-se-surface="console"] .se-topbar,
+html[data-se-surface="console"] .se-keypad-plate{display:none!important}
+html[data-se-surface="console"] .se-decks{
+  display:block!important;position:relative!important;
+  flex:1 1 0!important;height:auto!important;min-height:0!important
+}
+html[data-se-surface="console"] .se-console-plate{
+  position:relative!important;inset:auto!important;box-sizing:border-box!important;
+  flex:1 1 0!important;width:100%!important;height:auto!important;min-height:0!important
+}
+html[data-se-surface="console"] .se-console-plate .se-conv{
+  flex:1 1 0!important;min-height:120px!important;overflow-y:auto!important
+}
 </style>
 </head>
 <body>
@@ -242,7 +270,11 @@ body{
 // A direct file open cannot reach the Mac runtime. It used to silently fall
 // back to canned lanes and replies, making a dead connection look real.
 // Redirect normal file opens to the live Deck; the showcase is opt-in only.
-const DEMO_MODE = new URLSearchParams(location.search).get('demo') === '1';
+const BOOT_QUERY = new URLSearchParams(location.search);
+const DEMO_MODE = BOOT_QUERY.get('demo') === '1';
+const SURFACE_MODE = BOOT_QUERY.get('surface') || 'deck';
+const NATIVE_AUDIO_HOST = BOOT_QUERY.get('nativeAudio') === '1';
+document.documentElement.dataset.seSurface = SURFACE_MODE;
 if (location.protocol === 'file:' && !DEMO_MODE) {
   location.replace('https://speak.air.local/');
   return;
@@ -327,7 +359,8 @@ const SPEEDS = [1, 1.25, 1.5, 0.75];
 // Seed themes. `paper` is the CSS :root default and needs no overrides; the
 // others replace the token values inline on <html> at boot. `ember` keeps the
 // paper pad plate — the pad surface is always paper, whatever the console
-// does. Selected with ?theme=paper|ember|flight or speakeasyDeck.setTheme().
+// does. Selected with ?theme=paper|porcelain|ember|flight|obsidian or
+// speakeasyDeck.setTheme().
 // ────────────────────────────────────────────────────────────────────────────
 
 const SEEDS = {
@@ -346,6 +379,54 @@ const SEEDS = {
     'btn-sheen': 'inset 0 1px 0 rgba(255,255,255,0.07)',
     'panel-shadow': 'inset 0 0 0 1px rgba(255,255,255,0.06), 0 14px 30px -16px rgba(0,0,0,0.65)',
     'card-shadow': '0 1px 2px rgba(0,0,0,0.4)'
+  } },
+  obsidian: { scheme: 'dark', vars: {
+    'page-bg': '#030405', 'panel': '#090b0d', 'panel-head': '#0d1013', 'cell': '#11151a', 'trace-bg': '#07090b',
+    'line': '#252c33', 'line-soft': '#181e24',
+    'ink': '#f1f4f6', 'ink-2': '#b6c0c9', 'ink-3': '#77838e', 'ink-4': '#4d5862',
+    'accent': '#79b8ff', 'accent-dim': '#4b82b8', 'accent-ink': '#9dcbff', 'accent-edge': '#244968',
+    'accent-ring': 'rgba(121,184,255,0.17)', 'accent-contrast': '#061522', 'chip-bg': '#091a2a', 'chip-ink': '#9dcbff', 'caption-ink': '#b6c0c9',
+    'you-bg': '#050709', 'you-edge': '#252c33', 'you-ink': '#f1f4f6',
+    'player-bg': '#0b1117', 'player-edge': '#252c33', 'player-ink': '#e6f2ff', 'player-text': '#79b8ff',
+    'wave-on': '#79b8ff', 'wave-off': '#2b3946',
+    'plate-bg': '#07090b', 'plate-wash': 'linear-gradient(168deg,#11151a,#06080a)', 'plate-edge': '#252c33',
+    'plate-rule': '#181e24', 'plate-ink': '#edf3f8', 'plate-ink-2': '#aebbc6', 'plate-ink-3': '#717e89',
+    'plate-track': '#151b21',
+    'pad-face': 'linear-gradient(160deg,#14191f,#0d1116)', 'pad-face-on': 'linear-gradient(160deg,#102b43,#091a2a)',
+    'pad-face-empty': 'linear-gradient(160deg,#0c1014,#080b0e)', 'pad-edge': '#28323b', 'pad-accent': '#79b8ff',
+    'pad-ring': 'rgba(121,184,255,0.16)', 'pad-num': '#dbe5ed', 'pad-num-empty': '#4d5862',
+    'pad-ink-idle': '#7d8994', 'pad-snippet': '#77838e', 'pad-snippet-on': '#bdd8f4', 'pad-spark-idle': '#2b3946',
+    'mic-a': '#256fa8', 'mic-b': '#184a72', 'mic-edge': '#5fa6df', 'mic-ink': '#f3f9ff', 'mic-sub-ink': '#b9d8ef',
+    'btn-face': 'linear-gradient(180deg,#171c22,#0e1216)', 'btn-edge': '#28323b', 'btn-ink': '#aebbc6',
+    'btn-sheen': 'inset 0 1px 0 rgba(255,255,255,0.06)',
+    'led-idle': '#34414b', 'led-empty': '#252d34', 'ink-empty': '#4d5862',
+    'status-working': '#e8b85d', 'status-working-ink': '#e8b85d', 'status-working-glow': '0 0 5px rgba(232,184,93,0.62)',
+    'panel-shadow': 'inset 0 0 0 1px rgba(255,255,255,0.04), 0 16px 34px -18px rgba(0,0,0,0.82)',
+    'card-shadow': '0 1px 2px rgba(0,0,0,0.55)'
+  } },
+  porcelain: { scheme: 'light', vars: {
+    'page-bg': '#eeece7', 'panel': '#fcfbf8', 'panel-head': '#f6f3ed', 'cell': '#ffffff', 'trace-bg': '#f3f0e9',
+    'line': '#d5d0c7', 'line-soft': '#e3ded5',
+    'ink': '#1e2328', 'ink-2': '#4d555d', 'ink-3': '#747c83', 'ink-4': '#a0a5a8',
+    'accent': '#245a74', 'accent-dim': '#5a8396', 'accent-ink': '#204d60', 'accent-edge': '#b8cfd8',
+    'accent-ring': 'rgba(36,90,116,0.14)', 'accent-contrast': '#f6fbfd', 'chip-bg': '#e4eef2', 'chip-ink': '#204d60', 'caption-ink': '#4d555d',
+    'you-bg': '#1e2328', 'you-edge': '#1e2328', 'you-ink': '#f8f9f9',
+    'player-bg': '#e8edef', 'player-edge': '#ccd7db', 'player-ink': '#f6fbfd', 'player-text': '#204d60',
+    'wave-on': '#245a74', 'wave-off': '#c1c9cc',
+    'plate-bg': '#f2f3f3', 'plate-wash': 'linear-gradient(168deg,#ffffff,#e6e8e8)', 'plate-edge': '#c8cdcf',
+    'plate-rule': '#daddde', 'plate-ink': '#252b30', 'plate-ink-2': '#555f65', 'plate-ink-3': '#7a8388',
+    'plate-track': '#dfe3e4',
+    'pad-face': 'linear-gradient(160deg,#fbfcfc,#edefef)', 'pad-face-on': 'linear-gradient(160deg,#f8fbfc,#e4eef2)',
+    'pad-face-empty': 'linear-gradient(160deg,#f1f2f2,#e5e7e7)', 'pad-edge': '#cfd4d5', 'pad-accent': '#245a74',
+    'pad-ring': 'rgba(36,90,116,0.14)', 'pad-num': '#30373c', 'pad-num-empty': '#a0a5a8',
+    'pad-ink-idle': '#7a8388', 'pad-snippet': '#747c83', 'pad-snippet-on': '#4d6570', 'pad-spark-idle': '#c3cbce',
+    'mic-a': '#2f6d85', 'mic-b': '#204d60', 'mic-edge': '#477f94', 'mic-ink': '#f7fcfe', 'mic-sub-ink': '#c7dce4',
+    'btn-face': 'linear-gradient(180deg,#ffffff,#ecefef)', 'btn-edge': '#cbd1d2', 'btn-ink': '#555f65',
+    'btn-sheen': 'inset 0 1px 0 #fff',
+    'led-idle': '#c3cbce', 'led-empty': '#d7dcdd', 'ink-empty': '#a0a5a8',
+    'status-working': '#9b6b22', 'status-working-ink': '#805719', 'status-working-glow': '0 0 5px rgba(155,107,34,0.35)',
+    'panel-shadow': 'inset 0 0 0 1px rgba(255,255,255,0.6), 0 10px 24px -19px rgba(22,30,34,0.3)',
+    'card-shadow': '0 1px 2px rgba(30,35,40,0.1)'
   } },
   flight: { scheme: 'dark', vars: {
     'page-bg': '#05090b', 'panel': '#0c161a', 'panel-head': '#0f1c21', 'cell': '#122228', 'trace-bg': '#0a1316',
@@ -473,7 +554,7 @@ const host = {
 
 // The host may use a non-persistent data store, so nothing here reads or writes
 // localStorage. Boot config comes from the query string instead.
-const Q = new URLSearchParams(location.search);
+const Q = BOOT_QUERY;
 const flag = (k, d) => (Q.has(k) ? !/^(0|false|off|no)$/i.test(Q.get(k) || '') : d);
 
 const PROPS = {
@@ -697,6 +778,9 @@ function ensureAudioEl() {
 }
 
 function syncAudio(snap) {
+  // The hybrid iPad shell uses AVAudioPlayer as the one playback owner. The
+  // web console still renders transport state and sends intents when tapped.
+  if (NATIVE_AUDIO_HOST) return;
   const el = ensureAudioEl();
   if (!snap.playing) {
     el.pause();
@@ -744,7 +828,7 @@ const unlockAudio = () => {
     })
     .catch(() => { /* rejected — stay registered for the next gesture */ });
 };
-document.addEventListener('pointerdown', unlockAudio);
+if (!NATIVE_AUDIO_HOST) document.addEventListener('pointerdown', unlockAudio);
 
 function demoRestore() {
   // back to a clean local state — never simulate over the last authoritative snapshot
@@ -1385,7 +1469,7 @@ function tpl(v) {
   '<div class="se-shell" style="height:100%;min-height:0;overflow:hidden;background:var(--se-page-bg);padding:calc(14px + env(safe-area-inset-top,0px)) 16px 12px;display:flex;flex-direction:column;gap:12px;">' +
 
     // ─────────── top bar — titled after the host we're linked to ───────────
-    '<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 4px;flex:none;">' +
+    '<div class="se-topbar" style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 4px;flex:none;">' +
       '<div style="display:flex;align-items:center;gap:12px;">' +
         '<div style="width:30px;height:30px;border-radius:7px;background:var(--se-chip-bg);border:1px solid var(--se-accent-edge);color:var(--se-accent-ink);font:600 11px var(--se-mono);display:flex;align-items:center;justify-content:center;">SE</div>' +
         '<div>' +
@@ -1406,7 +1490,7 @@ function tpl(v) {
     '<div class="se-decks" style="display:flex;gap:14px;align-items:stretch;flex:1;min-height:0;">' +
 
       // ═══════ LEFT · pad surface, always paper ═══════
-      '<div style="flex:0 1 600px;min-width:380px;min-height:0;background-color:var(--se-plate-bg);background-image:var(--se-plate-wash);border:1px solid var(--se-plate-edge);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--se-panel-shadow);position:relative;">' +
+      '<div class="se-keypad-plate" style="flex:0 1 600px;min-width:380px;min-height:0;background-color:var(--se-plate-bg);background-image:var(--se-plate-wash);border:1px solid var(--se-plate-edge);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--se-panel-shadow);position:relative;">' +
         '<span style="position:absolute;top:7px;left:7px;width:4px;height:4px;border-radius:50%;background:var(--se-plate-edge);"></span>' +
         '<span style="position:absolute;top:7px;right:7px;width:4px;height:4px;border-radius:50%;background:var(--se-plate-edge);"></span>' +
         '<span style="position:absolute;bottom:7px;left:7px;width:4px;height:4px;border-radius:50%;background:var(--se-plate-edge);"></span>' +
@@ -1491,7 +1575,7 @@ function tpl(v) {
       '</div>' +
 
       // ═══════ RIGHT · lane console ═══════
-      '<div style="flex:1;min-width:0;min-height:0;background:var(--se-panel);border:1px solid var(--se-line);border-radius:var(--se-radius);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--se-panel-shadow);">' +
+      '<div class="se-console-plate" style="flex:1;min-width:0;min-height:0;background:var(--se-panel);border:1px solid var(--se-line);border-radius:var(--se-radius);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--se-panel-shadow);">' +
 
         // lane header
         '<div class="se-lane-head">' +
@@ -1717,6 +1801,18 @@ function morph(live, next) {
 const root = document.getElementById('deck');
 const stage = document.createElement('div');
 
+function prepareSurface(container) {
+  if (SURFACE_MODE !== 'console') return;
+  const shell = container.firstElementChild;
+  const consolePlate = container.querySelector('.se-console-plate');
+  if (!shell || !consolePlate) return;
+  // Detach the lane console before discarding the full-deck siblings. Keeping
+  // it as the shell's direct flex child makes sizing deterministic inside a
+  // half-width WKWebView, independent of the browser deck's narrow breakpoint.
+  consolePlate.remove();
+  shell.replaceChildren(consolePlate);
+}
+
 let queued = false;
 function paint() {
   if (queued) return;
@@ -1725,6 +1821,7 @@ function paint() {
     queued = false;
     const v = view();
     stage.innerHTML = tpl(v);
+    prepareSurface(stage);
     if (!root.firstChild) root.appendChild(stage.firstChild);
     else morph(root.firstChild, stage.firstChild);
     host.publish('Speakeasy · ' + v.laneNum + ' ' + v.laneTitle + ' · ' + v.confirmLine);
