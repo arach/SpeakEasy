@@ -15,7 +15,7 @@ function runtimeInternals(runtime: DeckRuntime): RuntimeInternals {
 
 describe('Deck canonical IPC lifecycle', () => {
   test('lane navigation preserves an in-flight canonical waiter and playback', async () => {
-    const runtime = new DeckRuntime({ warmCatalog: false });
+    const runtime = new DeckRuntime({ warmCatalog: false, warmCanonical: false });
     const internal = runtimeInternals(runtime);
     const controller = new AbortController();
     internal.busy = true;
@@ -37,7 +37,7 @@ describe('Deck canonical IPC lifecycle', () => {
   });
 
   test('stop silences transport without dropping the canonical result', async () => {
-    const runtime = new DeckRuntime({ warmCatalog: false });
+    const runtime = new DeckRuntime({ warmCatalog: false, warmCanonical: false });
     const internal = runtimeInternals(runtime);
     const controller = new AbortController();
     internal.busy = true;
@@ -57,7 +57,7 @@ describe('Deck canonical IPC lifecycle', () => {
   });
 
   test('a second capture is rejected without cancelling the current turn', async () => {
-    const runtime = new DeckRuntime({ warmCatalog: false });
+    const runtime = new DeckRuntime({ warmCatalog: false, warmCanonical: false });
     const internal = runtimeInternals(runtime);
     const controller = new AbortController();
     internal.busy = true;

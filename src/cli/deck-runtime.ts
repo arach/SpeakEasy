@@ -10,7 +10,7 @@ import {
   type DeckAgentClient,
   type DeckAgentClientOptions,
 } from './deck-agent-client.js';
-import { submitCodexDesktopTurn } from './codex-desktop-submit.js';
+import { CodexDesktopSession } from './codex-desktop-submit.js';
 import { displayCodexThreadTitle, listCodexThreadReferences } from './codex-thread-catalog.js';
 
 /** execFile as a promise, capturing stdout, with a hard timeout. */
@@ -124,6 +124,8 @@ export interface DeckSnapshot {
 export interface DeckRuntimeOptions {
   /** Skip the eager Codex catalog read in isolated runtime tests. */
   warmCatalog?: boolean;
+  /** Skip exact-task owner prewarming in isolated runtime tests. */
+  warmCanonical?: boolean;
 }
 
 const intentSchema = z.discriminatedUnion('name', [
@@ -380,6 +382,10 @@ export class DeckRuntime extends EventEmitter {
   private laneClients = new Map<number, { key: string; client: LaneAgentClient }>();
   /** One direct turn currently owned by the Codex Desktop bridge. */
   private canonicalTurnAbort: AbortController | null = null;
+  /** Warm exact-task channel. Owner discovery is intentionally amortized
+   * across turns because mature Codex task snapshots can be hundreds of MB. */
+  private canonicalSession: CodexDesktopSession | null = null;
+  private canonicalSessionReady = false;
   private threads: DeckMessage[][] = Array.from({ length: LANE_COUNT + 1 }, () => []);
   private playing: string | null = null;
   private paused = false;
@@ -420,6 +426,7 @@ export class DeckRuntime extends EventEmitter {
     // Warm the exact Codex task catalog before the user opens lane setup. The
     // explicit refresh action reuses this in-flight request if it is still busy.
     if (options.warmCatalog !== false) void this.refreshThreadCatalog();
+    if (options.warmCanonical !== false) queueMicrotask(() => this.warmCanonicalLane(this.laneIx));
   }
 
   /** Copy identity from the exact Codex catalog record used for the binding.
@@ -708,6 +715,37 @@ export class DeckRuntime extends EventEmitter {
     this.setPhase(this.phase, `${status} · ${label}`);
     this.log('LANE SELECTED', index === MASTER_IX ? 'overview' : `lane ${index + 1}`);
     this.changed();
+    this.warmCanonicalLane(index);
+  }
+
+  /** Reuse one proven Desktop owner while a task remains selected. Switching
+   * targets replaces the warm channel only while no canonical response is in
+   * flight; navigation during work therefore cannot detach the origin turn. */
+  private canonicalSessionFor(taskId: string): CodexDesktopSession {
+    if (this.canonicalSession?.threadId === taskId) return this.canonicalSession;
+    this.canonicalSession?.close();
+    this.canonicalSession = new CodexDesktopSession(taskId);
+    this.canonicalSessionReady = false;
+    return this.canonicalSession;
+  }
+
+  private warmCanonicalLane(index: number): void {
+    if (this.destroyed || this.busy) return;
+    const route = resolveDeckTurnRoute(index, this.lanes[index]?.threadId);
+    if (route.kind !== 'canonical') return;
+    const session = this.canonicalSessionFor(route.taskId);
+    if (this.canonicalSessionReady) return;
+    void session.warm().then(() => {
+      if (this.destroyed || this.canonicalSession !== session || this.canonicalSessionReady) return;
+      this.canonicalSessionReady = true;
+      this.log('CODEX LINK READY', `lane ${index + 1} · exact task owner verified`);
+      this.changed();
+    }).catch((error) => {
+      if (this.destroyed || this.canonicalSession !== session) return;
+      this.canonicalSessionReady = false;
+      this.log('CODEX LINK FAILED', (error as Error).message.slice(0, 60));
+      this.changed();
+    });
   }
 
   /** Live, compact picture of the whole deck — the overview lane's eyes. One
@@ -1054,6 +1092,7 @@ export class DeckRuntime extends EventEmitter {
       this.busy = false;
       if (this.suppressAutoplayForGeneration === gen) this.suppressAutoplayForGeneration = null;
       if (this.lanes[lane]?.state !== 'speaking' && this.setLaneState(lane, 'idle')) this.changed();
+      if (this.laneIx !== lane) this.warmCanonicalLane(this.laneIx);
     }
   }
 
@@ -1073,10 +1112,12 @@ export class DeckRuntime extends EventEmitter {
         const controller = new AbortController();
         this.canonicalTurnAbort = controller;
         try {
-          const result = await submitCodexDesktopTurn(route.taskId, question, {
+          const session = this.canonicalSessionFor(route.taskId);
+          const result = await session.turn(question, {
             signal: controller.signal,
             timeoutMs: 180_000,
           });
+          this.canonicalSessionReady = true;
           lane.updatedAt = Date.now();
           this.log(
             'CANONICAL TURN',
@@ -1132,6 +1173,9 @@ export class DeckRuntime extends EventEmitter {
   private cancelAgentWork(): void {
     this.canonicalTurnAbort?.abort();
     this.canonicalTurnAbort = null;
+    this.canonicalSession?.close();
+    this.canonicalSession = null;
+    this.canonicalSessionReady = false;
     for (const { client } of this.laneClients.values()) client.interrupt?.();
   }
 

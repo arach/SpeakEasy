@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
+const readline = require('node:readline');
 const { randomUUID, createHash } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
@@ -20,7 +21,7 @@ const STEER_TURN_VERSION = 1;
 // seconds even while the owner is healthy. Keep the wait bounded, but size the
 // default for real tasks instead of treating a large canonical history as a
 // missing owner.
-const DEFAULT_SNAPSHOT_TIMEOUT_MS = 30_000;
+const DEFAULT_SNAPSHOT_TIMEOUT_MS = 120_000;
 const MIN_SNAPSHOT_TIMEOUT_MS = 5_000;
 const MAX_SNAPSHOT_TIMEOUT_MS = 120_000;
 const TURN_TIMEOUT_MS = 30 * 60_000;
@@ -35,6 +36,22 @@ function snapshotTimeoutMs(value = process.env.SPEAKEASY_CODEX_OWNER_TIMEOUT_MS)
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_SNAPSHOT_TIMEOUT_MS;
   return Math.max(MIN_SNAPSHOT_TIMEOUT_MS, Math.min(Math.trunc(parsed), MAX_SNAPSHOT_TIMEOUT_MS));
+}
+
+/** Keep only routing and steering metadata after a potentially very large
+ * Desktop snapshot has proven ownership. Long task histories can be hundreds
+ * of megabytes; a warm bridge must not retain a duplicate transcript merely
+ * to remember the owner client and rollout path. */
+function compactConversationState(state) {
+  if (!state || typeof state !== 'object') return {};
+  return {
+    id: state.id,
+    title: state.title,
+    cwd: state.cwd,
+    rolloutPath: state.rolloutPath,
+    latestCollaborationMode: state.latestCollaborationMode,
+    threadRuntimeStatus: state.threadRuntimeStatus,
+  };
 }
 
 function writeResult(result) {
@@ -232,6 +249,7 @@ class DesktopIPCClient {
     this.socketPath = path.join(codexHome(), 'ipc', 'ipc.sock');
     this.clientId = 'initializing-client';
     this.ownerClientId = null;
+    this.ownerState = null;
     this.socket = null;
     this.buffer = Buffer.alloc(0);
     this.pending = new Map();
@@ -450,7 +468,7 @@ class DesktopIPCClient {
     // ownership, so ignore them and keep the read-only follower attached. A
     // later owner snapshot (or IPC close) remains the authority boundary.
     if (params?.change?.type !== 'snapshot') return;
-    const state = params?.change?.conversationState;
+    const state = compactConversationState(params?.change?.conversationState);
     if (this.strictObservation && this.ownerClientId && (
       state?.id !== this.threadId ||
       typeof state?.rolloutPath !== 'string' ||
@@ -464,6 +482,7 @@ class DesktopIPCClient {
     }
     if (typeof state?.rolloutPath === 'string') this.ownerRolloutPath = state.rolloutPath;
     this.ownerClientId = message.sourceClientId;
+    this.ownerState = state;
     this.snapshotWaiter?.resolve({
       ownerClientId: message.sourceClientId,
       state,
@@ -653,17 +672,102 @@ async function withClient(threadId, action, strictObservation = false) {
   }
 }
 
+function validateOwnedSnapshot(snapshot, threadId) {
+  const state = snapshot?.state || {};
+  const rolloutPath = assertRolloutPath(state.rolloutPath, threadId);
+  if (state.id !== threadId) fail('Codex Desktop returned the wrong task.', 'task-mismatch');
+  return { state, rolloutPath };
+}
+
+/** Submit against an already-following Desktop owner. The active turn is read
+ * from the canonical rollout rather than from the initial snapshot so a warm
+ * channel remains correct as the task moves between idle and working. */
+async function submitOwnedTurn(client, snapshot, threadId, text) {
+  const transcript = String(text || '').trim();
+  if (!transcript) fail('The transcript is empty.', 'empty-transcript');
+  const currentSnapshot = client.ownerClientId && client.ownerState
+    ? { ownerClientId: client.ownerClientId, state: client.ownerState }
+    : snapshot;
+  const { state, rolloutPath } = validateOwnedSnapshot(currentSnapshot, threadId);
+  const offset = fs.statSync(rolloutPath).size;
+  const activeTurnId = latestActiveTurnId(rolloutPath);
+  let turnId;
+  let delivery;
+  if (activeTurnId) {
+    await client.steerTurn(transcript, currentSnapshot.ownerClientId, state);
+    turnId = activeTurnId;
+    delivery = 'steered-active-turn';
+  } else {
+    turnId = await client.startTurn(transcript, currentSnapshot.ownerClientId);
+    delivery = 'started-turn';
+  }
+  const response = await waitForTurn(rolloutPath, offset, turnId);
+  return { ok: true, threadId, turnId, delivery, response };
+}
+
+/** Persistent stdio protocol used by the Deck runtime. Owner discovery and the
+ * expensive canonical snapshot happen once; subsequent dictations reuse the
+ * exact same proven Desktop channel. Requests are deliberately serialized so
+ * one response can never be attributed to another capture. */
+async function serveTask(threadId) {
+  const client = new DesktopIPCClient(threadId);
+  try {
+    await client.connect();
+    const snapshot = await client.follow();
+    const { state } = validateOwnedSnapshot(snapshot, threadId);
+    writeResult({
+      ok: true,
+      type: 'ready',
+      threadId,
+      task: { id: state.id, title: state.title || 'Untitled task', cwd: state.cwd || '' },
+    });
+
+    const lines = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+    for await (const line of lines) {
+      if (!line.trim()) continue;
+      let request;
+      try {
+        request = JSON.parse(line);
+      } catch {
+        writeResult({ ok: false, code: 'protocol-mismatch', error: 'Unreadable warm bridge request.' });
+        continue;
+      }
+      const requestId = typeof request.requestId === 'string' ? request.requestId : null;
+      if (request.type !== 'submit' || !requestId) {
+        writeResult({ ok: false, requestId, code: 'protocol-mismatch', error: 'Invalid warm bridge request.' });
+        continue;
+      }
+      try {
+        const result = await submitOwnedTurn(client, snapshot, threadId, request.text);
+        writeResult({ requestId, ...result });
+      } catch (error) {
+        writeResult({
+          ok: false,
+          requestId,
+          code: error?.code || 'bridge-failed',
+          error: error instanceof Error ? error.message : String(error),
+        });
+        if (client.failure) throw client.failure;
+      }
+    }
+  } finally {
+    client.close();
+  }
+}
+
 async function main() {
   const [command, argument] = process.argv.slice(2);
   if (command === 'list') {
     writeResult({ ok: true, tasks: listTasks(argument) });
     return;
   }
+  if (command === 'serve' && argument) {
+    await serveTask(argument);
+    return;
+  }
   if ((command === 'validate' || command === 'submit' || command === 'observe') && argument) {
     const result = await withClient(argument, async (client, snapshot) => {
-      const state = snapshot.state || {};
-      const rolloutPath = assertRolloutPath(state.rolloutPath, argument);
-      if (state.id !== argument) fail('Codex Desktop returned the wrong task.', 'task-mismatch');
+      const { state, rolloutPath } = validateOwnedSnapshot(snapshot, argument);
       if (command === 'validate') {
         return {
           ok: true,
@@ -673,31 +777,12 @@ async function main() {
       if (command === 'observe') {
         return await observeRollout(client, rolloutPath, argument, process.argv[4], process.argv[5]);
       }
-      const text = (await readStdin()).trim();
-      if (!text) fail('The transcript is empty.', 'empty-transcript');
-      const offset = fs.statSync(rolloutPath).size;
-      const taskIsActive = state?.threadRuntimeStatus?.type === 'active';
-      const activeTurnId = taskIsActive ? latestActiveTurnId(rolloutPath) : null;
-      if (taskIsActive && !activeTurnId) {
-        fail('Codex Desktop reports an active task without a correlatable turn.', 'protocol-mismatch');
-      }
-      let turnId;
-      let delivery;
-      if (activeTurnId) {
-        await client.steerTurn(text, snapshot.ownerClientId, state);
-        turnId = activeTurnId;
-        delivery = 'steered-active-turn';
-      } else {
-        turnId = await client.startTurn(text, snapshot.ownerClientId);
-        delivery = 'started-turn';
-      }
-      const response = await waitForTurn(rolloutPath, offset, turnId);
-      return { ok: true, threadId: argument, turnId, delivery, response };
+      return await submitOwnedTurn(client, snapshot, argument, await readStdin());
     }, command === 'observe');
     writeResult(result);
     return;
   }
-  fail('Usage: codex-desktop-bridge.cjs list [limit] | validate <task-id> | submit <task-id> | observe <task-id> [cursor]', 'usage');
+  fail('Usage: codex-desktop-bridge.cjs list [limit] | validate <task-id> | submit <task-id> | serve <task-id> | observe <task-id> [cursor]', 'usage');
 }
 
 if (require.main === module) {
@@ -717,4 +802,5 @@ module.exports = {
   observationMessages,
   assertRolloutPath,
   snapshotTimeoutMs,
+  compactConversationState,
 };

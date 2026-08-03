@@ -7,6 +7,7 @@ const {
   isTerminalRecord,
   observationMessages,
   snapshotTimeoutMs,
+  compactConversationState,
 } = require('../Sources/SpeakEasy/Resources/codex-desktop-bridge.cjs');
 
 const taskID = '019f99a4-7867-7c23-ac29-0c0eca7da603';
@@ -65,9 +66,32 @@ test('completion observation commits its cursor atomically with the event', () =
 });
 
 test('owner discovery allows large canonical task snapshots without becoming unbounded', () => {
-  assert.equal(snapshotTimeoutMs(), 30_000);
-  assert.equal(snapshotTimeoutMs('not-a-number'), 30_000);
+  assert.equal(snapshotTimeoutMs(), 120_000);
+  assert.equal(snapshotTimeoutMs('not-a-number'), 120_000);
   assert.equal(snapshotTimeoutMs('1000'), 5_000);
   assert.equal(snapshotTimeoutMs('45000'), 45_000);
   assert.equal(snapshotTimeoutMs('999999'), 120_000);
+});
+
+test('warm owner state drops the canonical transcript after proving identity', () => {
+  const compact = compactConversationState({
+    id: taskID,
+    title: 'Long-running task',
+    cwd: '/tmp/project',
+    rolloutPath: `/tmp/${taskID}.jsonl`,
+    latestCollaborationMode: { mode: 'default' },
+    threadRuntimeStatus: { type: 'idle' },
+    messages: Array.from({ length: 1_000 }, () => ({ text: 'large history' })),
+    turns: ['not retained'],
+  });
+  assert.deepEqual(compact, {
+    id: taskID,
+    title: 'Long-running task',
+    cwd: '/tmp/project',
+    rolloutPath: `/tmp/${taskID}.jsonl`,
+    latestCollaborationMode: { mode: 'default' },
+    threadRuntimeStatus: { type: 'idle' },
+  });
+  assert.equal('messages' in compact, false);
+  assert.equal('turns' in compact, false);
 });
