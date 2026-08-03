@@ -51,10 +51,16 @@ export interface DeckMessage {
   dur: number;
   /** true while this is only a progress mirror — no controllable audio behind it */
   mirrored?: boolean;
-  /** synthesized audio owned by the runtime — real transport control when present */
+  /** the segment currently being spoken — real transport control when present */
   file?: string;
-  /** where a connected deck can fetch the audio to play it on the device */
+  /** where a connected deck can fetch the current segment to play it on the device */
   audioUrl?: string;
+  /** every narration segment, in speaking order. Long replies span several files. */
+  segments?: string[];
+  /** the deck-facing URL of each segment, index-aligned with `segments` */
+  segmentUrls?: string[];
+  /** estimated seconds per segment, index-aligned with `segments` */
+  segmentDurs?: number[];
 }
 
 export interface DeckTraceEntry {
@@ -103,7 +109,14 @@ export interface DeckSnapshot {
   threads: DeckMessage[][];
   playing: string | null;
   paused: boolean;
+  /** elapsed seconds across the whole narration, not just the current segment */
   pos: number;
+  /** which narration segment is playing — long replies span several files */
+  segIx: number;
+  /** seconds of narration before the current segment begins */
+  segStart: number;
+  /** total number of segments in the narration in flight */
+  segCount: number;
   speedIx: number;
   vol: number;
   autoplay: boolean;
@@ -343,6 +356,33 @@ export function estimateDuration(text: string, rate = 1): number {
   return Math.max(1.5, words / (2.5 * rate));
 }
 
+/** Exact duration of a rendered audio file, or null when it cannot be read. */
+export function audioDurationOf(file: string): number | null {
+  try {
+    const info = execFileSync('afinfo', [file], {
+      encoding: 'utf8',
+      timeout: 5_000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const match = info.match(/estimated duration:\s*([\d.]+)\s*sec/i);
+    const seconds = match ? Number.parseFloat(match[1]) : Number.NaN;
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Per-segment durations for a multi-part narration. The rendered audio is the
+ * authority; the word-rate estimate is only a fallback so the transport still
+ * has a usable clock when `afinfo` cannot read a file.
+ */
+export function measureSegmentDurations(files: string[], text: string): number[] {
+  if (files.length === 0) return [];
+  const fallback = Math.max(1.5, estimateDuration(text) / files.length);
+  return files.map((file) => audioDurationOf(file) ?? fallback);
+}
+
 
 export function parseIntent(raw: unknown): { intent?: DeckIntent; error?: string } {
   const parsed = intentSchema.safeParse(raw);
@@ -390,6 +430,8 @@ export class DeckRuntime extends EventEmitter {
   private playing: string | null = null;
   private paused = false;
   private pos = 0;
+  /** Index of the narration segment currently being spoken for `playing`. */
+  private segIx = 0;
   private speedIx = 0;
   private vol = 0.8;
   private autoplay = true;
@@ -532,6 +574,11 @@ export class DeckRuntime extends EventEmitter {
       playing: this.playing,
       paused: this.paused,
       pos: this.pos,
+      // Narration segment the device should be playing, and where it starts in
+      // the whole-message timeline, so the deck can seek inside the right file.
+      segIx: this.segIx,
+      segStart: this.segmentStart(),
+      segCount: this.segmentCount(),
       speedIx: this.speedIx,
       vol: this.vol,
       autoplay: this.autoplay,
@@ -781,6 +828,7 @@ export class DeckRuntime extends EventEmitter {
     this.playing = null;
     this.paused = false;
     this.pos = 0;
+    this.segIx = 0;
     if (confirm) this.setPhase(this.phase === 'speaking' ? 'idle' : this.phase, confirm);
   }
 
@@ -850,10 +898,9 @@ export class DeckRuntime extends EventEmitter {
           this.stopPlayer();
           this.playing = intent.id;
           this.paused = false;
-          this.pos = 0;
           this.setPhase('speaking', 'PLAYING');
           this.log('PLAYBACK STARTED', `${SPEEDS[this.speedIx].toFixed(2)}x`);
-          if (msg.file) this.playFile(msg.file);
+          this.startSegments(msg);
         }
         this.ensureTicker();
         this.changed();
@@ -898,11 +945,10 @@ export class DeckRuntime extends EventEmitter {
             this.stopPlayer();
             this.playing = `${this.laneIx}:${i}`;
             this.paused = false;
-            this.pos = 0;
             this.setPhase('speaking', 'REPLAYING LAST REPLY');
             this.ensureTicker();
             this.log('REPLAY', `lane ${this.laneIx + 1} · last reply`);
-            this.playFile(t[i].file!);
+            this.startSegments(t[i]);
             this.changed();
             return { ok: true, rev: this.rev };
           }
@@ -974,25 +1020,38 @@ export class DeckRuntime extends EventEmitter {
         return { ok: true, rev: this.rev };
       }
       case 'playback.progress': {
-        // the device owns playback of runtime files — adopt its clock
+        // the device owns playback of runtime files — adopt its clock. It
+        // reports a position inside the segment it is playing, so offset by
+        // everything already narrated.
         if (this.playing !== intent.id) return { ok: false, rev: this.rev, error: 'not playing' };
-        this.pos = intent.pos;
+        this.pos = this.segmentStart() + intent.pos;
         if (intent.dur) {
           const msg = this.messageAt(intent.id);
-          if (msg) msg.dur = intent.dur;
+          const durs = msg?.segmentDurs;
+          if (durs) durs[this.segIx] = intent.dur;
+          if (msg) msg.dur = durs ? durs.reduce((total, d) => total + d, 0) : intent.dur;
         }
         this.changed();
         return { ok: true, rev: this.rev };
       }
       case 'playback.ended': {
         if (this.playing !== intent.id) return { ok: false, rev: this.rev, error: 'not playing' };
+        // The device finished one segment. Hand it the next before declaring
+        // the narration over — this is where long replies used to stop.
+        if (this.advanceSegment()) {
+          this.pos = this.segmentStart();
+          this.log('SEGMENT', `${this.segIx + 1}/${this.segmentCount()}`);
+          this.changed();
+          return { ok: true, rev: this.rev };
+        }
         const [li] = intent.id.split(':').map(Number);
         this.playing = null;
+        this.segIx = 0;
         this.pos = 0;
         this.paused = false;
         this.setPhase('idle', 'READY');
         this.setLaneState(li, 'idle');
-        this.log('PLAYBACK ENDED', 'buffer complete');
+        this.log('PLAYBACK ENDED', 'narration complete');
         this.changed();
         return { ok: true, rev: this.rev };
       }
@@ -1016,8 +1075,13 @@ export class DeckRuntime extends EventEmitter {
     }
     this.changed();
     if (play) {
-      const file = await this.synthesize(text);
-      if (file) this.playFile(file);
+      const files = await this.synthesizeSegments(text);
+      if (files.length === 0) return;
+      // A mirror stays Mac-local: segments drive ordered local playback, but no
+      // deck-facing URLs are published, so a connected device stays silent.
+      this.attachSegments(msg, files, text, false);
+      if (this.playing === id) this.startSegments(msg);
+      this.changed();
     }
   }
 
@@ -1054,7 +1118,7 @@ export class DeckRuntime extends EventEmitter {
       this.log('AGENT REPLY', `${msg.dur.toFixed(0)}s queued`);
       this.changed();
 
-      const file = await this.synthesize(reply);
+      const files = await this.synthesizeSegments(reply);
       if (!alive()) {
         // cancelled while synthesizing — finalize the reply as text-only
         if (!msg.file) {
@@ -1063,7 +1127,7 @@ export class DeckRuntime extends EventEmitter {
         }
         return;
       }
-      if (!file) {
+      if (files.length === 0) {
         // synthesis failed — show the reply without audio, never fake playback
         msg.mirrored = true;
         this.setPhase('idle', `READY · LANE ${String(lane + 1).padStart(2, '0')}`);
@@ -1071,19 +1135,20 @@ export class DeckRuntime extends EventEmitter {
         this.changed();
         return;
       }
-      msg.file = file;
-      msg.audioUrl = `/audio/${path.basename(file)}`;
+      this.attachSegments(msg, files, reply);
+      if (files.length > 1) {
+        this.log('NARRATION SEGMENTS', `${files.length} parts · ${msg.dur.toFixed(0)}s total`);
+      }
       if (this.autoplay && this.suppressAutoplayForGeneration !== gen) {
         this.playing = id;
         this.paused = false;
-        this.pos = 0;
         this.setPhase('speaking', `SPEAKING · LANE ${String(lane + 1).padStart(2, '0')}`);
         this.setLaneState(lane, 'speaking');
         this.ensureTicker();
         this.changed();
         // a connected deck plays the audio on the device; the Mac speaks only
         // when nobody is watching
-        if (this.liveClients() === 0) this.playFile(file);
+        this.startSegments(msg);
       } else {
         this.setPhase('idle', `READY · LANE ${String(lane + 1).padStart(2, '0')}`);
         this.changed();
@@ -1127,7 +1192,9 @@ export class DeckRuntime extends EventEmitter {
           );
           const text = result.response.trim();
           if (!text) throw new Error('empty reply from the canonical task');
-          return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : text;
+          // The full canonical answer is returned. Narration length is bounded
+          // by ordered segment synthesis, never by clipping the agent's reply.
+          return text;
         } finally {
           if (this.canonicalTurnAbort === controller) this.canonicalTurnAbort = null;
         }
@@ -1153,7 +1220,7 @@ export class DeckRuntime extends EventEmitter {
       }
       const text = result.text.trim();
       if (!text) throw new Error('empty reply from session');
-      return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : text;
+      return text;
     } catch (error) {
       const canonical = route.kind === 'canonical';
       this.log(canonical ? 'CANONICAL FAILED' : 'AGENT FAILED', (error as Error).message.slice(0, 60));
@@ -1179,40 +1246,124 @@ export class DeckRuntime extends EventEmitter {
     for (const { client } of this.laneClients.values()) client.interrupt?.();
   }
 
-  /** Synthesize to a runtime-owned file — the user's configured provider first
-   * (cloud silent mode → exact cache entry copied out), the macOS system voice
-   * as fallback. The copy means cache eviction can never pull audio mid-play. */
-  private async synthesize(text: string): Promise<string | null> {
+  /** Synthesize to runtime-owned files — the user's configured provider first
+   * (cloud silent mode → exact cache entries copied out), the macOS system voice
+   * as fallback. The copy means cache eviction can never pull audio mid-play.
+   *
+   * A reply longer than one provider request becomes several ordered segments.
+   * Partial synthesis is still returned: speaking most of a long answer beats
+   * discarding all of it, and the shortfall is logged rather than hidden. */
+  private async synthesizeSegments(text: string): Promise<string[]> {
+    const stamp = Date.now();
     try {
       const { SpeakEasy } = await import('../index');
       const speaker = new SpeakEasy({
         volume: this.vol,
-        // The deck needs a durable file it can copy to its own playback area.
-        // Caching also makes silent system-voice synthesis return that exact file.
+        // The deck needs durable files it can copy to its own playback area.
+        // Caching also makes silent system-voice synthesis return those files.
         cache: { enabled: true },
       });
-      await speaker.speak(text, { silent: true });
-      // the SDK reports the exact file it used — no scanning, no correlation guesswork
-      if (speaker.lastAudioFile && existsSync(speaker.lastAudioFile)) {
-        const owned = path.join(this.synthDir, `reply-${Date.now()}${path.extname(speaker.lastAudioFile) || '.mp3'}`);
-        copyFileSync(speaker.lastAudioFile, owned);
-        return owned;
+      try {
+        await speaker.speak(text, { silent: true });
+      } catch (error) {
+        // Some segments may still have rendered — keep whatever was produced.
+        this.log('SYNTH PARTIAL', (error as Error).message.slice(0, 60));
       }
+      // the SDK reports the exact files it used — no scanning, no correlation guesswork
+      const owned: string[] = [];
+      speaker.lastAudioFiles.forEach((source, i) => {
+        if (!existsSync(source)) return;
+        const target = path.join(
+          this.synthDir,
+          `reply-${stamp}-${String(i).padStart(2, '0')}${path.extname(source) || '.mp3'}`
+        );
+        copyFileSync(source, target);
+        owned.push(target);
+      });
+      if (owned.length > 0) return owned;
     } catch {
       // cloud silent mode unavailable — fall through to the system voice
     }
-    const file = path.join(this.synthDir, `reply-${Date.now()}.aiff`);
+    const file = path.join(this.synthDir, `reply-${stamp}.aiff`);
     try {
-      await run('say', ['-o', file, text], 30_000);
-      return file;
+      // `say` reads from argv and has no practical length limit, so the system
+      // fallback stays a single file regardless of how long the reply is.
+      await run('say', ['-o', file, text], 120_000);
+      return [file];
     } catch (error) {
       this.log('SYNTH FAILED', (error as Error).message.slice(0, 60));
       this.changed();
-      return null;
+      return [];
     }
   }
 
-  /** Controlled playback of a runtime-owned file: pause/resume/stop are real.
+  /** Attach ordered narration segments to a message and point it at the first.
+   *
+   * `exposeToDeck` decides whether a connected device may fetch and play the
+   * audio. Mirrors stay Mac-local, so publishing their URLs would produce the
+   * double audio the transport is careful to avoid. */
+  private attachSegments(
+    msg: DeckMessage,
+    files: string[],
+    text: string,
+    exposeToDeck = true
+  ): void {
+    const durations = measureSegmentDurations(files, text);
+    msg.segments = files;
+    msg.segmentUrls = exposeToDeck ? files.map((f) => `/audio/${path.basename(f)}`) : undefined;
+    msg.segmentDurs = durations;
+    msg.dur = durations.reduce((total, d) => total + d, 0);
+    this.focusSegment(msg, 0);
+  }
+
+  /** Point a message's transport fields at segment `ix`. */
+  private focusSegment(msg: DeckMessage, ix: number): void {
+    msg.file = msg.segments?.[ix];
+    msg.audioUrl = msg.segmentUrls?.[ix];
+  }
+
+  /** Seconds of narration before the current segment starts. */
+  private segmentStart(): number {
+    const msg = this.playing ? this.messageAt(this.playing) : null;
+    const durs = msg?.segmentDurs;
+    if (!durs) return 0;
+    return durs.slice(0, this.segIx).reduce((total, d) => total + d, 0);
+  }
+
+  /** How many segments the narration in flight has. */
+  private segmentCount(): number {
+    const msg = this.playing ? this.messageAt(this.playing) : null;
+    return msg?.segments?.length ?? (msg?.file ? 1 : 0);
+  }
+
+  /**
+   * Advance to the next narration segment. Returns false once the last segment
+   * has been spoken, which is the only point at which playback is complete.
+   */
+  private advanceSegment(): boolean {
+    if (!this.playing) return false;
+    const msg = this.messageAt(this.playing);
+    const segments = msg?.segments;
+    if (!msg || !segments || this.segIx + 1 >= segments.length) return false;
+    this.segIx += 1;
+    this.focusSegment(msg, this.segIx);
+    return true;
+  }
+
+  /** Begin a message's narration from its first segment. */
+  private startSegments(msg: DeckMessage): void {
+    this.segIx = 0;
+    this.focusSegment(msg, 0);
+    this.pos = 0;
+    if (this.liveClients() === 0 && msg.file) this.playFile(msg.file);
+  }
+
+  /** Controlled playback of one runtime-owned segment: pause/resume/stop are real.
+   *
+   * Each invocation costs ~1s of `afplay` process and audio-device startup, so a
+   * multi-segment narration has a short seam between parts. Chunks are sized in
+   * the ~80s range to keep that overhead near one percent; removing it entirely
+   * would mean a persistent audio process rather than one-shot `afplay`.
    * Skipped entirely while a deck is connected — the deck plays the audio on
    * the device instead (double audio is the bug this prevents). */
   private playFile(file: string): void {
@@ -1228,17 +1379,31 @@ export class DeckRuntime extends EventEmitter {
       // a killed predecessor must not clear the reference of its replacement
       if (this.player !== player) return;
       this.player = null;
-      // natural completion is authoritative — the audio really is done
-      if (this.playing && !this.paused) {
-        const [li] = this.playing.split(':').map(Number);
-        this.playing = null;
-        this.pos = 0;
-        this.paused = false;
-        this.setPhase('idle', 'READY');
-        this.setLaneState(li, 'idle');
-        this.log('PLAYBACK ENDED', 'buffer complete');
-        this.changed();
+      // natural completion is authoritative — this segment really is done
+      if (!this.playing || this.paused) return;
+
+      // A long reply is several ordered segments. Only the last one ends the
+      // narration; the rest hand off to their successor.
+      if (this.advanceSegment()) {
+        const next = this.messageAt(this.playing)?.file;
+        this.pos = this.segmentStart();
+        if (next) {
+          this.log('SEGMENT', `${this.segIx + 1}/${this.segmentCount()}`);
+          this.changed();
+          this.playFile(next);
+          return;
+        }
       }
+
+      const [li] = this.playing.split(':').map(Number);
+      this.playing = null;
+      this.segIx = 0;
+      this.pos = 0;
+      this.paused = false;
+      this.setPhase('idle', 'READY');
+      this.setLaneState(li, 'idle');
+      this.log('PLAYBACK ENDED', 'narration complete');
+      this.changed();
     });
   }
 
