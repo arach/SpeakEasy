@@ -14,6 +14,7 @@ export interface PadTransport {
   connect(): Promise<void>;
   disconnect(): void;
   resume?(): void;
+  forgetPairing?(): void;
   subscribe(listener: (event: TransportEvent) => void): () => void;
   send(command: PadCommand, baseRevision: number): Promise<CommandAck>;
 }
@@ -276,6 +277,14 @@ interface SessionAcceptedMessage {
 
 const LAN_SESSION_KEY = "speakeasy.pad.lan-session.v1";
 
+export function forgetStoredLANSession(storage: Pick<Storage, "removeItem"> = localStorage): void {
+  try {
+    storage.removeItem(LAN_SESSION_KEY);
+  } catch {
+    // Pairing cleanup should still allow the UI to return to its unpaired state.
+  }
+}
+
 export function makePadSocketURL(location: Pick<Location, "protocol" | "host">): string {
   const scheme = location.protocol === "https:" ? "wss:" : "ws:";
   return `${scheme}//${location.host}/pad`;
@@ -486,6 +495,12 @@ export class LANPadTransport implements PadTransport {
     this.#reconnectTimer = undefined;
     this.#socket?.close(1000, "Pad closed");
     this.#socket = undefined;
+  }
+
+  forgetPairing(): void {
+    this.disconnect();
+    this.#session = undefined;
+    forgetStoredLANSession();
   }
 
   send(command: PadCommand, baseRevision: number): Promise<CommandAck> {

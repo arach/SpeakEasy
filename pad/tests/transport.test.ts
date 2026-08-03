@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PadSnapshot } from "../src/model.ts";
-import { claimNextSequence, MockPadTransport, linkAllowsCommands, makeCommandEnvelope, makeLANBootstrapMessage, makePadSocketURL, makeRequestId, reconnectDecision, requestIdKey, socketCloseDetail } from "../src/transport.ts";
+import { claimNextSequence, forgetStoredLANSession, MockPadTransport, linkAllowsCommands, makeCommandEnvelope, makeLANBootstrapMessage, makePadSocketURL, makeRequestId, reconnectDecision, requestIdKey, socketCloseDetail } from "../src/transport.ts";
 
 describe("MockPadTransport", () => {
   test("acknowledges lane activation with a newer authoritative snapshot", async () => {
@@ -39,6 +39,14 @@ describe("linkAllowsCommands", () => {
     expect(linkAllowsCommands("suspect")).toBe(true);
     expect(linkAllowsCommands("degraded")).toBe(false);
     expect(linkAllowsCommands("offline")).toBe(false);
+  });
+});
+
+describe("pairing cleanup", () => {
+  test("removes only the resumable LAN session", () => {
+    const removed: string[] = [];
+    forgetStoredLANSession({ removeItem: (key) => removed.push(key) });
+    expect(removed).toEqual(["speakeasy.pad.lan-session.v1"]);
   });
 });
 

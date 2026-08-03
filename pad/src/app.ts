@@ -13,7 +13,7 @@ import {
   type PadCommand,
   type PadSnapshot,
 } from "./model.ts";
-import { createTransport, linkAllowsCommands, type PadTransport } from "./transport.ts";
+import { createTransport, forgetStoredLANSession, linkAllowsCommands, type PadTransport } from "./transport.ts";
 import { finishCommandAfterRecording, RecordingStartLatch } from "./ptt.ts";
 import {
   applyPadTheme,
@@ -33,7 +33,7 @@ import { applyPadMode, PAD_MODE_COPY, PAD_MODE_IDS, readPadMode, savePadMode, ty
 const mount = document.querySelector<HTMLDivElement>("#app");
 if (!mount) throw new Error("SpeakEasy Pad could not find its app mount.");
 const root: HTMLDivElement = mount;
-const PAD_BUILD = "0726.6";
+const PAD_BUILD = "0802.1";
 
 const bootstrap = consumeBootstrapFromLocation(window.location, window.history);
 const transport = createTransport(bootstrap.kind === "valid" ? bootstrap.payload : undefined);
@@ -62,8 +62,13 @@ let appearanceSheetOpen = false;
 let appearanceSheetView: "browse" | "editor" = "browse";
 let editorThemeId: string | undefined;
 let editorText = "";
+let editorInitialText = "";
 let editorErrors: string[] = [];
+let editorDiscardArmed = false;
+let editorDiscardDestination: "browse" | "close" = "browse";
 let themeDeleteArmed = false;
+let linkActionArmed: "pair" | "forget" | undefined;
+let focusAfterRender: string | undefined;
 let deferredInstall: BeforeInstallPromptEvent | undefined;
 let pttStart: Promise<boolean> | undefined;
 let pressButton: HTMLElement | undefined;
@@ -589,38 +594,55 @@ function receiptMarkup(): string {
   </div>`;
 }
 
+function themePreviewMarkup(item: PadTheme): string {
+  return `<span class="theme-preview" data-preview-scheme="${item.scheme}" style="--preview-accent:${esc(themeAccent(item))}" aria-hidden="true">
+    <i><b></b><b></b><b></b></i><i><b></b><b></b></i>
+  </span>`;
+}
+
+function appearanceHasChanges(): boolean {
+  return mode !== readPadMode() || theme.id !== readPadTheme().id;
+}
+
 function sheetMarkup(): string {
   if (!connectionSheetOpen && !installSheetOpen && !appearanceSheetOpen) return "";
   if (appearanceSheetOpen) {
     if (appearanceSheetView === "editor") return themeEditorMarkup();
     const themes = listPadThemes();
+    const dirty = appearanceHasChanges();
     return `<div class="sheet-backdrop" data-dismiss-sheet>
-      <section class="sheet appearance-sheet" role="dialog" aria-modal="true" aria-labelledby="appearance-title">
-        <button class="sheet-close" type="button" data-dismiss-sheet aria-label="Close">${icons.close}</button>
-        <p class="eyebrow">STUDIO CONTROL SURFACES</p>
-        <h2 id="appearance-title">Choose a Pad layout</h2>
-        <div class="mode-options">${PAD_MODE_IDS.map((id, index) => `<button type="button" class="mode-option" data-select-mode="${id}" data-selected="${id === mode}" aria-pressed="${id === mode}">
+      <section class="sheet appearance-sheet" role="dialog" aria-modal="true" aria-labelledby="appearance-title" aria-describedby="appearance-description" tabindex="-1" data-focus-id="dialog">
+        <button class="sheet-close" type="button" data-dismiss-sheet data-focus-id="sheet-close" aria-label="Cancel appearance changes">${icons.close}</button>
+        <p class="eyebrow">STUDIO APPEARANCE</p>
+        <h2 id="appearance-title">Appearance</h2>
+        <p class="sheet-intro" id="appearance-description">Choose the control layout and visual theme independently. Changes preview live and stay on this Pad only after you apply them.</p>
+        <div class="appearance-section-heading"><p class="eyebrow">CONTROL SURFACE</p><span>Layout</span></div>
+        <div class="mode-options">${PAD_MODE_IDS.map((id, index) => `<button type="button" class="mode-option" data-select-mode="${id}" data-focus-id="mode-${id}" data-selected="${id === mode}" aria-pressed="${id === mode}">
           <span class="mode-preview" data-preview="${id}" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
           <span><strong>${(index + 1).toString().padStart(2, "0")} · ${PAD_MODE_COPY[id].label}</strong><small>${PAD_MODE_COPY[id].description}</small></span>
         </button>`).join("")}</div>
-        <div class="finish-label"><p class="eyebrow">DECK THEME</p><span>Manifest · Contract v1</span></div>
-        <div class="finish-options">${themes.map((item) => `<button type="button" data-select-theme="${item.id}" data-selected="${item.id === theme.id}" aria-pressed="${item.id === theme.id}"><i style="background:${themeAccent(item)}"></i>${esc(item.name)}</button>`).join("")}
-          <button type="button" class="finish-new" data-new-theme><i aria-hidden="true">+</i>NEW DECK THEME</button>
+        <div class="appearance-section-heading"><p class="eyebrow">DECK THEME</p><span>Color system</span></div>
+        <div class="finish-options">${themes.map((item) => `<button type="button" class="theme-option" data-select-theme="${item.id}" data-focus-id="theme-${item.id}" data-selected="${item.id === theme.id}" aria-pressed="${item.id === theme.id}">${themePreviewMarkup(item)}<span>${esc(item.name)}</span></button>`).join("")}
+          <button type="button" class="finish-new" data-new-theme data-focus-id="new-theme"><i aria-hidden="true">+</i><span><strong>CREATE THEME</strong><small>Advanced</small></span></button>
         </div>
         ${theme.source === "custom" ? `<div class="theme-edit-row">
           <span>CUSTOM · ${esc(theme.name)}</span>
-          <button type="button" data-edit-theme="${theme.id}">EDIT MANIFEST</button>
-          <button type="button" class="theme-delete" data-delete-theme data-armed="${themeDeleteArmed}">${themeDeleteArmed ? "CONFIRM DELETE" : "DELETE"}</button>
+          <button type="button" data-edit-theme="${theme.id}" data-focus-id="edit-theme">EDIT</button>
+          <button type="button" class="theme-delete" data-delete-theme data-focus-id="delete-theme" data-armed="${themeDeleteArmed}">${themeDeleteArmed ? "CONFIRM DELETE" : "DELETE"}</button>
         </div>` : ""}
-        <p class="sheet-note">Deck themes are Chrome-style manifests — colors, CSS, and HTML chrome bound through Pad Theme Contract v1 (docs/theme-contract.md). Saved on this device; the Mac link keeps running while you switch.</p>
+        <div class="appearance-actions">
+          <p role="status">${dirty ? "Previewing unapplied changes" : "Using saved appearance"}</p>
+          <button type="button" class="sheet-secondary" data-appearance-cancel data-focus-id="appearance-cancel">CANCEL</button>
+          <button type="button" class="sheet-primary" data-appearance-apply data-focus-id="appearance-apply" ${dirty ? "" : "disabled"}>APPLY CHANGES</button>
+        </div>
       </section>
     </div>`;
   }
   if (connectionSheetOpen) {
     const copy = LINK_COPY[health];
     return `<div class="sheet-backdrop" data-dismiss-sheet>
-      <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="connection-title">
-        <button class="sheet-close" type="button" data-dismiss-sheet aria-label="Close">${icons.close}</button>
+      <section class="sheet connection-sheet" role="dialog" aria-modal="true" aria-labelledby="connection-title" aria-describedby="connection-description" tabindex="-1" data-focus-id="dialog">
+        <button class="sheet-close" type="button" data-dismiss-sheet data-focus-id="sheet-close" aria-label="Close Companion Link settings">${icons.close}</button>
         <p class="eyebrow">COMPANION LINK</p>
         <h2 id="connection-title">${esc(hostName)}</h2>
         <div class="link-readout" data-health="${health}">
@@ -633,13 +655,20 @@ function sheetMarkup(): string {
           <div><dt>ROUTE</dt><dd>${sessionSecurity === "demo" ? "In-browser simulator" : sessionSecurity === "lan-prototype-v1" ? "Trusted-LAN pilot · plaintext" : "End-to-end encrypted"}</dd></div>
           <div><dt>AUTHORITY</dt><dd>${transport.mode === "demo" ? "Browser demo state · no Mac connected" : "The Mac acknowledges every command"}</dd></div>
         </dl>
-        <p class="sheet-note">Connection health and pairing trust are separate. If the route drops, this Pad keeps no command queued.</p>
+        <div class="link-actions">
+          <button type="button" class="sheet-primary" data-link-reconnect data-focus-id="link-reconnect">${health === "healthy" ? "CHECK CONNECTION" : "RECONNECT NOW"}</button>
+          <button type="button" class="sheet-secondary" data-link-copy data-focus-id="link-copy">COPY DIAGNOSTICS</button>
+          <button type="button" class="sheet-secondary" data-link-pair data-focus-id="link-pair" data-armed="${linkActionArmed === "pair"}" ${transport.mode === "demo" ? "disabled" : ""}>${linkActionArmed === "pair" ? "CONFIRM PAIR AGAIN" : "PAIR AGAIN"}</button>
+          <button type="button" class="sheet-secondary danger-action" data-link-forget data-focus-id="link-forget" data-armed="${linkActionArmed === "forget"}" ${transport.mode === "demo" ? "disabled" : ""}>${linkActionArmed === "forget" ? "CONFIRM FORGET" : "FORGET THIS PAD"}</button>
+        </div>
+        ${linkActionArmed ? `<p class="link-action-warning" role="alert">${linkActionArmed === "pair" ? "This removes the current pairing, then waits for a fresh code from your Mac." : "This removes pairing, custom themes, and saved appearance from this Pad."}</p>` : ""}
+        <p class="sheet-note" id="connection-description">Connection health and pairing trust are separate. If the route drops, this Pad keeps no command queued.</p>
       </section>
     </div>`;
   }
   return `<div class="sheet-backdrop" data-dismiss-sheet>
-    <section class="sheet install-sheet" role="dialog" aria-modal="true" aria-labelledby="install-title">
-      <button class="sheet-close" type="button" data-dismiss-sheet aria-label="Close">${icons.close}</button>
+    <section class="sheet install-sheet" role="dialog" aria-modal="true" aria-labelledby="install-title" tabindex="-1" data-focus-id="dialog">
+      <button class="sheet-close" type="button" data-dismiss-sheet data-focus-id="sheet-close" aria-label="Close install instructions">${icons.close}</button>
       <p class="eyebrow">FULL-SCREEN CONTROL SURFACE</p>
       <h2 id="install-title">Add SpeakEasy Pad to Home Screen</h2>
       <ol>
@@ -674,17 +703,19 @@ const THEME_STARTER_MANIFEST = `{
 function themeEditorMarkup(): string {
   const title = editorThemeId ? `Edit “${esc(findPadTheme(editorThemeId)?.name ?? "deck theme")}”` : "New deck theme";
   return `<div class="sheet-backdrop" data-dismiss-sheet>
-    <section class="sheet appearance-sheet theme-editor" role="dialog" aria-modal="true" aria-labelledby="theme-editor-title">
-      <button class="sheet-close" type="button" data-dismiss-sheet aria-label="Close">${icons.close}</button>
-      <p class="eyebrow">PAD THEME CONTRACT v1</p>
+    <section class="sheet appearance-sheet theme-editor" role="dialog" aria-modal="true" aria-labelledby="theme-editor-title" aria-describedby="theme-editor-description" tabindex="-1" data-focus-id="dialog">
+      <button class="sheet-close" type="button" data-dismiss-sheet data-focus-id="sheet-close" aria-label="Close theme editor">${icons.close}</button>
+      <p class="eyebrow">ADVANCED THEME EDITOR</p>
       <h2 id="theme-editor-title">${title}</h2>
-      <p class="sheet-note">A deck theme is a Chrome-style manifest: metadata, <b>colors</b> (design tokens), <b>css</b>, and <b>html</b> chrome with <b>data-pad-slot</b> mounts. Full contract: docs/theme-contract.md.</p>
-      <textarea class="theme-manifest" data-theme-manifest spellcheck="false" autocomplete="off" aria-label="Theme manifest JSON">${esc(editorText)}</textarea>
+      <p class="sheet-intro" id="theme-editor-description">Edit the theme colors and optional custom chrome as JSON. Nothing is saved until you choose Save theme.</p>
+      <details class="theme-contract-details"><summary>Theme manifest details</summary><p>Pad Theme Contract v1 supports metadata, color tokens, CSS, and optional HTML mount regions. The full reference is in <code>docs/theme-contract.md</code>.</p></details>
+      <textarea class="theme-manifest" data-theme-manifest data-focus-id="theme-manifest" spellcheck="false" autocomplete="off" aria-label="Theme manifest JSON">${esc(editorText)}</textarea>
       ${editorErrors.length > 0 ? `<ul class="theme-editor-errors" role="alert">${editorErrors.map((error) => `<li>${esc(error)}</li>`).join("")}</ul>` : ""}
+      ${editorDiscardArmed ? `<div class="theme-editor-warning" role="alert"><span>Discard your unsaved changes?</span><button type="button" class="sheet-secondary" data-theme-keep data-focus-id="theme-keep">KEEP EDITING</button><button type="button" class="sheet-secondary danger-action" data-theme-discard data-focus-id="theme-discard">DISCARD</button></div>` : ""}
       <div class="theme-editor-actions">
-        <button type="button" class="sheet-primary" data-theme-save>SAVE THEME</button>
-        <button type="button" class="sheet-secondary" data-theme-template>STARTER TEMPLATE</button>
-        <button type="button" class="sheet-secondary" data-theme-back>BACK</button>
+        <button type="button" class="sheet-primary" data-theme-save data-focus-id="theme-save">SAVE THEME</button>
+        <button type="button" class="sheet-secondary" data-theme-template data-focus-id="theme-template">STARTER TEMPLATE</button>
+        <button type="button" class="sheet-secondary" data-theme-back data-focus-id="theme-back">BACK TO APPEARANCE</button>
       </div>
     </section>
   </div>`;
@@ -705,11 +736,11 @@ function topbarMarkup(): string {
       <span class="brand-copy"><strong>SPEAKEASY</strong><small>PAD / CONTROL SURFACE</small></span>
     </div>
     <div class="topbar-actions">
-      <button class="theme-button" type="button" data-appearance aria-label="Change layout and deck theme. Current layout ${PAD_MODE_COPY[mode].label}, ${esc(theme.name)} theme">
+      <button class="theme-button" type="button" data-appearance data-focus-id="appearance-trigger" aria-label="Change layout and deck theme. Current layout ${PAD_MODE_COPY[mode].label}, ${esc(theme.name)} theme">
         <span class="theme-swatch" aria-hidden="true"></span>${icons.theme}<span>${PAD_MODE_COPY[mode].label}</span>
       </button>
-      <button class="install-button" type="button" data-install aria-label="Install SpeakEasy Pad">${icons.install}<span>INSTALL</span></button>
-      <button class="link-chip" type="button" data-connection data-health="${health}" aria-label="${esc(link.label)}. ${esc(linkDetail || link.detail)}">
+      <button class="install-button" type="button" data-install data-focus-id="install-trigger" aria-label="Install SpeakEasy Pad">${icons.install}<span>INSTALL</span></button>
+      <button class="link-chip" type="button" data-connection data-focus-id="connection-trigger" data-health="${health}" aria-label="${esc(link.label)}. ${esc(linkDetail || link.detail)}">
         ${mode === "micro" ? `<span class="link-measure">${health === "offline" ? "OFF" : lastAckLatencyMs === undefined ? "— MS" : `${lastAckLatencyMs} MS`}</span>` : barsMarkup(link.bars)}
         <span><strong>${transport.mode === "demo" ? "LOCAL DEMO" : mode === "micro" ? "COMMAND RTT" : esc(link.label)}</strong><small>${transport.mode === "demo" ? "AUDIO ON THIS DEVICE" : esc(hostName)}</small></span>
       </button>
@@ -731,6 +762,7 @@ function padStateAttributes(): string {
 }
 
 function render(): void {
+  const previousFocusId = (document.activeElement as HTMLElement | null)?.dataset.focusId;
   const regions: Array<[string, string]> = [
     ["topbar", topbarMarkup()],
     ["surface", surfaceMarkup()],
@@ -754,6 +786,20 @@ function render(): void {
   root.replaceChildren(shell);
 
   bindEvents();
+  const dialog = root.querySelector<HTMLElement>(".sheet[role=\"dialog\"]");
+  if (dialog) {
+    root.querySelectorAll<HTMLElement>(".topbar, .studio-surface, .status-rail, .fastener").forEach((element) => {
+      element.inert = true;
+      element.setAttribute("aria-hidden", "true");
+    });
+  }
+  const targetFocusId = focusAfterRender ?? previousFocusId ?? (dialog ? "sheet-close" : undefined);
+  focusAfterRender = undefined;
+  if (targetFocusId) {
+    const target = Array.from(root.querySelectorAll<HTMLElement>("[data-focus-id]"))
+      .find((element) => element.dataset.focusId === targetFocusId && !element.matches(":disabled"));
+    target?.focus({ preventScroll: true });
+  }
 }
 
 function showNotice(message: string, tone: "info" | "error" = "info"): void {
@@ -940,13 +986,118 @@ async function finishPtt(cancelled: boolean): Promise<void> {
   }
 }
 
-function closeSheets(): void {
+function closeSheets(returnFocusId?: "appearance-trigger" | "connection-trigger" | "install-trigger"): void {
   connectionSheetOpen = false;
   installSheetOpen = false;
   appearanceSheetOpen = false;
   appearanceSheetView = "browse";
   editorErrors = [];
+  editorDiscardArmed = false;
   themeDeleteArmed = false;
+  linkActionArmed = undefined;
+  focusAfterRender = returnFocusId;
+}
+
+function cancelAppearance(): void {
+  theme = readPadTheme();
+  mode = readPadMode();
+  applyPadTheme(theme);
+  applyPadMode(mode);
+  closeSheets("appearance-trigger");
+}
+
+function editorHasUnsavedChanges(): boolean {
+  return editorText !== editorInitialText;
+}
+
+function requestEditorExit(destination: "browse" | "close"): void {
+  if (editorHasUnsavedChanges()) {
+    editorDiscardArmed = true;
+    editorDiscardDestination = destination;
+    focusAfterRender = "theme-discard";
+    render();
+    return;
+  }
+  if (destination === "close") cancelAppearance();
+  else {
+    appearanceSheetView = "browse";
+    editorErrors = [];
+    focusAfterRender = editorThemeId ? `theme-${editorThemeId}` : "new-theme";
+  }
+  render();
+}
+
+function requestSheetDismiss(): void {
+  if (appearanceSheetOpen && appearanceSheetView === "editor") {
+    requestEditorExit("close");
+    return;
+  }
+  if (appearanceSheetOpen) {
+    cancelAppearance();
+    render();
+    return;
+  }
+  closeSheets(connectionSheetOpen ? "connection-trigger" : "install-trigger");
+  render();
+}
+
+function connectionDiagnostics(): string {
+  return [
+    "SpeakEasy Pad diagnostics",
+    `Build: ${PAD_BUILD}`,
+    `Host: ${hostName}`,
+    `Transport: ${transport.mode}`,
+    `Link: ${health} · ${linkDetail}`,
+    `Security: ${sessionSecurity}`,
+    `Lease remaining: ${leaseRemaining()}`,
+    `Layout: ${PAD_MODE_COPY[mode].label}`,
+    `Theme: ${theme.name}`,
+    `Revision: ${snapshot.revision}`,
+    `Last snapshot: ${snapshotAgeLabel()}`,
+    `Acknowledged commands: ${acknowledgedCommandCount}`,
+    `Last round trip: ${lastAckLatencyMs === undefined ? "not measured" : `${lastAckLatencyMs} ms`}`,
+  ].join("\n");
+}
+
+async function copyDiagnostics(): Promise<void> {
+  const text = connectionDiagnostics();
+  let copied = false;
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.append(field);
+  field.select();
+  try {
+    copied = document.execCommand("copy");
+  } finally {
+    field.remove();
+  }
+  if (!copied && navigator.clipboard) {
+    copied = await Promise.race([
+      navigator.clipboard.writeText(text).then(() => true).catch(() => false),
+      new Promise<boolean>((resolve) => window.setTimeout(() => resolve(false), 900)),
+    ]);
+  }
+  showNotice(copied ? "Connection diagnostics copied." : "Could not copy diagnostics on this browser.", copied ? "info" : "error");
+}
+
+function returnToUnpairedPad(forgetAppearance: boolean): void {
+  transport.forgetPairing?.();
+  forgetStoredLANSession();
+  if (forgetAppearance) {
+    try {
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+        if (key?.startsWith("speakeasy.pad.")) localStorage.removeItem(key);
+      }
+    } catch {
+      // Navigation still returns the Pad to an unpaired state if storage is unavailable.
+    }
+  }
+  const cleanURL = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+  window.location.replace(cleanURL);
 }
 
 function bindEvents(): void {
@@ -965,6 +1116,8 @@ function bindEvents(): void {
 
   root.querySelector<HTMLButtonElement>("[data-appearance]")?.addEventListener("click", () => {
     appearanceSheetOpen = true;
+    appearanceSheetView = "browse";
+    focusAfterRender = "sheet-close";
     render();
   });
   root.querySelectorAll<HTMLButtonElement>("[data-select-mode]").forEach((button) => {
@@ -972,9 +1125,8 @@ function bindEvents(): void {
       const next = button.dataset.selectMode as PadMode;
       if (!PAD_MODE_IDS.includes(next)) return;
       mode = next;
-      savePadMode(mode);
       applyPadMode(mode);
-      notifyNative("selection");
+      focusAfterRender = `mode-${next}`;
       render();
     });
   });
@@ -983,10 +1135,9 @@ function bindEvents(): void {
       const next = findPadTheme(button.dataset.selectTheme ?? "");
       if (!next) return;
       theme = next;
-      savePadTheme(theme.id);
       applyPadTheme(theme);
       themeDeleteArmed = false;
-      notifyNative("selection");
+      focusAfterRender = `theme-${next.id}`;
       render();
     });
   });
@@ -994,7 +1145,10 @@ function bindEvents(): void {
     appearanceSheetView = "editor";
     editorThemeId = undefined;
     editorText = THEME_STARTER_MANIFEST;
+    editorInitialText = editorText;
     editorErrors = [];
+    editorDiscardArmed = false;
+    focusAfterRender = "theme-manifest";
     render();
   });
   root.querySelector<HTMLButtonElement>("[data-edit-theme]")?.addEventListener("click", (event) => {
@@ -1003,22 +1157,25 @@ function bindEvents(): void {
     appearanceSheetView = "editor";
     editorThemeId = target.id;
     editorText = JSON.stringify(target.manifest, null, 2);
+    editorInitialText = editorText;
     editorErrors = [];
+    editorDiscardArmed = false;
+    focusAfterRender = "theme-manifest";
     render();
   });
   root.querySelector<HTMLButtonElement>("[data-delete-theme]")?.addEventListener("click", () => {
     if (theme.source !== "custom") return;
     if (!themeDeleteArmed) {
       themeDeleteArmed = true;
+      focusAfterRender = "delete-theme";
       render();
       return;
     }
     themeDeleteArmed = false;
     deleteCustomTheme(theme.id);
     theme = readPadTheme({ getItem: () => null });
-    savePadTheme(theme.id);
     applyPadTheme(theme);
-    notifyNative("selection");
+    focusAfterRender = `theme-${theme.id}`;
     render();
   });
   root.querySelector<HTMLTextAreaElement>("[data-theme-manifest]")?.addEventListener("input", (event) => {
@@ -1027,11 +1184,28 @@ function bindEvents(): void {
   root.querySelector<HTMLButtonElement>("[data-theme-template]")?.addEventListener("click", () => {
     editorText = THEME_STARTER_MANIFEST;
     editorErrors = [];
+    editorDiscardArmed = false;
+    focusAfterRender = "theme-manifest";
     render();
   });
   root.querySelector<HTMLButtonElement>("[data-theme-back]")?.addEventListener("click", () => {
+    requestEditorExit("browse");
+  });
+  root.querySelector<HTMLButtonElement>("[data-theme-keep]")?.addEventListener("click", () => {
+    editorDiscardArmed = false;
+    focusAfterRender = "theme-manifest";
+    render();
+  });
+  root.querySelector<HTMLButtonElement>("[data-theme-discard]")?.addEventListener("click", () => {
+    editorDiscardArmed = false;
+    if (editorDiscardDestination === "close") {
+      cancelAppearance();
+      render();
+      return;
+    }
     appearanceSheetView = "browse";
     editorErrors = [];
+    focusAfterRender = editorThemeId ? `theme-${editorThemeId}` : "new-theme";
     render();
   });
   root.querySelector<HTMLButtonElement>("[data-theme-save]")?.addEventListener("click", () => {
@@ -1043,13 +1217,28 @@ function bindEvents(): void {
     }
     const saved = upsertCustomTheme(result.manifest, editorThemeId);
     theme = saved;
-    savePadTheme(theme.id);
     applyPadTheme(theme);
     appearanceSheetView = "browse";
+    editorText = JSON.stringify(result.manifest, null, 2);
+    editorInitialText = editorText;
     editorErrors = [];
+    editorDiscardArmed = false;
     themeDeleteArmed = false;
-    notifyNative("selection");
+    focusAfterRender = `theme-${saved.id}`;
     showNotice(`Deck theme “${saved.name}” saved.`);
+  });
+  root.querySelector<HTMLButtonElement>("[data-appearance-cancel]")?.addEventListener("click", () => {
+    cancelAppearance();
+    render();
+  });
+  root.querySelector<HTMLButtonElement>("[data-appearance-apply]")?.addEventListener("click", () => {
+    savePadMode(mode);
+    savePadTheme(theme.id);
+    applyPadMode(mode);
+    applyPadTheme(theme);
+    notifyNative("selection");
+    closeSheets("appearance-trigger");
+    showNotice(`Appearance applied · ${PAD_MODE_COPY[mode].label} · ${theme.name}.`);
   });
 
   const ptt = root.querySelector<HTMLButtonElement>("[data-ptt]");
@@ -1081,7 +1270,53 @@ function bindEvents(): void {
 
   root.querySelector<HTMLButtonElement>("[data-connection]")?.addEventListener("click", () => {
     connectionSheetOpen = true;
+    linkActionArmed = undefined;
+    focusAfterRender = "sheet-close";
     render();
+  });
+  root.querySelector<HTMLButtonElement>("[data-link-reconnect]")?.addEventListener("click", async () => {
+    linkActionArmed = undefined;
+    if (health === "healthy") {
+      await pingMac();
+      return;
+    }
+    health = "connecting";
+    linkDetail = `Finding ${hostName}`;
+    focusAfterRender = "link-reconnect";
+    render();
+    try {
+      await transport.connect();
+      showNotice(`Connected to ${hostName}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Could not connect to ${hostName}.`;
+      health = "offline";
+      linkDetail = message;
+      showNotice(message, "error");
+    }
+  });
+  root.querySelector<HTMLButtonElement>("[data-link-copy]")?.addEventListener("click", () => {
+    focusAfterRender = "link-copy";
+    void copyDiagnostics();
+  });
+  root.querySelector<HTMLButtonElement>("[data-link-pair]")?.addEventListener("click", () => {
+    if (transport.mode === "demo") return;
+    if (linkActionArmed !== "pair") {
+      linkActionArmed = "pair";
+      focusAfterRender = "link-pair";
+      render();
+      return;
+    }
+    returnToUnpairedPad(false);
+  });
+  root.querySelector<HTMLButtonElement>("[data-link-forget]")?.addEventListener("click", () => {
+    if (transport.mode === "demo") return;
+    if (linkActionArmed !== "forget") {
+      linkActionArmed = "forget";
+      focusAfterRender = "link-forget";
+      render();
+      return;
+    }
+    returnToUnpairedPad(true);
   });
 
   const volumeSlider = root.querySelector<HTMLInputElement>("[data-demo-volume]");
@@ -1098,13 +1333,13 @@ function bindEvents(): void {
   });
   root.querySelector<HTMLButtonElement>("[data-install]")?.addEventListener("click", () => {
     installSheetOpen = true;
+    focusAfterRender = "sheet-close";
     render();
   });
   root.querySelectorAll<HTMLElement>("[data-dismiss-sheet]").forEach((element) => {
     element.addEventListener("click", (event) => {
       if (event.currentTarget !== event.target && (event.currentTarget as HTMLElement).classList.contains("sheet-backdrop")) return;
-      closeSheets();
-      render();
+      requestSheetDismiss();
     });
   });
   root.querySelector<HTMLButtonElement>("[data-install-now]")?.addEventListener("click", async () => {
@@ -1136,14 +1371,34 @@ window.addEventListener("pointermove", (event) => {
 });
 window.addEventListener("blur", () => void finishPtt(true));
 window.addEventListener("keydown", (event) => {
+  if (event.key === "Tab" && (connectionSheetOpen || installSheetOpen || appearanceSheetOpen)) {
+    const dialog = root.querySelector<HTMLElement>(".sheet[role=\"dialog\"]");
+    const focusable = dialog ? Array.from(dialog.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), textarea:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], summary, [tabindex]:not([tabindex="-1"])',
+    )).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true") : [];
+    if (dialog && focusable.length === 0) {
+      event.preventDefault();
+      dialog.focus();
+    } else if (focusable.length > 0) {
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog?.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  }
   if ((event.code === "Space" || event.code === "Enter") && !event.repeat && !connectionSheetOpen && !installSheetOpen && !appearanceSheetOpen && document.activeElement?.tagName !== "BUTTON") {
     event.preventDefault();
     startPtt(pressButton ?? root);
   }
   if (event.key === "Escape") {
     if (connectionSheetOpen || installSheetOpen || appearanceSheetOpen) {
-      closeSheets();
-      render();
+      event.preventDefault();
+      requestSheetDismiss();
     } else if (pttPressed) void finishPtt(true);
   }
 });
