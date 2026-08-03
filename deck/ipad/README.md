@@ -43,7 +43,12 @@ xcodebuild -project SpeakEasyDeck.xcodeproj -scheme SpeakEasyDeck \
 ```
 
 `build-device.sh` prefers a device whose name contains "iPad"; pin one with
-`SPEAKEASY_DEVICE_ID` (cached in `.device-id.local`).
+`SPEAKEASY_DEVICE_ID` (cached in `.device-id.local`). When a paired HTTPS Deck
+is already running, the script also provisions that exact connection into the
+iPad app: the paired URL and this Mac's public Caddy trust anchor travel over
+the Xcode device channel, then move into this-device-only Keychain storage.
+The app validates only that paired host, so the direct developer install needs
+no certificate profile and remains connected when it is opened normally later.
 
 ## Layout
 

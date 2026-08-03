@@ -1,5 +1,69 @@
 import Foundation
 import Combine
+import Security
+
+/// Developer-installed builds can be provisioned with the exact paired Deck
+/// URL and its private CA anchor at launch. The secret-bearing URL is copied
+/// into this-device-only Keychain storage so tapping the app later reconnects
+/// to the same Mac without a profile install or another Xcode launch.
+enum DeckProvisioning {
+    private static let service = "dev.arach.speakeasy.deck.provisioning"
+    private static let urlAccount = "paired-url-v1"
+    private static let rootAccount = "paired-root-der-v1"
+
+    static func importLaunchEnvironment() {
+        let environment = ProcessInfo.processInfo.environment
+        guard let rawURL = environment["SPEAKEASY_DECK_URL"],
+              let url = URL(string: rawURL),
+              url.scheme == "https",
+              url.host != nil,
+              let root = environment["SPEAKEASY_DECK_ROOT_DER"],
+              Data(base64Encoded: root) != nil else { return }
+        save(rawURL, account: urlAccount)
+        save(root, account: rootAccount)
+    }
+
+    static var pairedURL: URL? {
+        guard let raw = load(account: urlAccount),
+              let url = URL(string: raw),
+              url.scheme == "https",
+              url.host != nil else { return nil }
+        return url
+    }
+
+    static var trustAnchor: SecCertificate? {
+        guard let encoded = load(account: rootAccount),
+              let data = Data(base64Encoded: encoded) else { return nil }
+        return SecCertificateCreateWithData(nil, data as CFData)
+    }
+
+    private static func save(_ value: String, account: String) {
+        let match: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(match as CFDictionary)
+        var item = match
+        item[kSecValueData as String] = Data(value.utf8)
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        SecItemAdd(item as CFDictionary, nil)
+    }
+
+    private static func load(account: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+}
 
 struct DiscoveredDeck: Identifiable, Hashable {
     let id: String
@@ -33,7 +97,20 @@ final class DeckDiscovery: NSObject, ObservableObject, NetServiceBrowserDelegate
     override init() {
         super.init()
         browser.delegate = self
-        startSearch()
+        DeckProvisioning.importLaunchEnvironment()
+        if let url = DeckProvisioning.pairedURL {
+            let host = url.host ?? "Mac"
+            let deck = DiscoveredDeck(
+                id: "provisioned|\(host)",
+                serviceName: "SpeakEasy Deck (\(host))",
+                url: url
+            )
+            decks = [deck]
+            selectedDeck = deck
+            searching = false
+        } else {
+            startSearch()
+        }
     }
 
     var deckURL: URL? { selectedDeck?.url }
