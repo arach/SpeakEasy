@@ -6,7 +6,7 @@ import path from 'node:path';
 import type {
   Adapter,
   AdapterConfig,
-  PairingEvent,
+  AgentSessionStreamEvent,
 } from '@openscout/agent-sessions';
 
 export interface DeckAgentClient {
@@ -97,7 +97,7 @@ async function npmAdapterFactory(): Promise<AdapterFactory> {
   return module.createCodexAdapter;
 }
 
-function terminalError(event: PairingEvent): Error | undefined {
+function terminalError(event: AgentSessionStreamEvent): Error | undefined {
   if (event.event === 'turn:error') return new Error(event.message || 'Codex turn failed.');
   if (event.event !== 'turn:end') return undefined;
   if (event.status === 'failed') return new Error('Codex turn failed.');
@@ -168,7 +168,7 @@ export async function createDeckAgentClient(
           .join('\n\n');
         settle(() => resolve(output));
       };
-      const onEvent = (event: PairingEvent): void => {
+      const onEvent = (event: AgentSessionStreamEvent): void => {
         if ('sessionId' in event && event.sessionId !== sessionId) return;
         if (event.event === 'turn:start') {
           activeTurnId = event.turn.id;
