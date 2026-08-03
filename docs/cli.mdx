@@ -162,7 +162,7 @@ A config `port` is a preference (falls back to auto when busy); an explicit
 
 The Deck section of the Mac settings app shows live status (running host/port,
 connected devices, lane bindings, trace), manages lanes directly (each lane's
-menu binds a recent codex thread or resets to a fresh session — the same
+menu binds a recent Codex task or clears the pad's assignment — the same
 `lane.assign` intent the deck's own picker sends), and owns the bridge:
 start/stop/restart, auto-start, pairing, port, and a scannable device link. A
 release app includes the runtime, Deck assets, and a pinned Caddy helper, so the
@@ -172,6 +172,14 @@ built-in HTTP server remains available only through the explicit development
 flags `--no-tls --no-caddy`. The app discovers the running deck through
 `~/.config/speakeasy/deck-listener.json`, so it works no matter how the Deck
 was started.
+
+Bound lanes use the private, fail-closed Codex Desktop-owner bridge rather than
+the Deck's overview model. An unassigned worker pad refuses the turn instead of
+creating a shadow task. The Luna overview/observer path is read-only or outbound
+presentation only: it never receives the user's lane transcript, and the direct
+route never falls back to Scout or a fresh app-server task. Scout can help define
+and implement the observer/narrator/orchestrator topology, but it is not a broker
+or peer identity in the canonical conversation data plane.
 
 ## Complete Examples
 

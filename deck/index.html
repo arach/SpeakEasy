@@ -1342,7 +1342,7 @@ function view() {
     setupLaneRows: setupLaneRows,
     setupQuery: S.setupQuery,
     setupCurrentThread: setupCurrentThread,
-    setupCurrent: setupCurrentLane && setupCurrentThread ? setupCurrentLane.title : 'Fresh session on first ask',
+    setupCurrent: setupCurrentLane && setupCurrentThread ? setupCurrentLane.title : 'Unassigned — choose a Codex task',
     setupPending: S.setupPending,
     setupNotice: S.setupNotice,
     setupTone: S.setupTone,
@@ -1647,8 +1647,8 @@ function tpl(v) {
             '</div>' +
             '<div class="se-scroll se-setup-results">' +
               '<button type="button" data-act="setupassign" data-arg="" ' + (v.setupPending ? 'disabled ' : '') + 'style="min-height:62px;text-align:left;border:1.5px dashed var(--se-accent-edge);border-radius:10px;background:var(--se-chip-bg);padding:11px 14px;cursor:' + (v.setupPending ? 'wait' : 'pointer') + ';opacity:' + (v.setupPending ? '.55' : '1') + ';">' +
-                '<span style="display:block;font:600 10px var(--se-mono);letter-spacing:0.14em;color:var(--se-accent-ink);">+ FRESH SESSION</span>' +
-                '<span style="display:block;margin-top:5px;font:400 9.5px var(--se-sans);color:var(--se-ink-3);">Start a clean Codex task when you first speak to this pad.</span>' +
+                '<span style="display:block;font:600 10px var(--se-mono);letter-spacing:0.14em;color:var(--se-accent-ink);">CLEAR ASSIGNMENT</span>' +
+                '<span style="display:block;margin-top:5px;font:400 9.5px var(--se-sans);color:var(--se-ink-3);">Leave this pad unassigned. Speaking will not create a shadow task.</span>' +
               '</button>' +
               v.catalogRows.map(t =>
                 t.kind === 'more'
@@ -1823,22 +1823,15 @@ const ACTIONS = {
   setupassign: a => {
     if (S.setupPending) return;
     const index = S.setupLane;
-    const current = S.lanes && S.lanes[index] && S.lanes[index].threadId;
-    if (a && current === a) {
-      S.setupNotice = 'PAD ' + String(index + 1).padStart(2, '0') + ' ALREADY CONTINUES THIS TASK';
-      S.setupTone = 'ok';
-      paint();
-      return;
-    }
     const task = a ? (S.catalog || []).find(t => t.id === a) : null;
-    const label = task ? task.snippet : 'Fresh session on first ask';
+    const label = task ? task.snippet : 'Unassigned';
     S.setupPending = true;
     S.setupNotice = 'SETTING PAD ' + String(index + 1).padStart(2, '0') + '…';
     S.setupTone = 'ok';
-    const sent = sendIntent('lane.assign', { index: index, threadId: a || null }, ack => {
+    const sent = sendIntent('lane.assign', { index: index, threadId: a || null, activate: !!a }, ack => {
       S.setupPending = false;
       S.setupNotice = ack.ok
-        ? 'PAD ' + String(index + 1).padStart(2, '0') + ' → ' + label
+        ? 'PAD ' + String(index + 1).padStart(2, '0') + (a ? ' ACTIVE → ' : ' → ') + label
         : (ack.error || 'The lane could not be changed.');
       S.setupTone = ack.ok ? 'ok' : 'error';
       paint();

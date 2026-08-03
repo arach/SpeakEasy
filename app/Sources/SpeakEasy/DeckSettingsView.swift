@@ -222,7 +222,7 @@ struct DeckSettingsView: View {
         }
     }
 
-    /// Per-lane mapper: fresh session or any recent codex thread — the same
+    /// Per-lane mapper: unassigned or any recent Codex task — the same
     /// lane.assign intent the deck's own picker sends.
     private func laneMenu(
         lane: DeckBridgeController.Lane,
@@ -230,7 +230,7 @@ struct DeckSettingsView: View {
         catalog: [DeckBridgeController.CatalogThread]
     ) -> some View {
         Menu {
-            Button("Fresh session") { bridge.assign(lane: index, threadId: nil) }
+            Button("Clear assignment") { bridge.assign(lane: index, threadId: nil) }
             if catalog.isEmpty {
                 Button("Load recent threads…") { bridge.refreshCatalog() }
             } else {

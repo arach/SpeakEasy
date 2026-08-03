@@ -10,6 +10,7 @@ import {
   type DeckAgentClient,
   type DeckAgentClientOptions,
 } from './deck-agent-client.js';
+import { CodexDesktopSession } from './codex-desktop-submit.js';
 import { displayCodexThreadTitle, listCodexThreadReferences } from './codex-thread-catalog.js';
 
 /** execFile as a promise, capturing stdout, with a hard timeout. */
@@ -120,6 +121,13 @@ export interface DeckSnapshot {
   clients: number;
 }
 
+export interface DeckRuntimeOptions {
+  /** Skip the eager Codex catalog read in isolated runtime tests. */
+  warmCatalog?: boolean;
+  /** Skip exact-task owner prewarming in isolated runtime tests. */
+  warmCanonical?: boolean;
+}
+
 const intentSchema = z.discriminatedUnion('name', [
   // max 9: lanes 0-8 plus the deck-owned overview lane (MASTER_IX below —
   // a literal here because the schema initializes before the constants)
@@ -137,7 +145,13 @@ const intentSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('speak'), text: z.string().min(1).max(4000) }),
   z.object({ name: z.literal('lane.cycle'), index: z.number().int().min(0).max(8) }),
   z.object({ name: z.literal('catalog.refresh') }),
-  z.object({ name: z.literal('lane.assign'), index: z.number().int().min(0).max(8), threadId: z.string().max(64).nullable() }),
+  z.object({
+    name: z.literal('lane.assign'),
+    index: z.number().int().min(0).max(8),
+    threadId: z.string().max(64).nullable(),
+    /** The Deck picker activates what the operator just chose; Mac settings can map silently. */
+    activate: z.boolean().optional(),
+  }),
   z.object({ name: z.literal('playback.progress'), id: z.string().regex(/^\d:\d{1,3}$/), pos: z.number().min(0), dur: z.number().positive().optional() }),
   z.object({ name: z.literal('playback.ended'), id: z.string().regex(/^\d:\d{1,3}$/) }),
 ]);
@@ -162,6 +176,18 @@ const LANES_FILE = path.join(homedir(), '.config', 'speakeasy', 'deck-lanes.json
 
 const CODEX_SESSIONS_DIR = path.join(homedir(), '.codex', 'sessions');
 const CATALOG_LIMIT = 25;
+
+export type DeckTurnRoute =
+  | { kind: 'canonical'; taskId: string }
+  | { kind: 'unassigned' }
+  | { kind: 'overview' };
+
+/** Resolve authority before a transcript can touch any model transport. */
+export function resolveDeckTurnRoute(laneIx: number, taskId?: string): DeckTurnRoute {
+  if (laneIx === MASTER_IX) return { kind: 'overview' };
+  const exactTaskId = taskId?.trim();
+  return exactTaskId ? { kind: 'canonical', taskId: exactTaskId } : { kind: 'unassigned' };
+}
 
 /** Read at most `bytes` from the head of a file. */
 function readHead(file: string, bytes: number): string {
@@ -277,9 +303,9 @@ function scanCodexThreadsFallback(): DeckThreadInfo[] | null {
   return out;
 }
 
-/** Per-lane session reuse keys, persisted so a cycled (reset) lane keeps its
- * fresh session across deck restarts instead of resurrecting the base one.
- * Only deck-owned keys are honored — legacy scout session ids are ignored. */
+/** Per-lane binding keys. The files beneath these keys persist only the exact
+ * Codex task assigned to each worker pad; they are not worker-agent identities.
+ * Only Deck-owned keys are honored — legacy Scout session ids are ignored. */
 function loadLaneKeys(): string[] {
   const base = Array.from({ length: LANE_COUNT }, (_, i) => `speakeasy-deck-lane-${i}`);
   try {
@@ -293,11 +319,6 @@ function loadLaneKeys(): string[] {
   }
 }
 
-/** Session-level instructions for every lane's codex session. */
-const VOICE_SYSTEM_PROMPT =
-  'You are a voice responder for a spoken interface. Do not use tools, do not read or write files, do not access the network. ' +
-  'Answer from general knowledge only, in one or two spoken-style sentences, plain words, no lists, no code.';
-
 /** Session-level instructions for the overview lane: the digest is its eyes. */
 const OVERVIEW_SYSTEM_PROMPT =
   'You are the overview officer of a voice-command deck with nine lanes, each a live codex thread. ' +
@@ -306,8 +327,7 @@ const OVERVIEW_SYSTEM_PROMPT =
   'Do not use tools, do not read or write files, do not access the network. ' +
   'Plain spoken words, no lists, no code: one or two sentences for a status question, a few plain sentences for a summary.';
 
-/** Options for the lane session factory — model/effort select a cheaper,
- * faster brain for the overview lane while workers keep the default. */
+/** Options for the overview session factory. Worker pads never create one. */
 type LaneClientOptions = DeckAgentClientOptions;
 type LaneAgentClient = DeckAgentClient;
 
@@ -346,7 +366,7 @@ export class DeckRuntime extends EventEmitter {
     ...Array.from({ length: LANE_COUNT }, (_, i) => ({
       num: String(i + 1).padStart(2, '0'),
       name: `LANE ${i + 1}`,
-      title: 'new codex session on first ask',
+      title: 'assign a Codex task before speaking',
       state: 'idle' as const,
     })),
     {
@@ -356,10 +376,16 @@ export class DeckRuntime extends EventEmitter {
       state: 'idle' as const,
     },
   ];
-  /** per-lane session reuse keys — cycling a lane bumps its key to reset the session */
+  /** per-lane binding keys — clearing a lane rotates the persisted assignment */
   private laneKeys: string[] = loadLaneKeys();
-  /** warm session clients, created lazily on each lane's first question */
+  /** The single hidden overview client. Worker conversations never use it. */
   private laneClients = new Map<number, { key: string; client: LaneAgentClient }>();
+  /** One direct turn currently owned by the Codex Desktop bridge. */
+  private canonicalTurnAbort: AbortController | null = null;
+  /** Warm exact-task channel. Owner discovery is intentionally amortized
+   * across turns because mature Codex task snapshots can be hundreds of MB. */
+  private canonicalSession: CodexDesktopSession | null = null;
+  private canonicalSessionReady = false;
   private threads: DeckMessage[][] = Array.from({ length: LANE_COUNT + 1 }, () => []);
   private playing: string | null = null;
   private paused = false;
@@ -378,8 +404,11 @@ export class DeckRuntime extends EventEmitter {
   private ticker: NodeJS.Timeout | null = null;
   private busy = false;
   private destroyed = false;
-  /** bumped on stop/cancel — pending response work checks it before every phase */
+  /** Bumped for each accepted capture and teardown; async phases retain only
+   * the generation that created them. */
   private gen = 0;
+  /** A transport stop silences the current reply without detaching from Codex. */
+  private suppressAutoplayForGeneration: number | null = null;
   private player: ChildProcess | null = null;
   private playerRate = 1;
   private synthDir = mkdtempSync(path.join(tmpdir(), 'speakeasy-deck-synth-'));
@@ -391,12 +420,13 @@ export class DeckRuntime extends EventEmitter {
     return this.synthDir;
   }
 
-  constructor() {
+  constructor(options: DeckRuntimeOptions = {}) {
     super();
     this.restoreLaneBindings();
     // Warm the exact Codex task catalog before the user opens lane setup. The
     // explicit refresh action reuses this in-flight request if it is still busy.
-    void this.refreshThreadCatalog();
+    if (options.warmCatalog !== false) void this.refreshThreadCatalog();
+    if (options.warmCanonical !== false) queueMicrotask(() => this.warmCanonicalLane(this.laneIx));
   }
 
   /** Copy identity from the exact Codex catalog record used for the binding.
@@ -459,8 +489,8 @@ export class DeckRuntime extends EventEmitter {
     return this.catalogRefresh;
   }
 
-  /** Rebuild lane labels for persisted thread bindings — the adapter resumes
-   * the thread on its own; this restores what the pad SAYS it is bound to.
+  /** Rebuild lane labels for persisted task bindings. The direct Desktop
+   * bridge uses the exact task id; this restores what the pad says it targets.
    * Restores honor the one-thread-one-lane invariant too: legacy state from
    * before dedupe can double-bind a thread, and the first lane keeps it. */
   private restoreLaneBindings(): void {
@@ -471,14 +501,14 @@ export class DeckRuntime extends EventEmitter {
       try {
         threadId = readFileSync(path.join(laneRuntimeDir(key), 'codex-thread-id.txt'), 'utf8').trim();
       } catch {
-        return; // unseeded lane — fresh session
+        return; // unseeded lane — unassigned
       }
       if (!threadId) return;
       if (claimed.has(threadId)) {
-        // double binding from an older build — rotate to a fresh key
+        // double binding from an older build — rotate to an unassigned key
         this.laneKeys[i] = `speakeasy-deck-lane-${i}-${Date.now().toString(36)}`;
         rotated = true;
-        this.log('LANE DEDUPED', `lane ${i + 1} → fresh session (thread already bound)`);
+        this.log('LANE DEDUPED', `lane ${i + 1} → unassigned (task already bound)`);
         return;
       }
       claimed.add(threadId);
@@ -527,13 +557,11 @@ export class DeckRuntime extends EventEmitter {
 
   // ── lanes ────────────────────────────────────────────────────────────────
 
-  /** The lane's warm codex session client, created on first use. Sessions are
-   * owned by the deck via @openscout/agent-sessions — the adapter persists the
-   * codex thread id under the reuse key, so a lane resumes its exact thread
-   * across deck restarts with no broker involvement. */
+  /** The Deck-owned overview session. Worker pads are input/output peripherals
+   * for explicit Codex tasks and must never create an app-server session. */
   private async laneClient(ix: number): Promise<LaneAgentClient> {
-    // the overview lane has a fixed, deck-owned key — it is never remapped
-    const key = ix === MASTER_IX ? MASTER_REUSE_KEY : this.laneKeys[ix];
+    if (ix !== MASTER_IX) throw new Error('Assign a Codex task to this lane before speaking.');
+    const key = MASTER_REUSE_KEY;
     const existing = this.laneClients.get(ix);
     if (existing && existing.key === key) return existing.client;
     if (existing) {
@@ -545,15 +573,13 @@ export class DeckRuntime extends EventEmitter {
       cwd: process.cwd(),
       reuseKey: key,
       warmth: 'lazy',
-      systemPrompt: ix === MASTER_IX ? OVERVIEW_SYSTEM_PROMPT : VOICE_SYSTEM_PROMPT,
+      systemPrompt: OVERVIEW_SYSTEM_PROMPT,
+      model: OVERVIEW_MODEL,
+      effort: OVERVIEW_EFFORT,
     };
-    if (ix === MASTER_IX) {
-      options.model = OVERVIEW_MODEL;
-      options.effort = OVERVIEW_EFFORT;
-    }
     const client = await createDeckAgentClient(options);
     // a reset or destroy during creation must not install a stale client
-    const currentKey = ix === MASTER_IX ? MASTER_REUSE_KEY : this.laneKeys[ix];
+    const currentKey = MASTER_REUSE_KEY;
     if (this.destroyed || currentKey !== key) {
       void client.close().catch(() => undefined);
       throw new Error('lane was reset');
@@ -588,9 +614,7 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** The thread a lane's key currently points at, if one was recorded — the
-   * adapter writes this for fresh sessions too, so read it live rather than
-   * tracking it in memory. */
+  /** The exact Codex task assigned to a worker pad, if one was recorded. */
   private laneThreadId(index: number): string | null {
     try {
       const id = readFileSync(path.join(laneRuntimeDir(this.laneKeys[index]), 'codex-thread-id.txt'), 'utf8').trim();
@@ -600,8 +624,8 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** Channel mapper: bind a pad to an existing codex thread, or to a fresh
-   * session when threadId is null. Only ever called while no response is in
+  /** Channel mapper: bind a pad to an existing Codex task, or clear its
+   * assignment when threadId is null. Only ever called while no response is in
    * flight (apply() rejects lane.cycle/lane.assign when busy), so this never
    * touches another lane's turn. */
   private assignLane(index: number, threadId: string | null): void {
@@ -662,14 +686,14 @@ export class DeckRuntime extends EventEmitter {
         }
       }
     } else {
-      lane.title = 'new codex session on first ask';
+      lane.title = 'assign a Codex task before speaking';
       lane.threadId = undefined;
       lane.sessionAlias = undefined;
       lane.project = undefined;
       lane.cwd = undefined;
       lane.branch = undefined;
       lane.updatedAt = undefined;
-      this.log(threadId ? 'ASSIGN FAILED' : 'LANE RESET', `lane ${index + 1} → fresh session`);
+      this.log(threadId ? 'ASSIGN FAILED' : 'LANE CLEARED', `lane ${index + 1} → unassigned`);
     }
     this.changed();
   }
@@ -678,11 +702,57 @@ export class DeckRuntime extends EventEmitter {
     return this.lanes[ix]?.name.toLowerCase() ?? `lane ${ix + 1}`;
   }
 
+  /** Change only what the operator is viewing and targeting next.
+   *
+   * Canonical work and playback belong to their origin lane, not to the
+   * currently visible lane. Navigation must therefore never abort the Codex
+   * waiter, bump its generation, or stop its audio. */
+  private selectLane(index: number): void {
+    this.laneIx = index;
+    const label = index === MASTER_IX ? 'OVERVIEW' : `LANE ${String(index + 1).padStart(2, '0')}`;
+    const state = this.lanes[index]?.state;
+    const status = state === 'working' ? 'WORKING' : state === 'speaking' ? 'SPEAKING' : 'READY';
+    this.setPhase(this.phase, `${status} · ${label}`);
+    this.log('LANE SELECTED', index === MASTER_IX ? 'overview' : `lane ${index + 1}`);
+    this.changed();
+    this.warmCanonicalLane(index);
+  }
+
+  /** Reuse one proven Desktop owner while a task remains selected. Switching
+   * targets replaces the warm channel only while no canonical response is in
+   * flight; navigation during work therefore cannot detach the origin turn. */
+  private canonicalSessionFor(taskId: string): CodexDesktopSession {
+    if (this.canonicalSession?.threadId === taskId) return this.canonicalSession;
+    this.canonicalSession?.close();
+    this.canonicalSession = new CodexDesktopSession(taskId);
+    this.canonicalSessionReady = false;
+    return this.canonicalSession;
+  }
+
+  private warmCanonicalLane(index: number): void {
+    if (this.destroyed || this.busy) return;
+    const route = resolveDeckTurnRoute(index, this.lanes[index]?.threadId);
+    if (route.kind !== 'canonical') return;
+    const session = this.canonicalSessionFor(route.taskId);
+    if (this.canonicalSessionReady) return;
+    void session.warm().then(() => {
+      if (this.destroyed || this.canonicalSession !== session || this.canonicalSessionReady) return;
+      this.canonicalSessionReady = true;
+      this.log('CODEX LINK READY', `lane ${index + 1} · exact task owner verified`);
+      this.changed();
+    }).catch((error) => {
+      if (this.destroyed || this.canonicalSession !== session) return;
+      this.canonicalSessionReady = false;
+      this.log('CODEX LINK FAILED', (error as Error).message.slice(0, 60));
+      this.changed();
+    });
+  }
+
   /** Live, compact picture of the whole deck — the overview lane's eyes. One
    * line per lane: binding, state, title, and the last exchange if there is one. */
   private systemDigest(): string {
     const lines = this.lanes.slice(0, LANE_COUNT).map((lane, i) => {
-      const bound = lane.threadId ? `bound ${lane.sessionAlias}` : 'fresh session';
+      const bound = lane.threadId ? `bound ${lane.sessionAlias}` : 'unassigned';
       let line = `lane ${i + 1}: ${bound} · ${lane.state} · "${lane.title}"`;
       const msgs = this.threads[i];
       const lastYou = [...msgs].reverse().find((m) => m.role === 'you')?.text;
@@ -761,15 +831,7 @@ export class DeckRuntime extends EventEmitter {
   async apply(intent: DeckIntent): Promise<{ ok: boolean; rev: number; error?: string }> {
     switch (intent.name) {
       case 'lane.select': {
-        this.gen++; // an in-flight response must not restart audio under a new lane
-        this.cancelAgentWork();
-        this.laneIx = intent.index;
-        this.stopPlayer();
-        this.clearPlayback();
-        const label = intent.index === MASTER_IX ? 'OVERVIEW' : `LANE ${String(intent.index + 1).padStart(2, '0')}`;
-        this.setPhase(this.phase, `READY · ${label}`);
-        this.log('LANE SELECTED', intent.index === MASTER_IX ? 'overview' : `lane ${intent.index + 1}`);
-        this.changed();
+        this.selectLane(intent.index);
         return { ok: true, rev: this.rev };
       }
       case 'playback.toggle': {
@@ -816,13 +878,16 @@ export class DeckRuntime extends EventEmitter {
         this.changed();
         return { ok: true, rev: this.rev };
       case 'playback.stop':
-        this.gen++; // cancel any pending response work
-        this.cancelAgentWork();
+        // Transport control is intentionally not task control. Aborting the
+        // bridge here would leave Codex running while silently dropping its
+        // result from the Deck. Preserve the canonical waiter and merely keep
+        // this response from autoplaying when it lands.
+        if (this.busy) this.suppressAutoplayForGeneration = this.gen;
         this.stopPlayer();
         this.clearPlayback();
         this.listening = false;
-        this.setPhase('idle', 'CANCELLED');
-        this.log('PLAYBACK STOPPED', 'buffer cleared');
+        this.setPhase('idle', this.busy ? 'AUDIO STOPPED · TASK CONTINUES' : 'AUDIO STOPPED');
+        this.log('PLAYBACK STOPPED', this.busy ? 'audio cleared · canonical task continues' : 'buffer cleared');
         this.changed();
         return { ok: true, rev: this.rev };
       case 'playback.replay': {
@@ -845,8 +910,11 @@ export class DeckRuntime extends EventEmitter {
         return { ok: false, rev: this.rev, error: 'no replayable reply' };
       }
       case 'capture.start':
+        // Until one bridge can correlate multiple steering requests to a
+        // single terminal Codex turn, fail explicitly instead of detaching the
+        // response already in flight. The operator can still browse all lanes.
+        if (this.busy) return { ok: false, rev: this.rev, error: 'response already in flight' };
         this.gen++;
-        this.cancelAgentWork();
         this.stopPlayer();
         this.clearPlayback();
         this.listening = true;
@@ -893,6 +961,16 @@ export class DeckRuntime extends EventEmitter {
           return { ok: false, rev: this.rev, error: 'that thread belongs to the overview lane' };
         }
         this.assignLane(intent.index, intent.threadId);
+        // Mapping from the Deck is also a destination choice. Do this only
+        // after the exact binding is visible, so a failed write cannot switch
+        // the microphone to a lane that merely looks assigned.
+        if (
+          intent.activate &&
+          intent.threadId &&
+          this.lanes[intent.index]?.threadId === intent.threadId
+        ) {
+          this.selectLane(intent.index);
+        }
         return { ok: true, rev: this.rev };
       }
       case 'playback.progress': {
@@ -955,13 +1033,13 @@ export class DeckRuntime extends EventEmitter {
     const alive = () => this.gen === gen;
     this.setLaneState(lane, 'working');
     try {
-      this.setPhase('transcribing', 'TRANSCRIBING');
+      this.setPhase('transcribing', `TRANSCRIBING · LANE ${String(lane + 1).padStart(2, '0')}`);
       this.changed();
       await wait(600);
       if (!alive()) return;
 
       this.pushMessage(lane, { role: 'you', text: command, dur: estimateDuration(command) });
-      this.setPhase('submitting', 'SUBMITTING');
+      this.setPhase('submitting', `SUBMITTING · LANE ${String(lane + 1).padStart(2, '0')}`);
       this.log('AGENT ASKED', `${this.laneLabel(lane)} · ${command.slice(0, 40)}`);
       this.changed();
 
@@ -972,7 +1050,7 @@ export class DeckRuntime extends EventEmitter {
       this.pushMessage(lane, msg);
       const id = `${lane}:${this.threads[lane].length - 1}`;
 
-      this.setPhase('preparingSpeech', 'PREPARING SPEECH');
+      this.setPhase('preparingSpeech', `PREPARING SPEECH · LANE ${String(lane + 1).padStart(2, '0')}`);
       this.log('AGENT REPLY', `${msg.dur.toFixed(0)}s queued`);
       this.changed();
 
@@ -988,18 +1066,18 @@ export class DeckRuntime extends EventEmitter {
       if (!file) {
         // synthesis failed — show the reply without audio, never fake playback
         msg.mirrored = true;
-        this.setPhase('idle', 'READY');
+        this.setPhase('idle', `READY · LANE ${String(lane + 1).padStart(2, '0')}`);
         this.log('NO AUDIO', 'synthesis unavailable · text-only reply');
         this.changed();
         return;
       }
       msg.file = file;
       msg.audioUrl = `/audio/${path.basename(file)}`;
-      if (this.autoplay) {
+      if (this.autoplay && this.suppressAutoplayForGeneration !== gen) {
         this.playing = id;
         this.paused = false;
         this.pos = 0;
-        this.setPhase('speaking', 'SPEAKING');
+        this.setPhase('speaking', `SPEAKING · LANE ${String(lane + 1).padStart(2, '0')}`);
         this.setLaneState(lane, 'speaking');
         this.ensureTicker();
         this.changed();
@@ -1007,28 +1085,58 @@ export class DeckRuntime extends EventEmitter {
         // when nobody is watching
         if (this.liveClients() === 0) this.playFile(file);
       } else {
-        this.setPhase('idle', 'READY');
+        this.setPhase('idle', `READY · LANE ${String(lane + 1).padStart(2, '0')}`);
         this.changed();
       }
     } finally {
       this.busy = false;
+      if (this.suppressAutoplayForGeneration === gen) this.suppressAutoplayForGeneration = null;
       if (this.lanes[lane]?.state !== 'speaking' && this.setLaneState(lane, 'idle')) this.changed();
+      if (this.laneIx !== lane) this.warmCanonicalLane(this.laneIx);
     }
   }
 
-  /** Ask the lane's codex session and get a spoken-length answer back. Each
-   * lane owns one warm session via @openscout/agent-sessions — turns steer the
-   * codex app-server transport directly (no broker dispatch, no receipts), so
-   * follow-ups continue the exact same thread. */
+  /** Ask one lane. Existing worker bindings go through the sole Codex Desktop
+   * owner so the user's dictation is a native turn in the exact visible task.
+   * Luna remains confined to the deck-owned overview lane; it never receives
+   * or proxies a bound lane's user turn. */
   private async askAgent(question: string, laneIx: number): Promise<string> {
     const lane = this.lanes[laneIx];
+    const route = resolveDeckTurnRoute(laneIx, lane?.threadId);
     try {
-      const client = await this.laneClient(laneIx);
-      // the overview lane sees the whole deck: its question rides on a live digest
-      const input =
-        laneIx === MASTER_IX
-          ? `${this.systemDigest()}\n\nOperator asks: ${question.slice(0, 500)}`
-          : question.slice(0, 500);
+      if (route.kind === 'unassigned') {
+        this.log('LANE UNASSIGNED', `lane ${laneIx + 1} · no Codex task`);
+        return 'Assign a Codex task to this lane before speaking.';
+      }
+      if (route.kind === 'canonical') {
+        const controller = new AbortController();
+        this.canonicalTurnAbort = controller;
+        try {
+          const session = this.canonicalSessionFor(route.taskId);
+          const result = await session.turn(question, {
+            signal: controller.signal,
+            timeoutMs: 180_000,
+          });
+          this.canonicalSessionReady = true;
+          lane.updatedAt = Date.now();
+          this.log(
+            'CANONICAL TURN',
+            result.delivery === 'steered-active-turn'
+              ? `lane ${laneIx + 1} · steered active Codex task`
+              : `lane ${laneIx + 1} · started in Codex Desktop`,
+          );
+          const text = result.response.trim();
+          if (!text) throw new Error('empty reply from the canonical task');
+          return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : text;
+        } finally {
+          if (this.canonicalTurnAbort === controller) this.canonicalTurnAbort = null;
+        }
+      }
+
+      // Only the hidden overview role reaches this path. It receives a status
+      // digest, never a worker lane's transcript or canonical task context.
+      const client = await this.laneClient(MASTER_IX);
+      const input = `${this.systemDigest()}\n\nOperator asks: ${question.slice(0, 500)}`;
       const result = await client.turn({ input, timeoutMs: 180_000 });
       const thread = result.session.nativeId;
       // codex thread ids are UUIDv7 — the leading bytes are a timestamp, so
@@ -1047,7 +1155,12 @@ export class DeckRuntime extends EventEmitter {
       if (!text) throw new Error('empty reply from session');
       return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : text;
     } catch (error) {
-      this.log('AGENT FAILED', (error as Error).message.slice(0, 60));
+      const canonical = route.kind === 'canonical';
+      this.log(canonical ? 'CANONICAL FAILED' : 'AGENT FAILED', (error as Error).message.slice(0, 60));
+      if (canonical) {
+        return 'I could not reach the exact Codex task. Open that task in Codex Desktop and try again. SpeakEasy did not send this turn anywhere else.';
+      }
+      if (route.kind === 'unassigned') return 'Assign a Codex task to this lane before speaking.';
       const who = this.lanes[laneIx]?.name.toLowerCase();
       return who
         ? `${who[0].toUpperCase() + who.slice(1)} didn't answer that one — try again in a moment.`
@@ -1055,8 +1168,14 @@ export class DeckRuntime extends EventEmitter {
     }
   }
 
-  /** Interrupt any in-flight lane turn — called on stop, lane change, new capture, destroy. */
+  /** Detach from in-flight work during runtime teardown only. User-facing
+   * navigation and transport controls must preserve canonical task delivery. */
   private cancelAgentWork(): void {
+    this.canonicalTurnAbort?.abort();
+    this.canonicalTurnAbort = null;
+    this.canonicalSession?.close();
+    this.canonicalSession = null;
+    this.canonicalSessionReady = false;
     for (const { client } of this.laneClients.values()) client.interrupt?.();
   }
 
