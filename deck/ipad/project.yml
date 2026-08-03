@@ -12,7 +12,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: Apple Development
     SWIFT_VERSION: "5.0"
-    TARGETED_DEVICE_FAMILY: "2"
+    TARGETED_DEVICE_FAMILY: "1,2"
 
 targets:
   SpeakEasyDeck:
@@ -36,9 +36,10 @@ targets:
         NSBonjourServices:
           - _http._tcp
         NSLocalNetworkUsageDescription: SpeakEasy Deck finds and drives your Mac over your local network.
-        NSMicrophoneUsageDescription: Hold to Speak transcribes your voice on this iPad so your Mac can answer.
-        NSSpeechRecognitionUsageDescription: Hold to Speak transcribes your voice on this iPad so your Mac can answer.
+        NSMicrophoneUsageDescription: Hold to Speak transcribes your voice on this device so your Mac can answer.
         UILaunchStoryboardName: LaunchScreen
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
