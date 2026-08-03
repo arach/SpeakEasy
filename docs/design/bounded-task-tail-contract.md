@@ -1,6 +1,6 @@
 # Bounded task-tail contract
 
-Status: implementation brief for Scout / `@openscout/agent-sessions`
+Status: shipped in `@openscout/agent-sessions@0.2.78`; SpeakEasy consumes via Deck task-tail hydrate
 Date: 2026-08-03
 
 ## Problem

@@ -18,6 +18,15 @@ import {
   type CodexThreadCandidate,
 } from './codex-thread-catalog.js';
 import { DECK_LANES_FILE } from '../paths.js';
+import {
+  clearLaneTailCursor,
+  isBoundedLargeRead,
+  loadLaneTailCursor,
+  mergeTailMessages,
+  readDeckTaskTail,
+  saveLaneTailCursor,
+  type TailDeckMessage,
+} from './deck-task-tail.js';
 
 /** execFile as a promise, capturing stdout, with a hard timeout. */
 function run(cmd: string, args: string[], timeout: number): Promise<string> {
@@ -145,6 +154,8 @@ export interface DeckRuntimeOptions {
   warmCatalog?: boolean;
   /** Skip exact-task owner prewarming in isolated runtime tests. */
   warmCanonical?: boolean;
+  /** Test seam for bounded task-tail reads. */
+  taskTailRead?: typeof readDeckTaskTail;
 }
 
 const intentSchema = z.discriminatedUnion('name', [
@@ -339,6 +350,11 @@ export class DeckRuntime extends EventEmitter {
   private canonicalSession: CodexDesktopSession | null = null;
   private canonicalSessionReady = false;
   private threads: DeckMessage[][] = Array.from({ length: LANE_COUNT + 1 }, () => []);
+  /** Opaque task-tail cursors and seen source ids, keyed by lane index. */
+  private laneTailSeen = new Map<number, Set<string>>();
+  private laneTailInFlight = new Set<number>();
+  private tailPollTimer: NodeJS.Timeout | null = null;
+  private taskTailRead: typeof readDeckTaskTail = readDeckTaskTail;
   private playing: string | null = null;
   private paused = false;
   private pos = 0;
@@ -376,11 +392,20 @@ export class DeckRuntime extends EventEmitter {
 
   constructor(options: DeckRuntimeOptions = {}) {
     super();
+    if (options.taskTailRead) this.taskTailRead = options.taskTailRead;
     this.restoreLaneBindings();
     // Warm the exact Codex task catalog before the user opens lane setup. The
     // explicit refresh action reuses this in-flight request if it is still busy.
     if (options.warmCatalog !== false) void this.refreshThreadCatalog();
     if (options.warmCanonical !== false) queueMicrotask(() => this.warmCanonicalLane(this.laneIx));
+    // Hydrate recent canonical messages for restored bindings without loading
+    // full Codex rollouts. Scout is not involved — local readTaskTail only.
+    queueMicrotask(() => {
+      for (let i = 0; i < LANE_COUNT; i++) {
+        if (this.lanes[i]?.threadId) void this.syncLaneTaskTail(i, { reason: 'restore' });
+      }
+      this.ensureTailPoll();
+    });
   }
 
   /** Copy identity from the exact Codex catalog record used for the binding.
@@ -568,6 +593,8 @@ export class DeckRuntime extends EventEmitter {
     // the warm session and clear the visible thread for nothing
     if (threadId && this.laneThreadId(index) === threadId) {
       this.log('LANE UNCHANGED', `lane ${index + 1} already holds this thread`);
+      // Still refresh the tail so a re-selected mapping rehydrates recent history.
+      void this.syncLaneTaskTail(index, { reason: 'reaffirm' });
       this.changed();
       return;
     }
@@ -596,6 +623,7 @@ export class DeckRuntime extends EventEmitter {
     // the new binding starts with a clean conversation — no orphaned replies
     // from the old thread, and nothing for replay to resurrect
     this.threads[index] = [];
+    this.laneTailSeen.delete(index);
     const existing = this.laneClients.get(index);
     if (existing) {
       this.laneClients.delete(index);
@@ -620,6 +648,8 @@ export class DeckRuntime extends EventEmitter {
           this.assignLane(j, null);
         }
       }
+      // Initial last-20 hydration from the local rollout via readTaskTail.
+      void this.syncLaneTaskTail(index, { reason: 'assign', forceInitial: true });
     } else {
       lane.title = 'assign a Codex task before speaking';
       lane.threadId = undefined;
@@ -628,6 +658,11 @@ export class DeckRuntime extends EventEmitter {
       lane.cwd = undefined;
       lane.branch = undefined;
       lane.updatedAt = undefined;
+      try {
+        clearLaneTailCursor(laneRuntimeDir(this.laneKeys[index]));
+      } catch {
+        // ignore
+      }
       this.log(threadId ? 'ASSIGN FAILED' : 'LANE CLEARED', `lane ${index + 1} → unassigned`);
     }
     this.changed();
@@ -651,6 +686,139 @@ export class DeckRuntime extends EventEmitter {
     this.log('LANE SELECTED', index === MASTER_IX ? 'overview' : `lane ${index + 1}`);
     this.changed();
     this.warmCanonicalLane(index);
+    // Lane focus resumes the bounded tail cursor so background growth appears
+    // without reloading the full Codex rollout.
+    if (index !== MASTER_IX) void this.syncLaneTaskTail(index, { reason: 'select' });
+  }
+
+  private tailMessageToDeck(msg: TailDeckMessage): DeckMessage {
+    return {
+      role: msg.role,
+      text: msg.text,
+      dur: estimateDuration(msg.text),
+      mirrored: true,
+    };
+  }
+
+  /**
+   * Hydrate or incrementally advance one lane's conversation from the local
+   * Codex rollout via `@openscout/agent-sessions` `readTaskTail`. Never a Scout
+   * broker hop — dictation still uses canonical Desktop IPC separately.
+   */
+  private syncLaneTaskTail(
+    index: number,
+    options: { reason: string; forceInitial?: boolean } = { reason: 'sync' },
+  ): void {
+    if (this.destroyed || index === MASTER_IX) return;
+    if (this.laneTailInFlight.has(index)) return;
+    const taskId = this.lanes[index]?.threadId?.trim();
+    if (!taskId) return;
+
+    const runtimeDir = laneRuntimeDir(this.laneKeys[index]);
+    const stored = loadLaneTailCursor(runtimeDir);
+    // Empty presentation always rehydrates last-N. A stored cursor alone is not
+    // enough to rebuild the visible thread after a process restart.
+    const useCursor =
+      !options.forceInitial
+      && this.threads[index].length > 0
+      && stored?.taskId === taskId
+      ? stored.cursor
+      : undefined;
+
+    this.laneTailInFlight.add(index);
+    try {
+      const result = this.taskTailRead({
+        taskId,
+        cursor: useCursor,
+      });
+      if (this.destroyed || this.lanes[index]?.threadId !== taskId) return;
+
+      if (!result.ok) {
+        if (result.code === 'TASK_MISMATCH' || result.code === 'CURSOR_TASK_MISMATCH'
+          || result.code === 'CURSOR_INVALID' || result.code === 'SOURCE_REPLACED'
+          || result.code === 'SOURCE_TRUNCATED') {
+          clearLaneTailCursor(runtimeDir);
+          this.laneTailSeen.delete(index);
+          if (useCursor) {
+            this.laneTailInFlight.delete(index);
+            this.syncLaneTaskTail(index, { reason: `${options.reason}:reset`, forceInitial: true });
+            return;
+          }
+        }
+        this.log('TASK TAIL', `lane ${index + 1} · ${result.code}: ${result.message.slice(0, 48)}`);
+        return;
+      }
+
+      if (!isBoundedLargeRead(result) && result.fileSize > 32 * 1024 * 1024) {
+        this.log(
+          'TASK TAIL',
+          `lane ${index + 1} · refused oversized scan ${result.bytesRead}/${result.fileSize}`,
+        );
+        return;
+      }
+
+      const seen = this.laneTailSeen.get(index) ?? new Set<string>();
+      let changed = false;
+
+      if (result.mode === 'initial') {
+        if (this.threads[index].length === 0 || options.forceInitial) {
+          this.threads[index] = result.messages.map((m) => this.tailMessageToDeck(m));
+          seen.clear();
+          for (const m of result.messages) seen.add(m.sourceId);
+          changed = result.messages.length > 0;
+        } else {
+          const merged = mergeTailMessages({
+            existing: this.threads[index],
+            incoming: result.messages,
+            seenIds: seen,
+            maxMessages: MAX_MESSAGES_PER_LANE,
+            toMessage: (m) => this.tailMessageToDeck(m),
+          });
+          this.threads[index] = merged.messages;
+          changed = merged.added > 0;
+        }
+      } else {
+        const merged = mergeTailMessages({
+          existing: this.threads[index],
+          incoming: result.messages,
+          seenIds: seen,
+          maxMessages: MAX_MESSAGES_PER_LANE,
+          toMessage: (m) => this.tailMessageToDeck(m),
+        });
+        this.threads[index] = merged.messages;
+        changed = merged.added > 0;
+      }
+
+      this.laneTailSeen.set(index, seen);
+      saveLaneTailCursor(runtimeDir, { taskId, cursor: result.cursor });
+      this.log(
+        'TASK TAIL',
+        `lane ${index + 1} · ${result.mode} · ${result.messages.length} msgs · `
+          + `${Math.round(result.bytesRead / 1024)}KB/${Math.round(result.fileSize / 1024 / 1024)}MB · ${options.reason}`,
+      );
+      if (changed) this.changed();
+    } finally {
+      this.laneTailInFlight.delete(index);
+    }
+  }
+
+  /** Background poll so reconnecting decks pick up new rollout turns. */
+  private ensureTailPoll(): void {
+    if (this.tailPollTimer || this.destroyed) return;
+    this.tailPollTimer = setInterval(() => {
+      if (this.destroyed) return;
+      const targets = new Set<number>([this.laneIx]);
+      for (let i = 0; i < LANE_COUNT; i++) {
+        if (this.lanes[i]?.state === 'working' || this.lanes[i]?.state === 'speaking') {
+          targets.add(i);
+        }
+      }
+      for (const ix of targets) {
+        if (ix === MASTER_IX) continue;
+        if (this.lanes[ix]?.threadId) void this.syncLaneTaskTail(ix, { reason: 'poll' });
+      }
+    }, 4_000);
+    this.tailPollTimer.unref?.();
   }
 
   /** Reuse one proven Desktop owner while a task remains selected. Switching
@@ -1004,6 +1172,9 @@ export class DeckRuntime extends EventEmitter {
       const msg: DeckMessage = { role: 'agent', text: reply, dur: estimateDuration(reply) };
       this.pushMessage(lane, msg);
       const id = `${lane}:${this.threads[lane].length - 1}`;
+      // Advance the opaque tail cursor after live presentation so reconnect
+      // and poll merge the same exchange by fingerprint instead of duplicating it.
+      if (lane !== MASTER_IX) this.syncLaneTaskTail(lane, { reason: 'after-turn' });
 
       this.setPhase('preparingSpeech', `PREPARING SPEECH · ${laneNumber(lane)}`);
       this.log('AGENT REPLY', `${msg.dur.toFixed(0)}s queued`);
@@ -1302,6 +1473,10 @@ export class DeckRuntime extends EventEmitter {
     this.cancelAgentWork();
     this.stopPlayer();
     if (this.ticker) clearInterval(this.ticker);
+    if (this.tailPollTimer) {
+      clearInterval(this.tailPollTimer);
+      this.tailPollTimer = null;
+    }
     for (const { client } of this.laneClients.values()) void client.close().catch(() => undefined);
     this.laneClients.clear();
     rmSync(this.synthDir, { recursive: true, force: true });
