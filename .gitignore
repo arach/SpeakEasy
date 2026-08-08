@@ -17,6 +17,8 @@ out/
 .playwright-cli/
 /output/
 *.app.zip
+.derived-data*/
+.device-id.local
 
 # Local QA media
 app/Sources/SpeakEasy/Resources/Pad/demo-response.*
