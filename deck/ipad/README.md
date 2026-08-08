@@ -39,18 +39,38 @@ No QR, URL entry, or pin.
 - Narration downloads through the paired URL session and plays with
   `AVAudioPlayer`. The iPad reports its real progress to the runtime, so pause,
   speed, volume, replay, stop, and completion keep the existing semantics.
-- **Hold to Speak is Parakeet-first.** `SpeechCapture` records one private PCM
-  WAV with `AVAudioEngine`; release uploads it to `/api/transcribe`, where the
-  Mac app's embedded Parakeet model produces the only transcript. The iPad no
-  longer requests Speech Recognition permission or runs `SFSpeechRecognizer`.
-- While recording, the same native audio tap publishes a perceptual RMS level
-  at 30 Hz. SwiftUI uses it to animate the selected pad's sparkline in direct
-  response to the speaker's voice; no WebKit bridge participates.
+- **Hold to Speak is on-device Parakeet, and never loses an utterance.**
+  `DeckVoice` drives HudsonKit's `HudDictation` in `parakeetOnly` mode: capture,
+  the Parakeet Core ML model, and transcription all live on the iPad, so the Mac
+  is a destination rather than a dependency. Vox runs the `.mlmodelc` bundles
+  itself against Core ML and Accelerate — encoder pass, TDT decoding loop and
+  all — on weights NVIDIA trained (CC-BY-4.0) and FluidInference converted to
+  Core ML (Apache 2.0). See the credits in the repository root README. Nothing is uploaded — only text
+  crosses the wire. Apple Speech never runs, so no Speech Recognition
+  permission is requested.
+- Two durable queues back that promise. `HudDictation` holds *audio* that could
+  not be transcribed yet (the 461 MB model is still downloading, which starts
+  when a Mac is first paired), and `DeckTranscriptOutbox` holds *transcripts*
+  the Mac has not accepted. Both survive app relaunches; a recording is deleted
+  only once it has produced a transcript, and a transcript only once the Mac
+  acknowledges its `utteranceId`. Delivery carries the lane it was spoken to,
+  so speech held through a download still lands where it was aimed.
+- You can therefore dictate with the Mac asleep, the socket dropped, or a
+  response already in flight. The keypad shows what is still held rather than
+  reporting a send that did not happen.
+- While recording, `HudDictation` publishes a perceptual RMS level at 30 Hz.
+  SwiftUI uses it to animate the selected pad's sparkline in direct response to
+  the speaker's voice; no WebKit bridge participates.
 
 The browser deck remains available from `speakeasy deck`; its full layout is
 unchanged unless `surface=console` is explicitly requested by the iPad shell.
 
 ## Build
+
+Requires a sibling `hudson` checkout (`../../../hudson`) for the `HudsonVoice`
+product, which embeds Vox/Parakeet. The macOS app's prebuilt HudsonKit
+XCFrameworks are macOS-only and ship no voice product, so this target consumes
+Hudson from source the same way Scout's iOS app does.
 
 ```sh
 xcodegen generate --spec project.yml
@@ -76,16 +96,17 @@ no certificate profile and remains connected when it is opened normally later.
 
 | File | Role |
 | --- | --- |
-| `project.yml` | xcodegen spec — team `2U83JFPW66`, Bonjour/network/mic permissions |
+| `project.yml` | xcodegen spec — team `2U83JFPW66`, Bonjour/network/mic permissions, HudsonVoice |
 | `Sources/SpeakEasyDeckApp.swift` | `@main` entry point |
 | `Sources/DeckRootView.swift` | discovery-driven full-screen surface |
 | `Sources/DeckDiscovery.swift` | Bonjour discovery of the deck service |
 | `Sources/DeckModels.swift` | Codable snapshot, lane, message, catalog, trace, and URL contract |
-| `Sources/DeckConnection.swift` | WebSocket intents/snapshots, Parakeet upload, and native audio playback |
+| `Sources/DeckConnection.swift` | WebSocket intents/snapshots and native audio playback |
+| `Sources/DeckVoice.swift` | on-device Parakeet dictation, held audio, and transcript delivery |
+| `Sources/DeckTranscriptOutbox.swift` | durable queue of transcripts the Mac has not acknowledged |
 | `Sources/NativeDeckView.swift` | native keypad, hold-to-speak, transport, and lane setup |
 | `Sources/DeckSettingsView.swift` | sticky Appearance picker and companion diagnostics |
 | `Sources/DeckSurface.swift` | persistent native control-surface selection |
 | `Sources/DeckTheme.swift` | persistent native/WebKit theme palettes |
 | `Sources/DeckWebView.swift` | presentation-only WebKit lane viewer and paired-host trust |
-| `Sources/SpeechCapture.swift` | private PCM WAV capture for the Mac's Parakeet engine |
 | `Sources/Info.plist` | Bonjour, local-network, and microphone permissions |
