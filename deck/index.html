@@ -1725,13 +1725,11 @@ function tpl(v) {
             : '') +
         '</div>' +
 
-        // trace
+        // trace — the log only; its TRACE label lives in the status strip below,
+        // so the console ends in one strip instead of two stacked ones.
         (v.traceOn
-          ? '<div class="se-scroll" style="border-top:1px solid var(--se-line-soft);background:var(--se-trace-bg);padding:11px 20px 12px;flex:0 1 auto;min-height:0;max-height:180px;overflow-y:auto;color:var(--se-ink-4);">' +
-              '<div style="display:flex;align-items:center;justify-content:space-between;">' +
-                '<span style="font:600 8px var(--se-mono);letter-spacing:0.2em;color:var(--se-accent-ink);">TRACE</span>' +
-              '</div>' +
-              '<div style="margin-top:8px;display:flex;flex-direction:column;gap:1px;">' +
+          ? '<div class="se-scroll" style="border-top:1px solid var(--se-line-soft);background:var(--se-trace-bg);padding:10px 20px 11px;flex:0 1 auto;min-height:0;max-height:180px;overflow-y:auto;color:var(--se-ink-4);">' +
+              '<div style="display:flex;flex-direction:column;gap:1px;">' +
                 v.trace.map(ev =>
                   '<div style="display:flex;align-items:baseline;gap:10px;padding:4px 0;border-bottom:1px solid var(--se-line-soft);min-width:0;">' +
                     '<span style="font:400 9px var(--se-mono);color:var(--se-ink-4);flex:none;">' + esc(ev.at) + '</span>' +
@@ -1742,9 +1740,10 @@ function tpl(v) {
             '</div>'
           : '') +
 
-        // confirmation footer
+        // status strip — lane state on the left, the trace log's label on the right
         '<div style="flex:none;border-top:1px solid var(--se-line-soft);background:var(--se-panel-head);padding:11px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 20px;">' +
-          '<div><div style="font:600 11px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink);">' + esc(v.confirmLine) + '</div></div>' +
+          '<div style="font:600 11px var(--se-mono);letter-spacing:0.12em;color:var(--se-ink);">' + esc(v.confirmLine) + '</div>' +
+          (v.traceOn ? '<div style="font:600 8px var(--se-mono);letter-spacing:0.2em;color:var(--se-accent-ink);">TRACE</div>' : '') +
         '</div>' +
       '</div>' +
     '</div>' +
