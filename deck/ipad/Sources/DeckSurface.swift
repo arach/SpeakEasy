@@ -28,7 +28,7 @@ enum DeckSurfaceID: String, CaseIterable, Identifiable {
         case .flightDeck: "Six model / effort channels"
         case .checklist: "Dense operations ledger"
         case .pfd: "Live field with bezel keys"
-        case .micro: "Tactile nine-key hardware"
+        case .micro: "Programmable 4x4 key bank"
         }
     }
 }

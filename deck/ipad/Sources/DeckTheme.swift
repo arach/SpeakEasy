@@ -21,7 +21,7 @@ enum DeckThemeID: String, CaseIterable, Identifiable {
 
     var detail: String {
         switch self {
-        case .flight: "Night instrument panel"
+        case .flight: "Void graphite, mint signal"
         case .obsidian: "Technical black, cool blue"
         case .ceramic: "Warm daylight console"
         case .porcelain: "Quiet white, tailored graphite"
@@ -46,14 +46,16 @@ enum DeckThemeID: String, CaseIterable, Identifiable {
     var palette: DeckThemePalette {
         switch self {
         case .flight:
+            // Void graphite chassis + mint lamp. Tuned against the player-face
+            // study: cooler neutrals, slightly softer mint so it doesn't neon.
             DeckThemePalette(
-                page: 0x05090B, panel: 0x0C161A, panelHead: 0x0F1C21, cell: 0x122228,
-                trace: 0x0A1316, line: 0x1F333A, lineSoft: 0x1A2B31,
-                ink: 0xE8F0EE, ink2: 0xA9BCB8, ink3: 0x6C7F7B, ink4: 0x4D605C,
-                accent: 0x74F2CE, accentDim: 0x49A88C, accentDark: 0x08231B, accentEdge: 0x1E4A3F,
-                amber: 0xE0A83F, plate: 0x0A1316, plateTop: 0x0E191D, plateBottom: 0x080F12,
-                pad: 0x142328, padBottom: 0x0D171B, empty: 0x0A1216,
-                micTop: 0x0E8A6C, micBottom: 0x0A5F4B
+                page: 0x07090C, panel: 0x10161B, panelHead: 0x141A20, cell: 0x1A222A,
+                trace: 0x06080A, line: 0x2A333C, lineSoft: 0x1A2229,
+                ink: 0xF1F4F6, ink2: 0xA8B2BB, ink3: 0x6A7580, ink4: 0x4A5460,
+                accent: 0x5EE9C2, accentDim: 0x3AB894, accentDark: 0x0A1F1A, accentEdge: 0x1C4F42,
+                amber: 0xE0A83F, plate: 0x0A0E12, plateTop: 0x141A20, plateBottom: 0x0A0E12,
+                pad: 0x1A222A, padBottom: 0x0F1419, empty: 0x06080A,
+                micTop: 0x14A07A, micBottom: 0x0A6B50
             )
         case .obsidian:
             DeckThemePalette(

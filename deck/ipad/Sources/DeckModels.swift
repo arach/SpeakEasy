@@ -58,9 +58,18 @@ struct DeckLaneInfo: Decodable, Identifiable {
     let cwd: String?
     let branch: String?
     let updatedAt: Double?
+    /// "codex" for a task started in Codex Desktop, "deck" for a thread this
+    /// deck created itself. Absent while the lane is unassigned.
+    let origin: String?
 
     var id: String { num }
-    var isAssigned: Bool { state != .empty && threadId != nil }
+
+    /// A deck-created thread has no codex thread id until its first turn
+    /// answers, so ownership — not the id — is what makes a lane assigned.
+    var isAssigned: Bool { state != .empty && (threadId != nil || origin == "deck") }
+
+    /// True while this lane holds a fresh deck thread that has not spoken yet.
+    var isNewDeckThread: Bool { origin == "deck" && threadId == nil }
 }
 
 struct DeckSnapshot: Decodable {
@@ -103,6 +112,30 @@ struct DeckSnapshot: Decodable {
               threads.indices.contains(parts[0]),
               threads[parts[0]].indices.contains(parts[1]) else { return nil }
         return threads[parts[0]][parts[1]]
+    }
+}
+
+/// The narration speed detents, mirroring `SPEEDS` in the Mac runtime.
+///
+/// `all` is the *cycle* order the runtime advances through on `playback.speed`;
+/// `ordered` is the same set sorted by value, which is the only honest way to
+/// draw it as a row of detents -- a scale that reads left to right must not put
+/// 0.75x to the right of 1.5x just because that is where the cycle wraps.
+enum DeckPlaybackSpeeds {
+    static let all: [Double] = [1.0, 1.25, 1.5, 0.75]
+    static let ordered: [Double] = all.sorted()
+
+    static func value(at index: Int) -> Double {
+        all.indices.contains(index) ? all[index] : 1
+    }
+
+    static func label(at index: Int) -> String {
+        String(format: "%.2f×", value(at: index))
+    }
+
+    /// Position of the current detent on the ordered scale.
+    static func detent(at index: Int) -> Int {
+        ordered.firstIndex(of: value(at: index)) ?? 0
     }
 }
 

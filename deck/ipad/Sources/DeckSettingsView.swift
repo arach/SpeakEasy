@@ -389,6 +389,7 @@ private struct HybridThemeMiniature: View {
 
 struct DeckCompanionView: View {
     @ObservedObject var connection: DeckConnection
+    @ObservedObject var voice: DeckVoice
     let deck: DiscoveredDeck
     let onFindDecks: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -435,10 +436,26 @@ struct DeckCompanionView: View {
                     Divider().overlay(DeckPalette.lineSoft)
                     fact("HOST", deck.url.host ?? "Unknown Mac")
                     Divider().overlay(DeckPalette.lineSoft)
-                    fact("AUDIO", "Native iPad player · Parakeet capture")
+                    fact("AUDIO", "Native iPad player · on-device Parakeet")
+                    Divider().overlay(DeckPalette.lineSoft)
+                    fact("VOICE MODEL", modelSummary)
+                    if voice.heldAudio > 0 || voice.undelivered > 0 {
+                        Divider().overlay(DeckPalette.lineSoft)
+                        // Speech the device is still carrying is never a silent
+                        // condition — it is the operator's words, in writing.
+                        fact("HELD FOR YOU", heldSummary)
+                    }
                 }
                 .background(DeckPalette.panel, in: RoundedRectangle(cornerRadius: 10))
                 .overlay { RoundedRectangle(cornerRadius: 10).stroke(DeckPalette.line) }
+
+                // CC-BY-4.0 on the weights makes this attribution required, not
+                // decorative. Naming the three layers is also just honest about
+                // what is running on the device.
+                Text("Speech recognized on this iPad by Parakeet TDT 0.6B v3 — trained by NVIDIA (CC-BY-4.0), converted to Core ML by FluidInference (Apache 2.0), executed by Vox.")
+                    .deckMono(8)
+                    .foregroundStyle(DeckPalette.ink3)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 10) {
                     Button("RECONNECT NOW") { connection.reconnectNow() }
@@ -484,6 +501,23 @@ struct DeckCompanionView: View {
         .frame(height: 44)
     }
 
+    /// What the voice stack can do right now, in the operator's terms.
+    private var modelSummary: String {
+        if case .preparing(let progress) = voice.phase {
+            return "Downloading · \(Int(progress * 100))%"
+        }
+        if voice.modelReady { return "Parakeet · warm on this device" }
+        if voice.modelInstalled { return "Parakeet · downloaded, warming" }
+        return "Parakeet · downloads when paired"
+    }
+
+    private var heldSummary: String {
+        var parts: [String] = []
+        if voice.heldAudio > 0 { parts.append("\(voice.heldAudio) recording\(voice.heldAudio == 1 ? "" : "s")") }
+        if voice.undelivered > 0 { parts.append("\(voice.undelivered) transcript\(voice.undelivered == 1 ? "" : "s")") }
+        return parts.joined(separator: " · ")
+    }
+
     private var diagnostics: String {
         [
             "SpeakEasy Deck diagnostics",
@@ -494,6 +528,9 @@ struct DeckCompanionView: View {
             "Status: \(connection.localStatus ?? "ready")",
             "Theme: \(DeckThemeSelection.current.name)",
             "Surface: native keypad + WebKit lane viewer",
+            "Voice model: \(modelSummary)",
+            "Held recordings: \(voice.heldAudio)",
+            "Undelivered transcripts: \(voice.undelivered)",
         ].joined(separator: "\n")
     }
 }
