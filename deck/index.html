@@ -89,6 +89,7 @@
   --se-pad-num-empty:oklch(0.75 0.004 240);
   --se-pad-ink-idle:oklch(0.60 0.004 240);
   --se-pad-snippet:oklch(0.58 0.004 240);
+  --se-pad-snippet-empty:oklch(0.72 0.004 240);
   --se-pad-snippet-on:oklch(0.45 0.02 240);
   --se-pad-spark-idle:oklch(0.80 0.004 240);
 
@@ -429,7 +430,7 @@ const SEEDS = {
     'pad-face': 'linear-gradient(160deg,#14191f,#0d1116)', 'pad-face-on': 'linear-gradient(160deg,#102b43,#091a2a)',
     'pad-face-empty': 'linear-gradient(160deg,#0c1014,#080b0e)', 'pad-edge': '#28323b', 'pad-accent': '#79b8ff',
     'pad-ring': 'rgba(121,184,255,0.16)', 'pad-num': '#dbe5ed', 'pad-num-empty': '#4d5862',
-    'pad-ink-idle': '#7d8994', 'pad-snippet': '#77838e', 'pad-snippet-on': '#bdd8f4', 'pad-spark-idle': '#2b3946',
+    'pad-ink-idle': '#7d8994', 'pad-snippet': '#77838e', 'pad-snippet-empty': '#4f5a63', 'pad-snippet-on': '#bdd8f4', 'pad-spark-idle': '#2b3946',
     'knob-face': 'radial-gradient(circle at 34% 28%,#333c45,#1f262d 58%,#11161b)', 'knob-ring': '#3e4852',
     'knob-shadow': '0 3px 7px rgba(0,0,0,0.6)', 'knob-mark': '#c9d4de',
     'grille-face': 'radial-gradient(circle at 40% 32%,#171d23,#0a0e11)', 'grille-ring': '#2c353d',
@@ -460,7 +461,7 @@ const SEEDS = {
     'pad-face': 'linear-gradient(160deg,#fbfcfc,#edefef)', 'pad-face-on': 'linear-gradient(160deg,#f8fbfc,#e4eef2)',
     'pad-face-empty': 'linear-gradient(160deg,#f1f2f2,#e5e7e7)', 'pad-edge': '#cfd4d5', 'pad-accent': '#245a74',
     'pad-ring': 'rgba(36,90,116,0.14)', 'pad-num': '#30373c', 'pad-num-empty': '#a0a5a8',
-    'pad-ink-idle': '#7a8388', 'pad-snippet': '#747c83', 'pad-snippet-on': '#4d6570', 'pad-spark-idle': '#c3cbce',
+    'pad-ink-idle': '#7a8388', 'pad-snippet': '#747c83', 'pad-snippet-empty': '#a2a8ac', 'pad-snippet-on': '#4d6570', 'pad-spark-idle': '#c3cbce',
     'mic-a': '#2f6d85', 'mic-b': '#204d60', 'mic-edge': '#477f94', 'mic-ink': '#f7fcfe', 'mic-sub-ink': '#c7dce4',
     'btn-face': 'linear-gradient(180deg,#ffffff,#ecefef)', 'btn-edge': '#cbd1d2', 'btn-ink': '#555f65',
     'btn-sheen': 'inset 0 1px 0 #fff',
@@ -486,7 +487,7 @@ const SEEDS = {
     'pad-face': 'linear-gradient(160deg,#161c22,#0f1317)', 'pad-face-on': 'linear-gradient(160deg,#12352c,#0a1f1a)',
     'pad-face-empty': 'linear-gradient(160deg,#10151a,#0a0e11)', 'pad-edge': '#2c343c', 'pad-accent': '#74f2ce',
     'pad-ring': 'rgba(116,242,206,0.16)', 'pad-num': '#dce3e8', 'pad-num-empty': '#4a545c',
-    'pad-ink-idle': '#6b7680', 'pad-snippet': '#6b7680', 'pad-snippet-on': '#b9ebe0', 'pad-spark-idle': '#2a343c',
+    'pad-ink-idle': '#6b7680', 'pad-snippet': '#6b7680', 'pad-snippet-empty': '#4e5860', 'pad-snippet-on': '#b9ebe0', 'pad-spark-idle': '#2a343c',
     'knob-face': 'radial-gradient(circle at 34% 28%,#39424a,#242c33 58%,#151b21)', 'knob-ring': '#454f58',
     'knob-shadow': '0 3px 7px rgba(0,0,0,0.55)', 'knob-mark': '#cfd8de',
     'grille-face': 'radial-gradient(circle at 40% 32%,#1b2229,#0d1216)', 'grille-ring': '#333d45',
@@ -1332,8 +1333,11 @@ function view() {
       statusColor: sel ? T('pad-accent') : ink.ink,
       snippet: last ? '“' + last.text.slice(0, 58) + '…”' : 'No exchanges yet',
       hasSnippet: PROPS.showPadSnippets && !isEmpty,
-      snipColor: sel ? T('pad-snippet-on') : T('pad-snippet'),
-      nameColor: sel ? T('pad-accent') : T('plate-ink-2'),
+      // A placeholder is not content. It sits a step below a real quote so a
+      // wall of silent lanes stops competing with the ones that have something
+      // to say — and an unassigned pad drops its name to match its number.
+      snipColor: sel ? T('pad-snippet-on') : last ? T('pad-snippet') : T('pad-snippet-empty'),
+      nameColor: sel ? T('pad-accent') : isEmpty ? T('pad-num-empty') : T('plate-ink-2'),
       numColor: isEmpty ? T('pad-num-empty') : sel ? T('pad-accent') : T('pad-num'),
       face: isEmpty ? T('pad-face-empty') : sel ? T('pad-face-on') : T('pad-face'),
       edge: sel ? T('pad-accent') : T('pad-edge'),
