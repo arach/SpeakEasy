@@ -5,6 +5,7 @@ import SwiftUI
 struct DeckRootView: View {
     @StateObject private var discovery = DeckDiscovery()
     @StateObject private var connection = DeckConnection()
+    @StateObject private var voice = DeckVoice()
     @StateObject private var laneViewer = DeckLaneViewerController()
     @AppStorage(DeckThemeSelection.defaultsKey) private var selectedThemeRaw = DeckThemeID.flight.rawValue
 
@@ -14,11 +15,13 @@ struct DeckRootView: View {
                 ZStack(alignment: .bottomTrailing) {
                     NativeDeckView(
                         connection: connection,
+                        voice: voice,
                         laneViewer: laneViewer,
                         selectedDeck: deck,
                         onFindDecks: { discovery.refresh() }
                     )
                         .onAppear {
+                            voice.attach(to: connection)
                             connection.connect(to: deck.url)
                             laneViewer.deckURL = deck.url
                         }
