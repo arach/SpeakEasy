@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en" data-hudson-template="speakeasy-deck" data-hudson-theme="light">
+<html lang="en" data-hudson-template="speakeasy-deck" data-hudson-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="dark">
 <title>Speakeasy · Micro Deck</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23bd4722'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='monospace' font-size='20' font-weight='700' fill='white'%3ESE%3C/text%3E%3C/svg%3E">
 
@@ -358,9 +358,9 @@ const SPEEDS = [1, 1.25, 1.5, 0.75];
 // ────────────────────────────────────────────────────────────────────────────
 // Seed themes. `paper` is the CSS :root default and needs no overrides; the
 // others replace the token values inline on <html> at boot. `ember` keeps the
-// paper pad plate — the pad surface is always paper, whatever the console
-// does. Selected with ?theme=paper|porcelain|ember|flight|obsidian or
-// speakeasyDeck.setTheme().
+// paper pad plate — it is the one seed that leaves the plate tokens alone.
+// `flight` is what the deck boots to (DEFAULT_SEED, below). Selected with
+// ?theme=paper|porcelain|ember|flight|obsidian or speakeasyDeck.setTheme().
 // ────────────────────────────────────────────────────────────────────────────
 
 const SEEDS = {
@@ -455,9 +455,14 @@ const SEEDS = {
   } }
 };
 
+// The deck boots dark. `paper` is still the :root default and stays one
+// ?theme=paper away — it is the seed the tokens are authored against, not the
+// seed the product ships.
+const DEFAULT_SEED = 'flight';
+
 let appliedSeedKeys = [];
 function applySeed(name) {
-  const seed = SEEDS[name] || SEEDS.paper;
+  const seed = SEEDS[name] || SEEDS[DEFAULT_SEED];
   const style = document.documentElement.style;
   appliedSeedKeys.forEach(k => style.removeProperty(k));
   appliedSeedKeys = [];
@@ -470,7 +475,7 @@ function applySeed(name) {
   document.documentElement.dataset.hudsonTheme = seed.scheme;
   const meta = document.querySelector('meta[name="color-scheme"]');
   if (meta) meta.setAttribute('content', seed.scheme);
-  return SEEDS[name] ? name : 'paper';
+  return SEEDS[name] ? name : DEFAULT_SEED;
 }
 
 // Overrides — the smallest possible custom design: a base seed plus any
@@ -563,7 +568,7 @@ const PROPS = {
   showPadSnippets: flag('snippets', true)
 };
 
-let seedName = applySeed((Q.get('theme') || 'paper').toLowerCase());
+let seedName = applySeed((Q.get('theme') || DEFAULT_SEED).toLowerCase());
 applyOverrides(overridesFromQuery(Q));
 
 const S = {
