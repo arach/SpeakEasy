@@ -197,6 +197,13 @@ body{
 .se-scroll::-webkit-scrollbar-track{background:transparent}
 .se-scroll::-webkit-scrollbar-thumb{background:var(--se-line);border-radius:4px}
 
+/* The conversation is the one surface you read rather than operate, so its
+   scrollbar goes thinner and quieter than the pad grid's or the trace log's.
+   Same specificity as the .se-scroll rules above — it wins on source order. */
+.se-conv{scrollbar-width:thin;scrollbar-color:var(--se-line-soft) transparent}
+.se-conv::-webkit-scrollbar{width:4px}
+.se-conv::-webkit-scrollbar-thumb{background:var(--se-line-soft);border-radius:3px}
+
 .se-hoverink:hover{color:var(--se-accent-ink)!important}
 .se-press{transition:transform .09s ease,filter .09s ease}
 .se-press:active{transform:scale(.97);filter:brightness(1.04)}
