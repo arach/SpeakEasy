@@ -592,3 +592,27 @@ npm test cache  # Test caching specifically
 bun run cli -- --help  # Test CLI
 bun run cli -- --doctor  # Test health check
 ```
+
+## Speech recognition credits
+
+Voice input on the Mac app and the iPad Deck is transcribed on-device by
+Parakeet. Three parties made that possible, and the stack is worth naming
+plainly:
+
+- **[NVIDIA](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3)** trained the
+  model — Parakeet TDT 0.6B v3, a 600M-parameter FastConformer encoder with a
+  TDT decoder, built with NeMo and trained on the Granary corpus. Released
+  under **CC-BY-4.0**, which requires this attribution.
+- **[FluidInference / FluidAudio](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml)**
+  converted it to Core ML and publishes the `.mlmodelc` bundles this project
+  downloads at runtime, under **Apache 2.0**. Without their conversion there is
+  no on-device Parakeet on Apple silicon.
+- **[Vox](https://github.com/arach/vox)** executes those bundles. The inference
+  is Vox's own Swift implementation against Apple's Core ML and Accelerate —
+  model loading, the FastConformer encoder pass, the TDT decoding loop, chunked
+  streaming, vocabulary and text post-processing — roughly 2,700 lines in
+  `HudsonSpeechEngine/ASR/Parakeet`. Vox depends on no third-party ASR runtime;
+  it consumes FluidInference's weights, not their code.
+
+Model weights are fetched once at runtime and are not redistributed in this
+repository. SpeakEasy's own source remains MIT.
