@@ -6,6 +6,12 @@ import type { StudioHudsonRenderContext } from "studio/app-shell";
 import { useStudioRouter } from "studio/router";
 import { DeckHomePage } from "@/studio/DeckHome";
 import { PageHeader } from "@/studio/PageHeader";
+import { AudioInstrumentStudyPage } from "@/studio/AudioInstrumentStudy";
+import { LaneConsoleStudyPage } from "@/studio/LaneConsoleStudy";
+import { MicroThemesKimiStudyPage } from "@/studio/MicroThemesKimiStudy";
+import { MicroThemesMatureStudyPage } from "@/studio/MicroThemesMatureStudy";
+import { MicroThemesOpusStudyPage } from "@/studio/MicroThemesOpusStudy";
+import { PlayerFaceStudyPage } from "@/studio/PlayerFaceStudy";
 import { ThemesStudyPage } from "@/studio/ThemesStudy";
 import {
   HOME_HREF,
@@ -29,6 +35,24 @@ export function renderStudioPage(
   if (pathname === HOME_HREF) return <DeckHomePage />;
   if (page?.href === "/studio/studies/deck-themes") {
     return <ThemesStudyPage page={page} />;
+  }
+  if (page?.href === "/studio/studies/audio-instrument") {
+    return <AudioInstrumentStudyPage page={page} />;
+  }
+  if (page?.href === "/studio/studies/micro-themes-mature") {
+    return <MicroThemesMatureStudyPage page={page} />;
+  }
+  if (page?.href === "/studio/studies/micro-themes-kimi") {
+    return <MicroThemesKimiStudyPage page={page} />;
+  }
+  if (page?.href === "/studio/studies/lane-console") {
+    return <LaneConsoleStudyPage page={page} />;
+  }
+  if (page?.href === "/studio/studies/micro-themes-opus") {
+    return <MicroThemesOpusStudyPage page={page} />;
+  }
+  if (page?.href === "/studio/studies/player-face") {
+    return <PlayerFaceStudyPage page={page} />;
   }
   const body = page ? extras.docs[page.href] : undefined;
   if (page && body !== undefined) {
