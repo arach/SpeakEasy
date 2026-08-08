@@ -1534,7 +1534,12 @@ function playIcon(playing) {
 }
 
 function tpl(v) {
-  const plainBtn = 'border:1px solid var(--se-btn-edge);border-radius:8px;background:var(--se-btn-face);padding:12px 8px;text-align:center;font:600 9.5px var(--se-mono);letter-spacing:0.14em;color:var(--se-btn-ink);cursor:pointer;box-shadow:var(--se-btn-sheen);';
+  // Six equal columns. OPEN ON MAC is the longest label by four characters, and
+  // at 0.14em it overflowed its column and wrapped, leaving one cell two lines
+  // tall and the whole row ragged. Tighter tracking and narrower side padding
+  // buy it back at the same type size; min-height holds the row flat so a
+  // future label cannot reintroduce the stagger.
+  const plainBtn = 'border:1px solid var(--se-btn-edge);border-radius:8px;background:var(--se-btn-face);min-height:38px;padding:12px 5px;text-align:center;font:600 9.5px var(--se-mono);letter-spacing:0.10em;color:var(--se-btn-ink);cursor:pointer;box-shadow:var(--se-btn-sheen);';
 
   return '' +
   '<div class="se-shell" style="height:100%;min-height:0;overflow:hidden;background:var(--se-page-bg);padding:calc(14px + env(safe-area-inset-top,0px)) 16px 12px;display:flex;flex-direction:column;gap:12px;">' +
