@@ -183,7 +183,23 @@ export class CodexDesktopSession {
     const transcript = text.trim();
     if (!transcript) throw new Error('The transcript is empty.');
     if (options.signal?.aborted) throw new Error('The Codex turn was cancelled.');
-    await this.warm();
+    // Abort has to cover the handshake, not just the answer.
+    //
+    // The signal used to be wired up only after `warm()` resolved, so a cancel
+    // arriving while the owner was still being proven had nothing listening to
+    // it — the caller waited out the full ready timeout before the abort could
+    // take effect. That is the exact window an operator is most likely to
+    // cancel in: the task is unreachable, nothing is happening, and the deck
+    // looks stuck. Measured at 8s to release a turn that had been cancelled
+    // immediately; a cancel that takes eight seconds is not a cancel.
+    const onWarmAbort = () => this.reset(new Error('The Codex turn was cancelled.'), this.child);
+    options.signal?.addEventListener('abort', onWarmAbort, { once: true });
+    try {
+      await this.warm();
+    } finally {
+      options.signal?.removeEventListener('abort', onWarmAbort);
+    }
+    if (options.signal?.aborted) throw new Error('The Codex turn was cancelled.');
     const child = this.child;
     if (!child?.stdin.writable) throw new Error('Codex Desktop warm bridge is unavailable.');
     if (this.pending.size > 0) throw new Error('A canonical Codex turn is already in flight.');
