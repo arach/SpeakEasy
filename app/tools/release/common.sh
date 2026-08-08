@@ -415,8 +415,10 @@ speakeasy_bundle_app() {
         cp "$app_root/Resources/hud-preview-sample.aiff" "$bundle_path/Contents/Resources/"
     fi
 
+    # One mark, every platform: the iPad Deck, this bundle, and the site all
+    # render from design/icon/speakeasy-icon.swift so they cannot drift apart.
     echo "Generating app icon..."
-    swift "$app_root/Scripts/generate_icon.swift" "$bundle_path/Contents/Resources"
+    swift "$repo_root/design/icon/speakeasy-icon.swift" macos "$bundle_path/Contents/Resources"
 
     printf 'APPL????' > "$bundle_path/Contents/PkgInfo"
 }
