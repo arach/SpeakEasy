@@ -16,6 +16,12 @@
    THEME — the whole look lives in this block, and nothing below it hardcodes a
    color. Replacing these values re-skins the deck: no markup, no JS changes.
 
+   This is an invariant, not a description, and it has drifted before: the pad
+   plate hardware, the setup scrim and the setup error wash all carried baked-in
+   paper values, which only showed up as a bug once a dark seed became the
+   default. Neutral black/white depth shadows are the one exemption. If you need
+   a color below this line, add a token here instead.
+
    When the Hudson theme format is final this becomes a
    [data-hudson-template="speakeasy-deck"] block and the tokens alias across to
    the semantic surface — --se-panel: var(--card), --se-ink: var(--foreground),
@@ -63,7 +69,8 @@
   --se-wave-on:#b5421c;
   --se-wave-off:#c8bea4;
 
-  /* hardware plate — the pad surface is always paper, whatever the console does */
+  /* hardware plate. `ember` is the one seed that leaves these alone and keeps a
+     paper plate under a dark console; every other seed dresses the plate too. */
   --se-plate-bg:oklch(0.94 0.003 240);
   --se-plate-wash:linear-gradient(168deg,oklch(0.97 0.002 240),oklch(0.91 0.004 240));
   --se-plate-edge:oklch(0.78 0.005 240);
@@ -93,11 +100,37 @@
   --se-mic-sub-ink:#f0c7ac;
   --se-mic-sheen:inset 0 1px 0 rgba(255,255,255,0.18);
 
+  /* moulded hardware on the plate — encoder knob, speaker grille, mic dot.
+     These read as physical objects, so each carries its own face, hairline ring
+     and drop shadow rather than borrowing the plate's. A seed that darkens the
+     plate must darken these too, or the knob turns into a white puck. */
+  --se-knob-face:radial-gradient(circle at 34% 28%,#fff,oklch(0.86 0.003 240) 58%,oklch(0.70 0.005 240));
+  --se-knob-ring:oklch(0.80 0.005 240);
+  --se-knob-shadow:0 3px 7px rgba(0,0,0,0.28);
+  --se-knob-mark:var(--se-ink-3);
+  --se-grille-face:radial-gradient(circle at 40% 32%,oklch(0.32 0.01 240),oklch(0.16 0.01 240));
+  --se-grille-ring:oklch(0.45 0.01 240);
+  --se-grille-shadow:0 2px 5px rgba(0,0,0,0.3);
+  --se-grille-dot:oklch(0.42 0.01 240);
+  --se-mic-dot-face:radial-gradient(circle at 36% 30%,oklch(0.34 0.01 240),oklch(0.14 0.01 240));
+  --se-mic-dot-ring:oklch(0.40 0.01 240);
+  --se-mic-dot-shadow:0 4px 10px rgba(0,0,0,0.45);
+
   /* physical buttons on the plate */
   --se-btn-face:linear-gradient(180deg,oklch(0.98 0.002 240),oklch(0.93 0.003 240));
   --se-btn-edge:oklch(0.82 0.005 240);
   --se-btn-ink:oklch(0.42 0.005 240);
   --se-btn-sheen:inset 0 1px 0 #fff;
+
+  /* scrim behind the lane-setup workspace, and the wash behind a setup error.
+     Both used to be baked into the markup against paper's warm accent, which
+     put a rust tint under every dark seed. */
+  --se-scrim:rgba(24,18,10,.48);
+  --se-danger-wash:rgba(181,66,28,.09);
+  /* paper's accent is already the warning hue, so error and accent coincide
+     here. Seeds with a cool accent must break them apart or an error notice
+     renders mint-on-mint. */
+  --se-danger-ink:var(--se-accent);
 
   /* status — the only chromatic channel besides accent */
   --se-led-idle:oklch(0.80 0.004 240);
@@ -189,7 +222,7 @@ body{
   position:fixed;inset:0;z-index:80;
   display:flex;align-items:center;justify-content:center;
   padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
-  background:rgba(24,18,10,.48);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)
+  background:var(--se-scrim);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)
 }
 .se-setup{
   width:min(1120px,100%);height:min(820px,100%);min-height:0;
@@ -377,6 +410,7 @@ const SEEDS = {
     'mic-a': '#c2521f', 'mic-b': '#93391a', 'mic-edge': '#e0673a', 'mic-ink': '#fff3e6', 'mic-sub-ink': '#eebfa0',
     'btn-face': 'linear-gradient(180deg,#2e2417,#251c12)', 'btn-edge': '#44351f', 'btn-ink': '#cbb897',
     'btn-sheen': 'inset 0 1px 0 rgba(255,255,255,0.07)',
+    'scrim': 'rgba(12,8,3,.62)', 'danger-wash': 'rgba(224,103,58,.13)', 'danger-ink': '#ff9070',
     'panel-shadow': 'inset 0 0 0 1px rgba(255,255,255,0.06), 0 14px 30px -16px rgba(0,0,0,0.65)',
     'card-shadow': '0 1px 2px rgba(0,0,0,0.4)'
   } },
@@ -396,11 +430,18 @@ const SEEDS = {
     'pad-face-empty': 'linear-gradient(160deg,#0c1014,#080b0e)', 'pad-edge': '#28323b', 'pad-accent': '#79b8ff',
     'pad-ring': 'rgba(121,184,255,0.16)', 'pad-num': '#dbe5ed', 'pad-num-empty': '#4d5862',
     'pad-ink-idle': '#7d8994', 'pad-snippet': '#77838e', 'pad-snippet-on': '#bdd8f4', 'pad-spark-idle': '#2b3946',
+    'knob-face': 'radial-gradient(circle at 34% 28%,#333c45,#1f262d 58%,#11161b)', 'knob-ring': '#3e4852',
+    'knob-shadow': '0 3px 7px rgba(0,0,0,0.6)', 'knob-mark': '#c9d4de',
+    'grille-face': 'radial-gradient(circle at 40% 32%,#171d23,#0a0e11)', 'grille-ring': '#2c353d',
+    'grille-shadow': '0 2px 5px rgba(0,0,0,0.55)', 'grille-dot': '#29323a',
+    'mic-dot-face': 'radial-gradient(circle at 36% 30%,#191f25,#080b0e)', 'mic-dot-ring': '#2c353d',
+    'mic-dot-shadow': '0 4px 10px rgba(0,0,0,0.65)',
     'mic-a': '#256fa8', 'mic-b': '#184a72', 'mic-edge': '#5fa6df', 'mic-ink': '#f3f9ff', 'mic-sub-ink': '#b9d8ef',
     'btn-face': 'linear-gradient(180deg,#171c22,#0e1216)', 'btn-edge': '#28323b', 'btn-ink': '#aebbc6',
     'btn-sheen': 'inset 0 1px 0 rgba(255,255,255,0.06)',
     'led-idle': '#34414b', 'led-empty': '#252d34', 'ink-empty': '#4d5862',
     'status-working': '#e8b85d', 'status-working-ink': '#e8b85d', 'status-working-glow': '0 0 5px rgba(232,184,93,0.62)',
+    'scrim': 'rgba(2,3,4,.66)', 'danger-wash': 'rgba(255,138,116,.13)', 'danger-ink': '#ff8a74',
     'panel-shadow': 'inset 0 0 0 1px rgba(255,255,255,0.04), 0 16px 34px -18px rgba(0,0,0,0.82)',
     'card-shadow': '0 1px 2px rgba(0,0,0,0.55)'
   } },
@@ -425,6 +466,7 @@ const SEEDS = {
     'btn-sheen': 'inset 0 1px 0 #fff',
     'led-idle': '#c3cbce', 'led-empty': '#d7dcdd', 'ink-empty': '#a0a5a8',
     'status-working': '#9b6b22', 'status-working-ink': '#805719', 'status-working-glow': '0 0 5px rgba(155,107,34,0.35)',
+    'scrim': 'rgba(20,26,30,.44)', 'danger-wash': 'rgba(150,52,32,.10)', 'danger-ink': '#96341f',
     'panel-shadow': 'inset 0 0 0 1px rgba(255,255,255,0.6), 0 10px 24px -19px rgba(22,30,34,0.3)',
     'card-shadow': '0 1px 2px rgba(30,35,40,0.1)'
   } },
@@ -445,11 +487,18 @@ const SEEDS = {
     'pad-face-empty': 'linear-gradient(160deg,#10151a,#0a0e11)', 'pad-edge': '#2c343c', 'pad-accent': '#74f2ce',
     'pad-ring': 'rgba(116,242,206,0.16)', 'pad-num': '#dce3e8', 'pad-num-empty': '#4a545c',
     'pad-ink-idle': '#6b7680', 'pad-snippet': '#6b7680', 'pad-snippet-on': '#b9ebe0', 'pad-spark-idle': '#2a343c',
+    'knob-face': 'radial-gradient(circle at 34% 28%,#39424a,#242c33 58%,#151b21)', 'knob-ring': '#454f58',
+    'knob-shadow': '0 3px 7px rgba(0,0,0,0.55)', 'knob-mark': '#cfd8de',
+    'grille-face': 'radial-gradient(circle at 40% 32%,#1b2229,#0d1216)', 'grille-ring': '#333d45',
+    'grille-shadow': '0 2px 5px rgba(0,0,0,0.5)', 'grille-dot': '#2f3941',
+    'mic-dot-face': 'radial-gradient(circle at 36% 30%,#1d252c,#0b0f13)', 'mic-dot-ring': '#333d45',
+    'mic-dot-shadow': '0 4px 10px rgba(0,0,0,0.6)',
     'mic-a': '#12a078', 'mic-b': '#0a6b50', 'mic-edge': '#35c79c', 'mic-ink': '#eafff7', 'mic-sub-ink': '#9fdcc8',
     'btn-face': 'linear-gradient(180deg,#161c22,#0f1317)', 'btn-edge': '#2c343c', 'btn-ink': '#a8b2ba',
     'btn-sheen': 'inset 0 1px 0 rgba(255,255,255,0.06)',
     'led-idle': '#2c343c', 'led-empty': '#1c2329', 'ink-empty': '#4a545c',
     'status-working': '#e8b04a', 'status-working-ink': '#e8b04a', 'status-working-glow': '0 0 5px rgba(232,176,74,0.55)',
+    'scrim': 'rgba(3,5,7,.64)', 'danger-wash': 'rgba(255,122,98,.13)', 'danger-ink': '#ff7a62',
     'panel-shadow': 'inset 0 0 0 1px rgba(255,255,255,0.05), 0 14px 30px -16px rgba(0,0,0,0.7)',
     'card-shadow': '0 1px 2px rgba(0,0,0,0.45)'
   } }
@@ -1518,8 +1567,8 @@ function tpl(v) {
 
         // encoder strip
         '<div style="display:flex;align-items:center;gap:16px;padding:4px 6px;flex:none;">' +
-          '<div style="width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#fff,oklch(0.86 0.003 240) 58%,oklch(0.70 0.005 240));box-shadow:0 3px 7px rgba(0,0,0,0.28),inset 0 0 0 1px oklch(0.80 0.005 240);flex:none;position:relative;">' +
-            '<span style="position:absolute;top:5px;left:50%;width:2px;height:9px;border-radius:1px;background:var(--se-ink-3);transform:translateX(-50%);"></span>' +
+          '<div style="width:44px;height:44px;border-radius:50%;background:var(--se-knob-face);box-shadow:var(--se-knob-shadow),inset 0 0 0 1px var(--se-knob-ring);flex:none;position:relative;">' +
+            '<span style="position:absolute;top:5px;left:50%;width:2px;height:9px;border-radius:1px;background:var(--se-knob-mark);transform:translateX(-50%);"></span>' +
           '</div>' +
           '<div style="flex:1;min-width:0;">' +
             '<div style="display:flex;justify-content:space-between;align-items:baseline;">' +
@@ -1531,8 +1580,8 @@ function tpl(v) {
             '</button>' +
             '<div style="font:500 8px var(--se-mono);letter-spacing:0.18em;color:var(--se-plate-ink-3);margin-top:6px;">ENCODER</div>' +
           '</div>' +
-          '<div style="width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 40% 32%,oklch(0.32 0.01 240),oklch(0.16 0.01 240));box-shadow:inset 0 0 0 1px oklch(0.45 0.01 240),0 2px 5px rgba(0,0,0,0.3);flex:none;position:relative;overflow:hidden;">' +
-            '<span style="position:absolute;inset:6px;border-radius:50%;background:radial-gradient(oklch(0.42 0.01 240) 0.8px,transparent 0.9px) 0 0/4px 4px;"></span>' +
+          '<div style="width:44px;height:44px;border-radius:50%;background:var(--se-grille-face);box-shadow:inset 0 0 0 1px var(--se-grille-ring),var(--se-grille-shadow);flex:none;position:relative;overflow:hidden;">' +
+            '<span style="position:absolute;inset:6px;border-radius:50%;background:radial-gradient(var(--se-grille-dot) 0.8px,transparent 0.9px) 0 0/4px 4px;"></span>' +
           '</div>' +
         '</div>' +
 
@@ -1557,7 +1606,7 @@ function tpl(v) {
 
         // hold to speak
         '<div style="display:flex;gap:12px;align-items:stretch;flex:none;">' +
-          '<div style="width:50px;height:50px;border-radius:50%;background:radial-gradient(circle at 36% 30%,oklch(0.34 0.01 240),oklch(0.14 0.01 240));box-shadow:0 4px 10px rgba(0,0,0,0.45),inset 0 0 0 1px oklch(0.40 0.01 240);flex:none;align-self:center;"></div>' +
+          '<div style="width:50px;height:50px;border-radius:50%;background:var(--se-mic-dot-face);box-shadow:var(--se-mic-dot-shadow),inset 0 0 0 1px var(--se-mic-dot-ring);flex:none;align-self:center;"></div>' +
           '<button type="button" data-hold="1" aria-label="' + esc(v.micTitle) + '. ' + esc(v.micSub) + '" style="text-align:left;flex:1;min-width:0;background:' + v.micBg + ';border:1.5px solid ' + v.micEdge + ';border-radius:10px;padding:13px 17px;display:flex;align-items:center;gap:14px;cursor:pointer;box-shadow:var(--se-mic-sheen),0 4px 16px -6px var(--se-accent-ring);">' +
             '<span style="width:32px;height:32px;border-radius:50%;background:var(--se-player-ink);border:1.5px solid var(--se-mic-edge);display:inline-flex;align-items:center;justify-content:center;flex:none;">' +
               '<span style="width:8px;height:13px;border-radius:4px;background:var(--se-mic-b);"></span>' +
@@ -1737,7 +1786,7 @@ function tpl(v) {
               '<div style="margin-top:11px;position:relative;">' +
                 '<input type="search" data-setup-search="1" placeholder="Search Codex task titles or projects" autocomplete="off" style="width:100%;box-sizing:border-box;border:1px solid var(--se-line);border-radius:9px;background:var(--se-cell);padding:11px 13px;font:500 12px var(--se-sans);color:var(--se-ink);outline:none;" />' +
               '</div>' +
-              (v.setupNotice ? '<div role="status" style="margin-top:9px;border-radius:7px;padding:8px 10px;background:' + (v.setupTone === 'error' ? 'rgba(181,66,28,.09)' : 'var(--se-chip-bg)') + ';font:600 8.5px var(--se-mono);letter-spacing:0.08em;color:' + (v.setupTone === 'error' ? 'var(--se-accent)' : 'var(--se-accent-ink)') + ';">' + esc(v.setupNotice) + '</div>' : '') +
+              (v.setupNotice ? '<div role="status" style="margin-top:9px;border-radius:7px;padding:8px 10px;background:' + (v.setupTone === 'error' ? 'var(--se-danger-wash)' : 'var(--se-chip-bg)') + ';font:600 8.5px var(--se-mono);letter-spacing:0.08em;color:' + (v.setupTone === 'error' ? 'var(--se-danger-ink)' : 'var(--se-accent-ink)') + ';">' + esc(v.setupNotice) + '</div>' : '') +
               (v.catalogError ? '<div style="margin-top:8px;font:500 8px var(--se-mono);letter-spacing:0.07em;color:var(--se-accent-ink);">' + esc(v.catalogError) + '</div>' : '') +
             '</div>' +
             '<div class="se-scroll se-setup-results">' +
