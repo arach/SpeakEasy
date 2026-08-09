@@ -357,15 +357,15 @@
 
     <div class="install">
       <div class="install-tabs" id="installTabs">
-        <button class="active" data-cmd="npm install @arach/speakeasy">npm</button>
+        <button class="active" data-cmd="bun add @arach/speakeasy">bun</button>
         <button data-cmd="pnpm add @arach/speakeasy">pnpm</button>
+        <button data-cmd="npm install @arach/speakeasy">npm</button>
         <button data-cmd="yarn add @arach/speakeasy">yarn</button>
-        <button data-cmd="bun add @arach/speakeasy">bun</button>
         <button data-cmd='npx @arach/speakeasy "hello"'>npx</button>
       </div>
-      <div class="codebox"><span class="prompt">$ </span><span id="installCmd">npm install @arach/speakeasy</span>
-        <button class="copy-btn" data-copy-target="installCmd">copy</button>
-      </div>
+      <!-- Kept on one line deliberately: .codebox is white-space: pre, so a
+           newline before the copy button renders as blank lines in the box. -->
+      <div class="codebox"><span class="prompt">$ </span><span id="installCmd">bun add @arach/speakeasy</span><button class="copy-btn" data-copy-target="installCmd">copy</button></div>
     </div>
 
     <div class="hero-links">
@@ -559,7 +559,7 @@ $ speakeasy --doctor</span></div>
     </div>
 
     <div class="api-cta">
-      <button class="btn-primary" id="ctaInstall">npm install @arach/speakeasy</button>
+      <button class="btn-primary" id="ctaInstall">bun add @arach/speakeasy</button>
       <a class="btn-ghost" href="/docs/">Browse the docs</a>
     </div>
   </div>
@@ -656,7 +656,7 @@ $ speakeasy --doctor</span></div>
   // ---- closing CTA copies install command ----
   const cta = document.getElementById("ctaInstall");
   cta.addEventListener("click", async () => {
-    await navigator.clipboard.writeText("npm install @arach/speakeasy").catch(() => {});
+    await navigator.clipboard.writeText("bun add @arach/speakeasy").catch(() => {});
     const old = cta.textContent;
     cta.textContent = "copied ✓";
     setTimeout(() => (cta.textContent = old), 1500);
