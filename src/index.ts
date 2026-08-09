@@ -13,6 +13,7 @@ import { TTSAdapter, TTSProviderId, TTSRequest } from './adapters/types';
 import { createAdapterRegistry, PROVIDER_ORDER } from './adapters/registry';
 import { playAudioFile, playTTSResult, stopPlayback } from './adapters/audio';
 import { CONFIG_FILE, defaultCacheDir } from './paths';
+import { chunkForNarration, chunkLimitForProvider } from './narration/chunk';
 
 export { CONFIG_FILE } from './paths';
 
@@ -50,6 +51,25 @@ const API_KEY_URLS: Partial<Record<TTSProviderId, string>> = {
   gemini: 'https://makersuite.google.com/app/apikey',
 };
 
+/**
+ * Raised when one or more narration segments failed. The remaining segments are
+ * still spoken before this surfaces, so a mid-narration provider error costs the
+ * caller one segment rather than the rest of the response.
+ */
+export class NarrationSegmentError extends Error {
+  readonly failures: Array<{ text: string; error: Error }>;
+
+  constructor(failures: Array<{ text: string; error: Error }>) {
+    const detail = failures.map((f) => f.error.message).join('; ');
+    super(
+      `${failures.length} narration segment${failures.length === 1 ? '' : 's'} failed: ${detail}`
+    );
+    this.name = 'NarrationSegmentError';
+    this.failures = failures;
+    this.cause = failures[0]?.error;
+  }
+}
+
 export class SpeakEasy {
   private config: SpeakEasyConfig;
   private adapters: Map<TTSProviderId, TTSAdapter>;
@@ -59,8 +79,14 @@ export class SpeakEasy {
   private useCache = false;
   private debug = false;
   private hudEnabled = false;
-  /** Exact cached audio file used by the most recent speak() call, if any. */
+  /** Exact cached audio file used by the most recent segment, if any. */
   public lastAudioFile: string | null = null;
+  /**
+   * Every audio file produced by the most recent speak() call, in speaking
+   * order. Long text is narrated as several ordered segments, so a caller that
+   * needs the whole narration must read this rather than `lastAudioFile`.
+   */
+  public lastAudioFiles: string[] = [];
 
   constructor(config: SpeakEasyConfig) {
     const globalConfig = loadGlobalConfig();
@@ -136,6 +162,11 @@ export class SpeakEasy {
     }
   }
 
+  /**
+   * Speak `text`, however long it is. Text beyond one provider request is split
+   * into bounded semantic segments and queued in order, so narration length is
+   * limited by the text itself rather than by a single request's ceiling.
+   */
   async speak(text: string, options: SpeakEasyOptions = {}): Promise<void> {
     const cleanText = cleanTextForSpeech(text);
 
@@ -143,10 +174,25 @@ export class SpeakEasy {
       this.stopSpeaking();
     }
 
+    const maxChars = chunkLimitForProvider(this.config.provider as TTSProviderId);
+    const segments = chunkForNarration(cleanText, { maxChars });
+    if (segments.length === 0) return;
+
+    if (!this.isPlaying) this.lastAudioFiles = [];
+
     if (options.priority === 'high') {
-      this.queue.unshift({ text: cleanText, options });
+      // unshift in reverse so the segments stay in speaking order at the front
+      for (let i = segments.length - 1; i >= 0; i--) {
+        this.queue.unshift({ text: segments[i], options });
+      }
     } else {
-      this.queue.push({ text: cleanText, options });
+      for (const segment of segments) {
+        this.queue.push({ text: segment, options });
+      }
+    }
+
+    if (this.debug && segments.length > 1) {
+      console.log(`🧩 Narrating ${cleanText.length} characters as ${segments.length} segments`);
     }
 
     if (!this.isPlaying) {
@@ -154,24 +200,46 @@ export class SpeakEasy {
     }
   }
 
+  /**
+   * Drain the queue in order. A failing segment is recorded and reported once
+   * the rest have been spoken — losing the remainder of a narration because one
+   * request failed is worse than an out-of-order gap.
+   */
   private async processQueue(): Promise<void> {
-    if (this.queue.length === 0) return;
+    if (this.isPlaying) return;
 
     this.isPlaying = true;
-    const { text, options } = this.queue.shift()!;
+    const failures: Array<{ text: string; error: Error }> = [];
 
     try {
-      await this.speakText(text, options);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error('❌ Speech error:', errorMsg);
-      throw error;
+      while (this.queue.length > 0) {
+        const { text, options } = this.queue.shift()!;
+        try {
+          await this.speakText(text, options);
+        } catch (error) {
+          const failure = error instanceof Error ? error : new Error(String(error));
+          console.error('❌ Speech error:', failure.message);
+          failures.push({ text, error: failure });
+        }
+      }
     } finally {
       this.isPlaying = false;
-      if (this.queue.length > 0) {
-        await this.processQueue();
-      }
     }
+
+    if (failures.length > 0) {
+      throw new NarrationSegmentError(failures);
+    }
+  }
+
+  /** Drop any narration still queued. In-flight audio is unaffected. */
+  clearQueue(): void {
+    this.queue.length = 0;
+  }
+
+  /** Stop the current audio and abandon everything still queued. */
+  cancel(): void {
+    this.clearQueue();
+    this.stopSpeaking();
   }
 
   private async speakText(text: string, options: SpeakEasyOptions = {}): Promise<void> {
@@ -224,7 +292,7 @@ export class SpeakEasy {
 
           if (cachedEntry) {
             console.log('(already cached)');
-            this.lastAudioFile = cachedEntry.audioFilePath;
+            this.recordAudioFile(cachedEntry.audioFilePath);
             if (this.debug) {
               console.log(`📦 Using cached audio from: ${cachedEntry.audioFilePath}`);
             }
@@ -264,9 +332,8 @@ export class SpeakEasy {
             }
           );
           if (stored) {
-            this.lastAudioFile = path.join(
-              this.cache.getCacheDir(),
-              `${cacheKey}.${result.format}`
+            this.recordAudioFile(
+              path.join(this.cache.getCacheDir(), `${cacheKey}.${result.format}`)
             );
           }
           console.log('cached');
@@ -300,6 +367,12 @@ export class SpeakEasy {
     }
 
     throw new Error(`No available TTS provider. Ensure you're on macOS for system voice.`);
+  }
+
+  /** Track the audio behind one segment, keeping the ordered list in step. */
+  private recordAudioFile(file: string): void {
+    this.lastAudioFile = file;
+    this.lastAudioFiles.push(file);
   }
 
   private buildRequest(text: string, providerId: TTSProviderId): TTSRequest {
@@ -493,6 +566,12 @@ export const speak = (
 
 export * from './types';
 export * from './adapters/types';
+export {
+  NARRATION_CHUNK_CHARS,
+  PROVIDER_TEXT_LIMITS,
+  chunkForNarration,
+  chunkLimitForProvider,
+} from './narration/chunk';
 export { createAdapterRegistry, PROVIDER_ORDER } from './adapters/registry';
 export { playAudioFile, playTTSResult, stopPlayback } from './adapters/audio';
 export { SystemProvider, getAvailableVoices, getBestVoice } from './providers/system';
@@ -500,6 +579,7 @@ export { OpenAIProvider } from './providers/openai';
 export { ElevenLabsProvider } from './providers/elevenlabs';
 export { GroqProvider } from './providers/groq';
 export { GeminiProvider } from './providers/gemini';
-export { TTSCache, CacheMetadata, CacheStats } from './cache';
+export { TTSCache } from './cache';
+export type { CacheMetadata, CacheStats } from './cache';
 export * from './player-client';
 export * from './player-protocol';

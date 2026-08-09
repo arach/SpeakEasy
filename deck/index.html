@@ -792,11 +792,16 @@ function syncAudio(snap) {
   const msg = snap.threads[parts[0]] && snap.threads[parts[0]][parts[1]];
   if (!msg || !msg.audioUrl) return;
   const src = msg.audioUrl + (liveToken ? '?k=' + encodeURIComponent(liveToken) : '');
+  // A long reply is several ordered segments. snap.pos is the position in the
+  // whole narration, so the offset of the current segment has to come off it
+  // before it means anything to this element.
+  const segStart = snap.segStart || 0;
+  const inSegment = Math.max(0, (snap.pos || 0) - segStart);
   if (el.dataset.url !== src) {
     el.dataset.url = src;
     el.dataset.id = snap.playing;
     el.src = src;
-    el.currentTime = snap.pos || 0;
+    el.currentTime = inSegment;
   }
   el.playbackRate = SPEEDS[snap.speedIx] || 1;
   el.volume = typeof snap.vol === 'number' ? snap.vol : 0.8;
@@ -806,8 +811,8 @@ function syncAudio(snap) {
     el.play().catch(() => {});
   }
   // runtime corrections still win, but only on real drift — the device owns the clock
-  if (Math.abs((el.currentTime || 0) - (snap.pos || 0)) > 2.0) {
-    el.currentTime = snap.pos || 0;
+  if (Math.abs((el.currentTime || 0) - inSegment) > 2.0) {
+    el.currentTime = inSegment;
   }
 }
 
