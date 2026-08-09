@@ -1284,6 +1284,11 @@ function toggleAutoplay() {
   logEvent('AUTOPLAY', S.autoplay ? 'on' : 'off');
 }
 function stopAll() {
+  // STOP is contextual: while an agent turn is in flight, silence alone leaves
+  // the lane spinning and gives the operator no way to withdraw the request.
+  // Once the reply exists, it goes back to being an ordinary transport stop.
+  const turnInFlight = S.lanes && S.lanes.some(l => l.state === 'working');
+  if (turnInFlight && sendIntent('turn.abort')) return;
   if (sendIntent('playback.stop')) return;
   S.playing = null; S.paused = false; S.pos = 0; S.listening = false; S.confirm = 'CANCELLED';
   logEvent('PLAYBACK STOPPED', 'buffer cleared');
