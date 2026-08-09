@@ -15,9 +15,15 @@ What we want is **two steps of friction**: the paid pieces are not sitting in a
 tarball someone downloads for another reason. Getting them should require
 deliberately going and getting them. That is the whole bar.
 
-The corollary: the moat is not secrecy, it is maintenance. Codex Desktop's
-internals move. The integration keeps working because we keep tracking them.
-Whoever copies today's bridge owns today's bridge.
+And secrecy is not what we sell anyway. Most people will not install a
+developer build on the iPad they actually use. The product is the removal of
+that friction: a signed, installable Pad on the device you own. That is why
+public source and a paid build are not in tension — readable code does not put
+a working install on your iPad.
+
+The corollary: the moat is maintenance and distribution, not secrecy. Codex
+Desktop's internals move; the integration keeps working because we keep
+tracking them. Whoever copies today's bridge owns today's bridge.
 
 ## The tiers
 
@@ -33,10 +39,8 @@ frictionless as possible.
 ### 2 · App — signed download, free
 
 The macOS app: settings, voice configuration, the menu-bar player, permissions,
-the update path. Helper and surface for tier 1, and nothing more.
-
-Free and signed. Its job is to make tier 1 pleasant for people who do not live
-in a terminal, and to be the thing tier 3 plugs into.
+the update path — and the Deck. The Deck stays in the free app. It is the demo
+and the funnel for tier 3, and it is worth more there than behind a gate.
 
 ### 3 · Plugins — paid, delivered on request
 
@@ -44,11 +48,11 @@ Additional functionality that is not part of the core product. Today that is
 one pack: **the Codex integration and the Pad** — the Codex Desktop bridge,
 the deck runtime, the lane binding, and the iPad app.
 
-Delivered the way tier 1 already delivers skills: a tarball of files placed in
-the right location, installed by the user's agent rather than by hand. The
-mechanism exists — `speakeasy plugin <host>` already downloads a release
-tarball, validates its paths, installs it, health-checks it, and rolls back on
-failure. A paid pack is the same flow pointed at a gated source.
+Delivered through the mechanism tier 1 already has. `speakeasy plugin <host>`
+downloads a release tarball, validates its paths, installs it, health-checks
+it, and rolls back on failure — and its listing is the inventory of what is
+installed. Packs join that inventory: the same flow pointed at a gated source.
+One inventory, not two nouns. This is the architecture.
 
 ## Where the line falls
 
@@ -64,29 +68,29 @@ or if it only exists to serve the Pad.
 | `app/Sources/SpeakEasy/CodexThreadRouter.swift` | Mac app |
 | `deck/ipad/**` | public repo |
 
-Everything above ships publicly today. The `files` allowlist in `package.json`
-names the bridge and the deck assets explicitly.
+The tier-3 files that serve the Mac app's Deck keep shipping inside the app —
+deliberately, because the app is the funnel. The two-step bar applies to npm
+and to the pack channel.
 
 ## What "two steps" actually means here
 
 1. **Not in anything published for another reason.** Drop the bridge and the
    `deck/` assets from the npm `files` allowlist; split the CLI build so the
    deck runtime is not inside the public bundle. After this, `npm pack` yields
-   the TTS product and nothing else.
+   the TTS product and nothing else. The Mac app is a deliberate exception,
+   not a leak.
 2. **Fetched deliberately.** The pack comes from a gated URL rather than a
-   public release asset. A key exchanged for a download link is enough; it does
-   not need to be enforced at runtime.
+   public release asset; the Pad comes from the store. A key exchanged for a
+   download link is enough; nothing is enforced at runtime.
 
 That is the entire scheme. No third step.
 
 ## Consequences worth accepting
 
-- **The free Mac app loses the Deck.** `app/tools/release/common.sh` currently
-  copies the deck surface into the bundle. Under this split it stops, and
-  Settings → Deck becomes an affordance to install the Codex pack.
+- **Tier-3 code ships inside the free Mac app.** On purpose: the Deck is the
+  screenshot, the demo, and the funnel for the Pad.
 - **Already-published versions stay published.** Every tarball on npm is
   downloadable forever. This protects what we build from here.
-- **The public repo can stay public.** Once the tier-3 material is not
-  published, source visibility costs little — and it keeps the privacy claims
-  ("your Mac does the transcribing") verifiable, which is worth more than the
-  clone it prevents.
+- **The public repo stays public.** It keeps the privacy claims ("your Mac
+  does the transcribing") verifiable, and since what we sell is a working
+  install rather than the code, visibility costs nothing.
