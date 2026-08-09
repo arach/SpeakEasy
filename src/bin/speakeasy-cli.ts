@@ -86,6 +86,33 @@ async function run(): Promise<void> {
     return;
   }
 
+  // `speakeasy codex <sub>` — the Codex namespace. Everything the Codex
+  // companion needs lives under one word so the docs can say `codex` and mean
+  // it. Each subcommand forwards to the same implementation the bare verbs use.
+  if (process.argv[2] === 'codex') {
+    const sub = process.argv[3];
+    const rest = process.argv.slice(4);
+
+    if (sub === 'deck') {
+      const { runDeck } = await import('../cli/deck');
+      await runDeck(rest);
+      return;
+    }
+
+    if (sub === 'skill' || sub === 'install') {
+      const { runPlugin } = await import('../cli/plugin');
+      await runPlugin(['codex', ...rest]);
+      return;
+    }
+
+    console.error('Usage: speakeasy codex <command>\n');
+    console.error('  deck     serve the Codex control surface on the local network');
+    console.error('  skill    install the SpeakEasy skill into ~/.codex/skills\n');
+    console.error('  Example: bunx @arach/speakeasy codex deck');
+    process.exitCode = 1;
+    return;
+  }
+
   const program = new Command();
   program
     .name('speakeasy')
