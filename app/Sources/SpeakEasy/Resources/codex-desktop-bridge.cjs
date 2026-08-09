@@ -93,10 +93,31 @@ function listTasks(limit) {
     ORDER BY state.recency_at_ms DESC, state.updated_at_ms DESC
     LIMIT ${boundedLimit};
   `;
-  const output = execFileSync('/usr/bin/sqlite3', ['-readonly', '-json', database, query], {
-    encoding: 'utf8',
-    maxBuffer: 8 * 1024 * 1024,
-  });
+  // Codex keeps both databases in WAL mode. `-readonly` cannot create the
+  // companion -shm shared-memory index, so a cold open — no live writer
+  // currently attached — fails with SQLITE_CANTOPEN (14). That happens twice
+  // here: once for `database`, again for the ATTACHed catalog.
+  //
+  // `query_only = 1` lets SQLite build the -shm it needs while still rejecting
+  // every write with SQLITE_READONLY (8), so the live Codex databases are never
+  // modified. This is the supported way to read a WAL database you do not own.
+  let output;
+  try {
+    output = execFileSync(
+      '/usr/bin/sqlite3',
+      ['-json', database, `PRAGMA query_only = 1;\n${query}`],
+      { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+  } catch (error) {
+    // Surface the actual sqlite diagnostic. Swallowing it here is what made the
+    // menu bar show a generic "bridge exited unexpectedly" for a specific,
+    // diagnosable database error.
+    const detail = String(error.stderr || error.message || '').trim();
+    fail(
+      detail ? `Codex task catalog query failed: ${detail}` : 'Codex task catalog query failed.',
+      'catalog-query-failed',
+    );
+  }
   return JSON.parse(output || '[]');
 }
 
