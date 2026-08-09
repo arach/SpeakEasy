@@ -2,7 +2,7 @@ const puppeteer = require("puppeteer");
 (async () => {
   const browser = await puppeteer.launch({ headless: "new" });
   const page = await browser.newPage();
-  await page.goto("http://localhost:8899/landing/docs/design/landing-redesign-mock.html", { waitUntil: "networkidle0" });
+  await page.goto("http://localhost:8899/", { waitUntil: "networkidle0" });
   const r = {};
 
   // install tabs
