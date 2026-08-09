@@ -1,6 +1,6 @@
 import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, lstatSync, renameSync, openSync, closeSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, cpSync, rmSync, readdirSync, chmodSync, lstatSync, renameSync, openSync, closeSync, unlinkSync } from 'node:fs';
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
@@ -9,7 +9,8 @@ import chalk from 'chalk';
 import { WebSocket, WebSocketServer } from 'ws';
 import { DeckRuntime } from './deck-runtime';
 import { startDataPlane, writeDiscovery, clearDiscovery, type DataPlane } from './deck-live';
-import { CONFIG_FILE } from './constants';
+import { CONFIG_FILE, CONFIG_DIR, getPackageVersion } from './constants';
+import { REPO, downloadTarball, validateTarballPaths, assertNoSymlinks } from './plugin';
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -87,11 +88,65 @@ export function acquireDeckProcessLock(lockFile = DECK_LOCK_FILE): DeckProcessLo
   return { acquired: false, existingPid: null, release: () => {} };
 }
 
-/** The built CLI lives at dist/bin/speakeasy-cli.js; deck assets ship at the package root. */
+/** Where a fetched Deck surface lives, and the marker that keeps it in
+ *  lockstep with the CLI — the surface/runtime protocol moves together. */
+const INSTALLED_DECK_DIR = path.join(CONFIG_DIR, 'deck');
+const DECK_VERSION_MARKER = '.speakeasy-version';
+
+/** Deck assets are not published to npm — the Mac app sets SPEAKEASY_DECK_ROOT
+ *  for its bundled copy, a repo checkout has them in place, and anyone else
+ *  gets them fetched into ~/.config/speakeasy/deck on first run. */
 function deckRoot(): string {
   const bundledRoot = process.env.SPEAKEASY_DECK_ROOT?.trim();
   if (bundledRoot) return path.resolve(bundledRoot);
-  return path.resolve(__dirname, '..', '..', 'deck');
+  const checkoutRoot = path.resolve(__dirname, '..', '..', 'deck');
+  if (existsSync(path.join(checkoutRoot, 'index.html'))) return checkoutRoot;
+  return INSTALLED_DECK_DIR;
+}
+
+/** Fetch this version's release tarball and install just the deck/ subtree —
+ *  the same download/validate path the plugin installer uses. */
+async function installDeckSurface(dest: string): Promise<void> {
+  const ref = `v${getPackageVersion()}`;
+  console.log(chalk.dim(`  Fetching the Deck surface from github.com/${REPO} @ ${ref}…`));
+  const workdir = mkdtempSync(path.join(os.tmpdir(), 'speakeasy-deck-fetch-'));
+  try {
+    const tarball = path.join(workdir, 'repo.tar.gz');
+    await downloadTarball(ref, tarball);
+    validateTarballPaths(tarball);
+    execFileSync('tar', ['-xzf', tarball, '-C', workdir], { stdio: 'pipe' });
+    const top = readdirSync(workdir).find((e) => existsSync(path.join(workdir, e, 'deck', 'index.html')));
+    if (!top) throw new Error(`no deck surface in the ${ref} tarball`);
+    const src = path.join(workdir, top, 'deck');
+    assertNoSymlinks(src);
+
+    // stage next to the destination so the final swap is an atomic rename;
+    // take only the served surface — deck/ also carries the iPad project
+    const staging = `${dest}.staging-${process.pid}`;
+    rmSync(staging, { recursive: true, force: true });
+    mkdirSync(path.dirname(dest), { recursive: true });
+    mkdirSync(staging);
+    for (const asset of ['index.html', 'themes.json', 'variants']) {
+      const from = path.join(src, asset);
+      if (!existsSync(from)) throw new Error(`release tarball is missing deck/${asset}`);
+      cpSync(from, path.join(staging, asset), { recursive: true });
+    }
+    writeFileSync(path.join(staging, DECK_VERSION_MARKER), getPackageVersion());
+    rmSync(dest, { recursive: true, force: true });
+    renameSync(staging, dest);
+  } finally {
+    rmSync(workdir, { recursive: true, force: true });
+  }
+}
+
+/** A fetched surface from another CLI version is stale, not broken — refetch. */
+function installedSurfaceIsCurrent(root: string): boolean {
+  if (!existsSync(path.join(root, 'index.html'))) return false;
+  try {
+    return readFileSync(path.join(root, DECK_VERSION_MARKER), 'utf8').trim() === getPackageVersion();
+  } catch {
+    return false;
+  }
 }
 
 function lanAddress(): string | undefined {
@@ -643,9 +698,19 @@ function parseDeckArgs(argv: string[]): { port: number | null; portFromFlag: boo
 export async function runDeck(argv: string[]): Promise<void> {
   const args = parseDeckArgs(argv);
   const root = deckRoot();
+  if (root === INSTALLED_DECK_DIR && !installedSurfaceIsCurrent(root)) {
+    try {
+      await installDeckSurface(root);
+      console.log(chalk.dim(`  Deck surface installed at ${root}`));
+    } catch (error) {
+      console.error(`❌ Could not fetch the Deck surface: ${(error as Error).message}`);
+      console.error('   Check your network, install the SpeakEasy Mac app (speakeasy --app), or run from a repo checkout.');
+      process.exit(1);
+    }
+  }
   if (!existsSync(path.join(root, 'index.html'))) {
     console.error('❌ Deck assets not found at', root);
-    console.error('   The deck ships with the @arach/speakeasy package — reinstall or run from the repo.');
+    console.error('   The Deck ships with the SpeakEasy Mac app (speakeasy --app), or run from a repo checkout.');
     process.exit(1);
   }
 

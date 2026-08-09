@@ -12,6 +12,17 @@ cleanup() {
 trap cleanup EXIT
 
 cd "$REPO_ROOT"
+
+# The portable manifest (plugin.json, agent-plugins.org spec) and the Codex
+# submission manifest (.codex-plugin/plugin.json) describe one plugin — refuse
+# to package if they drift on identity or base version.
+bun -e '
+const root = await Bun.file("plugins/speakeasy/plugin.json").json();
+const codex = await Bun.file("plugins/speakeasy/.codex-plugin/plugin.json").json();
+if (root.name !== codex.name) throw new Error(`manifest name drift: ${root.name} vs ${codex.name}`);
+if (root.version !== codex.version.split("+")[0]) throw new Error(`manifest version drift: ${root.version} vs ${codex.version}`);
+'
+
 bun run build:plugin-runtime
 chmod 0755 plugins/speakeasy/skills/speakeasy/runtime/speakeasy-cli.js
 
