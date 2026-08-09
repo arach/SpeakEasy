@@ -392,7 +392,7 @@ export async function listCodexThreadReferences(
     const threads: AppThread[] = [];
     let cursor: string | null = null;
     do {
-      const page = await client.request<AppThreadPage>('thread/list', {
+      const page: AppThreadPage = await client.request('thread/list', {
         cursor,
         limit: Math.min(100, Math.max(1, limit - threads.length)),
         sortKey: 'recency_at',

@@ -304,8 +304,8 @@ export function submitCodexDesktopTurn(
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env,
     });
-    let stdout = Buffer.alloc(0);
-    let stderr = Buffer.alloc(0);
+    let stdout: Buffer = Buffer.alloc(0);
+    let stderr: Buffer = Buffer.alloc(0);
     let settled = false;
 
     const finish = (callback: () => void): void => {
