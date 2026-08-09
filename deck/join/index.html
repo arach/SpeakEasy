@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Pair this device — SpeakEasy Deck</title>
+<style>
+/* Light is the complete default on bare :root; dark only overrides. */
+:root {
+  color-scheme: light;
+  --bg:#FBFAF7; --panel:#FFFFFF; --hairline:#E4DECF;
+  --text:#262219; --muted:#6E6554; --faint:#9D9380;
+  --accent:#1E7A54; --accent-ink:#F1FAF5;
+  --amber:#96691F; --red:#B4443C;
+  --shadow:0 1px 2px rgba(88,74,50,.06), 0 8px 24px rgba(88,74,50,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg:#2A2722; --panel:#35312A; --hairline:#3E392F;
+    --text:#EDE7D9; --muted:#A79C88; --faint:#6F6655;
+    --accent:#6FE3B4; --accent-ink:#062A1E;
+    --amber:#F0B45A; --red:#F0645A;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:var(--bg); color:var(--text);
+  font:16px/1.55 ui-rounded, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing:antialiased;
+  padding:max(24px, env(safe-area-inset-top)) 20px calc(40px + env(safe-area-inset-bottom));
+  display:flex; justify-content:center;
+}
+.wrap { width:100%; max-width:30rem; }
+header { margin-bottom:28px; }
+.eyebrow {
+  font-size:.6875rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--faint); font-weight:600; margin-bottom:6px;
+}
+h1 { font-size:1.5rem; line-height:1.25; letter-spacing:-.01em; font-weight:650; }
+.sub { color:var(--muted); margin-top:8px; font-size:.9375rem; }
+
+ol { list-style:none; counter-reset:step; display:flex; flex-direction:column; gap:12px; }
+li.step {
+  counter-increment:step; position:relative;
+  background:var(--panel); border:1px solid var(--hairline); border-radius:14px;
+  padding:16px 16px 16px 54px; box-shadow:var(--shadow);
+  transition:opacity .2s ease;
+}
+li.step::before {
+  content:counter(step);
+  position:absolute; left:16px; top:16px;
+  width:26px; height:26px; border-radius:50%;
+  display:grid; place-items:center;
+  font-size:.8125rem; font-weight:650;
+  background:var(--bg); border:1px solid var(--hairline); color:var(--muted);
+}
+li.step[data-state="done"]::before {
+  content:"✓"; background:var(--accent); border-color:var(--accent); color:var(--accent-ink);
+}
+li.step[data-state="done"] { opacity:.6; }
+li.step[data-state="active"] { border-color:var(--accent); }
+.step h2 { font-size:1rem; font-weight:620; margin-bottom:4px; }
+.step p { color:var(--muted); font-size:.875rem; }
+.step p + p { margin-top:6px; }
+kbd {
+  font:inherit; font-size:.8125rem; font-weight:600;
+  background:var(--bg); border:1px solid var(--hairline);
+  border-radius:5px; padding:1px 5px; color:var(--text);
+}
+
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  margin-top:12px; width:100%; min-height:44px; padding:11px 18px;
+  border-radius:10px; border:1px solid transparent;
+  background:var(--accent); color:var(--accent-ink);
+  font:inherit; font-size:.9375rem; font-weight:620;
+  text-decoration:none; cursor:pointer; -webkit-tap-highlight-color:transparent;
+}
+.btn.ghost { background:transparent; border-color:var(--hairline); color:var(--text); }
+.btn[aria-disabled="true"] { opacity:.45; pointer-events:none; }
+
+.note {
+  margin-top:20px; padding:12px 14px; border-radius:10px;
+  background:var(--panel); border:1px solid var(--hairline);
+  font-size:.8125rem; color:var(--muted);
+}
+.note strong { color:var(--text); font-weight:620; }
+.err { border-color:var(--red); }
+.err strong { color:var(--red); }
+.status {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:.8125rem; color:var(--muted); margin-top:10px;
+}
+.dot { width:7px; height:7px; border-radius:50%; background:var(--faint); }
+.dot.ok { background:var(--accent); }
+.dot.wait { background:var(--amber); }
+.hide { display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">SpeakEasy Deck</div>
+    <h1>Pair this device</h1>
+    <p class="sub">Three steps, about a minute. Afterwards the deck opens straight from your home screen.</p>
+  </header>
+
+  <!-- No token: nothing here works without one, so say so plainly. -->
+  <div id="noKey" class="note err hide">
+    <strong>This link is missing its pairing key.</strong><br>
+    Open <em>SpeakEasy → Settings → Deck</em> on the Mac and scan the QR code shown there.
+    The key travels in the link, so a copied address without it will not connect.
+  </div>
+
+  <ol id="steps">
+    <li class="step" id="s1">
+      <h2>Install the certificate</h2>
+      <p>The deck is served over HTTPS by a certificate authority running on your Mac. iOS needs a copy before it will trust it.</p>
+      <a class="btn" id="certBtn" href="/ca.crt" download>Download the certificate</a>
+      <p style="margin-top:10px">Safari saves a profile, then asks you to review it in Settings.</p>
+    </li>
+
+    <li class="step" id="s2">
+      <h2>Approve it — two places</h2>
+      <p><strong>Install:</strong> Settings → General → <kbd>VPN &amp; Device Management</kbd> → tap the downloaded profile → Install.</p>
+      <p><strong>Then trust:</strong> Settings → General → About → <kbd>Certificate Trust Settings</kbd> → turn on full trust for <em>Caddy Local Authority</em>.</p>
+      <p>Both are required. Installing without enabling full trust is the usual reason the next step keeps failing.</p>
+      <div class="status" id="probe"><span class="dot wait"></span><span id="probeText">Checking trust…</span></div>
+    </li>
+
+    <li class="step" id="s3">
+      <h2>Open the deck</h2>
+      <p>Once trust is on, this opens the deck over HTTPS — which is also what lets the microphone work. Then <kbd>Share</kbd> → <kbd>Add to Home Screen</kbd>.</p>
+      <a class="btn" id="go" href="#" aria-disabled="true">Open the deck</a>
+      <a class="btn ghost" id="retry" href="#">Re-check trust</a>
+    </li>
+  </ol>
+
+  <div class="note" id="httpNote">
+    <strong>Why not just use HTTP?</strong> The deck loads fine over plain HTTP, but Safari only grants
+    microphone access in a secure context. Without the certificate you get the surface without dictation.
+  </div>
+</div>
+
+<script>
+(function () {
+  var params    = new URLSearchParams(location.search);
+  var key       = params.get('k') || '';
+  var host      = location.hostname;
+  var httpsBase = 'https://' + host;
+  var deckUrl   = httpsBase + '/' + (key ? '?k=' + encodeURIComponent(key) : '');
+
+  var s1 = document.getElementById('s1');
+  var s2 = document.getElementById('s2');
+  var s3 = document.getElementById('s3');
+  var go = document.getElementById('go');
+  var probeDot  = document.querySelector('#probe .dot');
+  var probeText = document.getElementById('probeText');
+
+  if (!key) {
+    document.getElementById('noKey').classList.remove('hide');
+    document.getElementById('steps').classList.add('hide');
+    document.getElementById('httpNote').classList.add('hide');
+    return;
+  }
+
+  go.href = deckUrl;
+
+  function setStep(el, state) { el.setAttribute('data-state', state); }
+
+  function trusted() {
+    setStep(s1, 'done');
+    setStep(s2, 'done');
+    setStep(s3, 'active');
+    probeDot.className = 'dot ok';
+    probeText.textContent = 'Certificate trusted.';
+    go.setAttribute('aria-disabled', 'false');
+  }
+
+  function notTrusted(msg) {
+    setStep(s2, 'active');
+    probeDot.className = 'dot wait';
+    probeText.textContent = msg || 'Not trusted yet — finish both steps above.';
+    go.setAttribute('aria-disabled', 'true');
+  }
+
+  // If this page is already on HTTPS the certificate is demonstrably trusted,
+  // so skip the probe entirely.
+  if (location.protocol === 'https:') { trusted(); return; }
+
+  // Otherwise probe the HTTPS origin. An untrusted certificate makes the
+  // request fail outright; a trusted one resolves (opaque is fine — we only
+  // care that the TLS handshake completed).
+  function probe() {
+    notTrusted('Checking trust…');
+    var done = false;
+    var timer = setTimeout(function () {
+      if (!done) { done = true; notTrusted('Still not trusted — check both settings above.'); }
+    }, 6000);
+
+    fetch(httpsBase + '/healthz', { mode: 'no-cors', cache: 'no-store' })
+      .then(function () {
+        if (done) return;
+        done = true; clearTimeout(timer); trusted();
+      })
+      .catch(function () {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        notTrusted('Not trusted yet — finish both steps above.');
+      });
+  }
+
+  setStep(s1, 'active');
+  document.getElementById('certBtn').addEventListener('click', function () {
+    setStep(s1, 'done');
+    setTimeout(probe, 1500);
+  });
+  document.getElementById('retry').addEventListener('click', function (e) {
+    e.preventDefault(); probe();
+  });
+
+  probe();
+  // Coming back from Settings is the moment trust usually flips.
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && go.getAttribute('aria-disabled') === 'true') probe();
+  });
+})();
+</script>
+</body>
+</html>
