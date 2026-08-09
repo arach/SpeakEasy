@@ -30,9 +30,9 @@ export default function DualModeSection() {
             Two-way voice · available now
           </Badge>
           <h2 className="font-display text-4xl font-extralight leading-tight tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
-            Speak to the task you’re already in.
+            One exact task.
             <span className="block bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text font-light text-transparent">
-              Hear its real answer come back.
+              No shadow conversation.
             </span>
           </h2>
           <p className="mx-auto mt-6 max-w-2xl font-text text-lg font-light leading-relaxed text-slate-600">
