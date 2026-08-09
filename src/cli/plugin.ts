@@ -34,6 +34,30 @@ const HOSTS: Host[] = [
   },
 ];
 
+/** Where a host's SpeakEasy skill lives once installed. */
+function installedPath(host: Host): string {
+  return path.join(host.skillsDir(), 'speakeasy');
+}
+
+/** The inventory. `speakeasy plugin` with no host is a question, not a mistake,
+ *  so it answers on stdout and exits 0 — it shows what we ship and what is
+ *  already on this machine. Errors still route through usage() on stderr. */
+function listHosts(): void {
+  console.log('');
+  console.log(chalk.bold('  🔌 SpeakEasy plugins'));
+  console.log('');
+  for (const h of HOSTS) {
+    const present = existsSync(installedPath(h));
+    const mark = present ? chalk.green('✓ installed') : chalk.dim('· not installed');
+    console.log(`    ${chalk.cyan(h.id.padEnd(8))} ${h.name.padEnd(13)} ${mark}`);
+    console.log(`    ${' '.repeat(8)} ${chalk.dim(installedPath(h))}`);
+  }
+  console.log('');
+  console.log(chalk.dim('  Install one:  speakeasy plugin <host>'));
+  console.log(chalk.dim('  Pin a build:  speakeasy plugin <host> --ref v0.2.19'));
+  console.log('');
+}
+
 function usage(): void {
   console.error('');
   console.error(chalk.bold('  🔌 speakeasy plugin <host>'));
@@ -213,12 +237,14 @@ export async function runPlugin(argv: string[]): Promise<void> {
   const target = HOSTS.find((h) => h.id === host);
 
   if (!target) {
-    usage();
-    if (host) {
-      console.error(`❌ Unknown host: ${host}`);
-      process.exit(1);
+    // No host named: this is the inventory, not a failure.
+    if (!host) {
+      listHosts();
+      return;
     }
-    return;
+    usage();
+    console.error(`❌ Unknown host: ${host}`);
+    process.exit(1);
   }
 
   console.log('');
