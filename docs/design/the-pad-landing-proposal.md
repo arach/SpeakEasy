@@ -1,8 +1,8 @@
 # THE PAD — landing page proposal
 
-Status: blue-sky design proposal
+Status: shipped — the mock is now the live `/codex` page
 Date: 2026-08-08
-Companion mock: `the-pad-landing-mock.html` (self-contained, open in a browser)
+Companion mock: `landing/mocks/pad.html` (rendered by `landing/app/codex/page.tsx`)
 
 ---
 

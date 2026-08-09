@@ -54,9 +54,9 @@ import compiles through, so the deck code is inside the embedded
 `deck/ipad/project.yml` references nothing outside its own directory. Already
 a clean cut.
 
-The shipping Codex page is `landing/app/codex/page.tsx`, with "Download DMG"
-buttons. The App Store treatment lives in
-`docs/design/the-pad-landing-mock.html`, an unshipped design mock.
+The shipping Codex page is `landing/app/codex/page.tsx`, which now renders
+`landing/mocks/pad.html` directly — so the App Store treatment that used to
+live only in the mock is what ships.
 
 ## The change
 
