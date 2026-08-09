@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpeakEasy — One API. Every voice.</title>
+<!--
+  Design mock for the SpeakEasy landing redesign.
+  Self-contained: Google Fonts + hand-written CSS + vanilla JS.
+  Open from the repo so audio resolves: docs/design/../../public/audio/*.mp3
+  (i.e. file:///…/landing/docs/design/landing-redesign-mock.html)
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Spectral:ital,wght@0,300;0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #FBFAF7;
+    --paper-warm: #F5F2EB;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #8A8580;
+    --emerald: #047857;
+    --emerald-deep: #065F46;
+    --emerald-bright: #34D399;
+    --hairline: #E7E2D9;
+    --dark: #0C0A09;
+    --dark-2: #161311;
+    --dark-ink: #E7E5E4;
+    --dark-ink-2: #A8A29E;
+    --radius: 10px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif: "Spectral", Georgia, serif;
+    --pixel: "Silkscreen", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  html, body { overflow-x: clip; }
+  ::selection { background: rgba(4,120,87,.16); }
+
+  .wrap { max-width: 64rem; margin: 0 auto; padding: 0 1.5rem; }
+
+  /* ---------- nav ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(251,250,247,.85);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--hairline);
+  }
+  nav .wrap {
+    display: flex; align-items: center; justify-content: space-between; gap: 1.2rem;
+    padding-top: .8rem; padding-bottom: .8rem;
+  }
+  .wordmark { font-family: var(--pixel); font-size: 1.05rem; color: var(--ink); text-decoration: none; letter-spacing: .02em; }
+  .nav-links { display: flex; align-items: center; gap: 1.4rem; }
+  .nav-links a {
+    font-family: var(--mono); font-size: .78rem; color: var(--ink-2);
+    text-decoration: none; transition: color .15s;
+  }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-pill {
+    border: 1px solid var(--hairline); border-radius: 999px;
+    padding: .3rem .8rem; color: var(--ink) !important;
+    display: inline-flex; gap: .4rem; align-items: center;
+    transition: border-color .15s, background .15s;
+  }
+  .nav-pill:hover { border-color: var(--emerald); background: rgba(4,120,87,.05); }
+  .nav-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--emerald); }
+
+  /* ---------- shared bits ---------- */
+  .eyebrow {
+    font-family: var(--mono); font-size: .78rem; font-weight: 500;
+    color: var(--emerald); letter-spacing: .04em;
+  }
+  h1, h2 { font-weight: 300; letter-spacing: -0.015em; line-height: 1.08; }
+  h1 { font-size: clamp(2.75rem, 6vw, 4.4rem); }
+  h2 { font-size: clamp(1.75rem, 3.5vw, 2.5rem); }
+  section { padding: 6.5rem 0; }
+
+  /* play buttons + equalizer */
+  .play {
+    display: inline-flex; align-items: center; gap: .55rem;
+    font-family: var(--mono); font-size: .8rem; font-weight: 500;
+    border: none; cursor: pointer; background: none; color: inherit;
+  }
+  .play .icon {
+    width: 2.4rem; height: 2.4rem; border-radius: 50%;
+    background: var(--emerald); color: #fff;
+    display: grid; place-items: center; flex: none;
+    transition: transform .15s, background .15s;
+  }
+  .play:hover .icon { transform: scale(1.07); background: var(--emerald-deep); }
+  .play .icon svg { width: .85rem; height: .85rem; }
+  .eq { display: none; align-items: flex-end; gap: 2.5px; height: 14px; }
+  .eq span { width: 3px; border-radius: 2px; background: var(--emerald); animation: eq .9s ease-in-out infinite; }
+  .eq span:nth-child(2) { animation-delay: .15s; }
+  .eq span:nth-child(3) { animation-delay: .3s; }
+  .eq span:nth-child(4) { animation-delay: .45s; }
+  .playing .eq { display: inline-flex; }
+  .playing .icon { background: var(--emerald-deep); }
+  @keyframes eq { 0%,100% { height: 4px; } 50% { height: 14px; } }
+
+  .codebox {
+    background: var(--dark); color: var(--dark-ink);
+    border-radius: var(--radius);
+    font-family: var(--mono); font-size: .82rem; line-height: 1.7;
+    padding: 1.1rem 1.3rem; overflow-x: auto; white-space: pre;
+    position: relative;
+  }
+  .codebox .cm { color: #78716C; }           /* comment */
+  .codebox .kw { color: var(--emerald-bright); } /* keyword / key */
+  .codebox .st { color: #FBBF24; }           /* string */
+  .codebox .fn { color: #93C5FD; }           /* function */
+  .codebox .num { color: #FCA5A5; }
+
+  .copy-btn {
+    position: absolute; top: .6rem; right: .6rem;
+    font-family: var(--mono); font-size: .68rem;
+    color: var(--dark-ink-2); background: var(--dark-2);
+    border: 1px solid #292524; border-radius: 6px;
+    padding: .25rem .6rem; cursor: pointer; transition: color .15s, border-color .15s;
+  }
+  .copy-btn:hover { color: #fff; border-color: var(--emerald); }
+  @media (max-width: 560px) { .codebox { font-size: .74rem; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 7rem 0 5.5rem; text-align: center; position: relative; }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 60% 45% at 50% 0%, rgba(4,120,87,.06), transparent 70%);
+  }
+  .hero .wrap { position: relative; }
+  .hero h1 { margin: 1rem 0 2.2rem; }
+  .say-line {
+    display: inline-flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: center;
+    background: var(--dark); border-radius: 14px; padding: 1.1rem 1.5rem;
+    font-family: var(--mono); font-size: clamp(.82rem, 2vw, 1rem); color: var(--dark-ink);
+    box-shadow: 0 20px 50px -20px rgba(12,10,9,.35);
+  }
+  .say-line .play .icon { width: 2.8rem; height: 2.8rem; }
+  .hero-sub { max-width: 42rem; margin: 2.2rem auto 0; color: var(--ink-2); font-size: 1.15rem; }
+  .hero-sub em { color: var(--ink); }
+
+  .install { margin-top: 2.8rem; display: inline-block; text-align: left; }
+  .install-tabs { display: flex; gap: 1.1rem; padding: 0 .3rem; margin-bottom: .45rem; }
+  .install-tabs button {
+    font-family: var(--mono); font-size: .74rem; color: var(--ink-3);
+    background: none; border: none; cursor: pointer; padding: .1rem 0;
+    border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+  }
+  .install-tabs button.active { color: var(--emerald); border-bottom-color: var(--emerald); }
+  .install .codebox { padding-right: 4.5rem; }
+  .hero-links { margin-top: 1.4rem; display: flex; gap: 1.6rem; justify-content: center; }
+  .hero-links a {
+    font-family: var(--mono); font-size: .78rem; color: var(--ink-2); text-decoration: none;
+    border-bottom: 1px solid var(--hairline); padding-bottom: 1px; transition: color .15s, border-color .15s;
+  }
+  .hero-links a:hover { color: var(--emerald); border-bottom-color: var(--emerald); }
+  .hero-stats {
+    margin-top: 3rem; font-family: var(--mono); font-size: .72rem; color: var(--ink-3);
+    display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;
+  }
+  .hero-stats span::before { content: "· "; color: var(--hairline); }
+  .hero-stats span:first-child::before { content: ""; }
+
+  /* ---------- voice board ---------- */
+  .voices { border-top: 1px solid var(--hairline); }
+  .section-head { text-align: center; max-width: 40rem; margin: 0 auto 3.5rem; }
+  .section-head .eyebrow { display: block; margin-bottom: .9rem; }
+  .section-head p { margin-top: 1rem; color: var(--ink-2); }
+  .voice-row {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: .9rem;
+  }
+  .voice-row > * { min-width: 0; }
+  @media (max-width: 900px) { .voice-row { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .voice-row { grid-template-columns: 1fr; } }
+  .voice-card {
+    position: relative;
+    border: 1px solid var(--hairline); border-radius: var(--radius);
+    background: #fff; padding: 1.2rem 1.1rem 1.1rem;
+    display: flex; flex-direction: column; gap: .35rem;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .voice-card:hover { border-color: #D8D2C6; box-shadow: 0 10px 30px -18px rgba(12,10,9,.25); }
+  .voice-card.playing-card { border-color: var(--emerald); }
+  .voice-card .name { font-family: var(--mono); font-size: .82rem; font-weight: 500; display: flex; align-items: center; gap: .5rem; }
+  .voice-card .note { font-size: .85rem; color: var(--ink-2); line-height: 1.45; flex: 1; }
+  .voice-card .tag {
+    position: absolute; bottom: 1.35rem; right: 1.1rem;
+    font-family: var(--mono); font-size: .58rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--emerald); border: 1px solid rgba(4,120,87,.35); border-radius: 4px; padding: .05rem .3rem;
+  }
+  .voice-card .play { margin-top: .8rem; }
+  .voice-card .play .icon { width: 2rem; height: 2rem; }
+  .fallback-note { max-width: 34rem; margin: 3rem auto 0; }
+  .fallback-note .codebox { font-size: .76rem; text-align: left; }
+
+  /* ---------- agent loop (dark) ---------- */
+  .agent { padding: 2.5rem 1.5rem; }
+  .agent .wrap {
+    background: var(--dark); color: var(--dark-ink);
+    border-radius: 20px; padding: 5.5rem 3.5rem;
+    box-shadow: 0 30px 60px -30px rgba(12,10,9,.35);
+  }
+  @media (max-width: 640px) {
+    .agent { padding: 1rem .75rem; }
+    .agent .wrap { padding: 3.5rem 1.4rem; border-radius: 16px; }
+  }
+  .agent .eyebrow { color: var(--emerald-bright); }
+  .agent h2 { color: #FAFAF9; }
+  .agent .lead { color: var(--dark-ink-2); max-width: 38rem; margin-top: 1.2rem; font-size: 1.1rem; }
+  .agent-grid {
+    display: grid; grid-template-columns: 1.05fr .95fr; gap: 3.5rem; margin-top: 3.5rem; align-items: start;
+  }
+  @media (max-width: 860px) { .agent-grid { grid-template-columns: 1fr; } }
+  .agent .codebox { background: var(--dark-2); border: 1px solid #292524; }
+  .notif-list { display: flex; flex-direction: column; gap: .7rem; }
+  .notif {
+    display: flex; align-items: center; gap: 1rem;
+    border: 1px solid #292524; border-radius: var(--radius);
+    padding: .9rem 1.1rem; background: var(--dark-2);
+    transition: border-color .2s;
+  }
+  .notif:hover { border-color: #44403C; }
+  .notif.playing-card { border-color: var(--emerald-bright); }
+  .notif .label { flex: 1; font-size: .98rem; color: var(--dark-ink); }
+  .notif .src { font-family: var(--mono); font-size: .65rem; color: var(--dark-ink-2); }
+  .agent-closing {
+    margin-top: 3.5rem; font-family: var(--mono); font-size: .82rem; color: var(--emerald-bright);
+    border-top: 1px solid #292524; padding-top: 1.6rem;
+  }
+  .agent-closing .dim { color: var(--dark-ink-2); }
+
+  /* ---------- claims ---------- */
+  .claims-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5rem; }
+  .claims-grid > * { min-width: 0; }
+  @media (max-width: 860px) { .claims-grid { grid-template-columns: 1fr; } }
+  .claim { display: flex; flex-direction: column; border-top: 1px solid var(--hairline); padding-top: 1.7rem; }
+  .claim h3 { font-weight: 500; font-size: 1.25rem; letter-spacing: -0.01em; margin-bottom: .6rem; line-height: 1.3; }
+  @media (min-width: 861px) { .claim h3 { min-height: 2.6em; } }
+  .claim h3 .n { font-family: var(--mono); font-size: .75rem; color: var(--emerald); vertical-align: super; margin-right: .35rem; }
+  .claim p { font-size: .98rem; color: var(--ink-2); margin-bottom: 1.2rem; }
+  .claim p a { color: var(--emerald); text-decoration: none; border-bottom: 1px solid rgba(4,120,87,.3); }
+  .claim .codebox { margin-top: auto; font-size: .72rem; padding: .9rem 1.1rem; }
+
+  /* ---------- api / closing ---------- */
+  .api { background: var(--paper-warm); border-top: 1px solid var(--hairline); }
+  .api-block { max-width: 40rem; margin: 0 auto; }
+  .api-bar { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+  .api-copy {
+    position: static; color: var(--ink-3); background: none;
+    border: 1px solid var(--hairline); flex: none;
+  }
+  .api-copy:hover { color: var(--ink); border-color: var(--ink-3); }
+  .api-tabs { display: flex; gap: 1.1rem; margin-bottom: .45rem; padding-left: .3rem; }
+  .api-tabs button {
+    font-family: var(--mono); font-size: .74rem; color: var(--ink-3);
+    background: none; border: none; cursor: pointer;
+    border-bottom: 2px solid transparent; padding: .1rem 0;
+    transition: color .15s, border-color .15s;
+  }
+  .api-tabs button.active { color: var(--emerald); border-bottom-color: var(--emerald); }
+  .api-cta { display: flex; gap: 1rem; justify-content: center; margin-top: 2.5rem; flex-wrap: wrap; }
+  .btn-primary {
+    font-family: var(--mono); font-size: .82rem; font-weight: 500;
+    background: var(--dark); color: var(--dark-ink); border: none; border-radius: var(--radius);
+    padding: .8rem 1.5rem; cursor: pointer; transition: background .15s, transform .15s;
+  }
+  .btn-primary:hover { background: var(--emerald-deep); color: #fff; transform: translateY(-1px); }
+  .btn-ghost {
+    font-family: var(--mono); font-size: .82rem;
+    background: none; color: var(--ink); border: 1px solid var(--hairline); border-radius: var(--radius);
+    padding: .8rem 1.5rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+    transition: border-color .15s;
+  }
+  .btn-ghost:hover { border-color: var(--ink-3); }
+
+  /* ---------- codex banner ---------- */
+  .codex { padding: 3rem 0; }
+  .codex-inner {
+    border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+    padding: 2rem 0; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  }
+  @media (max-width: 640px) {
+    .codex-inner { align-items: flex-start; }
+    .codex-inner .new { margin-top: .3rem; }
+  }
+  .codex-inner .new {
+    font-family: var(--mono); font-size: .62rem; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--emerald); border: 1px solid rgba(4,120,87,.35); border-radius: 4px; padding: .2rem .5rem; flex: none;
+  }
+  .codex-inner .txt { flex: 1; min-width: 16rem; }
+  .codex-inner .txt strong { font-weight: 500; }
+  .codex-inner .txt span { color: var(--ink-2); font-size: .95rem; }
+  .codex-inner a {
+    font-family: var(--mono); font-size: .8rem; color: var(--emerald); text-decoration: none; flex: none;
+  }
+  .codex-inner a:hover { text-decoration: underline; }
+
+  /* ---------- footer ---------- */
+  footer { padding: 3rem 0 3.5rem; }
+  footer .wrap { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+  footer .links { display: flex; gap: 1.4rem; }
+  footer .links a { font-family: var(--mono); font-size: .74rem; color: var(--ink-2); text-decoration: none; }
+  footer .links a:hover { color: var(--emerald); }
+  footer .made { font-size: .85rem; color: var(--ink-3); }
+
+  /* ---------- small screens ---------- */
+  @media (max-width: 640px) {
+    .nav-pill { display: none; }
+    .nav-links { gap: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="wordmark" href="#">SpeakEasy</a>
+    <div class="nav-links">
+      <a href="/docs/">Docs</a>
+      <a href="https://github.com/arach/SpeakEasy">GitHub</a>
+      <a href="https://www.npmjs.com/package/@arach/speakeasy">npm</a>
+      <a class="nav-pill" href="/codex/"><span class="dot"></span>Introducing Codex →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- 1 · HERO -->
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">@arach/speakeasy</span>
+    <h1>One API. Every voice.</h1>
+
+    <div class="say-line">
+      <button class="play" data-src="../../public/audio/tagline-demo.mp3" aria-label="Play the tagline">
+        <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
+      </button>
+      <span><span class="kw">await</span> <span class="fn">say</span>(<span class="st">"Text to speech, with nothing in the way."</span>);</span>
+      <span class="eq"><span></span><span></span><span></span><span></span></span>
+    </div>
+
+    <p class="hero-sub">
+      A TypeScript text-to-speech library and CLI. macOS system voices, OpenAI, ElevenLabs,
+      Groq, and Gemini behind one function — with automatic fallback, so it
+      <em>always says something</em>.
+    </p>
+
+    <div class="install">
+      <div class="install-tabs" id="installTabs">
+        <button class="active" data-cmd="npm install @arach/speakeasy">npm</button>
+        <button data-cmd="pnpm add @arach/speakeasy">pnpm</button>
+        <button data-cmd="yarn add @arach/speakeasy">yarn</button>
+        <button data-cmd="bun add @arach/speakeasy">bun</button>
+        <button data-cmd='npx @arach/speakeasy "hello"'>npx</button>
+      </div>
+      <div class="codebox"><span class="prompt">$ </span><span id="installCmd">npm install @arach/speakeasy</span>
+        <button class="copy-btn" data-copy-target="installCmd">copy</button>
+      </div>
+    </div>
+
+    <div class="hero-links">
+      <a href="/docs/">Read the docs</a>
+      <a href="https://github.com/arach/SpeakEasy">Star on GitHub</a>
+    </div>
+
+    <div class="hero-stats">
+      <span>~1.3k downloads/mo</span>
+      <span>zero runtime dependencies</span>
+      <span>Node ≥ 22.12 or Bun</span>
+    </div>
+  </div>
+</header>
+
+<!-- 2 · VOICE BOARD -->
+<section class="voices">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">// the proof</span>
+      <h2>Five providers. One sentence.</h2>
+      <p>The same words, synthesized five ways. Press play — this is the whole pitch.</p>
+    </div>
+
+    <div class="voice-row">
+      <div class="voice-card" data-card>
+        <span class="name">macOS System <span class="tag">fallback</span></span>
+        <span class="note">Free. No key. Always there.</span>
+        <button class="play" data-src="../../public/audio/welcome-demo.mp3">
+          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
+          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
+        </button>
+      </div>
+      <div class="voice-card" data-card>
+        <span class="name">OpenAI</span>
+        <span class="note">tts-1 · nova · warm &amp; reliable</span>
+        <button class="play" data-src="../../public/audio/tagline-demo.mp3">
+          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
+          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
+        </button>
+      </div>
+      <div class="voice-card" data-card>
+        <span class="name">ElevenLabs</span>
+        <span class="note">voice IDs · premium quality</span>
+        <button class="play" data-src="../../public/audio/build-complete.mp3">
+          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
+          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
+        </button>
+      </div>
+      <div class="voice-card" data-card>
+        <span class="name">Groq</span>
+        <span class="note">Orpheus · very fast</span>
+        <button class="play" data-src="../../public/audio/permission.mp3">
+          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
+          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
+        </button>
+      </div>
+      <div class="voice-card" data-card>
+        <span class="name">Gemini</span>
+        <span class="note">2.5 Flash TTS</span>
+        <button class="play" data-src="../../public/audio/waiting-for-you.mp3">
+          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
+          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="fallback-note">
+      <div class="codebox"><span class="cm">// missing key? rate limit? offline?
+// → falls back to the system voice.
+//   It always says something.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · AGENT LOOP (dark) -->
+<section class="agent">
+  <div class="wrap">
+    <span class="eyebrow">// the use case</span>
+    <h2>Your agent finished ten minutes ago.<br>You were making coffee.</h2>
+    <p class="lead">
+      Hook SpeakEasy into Claude Code, Cursor, or Codex and your tools speak a one-line
+      summary when they stop. No API key — the system voice is free.
+    </p>
+
+    <div class="agent-grid">
+      <div class="codebox"><span class="cm">// ~/.claude/settings.json</span>
+{
+  <span class="kw">"hooks"</span>: {
+    <span class="kw">"Stop"</span>: [{
+      <span class="kw">"command"</span>: <span class="st">"npx @arach/speakeasy \"$SUMMARY\""</span>
+    }]
+  }
+}</div>
+
+      <div class="notif-list">
+        <div class="notif" data-card>
+          <button class="play" data-src="../../public/audio/build-complete.mp3" aria-label="Play notification">
+            <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
+          </button>
+          <span class="label">"Build completed successfully."</span>
+          <span class="eq"><span></span><span></span><span></span><span></span></span>
+          <span class="src">system voice</span>
+        </div>
+        <div class="notif" data-card>
+          <button class="play" data-src="../../public/audio/permission.mp3" aria-label="Play notification">
+            <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
+          </button>
+          <span class="label">"Claude needs your permission."</span>
+          <span class="eq"><span></span><span></span><span></span><span></span></span>
+          <span class="src">system voice</span>
+        </div>
+        <div class="notif" data-card>
+          <button class="play" data-src="../../public/audio/waiting-input.mp3" aria-label="Play notification">
+            <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
+          </button>
+          <span class="label">"Waiting for your input."</span>
+          <span class="eq"><span></span><span></span><span></span><span></span></span>
+          <span class="src">system voice</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="agent-closing">$ npx @arach/speakeasy "it works" <span class="dim">— try it. that's the install.</span></p>
+  </div>
+</section>
+
+<!-- 4 · THREE CLAIMS -->
+<section class="claims">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">// the engineering</span>
+      <h2>Built like a library, not a landing page.</h2>
+    </div>
+
+    <div class="claims-grid">
+      <div class="claim">
+        <h3><span class="n">01</span>It never stays silent.</h3>
+        <p>Automatic fallback walks your provider order — OpenAI down, key missing, offline — and lands on the system voice. <a href="/docs/providers/">Providers →</a></p>
+        <div class="codebox"><span class="kw">fallbackOrder</span>: [<span class="st">"openai"</span>, <span class="st">"groq"</span>, <span class="st">"system"</span>]</div>
+      </div>
+      <div class="claim">
+        <h3><span class="n">02</span>It never says the same thing twice.</h3>
+        <p>SQLite cache keyed on text, voice, and rate. The second call is a file read, not an API bill. <a href="/docs/configuration/">Cache →</a></p>
+        <div class="codebox"><span class="kw">cache</span>: { <span class="kw">enabled</span>: <span class="num">true</span>, <span class="kw">ttl</span>: <span class="st">"7d"</span> }</div>
+      </div>
+      <div class="claim">
+        <h3><span class="n">03</span>It knows what matters.</h3>
+        <p>A priority queue with interrupt: an error alert cuts the line; a status update waits its turn. <a href="/docs/sdk/">Queue →</a></p>
+        <div class="codebox"><span class="fn">speak</span>(msg, { <span class="kw">priority</span>: <span class="st">"high"</span>, <span class="kw">interrupt</span>: <span class="num">true</span> })</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 · THE WHOLE API -->
+<section class="api">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">// the contract</span>
+      <h2>That's the entire API.</h2>
+      <p>If you can read this block, you can ship it.</p>
+    </div>
+
+    <div class="api-block">
+      <div class="api-bar">
+        <div class="api-tabs" id="apiTabs">
+          <button class="active" data-pane="sdk">SDK</button>
+          <button data-pane="cli">CLI</button>
+        </div>
+        <button class="copy-btn api-copy" data-copy-target="sdkCode">copy</button>
+      </div>
+      <div class="codebox" data-pane="sdk"><span id="sdkCode"><span class="kw">import</span> { SpeakEasy } <span class="kw">from</span> <span class="st">"@arach/speakeasy"</span>;
+
+<span class="kw">const</span> speaker = <span class="kw">new</span> <span class="fn">SpeakEasy</span>({
+  <span class="kw">provider</span>: <span class="st">"openai"</span>,
+  <span class="kw">openaiVoice</span>: <span class="st">"nova"</span>,
+  <span class="kw">rate</span>: <span class="num">180</span>,
+  <span class="kw">cache</span>: { <span class="kw">enabled</span>: <span class="num">true</span> },
+});
+
+<span class="kw">await</span> speaker.<span class="fn">speak</span>(<span class="st">"Hello, world."</span>);</span></div>
+      <div class="codebox" data-pane="cli" hidden><span id="cliCode"><span class="cm"># speak</span>
+$ speakeasy <span class="st">"Hello, world."</span> --provider openai --voice nova
+
+<span class="cm"># save to file</span>
+$ speakeasy <span class="st">"Build done"</span> --out build.mp3
+
+<span class="cm"># health check</span>
+$ speakeasy --doctor</span></div>
+    </div>
+
+    <div class="api-cta">
+      <button class="btn-primary" id="ctaInstall">npm install @arach/speakeasy</button>
+      <a class="btn-ghost" href="/docs/">Browse the docs</a>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · CODEX BANNER -->
+<section class="codex">
+  <div class="wrap">
+    <div class="codex-inner">
+      <span class="new">New</span>
+      <div class="txt">
+        <strong>Introducing SpeakEasy for Codex</strong><br>
+        <span>A Mac app and iPad control surface built on this library. Speak to the task you're in; hear the answer come back.</span>
+      </div>
+      <a href="/codex/">See it →</a>
+    </div>
+  </div>
+</section>
+
+<!-- 7 · FOOTER -->
+<footer>
+  <div class="wrap">
+    <a class="wordmark" href="#">SpeakEasy</a>
+    <div class="links">
+      <a href="/docs/">Docs</a>
+      <a href="https://github.com/arach/SpeakEasy">GitHub</a>
+      <a href="https://www.npmjs.com/package/@arach/speakeasy">npm</a>
+      <a href="/codex/">Codex</a>
+    </div>
+    <span class="made">Made by <a href="https://arach.dev" style="color:var(--emerald);text-decoration:none;">Arach</a></span>
+  </div>
+</footer>
+
+<script>
+  // ---- shared audio: one element, one thing playing at a time ----
+  const audio = new Audio();
+  let current = null;
+
+  function stopCurrent() {
+    if (!current) return;
+    current.classList.remove("playing");
+    const card = current.closest("[data-card]");
+    if (card) card.classList.remove("playing-card");
+    current = null;
+    audio.pause();
+  }
+
+  document.querySelectorAll(".play").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (current === btn) { stopCurrent(); return; }
+      stopCurrent();
+      audio.src = btn.dataset.src;
+      audio.play().catch(() => {});
+      current = btn;
+      btn.classList.add("playing");
+      const card = btn.closest("[data-card]");
+      if (card) card.classList.add("playing-card");
+    });
+  });
+  audio.addEventListener("ended", stopCurrent);
+
+  // ---- install tabs ----
+  const installCmd = document.getElementById("installCmd");
+  document.querySelectorAll("#installTabs button").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll("#installTabs button").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      installCmd.textContent = tab.dataset.cmd;
+    });
+  });
+
+  // ---- api tabs ----
+  document.querySelectorAll("#apiTabs button").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll("#apiTabs button").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      document.querySelectorAll(".codebox[data-pane]").forEach(p => {
+        p.hidden = p.dataset.pane !== tab.dataset.pane;
+      });
+      document.querySelector(".api-copy").dataset.copyTarget = tab.dataset.pane + "Code";
+    });
+  });
+
+  // ---- copy buttons ----
+  document.querySelectorAll(".copy-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const el = document.getElementById(btn.dataset.copyTarget);
+      await navigator.clipboard.writeText(el.textContent).catch(() => {});
+      btn.textContent = "copied";
+      setTimeout(() => (btn.textContent = "copy"), 1500);
+    });
+  });
+
+  // ---- closing CTA copies install command ----
+  const cta = document.getElementById("ctaInstall");
+  cta.addEventListener("click", async () => {
+    await navigator.clipboard.writeText("npm install @arach/speakeasy").catch(() => {});
+    const old = cta.textContent;
+    cta.textContent = "copied ✓";
+    setTimeout(() => (cta.textContent = old), 1500);
+  });
+</script>
+
+</body>
+</html>
