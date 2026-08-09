@@ -23,7 +23,7 @@ Mac, a browser, or an iPad on your local network.
 Paste this bounded task into Codex Desktop:
 
 > Install SpeakEasy 0.2.19 on this Mac. Read
-> https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
+> https://speakeasy.arach.dev/agent.md and follow Path 3. Do not build from
 > source or bypass Gatekeeper. Tell me which human-only steps remain.
 
 `0.2.19` is the first public **Latest** train, covering the Mac core and the
@@ -169,7 +169,7 @@ narration, and the Deck—the recommended installation flow is a bounded Codex
 task. Paste this into Codex:
 
 > Install SpeakEasy 0.2.19 on this Mac. Read
-> https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
+> https://speakeasy.arach.dev/agent.md and follow Path 3. Do not build from
 > source or bypass Gatekeeper. Tell me which human-only steps remain.
 
 Codex downloads and inspects the pinned installer, verifies the published
