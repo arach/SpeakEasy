@@ -120,8 +120,13 @@ kbd {
     <li class="step" id="s1">
       <h2>Install the certificate</h2>
       <p>The deck is served over HTTPS by a certificate authority running on your Mac. iOS needs a copy before it will trust it.</p>
-      <a class="btn" id="certBtn" href="/ca.crt" download>Download the certificate</a>
-      <p style="margin-top:10px">Safari saves a profile, then asks you to review it in Settings.</p>
+      <!-- No `download` attribute on purpose. It forces a file save, and iOS
+           then writes the PEM out as a .txt instead of recognising it as a
+           configuration profile. Plain navigation lets Safari act on the
+           Content-Type and offer to install. -->
+      <a class="btn" id="certBtn" href="/ca.crt">Get the certificate</a>
+      <p style="margin-top:10px">Safari asks permission to download a configuration profile — allow it, then open Settings.</p>
+      <p>If it saves a <em>.txt</em> file instead, the profile did not register; see the note at the bottom.</p>
     </li>
 
     <li class="step" id="s2">
@@ -143,6 +148,13 @@ kbd {
   <div class="note" id="httpNote">
     <strong>Why not just use HTTP?</strong> The deck loads fine over plain HTTP, but Safari only grants
     microphone access in a secure context. Without the certificate you get the surface without dictation.
+  </div>
+
+  <div class="note">
+    <strong>Saved as a .txt file?</strong> The certificate is served PEM-encoded. Safari sometimes reads that
+    as plain text and files it away instead of offering to install it. Long-press the button, choose
+    <kbd>Download Linked File</kbd>, then open it from the Files app — or ask for the certificate as a
+    <em>.mobileconfig</em> profile, which iOS always recognises.
   </div>
 </div>
 
