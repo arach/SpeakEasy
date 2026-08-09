@@ -464,6 +464,17 @@ function proxyDataRequest(req: IncomingMessage, res: ServerResponse, live: LiveP
  * explicit development fallback (`--no-tls`), not the production LAN path. */
 export async function startNodeServer(root: string, port: number, live: LiveProxy | null): Promise<DeckHandle> {
   const proxyWss = new WebSocketServer({ noServer: true });
+  const proxyHeartbeat = setInterval(() => {
+    for (const client of proxyWss.clients as Set<WebSocket & { isAlive?: boolean }>) {
+      if (client.isAlive === false) {
+        client.terminate();
+        continue;
+      }
+      client.isAlive = false;
+      client.ping();
+    }
+  }, 15_000);
+  proxyHeartbeat.unref();
   const server = createServer(async (req, res) => {
     let pathname: string;
     try {
@@ -538,6 +549,11 @@ export async function startNodeServer(root: string, port: number, live: LiveProx
     }
 
     proxyWss.handleUpgrade(req, socket, head, (client) => {
+      const liveClient = client as WebSocket & { isAlive?: boolean };
+      liveClient.isAlive = true;
+      liveClient.on('pong', () => {
+        liveClient.isAlive = true;
+      });
       const upstream = new WebSocket(`ws://127.0.0.1:${live.dataPort}${req.url ?? '/ws'}`, {
         headers: { host: req.headers.host ?? `127.0.0.1:${port}` },
         ...(req.headers.origin ? { origin: req.headers.origin } : {}),
@@ -563,6 +579,7 @@ export async function startNodeServer(root: string, port: number, live: LiveProx
   return {
     engine: 'built-in server',
     stop: () => {
+      clearInterval(proxyHeartbeat);
       for (const client of proxyWss.clients) client.terminate();
       proxyWss.close();
       server.close();
