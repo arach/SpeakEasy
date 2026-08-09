@@ -25,6 +25,11 @@ enum DeckConnectionState: Equatable {
 /// the device by `DeckVoice`, which uses this class only as a delivery route —
 /// so a dropped socket costs the operator a retry, never their words.
 final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLSessionWebSocketDelegate, AVAudioPlayerDelegate {
+    private struct HTTPIntentResult: Decodable {
+        let ok: Bool
+        let error: String?
+    }
+
     @Published private(set) var snapshot: DeckSnapshot?
     @Published private(set) var state: DeckConnectionState = .disconnected
     @Published private(set) var localStatus: String?
@@ -49,6 +54,7 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
     private var reconnectWork: DispatchWorkItem?
     private var generation = 0
     private var intentID = 0
+    private let httpFallbackIntents: Set<String> = ["playback.stop", "capture.cancel", "turn.abort"]
 
     private var audioPlayer: AVAudioPlayer?
     private var audioPlayingID: String?
@@ -200,6 +206,7 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
     func sendIntent(_ name: String, _ arguments: [String: Any] = [:]) -> Int? {
         guard state == .connected, let socket else {
             localStatus = "MAC OFFLINE · RETRYING"
+            if httpFallbackIntents.contains(name) { postControlIntent(name, arguments) }
             return nil
         }
         intentID &+= 1
@@ -212,10 +219,64 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         socket.send(.string(string)) { [weak self] error in
             guard let error else { return }
             DispatchQueue.main.async {
-                self?.localStatus = error.localizedDescription.uppercased()
+                guard let self else { return }
+                self.localStatus = error.localizedDescription.uppercased()
+                if self.httpFallbackIntents.contains(name) {
+                    self.postControlIntent(name, arguments)
+                }
             }
         }
         return id
+    }
+
+    /// Control must remain reachable when the long-lived transport is the
+    /// thing that failed. These intents are idempotent enough to retry after an
+    /// ambiguous socket send, and the runtime already exposes the same parser
+    /// over HTTP for exactly this independent route.
+    private func postControlIntent(_ name: String, _ arguments: [String: Any]) {
+        guard let url = deckURL?.deckEndpoint(path: "/api/intent") else {
+            localStatus = "NO PAIRED MAC"
+            return
+        }
+        var payload: [String: Any] = ["name": name]
+        arguments.forEach { payload[$0.key] = $0.value }
+        guard JSONSerialization.isValidJSONObject(payload),
+              let body = try? JSONSerialization.data(withJSONObject: payload) else {
+            localStatus = "CONTROL COMMAND INVALID"
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = body
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 10
+
+        // A dedicated session survives closeTransport() invalidating the dead
+        // WebSocket's session while this one-shot recovery request is in flight.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 10
+        let fallbackSession = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+        fallbackSession.dataTask(with: request) { [weak self, fallbackSession] data, response, error in
+            defer { fallbackSession.finishTasksAndInvalidate() }
+            let http = response as? HTTPURLResponse
+            let result = data.flatMap { try? JSONDecoder().decode(HTTPIntentResult.self, from: $0) }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                let alreadySatisfied = (name == "capture.cancel" && result?.error == "not recording")
+                    || (name == "turn.abort" && result?.error == "nothing in flight")
+                if let error {
+                    self.localStatus = "CONTROL FAILED · \(error.localizedDescription.uppercased())"
+                } else if !(200..<300).contains(http?.statusCode ?? 0) || (result?.ok != true && !alreadySatisfied) {
+                    self.localStatus = (result?.error ?? "CONTROL COMMAND REJECTED").uppercased()
+                } else if self.state != .connected {
+                    self.localStatus = "CONTROL SENT · RECONNECTING"
+                } else {
+                    self.localStatus = nil
+                }
+            }
+        }.resume()
     }
 
     func selectLane(_ index: Int) {
