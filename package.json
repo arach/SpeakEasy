@@ -10,16 +10,11 @@
   "bugs": {
     "url": "https://github.com/arach/SpeakEasy/issues"
   },
-  "private": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/test.*",
-    "deck/index.html",
-    "deck/themes.json",
-    "deck/variants",
-    "app/Sources/SpeakEasy/Resources/codex-desktop-bridge.cjs"
+    "!dist/test.*"
   ],
   "exports": {
     ".": "./dist/index.js"
@@ -32,9 +27,9 @@
     "build:plugin-runtime": "bun build src/bin/speakeasy-cli.ts --target=bun --outfile plugins/speakeasy/skills/speakeasy/runtime/speakeasy-cli.js",
     "package:plugin-submission": "plugins/speakeasy/tools/build-submission.sh",
     "verify:plugin-bundle": "plugins/speakeasy/tools/verify-skill-bundle.sh",
-    "prepublishOnly": "pnpm run build && rm -f dist/test.js dist/test.d.ts dist/test.js.map dist/test.d.ts.map",
-    "dev": "tsc --watch",
-    "test": "node dist/test.js",
+    "prepublishOnly": "pnpm run build",
+    "dev": "pnpm run build --watch",
+    "test": "bun test src",
     "test:privacy": "bun test src/privacy-permissions.test.ts",
     "test:cache": "pnpm run build && node scripts/cache-test.js",
     "example": "pnpm run build && node examples/basic-usage.js",

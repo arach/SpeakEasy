@@ -416,7 +416,6 @@ speakeasy_bundle_app() {
     fi
 
     echo "Generating app icon..."
-    chmod +x "$app_root/Scripts/generate_icon.swift"
     swift "$app_root/Scripts/generate_icon.swift" "$bundle_path/Contents/Resources"
 
     printf 'APPL????' > "$bundle_path/Contents/PkgInfo"

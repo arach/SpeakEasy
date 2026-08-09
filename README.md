@@ -64,7 +64,7 @@ We didn't find a configuration file. Let's create one to get you started!
    A unified text-to-speech CLI that works with multiple providers.
 
    Supported Providers:
-   • System Voices - macOS, Windows, Linux (no key needed)
+   • System Voices - macOS built-in (no key needed)
    • ElevenLabs - Premium voices (🔑 key required)
    • OpenAI - High quality voices (🔑 key required)
    • Groq - Fast & cheap (🔑 key required)

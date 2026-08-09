@@ -22,7 +22,7 @@ We didn't find a configuration file. Let's create one to get you started!
    A unified text-to-speech CLI that works with multiple providers.
 
    Supported Providers:
-   • System Voices - macOS, Windows, Linux (no key needed)
+   • System Voices - macOS built-in (no key needed)
    • ElevenLabs - Premium voices (🔑 key required)
    • OpenAI - High quality voices (🔑 key required)
    • Groq - Fast & cheap (🔑 key required)
@@ -76,6 +76,12 @@ Usage:
   speakeasy --config
   speakeasy --cache --clear
 
+Commands:
+  deck                Serve the Deck control surface on the local network
+                      (first run fetches the surface from the matching release)
+  plugin [host]       Install the SpeakEasy skill into an agent host
+                      (no host: list hosts and what's installed)
+
 Options:
   --text, -t          Text to speak (can be positional argument)
   --provider, -p      Provider: system, openai, elevenlabs, groq, gemini
@@ -103,6 +109,12 @@ Options:
   --id KEY            Show detailed info for specific cache entry
   --play KEY          Play cached audio by ID
   --out FILE          Save audio to file (in addition to playing)
+  --silent, -s        Generate audio without playing it
+  --premium           Use best available system voice (Premium > Enhanced > Standard)
+  --list-voices       List available macOS system voices
+  --app               Open the SpeakEasy settings app (downloads on first use)
+  --update-app        Update the settings app
+  --version, -V       Show the CLI version
 
 Examples:
   speakeasy "Hello world"
