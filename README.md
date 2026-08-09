@@ -22,14 +22,14 @@ Mac, a browser, or an iPad on your local network.
 
 Paste this bounded task into Codex Desktop:
 
-> Install SpeakEasy 0.2.18 on this Mac. Read
+> Install SpeakEasy 0.2.19 on this Mac. Read
 > https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
 > source or bypass Gatekeeper. Tell me which human-only steps remain.
 
-The current `0.2.18` build is an immutable self-serve **Mac core** preview. Do
-not use it to evaluate the browser/iPad path. It remains a GitHub prerelease
-permanently; the first public **Latest** train is `0.2.19` after the clean
-second-Mac, paired-HTTPS device, and observer/presenter gates pass.
+`0.2.19` is the first public **Latest** train, covering the Mac core and the
+browser/iPad deck. The earlier `0.2.18` build remains a GitHub prerelease
+permanently and is a Mac-core-only preview — do not use it to evaluate the
+browser/iPad path.
 See [SpeakEasy for Codex](https://speakeasy.arach.dev/codex/) for the product
 loop and [`docs/release/self-serve-mac-test.md`](docs/release/self-serve-mac-test.md)
 for the clean-machine proof.
@@ -168,7 +168,7 @@ For the complete macOS app—local dictation, exact Codex task lanes, native
 narration, and the Deck—the recommended installation flow is a bounded Codex
 task. Paste this into Codex:
 
-> Install SpeakEasy 0.2.18 on this Mac. Read
+> Install SpeakEasy 0.2.19 on this Mac. Read
 > https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from
 > source or bypass Gatekeeper. Tell me which human-only steps remain.
 
@@ -179,7 +179,7 @@ and local-network prompts that macOS requires a person to handle.
 
 For a manual install, download the same signed and notarized release:
 
-**[Download SpeakEasy 0.2.18 for macOS](https://github.com/arach/SpeakEasy/releases/download/v0.2.18/SpeakEasy.dmg)**
+**[Download SpeakEasy 0.2.19 for macOS](https://github.com/arach/SpeakEasy/releases/download/v0.2.19/SpeakEasy.dmg)**
 
 1. Drag SpeakEasy to **Applications**.
 2. Open it and approve microphone and local-network access when macOS asks.
