@@ -1,49 +1,5 @@
-import { Suspense } from "react"
-import HeroSection from "@/components/hero-section"
-import FeaturesSection from "@/components/features-section"
-import CodeExamples from "@/components/code-examples"
-import ClaudeIntegrationSection from "@/components/claude-integration-section"
-import QuickStartSection from "@/components/quick-start-section"
-import DownloadSection from "@/components/download-section"
-import DualModeSection from "@/components/dual-mode-section"
+import { MockPage } from "@/lib/mock-page"
 
 export default function Home() {
-  return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 relative overflow-hidden">
-      <HeroSection />
-      <DualModeSection />
-      <DownloadSection />
-      <Suspense fallback={<div className="h-96" />}>
-        <CodeExamples />
-      </Suspense>
-      <QuickStartSection />
-      <ClaudeIntegrationSection />
-      <FeaturesSection />
-
-      {/* Footer */}
-      <footer className="py-8 px-4 bg-slate-50/50 border-t border-slate-200/50">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center gap-6 text-sm">
-              <a href="/codex/" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
-                Codex
-              </a>
-              <a href="/docs/" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
-                Documentation
-              </a>
-              <a href="https://github.com/arach/SpeakEasy" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
-                GitHub
-              </a>
-              <a href="https://www.npmjs.com/package/@arach/speakeasy" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-emerald-600 font-medium transition-colors">
-                NPM
-              </a>
-            </div>
-            <p className="text-sm text-slate-600">
-              Made with ❤️ and 🤖 by <a href="https://arach.dev" className="text-emerald-600 hover:text-emerald-700 font-medium transition-colors">Arach</a>
-            </p>
-          </div>
-        </div>
-      </footer>
-    </main>
-  )
+  return <MockPage file="home.html" />
 }

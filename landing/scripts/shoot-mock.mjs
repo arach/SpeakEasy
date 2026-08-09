@@ -4,7 +4,8 @@ import puppeteer from "puppeteer";
 import fs from "node:fs";
 
 const outDir = process.argv[2] || "/tmp/mock-shots";
-const url = "http://localhost:8899/landing/docs/design/landing-redesign-mock.html";
+// the mock is the home page now — shoot the built site, not a loose file
+const url = "http://localhost:8899/";
 fs.mkdirSync(outDir, { recursive: true });
 
 const sections = [

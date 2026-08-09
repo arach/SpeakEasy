@@ -1,6 +1,6 @@
 # SpeakEasy landing page — redesign proposal
 
-Status: proposal, blue-sky. Companion mock: `docs/design/landing-redesign-mock.html` (self-contained; open it in a browser from the repo — audio paths resolve against `public/audio/`).
+Status: shipped — the mock is now the live home page. Companion mock: `landing/mocks/home.html` (rendered by `landing/app/page.tsx`; audio paths resolve against `public/audio/`).
 
 ---
 

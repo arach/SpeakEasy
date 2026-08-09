@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SpeakEasy — One API. Every voice.</title>
 <!--
-  Design mock for the SpeakEasy landing redesign.
+  This is the live home page — landing/app/page.tsx renders it through MockPage.
   Self-contained: Google Fonts + hand-written CSS + vanilla JS.
-  Open from the repo so audio resolves: docs/design/../../public/audio/*.mp3
-  (i.e. file:///…/landing/docs/design/landing-redesign-mock.html)
+  Audio is site-absolute (/audio/*.mp3), served from landing/public/audio, so it
+  resolves when served but not when opened straight off disk as a file:// URL.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -342,7 +342,7 @@
     <h1>One API. Every voice.</h1>
 
     <div class="say-line">
-      <button class="play" data-src="../../public/audio/tagline-demo.mp3" aria-label="Play the tagline">
+      <button class="play" data-src="/audio/tagline-demo.mp3" aria-label="Play the tagline">
         <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
       </button>
       <span><span class="kw">await</span> <span class="fn">say</span>(<span class="st">"Text to speech, with nothing in the way."</span>);</span>
@@ -393,7 +393,7 @@
       <div class="voice-card" data-card>
         <span class="name">macOS System <span class="tag">fallback</span></span>
         <span class="note">Free. No key. Always there.</span>
-        <button class="play" data-src="../../public/audio/welcome-demo.mp3">
+        <button class="play" data-src="/audio/welcome-demo.mp3">
           <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
           <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
         </button>
@@ -401,7 +401,7 @@
       <div class="voice-card" data-card>
         <span class="name">OpenAI</span>
         <span class="note">tts-1 · nova · warm &amp; reliable</span>
-        <button class="play" data-src="../../public/audio/tagline-demo.mp3">
+        <button class="play" data-src="/audio/tagline-demo.mp3">
           <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
           <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
         </button>
@@ -409,7 +409,7 @@
       <div class="voice-card" data-card>
         <span class="name">ElevenLabs</span>
         <span class="note">voice IDs · premium quality</span>
-        <button class="play" data-src="../../public/audio/build-complete.mp3">
+        <button class="play" data-src="/audio/build-complete.mp3">
           <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
           <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
         </button>
@@ -417,7 +417,7 @@
       <div class="voice-card" data-card>
         <span class="name">Groq</span>
         <span class="note">Orpheus · very fast</span>
-        <button class="play" data-src="../../public/audio/permission.mp3">
+        <button class="play" data-src="/audio/permission.mp3">
           <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
           <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
         </button>
@@ -425,7 +425,7 @@
       <div class="voice-card" data-card>
         <span class="name">Gemini</span>
         <span class="note">2.5 Flash TTS</span>
-        <button class="play" data-src="../../public/audio/waiting-for-you.mp3">
+        <button class="play" data-src="/audio/waiting-for-you.mp3">
           <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
           <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
         </button>
@@ -462,7 +462,7 @@
 
       <div class="notif-list">
         <div class="notif" data-card>
-          <button class="play" data-src="../../public/audio/build-complete.mp3" aria-label="Play notification">
+          <button class="play" data-src="/audio/build-complete.mp3" aria-label="Play notification">
             <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
           </button>
           <span class="label">"Build completed successfully."</span>
@@ -470,7 +470,7 @@
           <span class="src">system voice</span>
         </div>
         <div class="notif" data-card>
-          <button class="play" data-src="../../public/audio/permission.mp3" aria-label="Play notification">
+          <button class="play" data-src="/audio/permission.mp3" aria-label="Play notification">
             <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
           </button>
           <span class="label">"Claude needs your permission."</span>
@@ -478,7 +478,7 @@
           <span class="src">system voice</span>
         </div>
         <div class="notif" data-card>
-          <button class="play" data-src="../../public/audio/waiting-input.mp3" aria-label="Play notification">
+          <button class="play" data-src="/audio/waiting-input.mp3" aria-label="Play notification">
             <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
           </button>
           <span class="label">"Waiting for your input."</span>

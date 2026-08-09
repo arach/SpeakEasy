@@ -1,14 +1,15 @@
 # THE PAD landing — copy edit pass (tone)
 
 Scope: **text only**. No CSS, colors, layout, spacing, or structure changed.
-Files touched: `docs/design/the-pad-landing-mock.html`, `docs/design/the-pad-landing-proposal.md`.
+Files touched: `landing/mocks/pad.html` (then at `docs/design/the-pad-landing-mock.html`),
+`docs/design/the-pad-landing-proposal.md`.
 
 Goal, in the owner's framing: "just be like, hey, here's a pad you can control
 your thing with." Confident and plain, peer to peer. Visual design left alone.
 
 ---
 
-## 1. Changes in `the-pad-landing-mock.html`
+## 1. Changes in `pad.html`
 
 ### Hero
 
