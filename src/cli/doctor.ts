@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import { CONFIG_DIR, CONFIG_FILE, DEFAULT_VOICES, DEFAULTS, PROVIDERS, getPackageVersion } from './constants';
+import { defaultCacheDir } from '../paths';
 import { loadGlobalConfig } from './config';
 
 export function runDoctor(): void {
@@ -128,7 +129,7 @@ export function runDoctor(): void {
   console.log('📦 Cache Configuration:');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cacheEnabled = (globalConfig as any).cache?.enabled;
-  const cacheDir = (globalConfig as any).cache?.dir || path.join('/tmp', 'speakeasy-cache');
+  const cacheDir = (globalConfig as any).cache?.dir || defaultCacheDir();
 
   if (cacheEnabled) {
     console.log('   ✅ Cache enabled');
@@ -182,5 +183,4 @@ export function runDoctor(): void {
   console.log('   • Run: speakeasy --config to view raw config');
   console.log('   • Run: speakeasy --diagnose for detailed diagnostics');
 }
-
 

@@ -55,7 +55,7 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 var fs5 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
+var path6 = __toESM(require("path"));
 
 // src/providers/system.ts
 var import_child_process2 = require("child_process");
@@ -272,7 +272,7 @@ function runSay(args) {
 }
 
 // src/cache.ts
-var path3 = __toESM(require("path"));
+var path4 = __toESM(require("path"));
 var fs3 = __toESM(require("fs"));
 var import_uuid = require("uuid");
 
@@ -319,6 +319,28 @@ function parseSize(size) {
   }
   return value * units[unit];
 }
+
+// src/paths.ts
+var import_node_os = require("os");
+var import_node_path = __toESM(require("path"));
+var HOME_DIR = (0, import_node_os.homedir)();
+var CONFIG_DIR = import_node_path.default.join(HOME_DIR, ".config", "speakeasy");
+var CONFIG_FILE = import_node_path.default.join(CONFIG_DIR, "settings.json");
+var HISTORY_DIR = import_node_path.default.join(CONFIG_DIR, "history");
+var USER_APP_DIR = import_node_path.default.join(HOME_DIR, ".speakeasy");
+var USER_APP_PATH = import_node_path.default.join(USER_APP_DIR, "SpeakEasy.app");
+var USER_APP_VERSION_FILE = import_node_path.default.join(USER_APP_DIR, ".app-version");
+var CODEX_SKILLS_DIR = import_node_path.default.join(HOME_DIR, ".codex", "skills");
+var CLAUDE_SKILLS_DIR = import_node_path.default.join(HOME_DIR, ".claude", "skills");
+var CODEX_SESSIONS_DIR = import_node_path.default.join(HOME_DIR, ".codex", "sessions");
+var DECK_DIR = import_node_path.default.join(CONFIG_DIR, "deck");
+var DECK_LANES_FILE = import_node_path.default.join(CONFIG_DIR, "deck-lanes.json");
+var DECK_TOKEN_FILE = import_node_path.default.join(CONFIG_DIR, "deck-token");
+var DECK_LOCK_FILE = import_node_path.default.join(CONFIG_DIR, "deck-runtime.lock");
+function defaultCacheDir(tempDir = "/tmp") {
+  return import_node_path.default.join(tempDir, "speakeasy-cache");
+}
+var CACHE_DIRS = [.../* @__PURE__ */ new Set([defaultCacheDir((0, import_node_os.tmpdir)()), defaultCacheDir()])];
 
 // src/cache.ts
 var CREATE_ENTRIES_TABLE = `
@@ -419,10 +441,10 @@ var TTSCache = class {
   cacheHits = 0;
   cacheMisses = 0;
   constructor(cacheDir, ttl = "7d", maxSize, logger) {
-    this.cacheDir = cacheDir || path3.join("/tmp", "speakeasy-cache");
-    this.dbPath = path3.join(this.cacheDir, "cache.sqlite");
-    this.metadataFile = path3.join(this.cacheDir, "metadata.json");
-    this.statsFile = path3.join(this.cacheDir, "stats.json");
+    this.cacheDir = cacheDir || defaultCacheDir();
+    this.dbPath = path4.join(this.cacheDir, "cache.sqlite");
+    this.metadataFile = path4.join(this.cacheDir, "metadata.json");
+    this.statsFile = path4.join(this.cacheDir, "stats.json");
     this.ttlMs = parseTTL(ttl);
     this.maxSize = maxSize ? parseSize(maxSize) : void 0;
     this.logger = logger || this.createDefaultLogger();
@@ -491,8 +513,8 @@ var TTSCache = class {
   }
   migrateLegacySqliteIfNeeded() {
     if (!this.db) return;
-    const legacyMetadataPath = path3.join(this.cacheDir, "metadata.sqlite");
-    const legacyKeyvPath = path3.join(this.cacheDir, "tts-cache.sqlite");
+    const legacyMetadataPath = path4.join(this.cacheDir, "metadata.sqlite");
+    const legacyKeyvPath = path4.join(this.cacheDir, "tts-cache.sqlite");
     this.importLegacyMetadataDb(legacyMetadataPath);
     this.importLegacyKeyvDb(legacyKeyvPath);
   }
@@ -942,7 +964,7 @@ var TTSCache = class {
   async set(key, entry, audioBuffer, options) {
     try {
       const extension = options?.extension || detectAudioExtension(audioBuffer);
-      const audioFilePath = path3.join(this.cacheDir, `${key}.${extension}`);
+      const audioFilePath = path4.join(this.cacheDir, `${key}.${extension}`);
       fs3.writeFileSync(audioFilePath, audioBuffer, { mode: 384 });
       fs3.chmodSync(audioFilePath, 384);
       const timestamp = Date.now();
@@ -1054,7 +1076,7 @@ var TTSCache = class {
     try {
       for (const file of fs3.readdirSync(this.cacheDir)) {
         if (file.endsWith(".mp3") || file.endsWith(".wav")) {
-          fs3.unlinkSync(path3.join(this.cacheDir, file));
+          fs3.unlinkSync(path4.join(this.cacheDir, file));
         }
       }
       if (this.useJsonFallback) {
@@ -1124,10 +1146,8 @@ var TTSCache = class {
 
 // src/history.ts
 var fs4 = __toESM(require("fs"));
-var path4 = __toESM(require("path"));
+var path5 = __toESM(require("path"));
 var import_uuid2 = require("uuid");
-var CONFIG_DIR = path4.join(require("os").homedir(), ".config", "speakeasy");
-var HISTORY_DIR = path4.join(CONFIG_DIR, "history");
 function getWeekNumber(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -1139,7 +1159,7 @@ function getWeekNumber(date) {
 function getHistoryFile(historyDir, date = /* @__PURE__ */ new Date()) {
   const { year, week } = getWeekNumber(date);
   const weekStr = week.toString().padStart(2, "0");
-  return path4.join(historyDir, `history-${year}-W${weekStr}.json`);
+  return path5.join(historyDir, `history-${year}-W${weekStr}.json`);
 }
 var NotificationHistory = class {
   entries = [];
@@ -1212,7 +1232,7 @@ var NotificationHistory = class {
       const files = fs4.readdirSync(this.historyDir).filter((f) => f.startsWith("history-") && f.endsWith(".json")).sort().reverse();
       for (const file of files) {
         try {
-          const data = fs4.readFileSync(path4.join(this.historyDir, file), "utf8");
+          const data = fs4.readFileSync(path5.join(this.historyDir, file), "utf8");
           const entries = JSON.parse(data);
           allEntries.push(...entries);
         } catch {
@@ -1891,8 +1911,6 @@ function enqueueInPlayer(audioPath, options = {}) {
 }
 
 // src/index.ts
-var CONFIG_DIR2 = path5.join(require("os").homedir(), ".config", "speakeasy");
-var CONFIG_FILE = path5.join(CONFIG_DIR2, "settings.json");
 function loadGlobalConfig() {
   try {
     if (fs5.existsSync(CONFIG_FILE)) {
@@ -1957,7 +1975,7 @@ var SpeakEasy = class {
     const cacheEnabled = cacheConfig?.enabled ?? (hasApiKeys && this.config.provider !== "system");
     this.useCache = cacheEnabled;
     if (this.useCache) {
-      const cacheDir = cacheConfig?.dir || path5.join(this.config.tempDir || "/tmp", "speakeasy-cache");
+      const cacheDir = cacheConfig?.dir || defaultCacheDir(this.config.tempDir || "/tmp");
       this.cache = new TTSCache(cacheDir, cacheConfig?.ttl || "7d", cacheConfig?.maxSize);
     }
     this.adapters = createAdapterRegistry(this.config);
@@ -2076,7 +2094,7 @@ var SpeakEasy = class {
             }
           );
           if (stored) {
-            this.lastAudioFile = path5.join(
+            this.lastAudioFile = path6.join(
               this.cache.getCacheDir(),
               `${cacheKey}.${result.format}`
             );

@@ -3,7 +3,20 @@ import { existsSync, rmSync, readdirSync, readFileSync, statSync } from 'node:fs
 import path from 'node:path';
 import os from 'node:os';
 import chalk from 'chalk';
-import { CONFIG_DIR, CONFIG_FILE } from './constants';
+import {
+  CACHE_DIRS,
+  CLAUDE_SKILLS_DIR,
+  CODEX_SKILLS_DIR,
+  CONFIG_DIR,
+  CONFIG_FILE,
+  DECK_DIR,
+  DECK_LANES_FILE,
+  DECK_LOCK_FILE,
+  DECK_TOKEN_FILE,
+  HISTORY_DIR,
+  SYSTEM_APP_PATH,
+  USER_APP_DIR,
+} from '../paths';
 
 /** Everything SpeakEasy can put on a machine, in one place.
  *
@@ -18,26 +31,23 @@ interface Item {
 }
 
 function items(): Item[] {
-  const home = os.homedir();
   const all: Item[] = [
-    { kind: 'App', path: '/Applications/SpeakEasy.app' },
-    { kind: 'App', path: path.join(home, '.speakeasy') },
-    { kind: 'Plugin', path: path.join(home, '.codex', 'skills', 'speakeasy') },
-    { kind: 'Plugin', path: path.join(home, '.claude', 'skills', 'speakeasy') },
-    { kind: 'Deck', path: path.join(CONFIG_DIR, 'deck') },
-    { kind: 'Deck', path: path.join(CONFIG_DIR, 'deck-lanes.json') },
-    { kind: 'Deck', path: path.join(CONFIG_DIR, 'deck-token') },
-    { kind: 'Deck', path: path.join(CONFIG_DIR, 'deck-runtime.lock') },
-    { kind: 'Cache', path: path.join(os.tmpdir(), 'speakeasy-cache') },
-    { kind: 'Cache', path: path.join('/tmp', 'speakeasy-cache') },
+    { kind: 'App', path: SYSTEM_APP_PATH },
+    { kind: 'App', path: USER_APP_DIR },
+    { kind: 'Plugin', path: path.join(CODEX_SKILLS_DIR, 'speakeasy') },
+    { kind: 'Plugin', path: path.join(CLAUDE_SKILLS_DIR, 'speakeasy') },
+    { kind: 'Deck', path: DECK_DIR },
+    { kind: 'Deck', path: DECK_LANES_FILE },
+    { kind: 'Deck', path: DECK_TOKEN_FILE },
+    { kind: 'Deck', path: DECK_LOCK_FILE },
+    ...CACHE_DIRS.map((cacheDir) => ({ kind: 'Cache', path: cacheDir })),
     { kind: 'Settings', path: CONFIG_FILE, personal: true },
-    { kind: 'History', path: path.join(CONFIG_DIR, 'history'), personal: true },
+    { kind: 'History', path: HISTORY_DIR, personal: true },
   ];
 
   // Skill backups the plugin installer leaves behind, and the deck's rotating
   // logs and listener snapshots — globbed, so they are found rather than named.
-  for (const host of ['.codex', '.claude']) {
-    const skills = path.join(home, host, 'skills');
+  for (const skills of [CODEX_SKILLS_DIR, CLAUDE_SKILLS_DIR]) {
     if (existsSync(skills)) {
       for (const entry of readdirSync(skills)) {
         if (entry.startsWith('speakeasy.backup-')) {
@@ -66,12 +76,11 @@ function items(): Item[] {
 /** The deck writes its pid to a lock file. Pulling its token and assets out
  *  from under a live process leaves a half-working server, so we stop first. */
 function runningDeckPid(): number | null {
-  const lock = path.join(CONFIG_DIR, 'deck-runtime.lock');
-  if (!existsSync(lock)) return null;
+  if (!existsSync(DECK_LOCK_FILE)) return null;
   let pid: unknown;
   try {
     // written by acquireDeckProcessLock as {"pid":…,"nonce":…}
-    ({ pid } = JSON.parse(readFileSync(lock, 'utf8')) as { pid?: unknown });
+    ({ pid } = JSON.parse(readFileSync(DECK_LOCK_FILE, 'utf8')) as { pid?: unknown });
   } catch {
     return null; // a truncated or stale lock is not a running deck
   }

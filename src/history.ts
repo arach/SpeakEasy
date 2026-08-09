@@ -1,9 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-
-const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
-const HISTORY_DIR = path.join(CONFIG_DIR, 'history');
+import { HISTORY_DIR } from './paths';
 
 export interface HistoryEntry {
   id: string;
@@ -152,4 +150,4 @@ export function getHistory(): NotificationHistory {
   return historyInstance;
 }
 
-export { HISTORY_DIR };
+export { HISTORY_DIR } from './paths';

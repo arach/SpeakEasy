@@ -9,8 +9,9 @@ import chalk from 'chalk';
 import { WebSocket, WebSocketServer } from 'ws';
 import { DeckRuntime } from './deck-runtime';
 import { startDataPlane, writeDiscovery, clearDiscovery, type DataPlane } from './deck-live';
-import { CONFIG_FILE, CONFIG_DIR, getPackageVersion } from './constants';
+import { CONFIG_FILE, getPackageVersion } from './constants';
 import { REPO, downloadTarball, validateTarballPaths, assertNoSymlinks } from './plugin';
+import { DECK_DIR, DECK_LOCK_FILE, DECK_TOKEN_FILE } from '../paths';
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -23,8 +24,6 @@ const TYPES: Record<string, string> = {
 };
 
 const DEFAULT_PORT = 43211;
-const DECK_LOCK_FILE = path.join(os.homedir(), '.config', 'speakeasy', 'deck-runtime.lock');
-
 export interface DeckProcessLock {
   acquired: boolean;
   existingPid: number | null;
@@ -90,7 +89,6 @@ export function acquireDeckProcessLock(lockFile = DECK_LOCK_FILE): DeckProcessLo
 
 /** Where a fetched Deck surface lives, and the marker that keeps it in
  *  lockstep with the CLI — the surface/runtime protocol moves together. */
-const INSTALLED_DECK_DIR = path.join(CONFIG_DIR, 'deck');
 const DECK_VERSION_MARKER = '.speakeasy-version';
 
 /** Deck assets are not published to npm — the Mac app sets SPEAKEASY_DECK_ROOT
@@ -101,7 +99,7 @@ function deckRoot(): string {
   if (bundledRoot) return path.resolve(bundledRoot);
   const checkoutRoot = path.resolve(__dirname, '..', '..', 'deck');
   if (existsSync(path.join(checkoutRoot, 'index.html'))) return checkoutRoot;
-  return INSTALLED_DECK_DIR;
+  return DECK_DIR;
 }
 
 /** Fetch this version's release tarball and install just the deck/ subtree —
@@ -181,7 +179,7 @@ function macBonjourName(): string | undefined {
 /** The deck capability token. Persistent across runs so a pinned iPad app keeps
  * working after a restart; file is owner-only, rotation on demand. */
 function deckToken(rotate: boolean): string {
-  const file = path.join(os.homedir(), '.config', 'speakeasy', 'deck-token');
+  const file = DECK_TOKEN_FILE;
   if (!rotate) {
     try {
       const st = lstatSync(file);
@@ -698,7 +696,7 @@ function parseDeckArgs(argv: string[]): { port: number | null; portFromFlag: boo
 export async function runDeck(argv: string[]): Promise<void> {
   const args = parseDeckArgs(argv);
   const root = deckRoot();
-  if (root === INSTALLED_DECK_DIR && !installedSurfaceIsCurrent(root)) {
+  if (root === DECK_DIR && !installedSurfaceIsCurrent(root)) {
     try {
       await installDeckSurface(root);
       console.log(chalk.dim(`  Deck surface installed at ${root}`));

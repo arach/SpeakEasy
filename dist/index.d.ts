@@ -233,6 +233,8 @@ declare class TTSCache {
     getSqliteBackend(): SqliteBackend | 'json';
 }
 
+declare const CONFIG_FILE: string;
+
 type TTSProviderId = 'system' | 'openai' | 'elevenlabs' | 'groq' | 'gemini';
 type TTSAudioFormat = 'mp3' | 'wav' | 'aiff';
 interface TTSRequest {
@@ -441,7 +443,6 @@ declare class PlayerUnavailableError extends Error {
 declare function sendPlayerCommand(command: PlayerCommand, commandArguments?: PlayerCommandArguments, timeoutMs?: number): Promise<PlayerCommandResponse>;
 declare function enqueueInPlayer(audioPath: string, options?: EnqueueOptions): Promise<PlayerCommandResponse>;
 
-declare const CONFIG_FILE: string;
 declare class SpeakEasy {
     private config;
     private adapters;

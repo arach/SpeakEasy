@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFile, execFileSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, existsSync, copyFileSync, readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, openSync, readSync, closeSync } from 'node:fs';
-import { tmpdir, homedir, hostname } from 'node:os';
+import { tmpdir, hostname } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import {
@@ -12,6 +12,7 @@ import {
 } from './deck-agent-client.js';
 import { CodexDesktopSession } from './codex-desktop-submit.js';
 import { displayCodexThreadTitle, listCodexThreadReferences } from './codex-thread-catalog.js';
+import { CODEX_SESSIONS_DIR, DECK_LANES_FILE } from '../paths.js';
 
 /** execFile as a promise, capturing stdout, with a hard timeout. */
 function run(cmd: string, args: string[], timeout: number): Promise<string> {
@@ -172,9 +173,6 @@ const OVERVIEW_MODEL = 'gpt-5.6-luna';
 const OVERVIEW_EFFORT = 'low';
 const TICK_MS = 250;
 const MAX_MESSAGES_PER_LANE = 50;
-const LANES_FILE = path.join(homedir(), '.config', 'speakeasy', 'deck-lanes.json');
-
-const CODEX_SESSIONS_DIR = path.join(homedir(), '.codex', 'sessions');
 const CATALOG_LIMIT = 25;
 
 export type DeckTurnRoute =
@@ -309,7 +307,7 @@ function scanCodexThreadsFallback(): DeckThreadInfo[] | null {
 function loadLaneKeys(): string[] {
   const base = Array.from({ length: LANE_COUNT }, (_, i) => `speakeasy-deck-lane-${i}`);
   try {
-    const saved = JSON.parse(readFileSync(LANES_FILE, 'utf8')) as Record<string, unknown>;
+    const saved = JSON.parse(readFileSync(DECK_LANES_FILE, 'utf8')) as Record<string, unknown>;
     return base.map((b, i) => {
       const v = saved[String(i)];
       return typeof v === 'string' && v.startsWith('speakeasy-deck-lane-') ? v : b;
@@ -594,7 +592,7 @@ export class DeckRuntime extends EventEmitter {
       this.laneKeys.forEach((k, i) => {
         out[String(i)] = k;
       });
-      writeFileSync(LANES_FILE, JSON.stringify(out), { mode: 0o600 });
+      writeFileSync(DECK_LANES_FILE, JSON.stringify(out), { mode: 0o600 });
     } catch {
       // best-effort
     }

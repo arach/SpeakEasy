@@ -12,9 +12,9 @@ import { getHistory } from './history';
 import { TTSAdapter, TTSProviderId, TTSRequest } from './adapters/types';
 import { createAdapterRegistry, PROVIDER_ORDER } from './adapters/registry';
 import { playAudioFile, playTTSResult, stopPlayback } from './adapters/audio';
+import { CONFIG_FILE, defaultCacheDir } from './paths';
 
-const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'speakeasy');
-export const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
+export { CONFIG_FILE } from './paths';
 
 function loadGlobalConfig(): GlobalConfig {
   try {
@@ -124,7 +124,7 @@ export class SpeakEasy {
 
     this.useCache = cacheEnabled;
     if (this.useCache) {
-      const cacheDir = cacheConfig?.dir || path.join(this.config.tempDir || '/tmp', 'speakeasy-cache');
+      const cacheDir = cacheConfig?.dir || defaultCacheDir(this.config.tempDir || '/tmp');
       this.cache = new TTSCache(cacheDir, cacheConfig?.ttl || '7d', cacheConfig?.maxSize);
     }
 
