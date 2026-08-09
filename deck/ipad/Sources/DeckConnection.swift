@@ -18,33 +18,30 @@ enum DeckConnectionState: Equatable {
     }
 }
 
-enum DeckCapturePhase: Equatable {
-    case idle
-    case arming
-    case recording
-    case transcribing
-
-    var label: String {
-        switch self {
-        case .idle: "PARAKEET READY"
-        case .arming: "MICROPHONE STARTING"
-        case .recording: "LISTENING · PARAKEET"
-        case .transcribing: "PARAKEET · TRANSCRIBING"
-        }
-    }
-}
-
-/// Owns the native iPad data plane: snapshots and intents over WebSocket,
-/// Parakeet-first microphone uploads, and device-side narration playback.
+/// Owns the native iPad data plane: snapshots and intents over WebSocket, plus
+/// device-side narration playback.
+///
+/// Dictation is deliberately *not* here. Speech is captured and transcribed on
+/// the device by `DeckVoice`, which uses this class only as a delivery route —
+/// so a dropped socket costs the operator a retry, never their words.
 final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLSessionWebSocketDelegate, AVAudioPlayerDelegate {
     @Published private(set) var snapshot: DeckSnapshot?
     @Published private(set) var state: DeckConnectionState = .disconnected
-    @Published private(set) var capturePhase: DeckCapturePhase = .idle
-    @Published private(set) var inputLevel: Double = 0
     @Published private(set) var localStatus: String?
 
+    /// Live narration level and envelope. A separate observable on purpose --
+    /// see `DeckPlaybackMeter` -- so 20 Hz metering does not invalidate the deck.
+    let meter = DeckPlaybackMeter()
+
+    /// Every intent acknowledgement, on the main thread. `DeckVoice` uses this
+    /// to retire transcripts by id, and returns true for the ones it owns.
+    var onAck: ((DeckAck) -> Bool)?
+
+    /// Set while the microphone is open, so an arriving snapshot does not start
+    /// narration playback over the operator's own voice.
+    var isCapturing = false
+
     private let logger = Logger(subsystem: "dev.arach.speakeasy.deck", category: "native-connection")
-    private let capture = SpeechCapture()
     private var deckURL: URL?
     private var pairedHost: String?
     private var session: URLSession?
@@ -52,57 +49,25 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
     private var reconnectWork: DispatchWorkItem?
     private var generation = 0
     private var intentID = 0
-    private var pttActive = false
-    private var serverCaptureStarted = false
-    private var transcriptionTask: URLSessionUploadTask?
-    private var pendingCaptureText: String?
-    private var pendingCaptureEndID: Int?
-    private var captureEndRetryWork: DispatchWorkItem?
-    private var cancelCaptureOnReconnect = false
 
     private var audioPlayer: AVAudioPlayer?
     private var audioPlayingID: String?
     private var audioLoadTask: URLSessionDataTask?
     private var progressTimer: Timer?
-
-    override init() {
-        super.init()
-        capture.onStarted = { [weak self] in
-            DispatchQueue.main.async { self?.captureDidStart() }
-        }
-        capture.onRecordingReady = { [weak self] url in
-            DispatchQueue.main.async { self?.transcribeWithParakeet(url) }
-        }
-        capture.onFailure = { [weak self] message in
-            DispatchQueue.main.async { self?.captureDidFail(message) }
-        }
-        capture.onLevel = { [weak self] level in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                guard self.capturePhase == .recording else {
-                    self.inputLevel = 0
-                    return
-                }
-                let target = Double(level)
-                let smoothing = target > self.inputLevel ? 0.62 : 0.2
-                self.inputLevel += (target - self.inputLevel) * smoothing
-            }
-        }
-    }
+    private var meterTick = 0
+    /// When the operator last moved the playhead on this device. See
+    /// `syncPlayback` for why a seek needs a grace window.
+    private var lastLocalSeek: Date?
 
     deinit {
         reconnectWork?.cancel()
         socket?.cancel(with: .goingAway, reason: nil)
         session?.invalidateAndCancel()
-        capture.abort()
         stopLocalPlayback()
     }
 
     func connect(to url: URL) {
         if deckURL == url, state == .connected { return }
-        if let deckURL, deckURL != url {
-            resetCaptureRecovery()
-        }
         generation &+= 1
         let currentGeneration = generation
         reconnectWork?.cancel()
@@ -112,12 +77,7 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         deckURL = url
         pairedHost = url.host
         state = .connecting
-        if pendingCaptureText != nil {
-            capturePhase = .transcribing
-            localStatus = "RECONNECTING TO FINISH CAPTURE"
-        } else {
-            localStatus = "OPENING NATIVE LINK"
-        }
+        localStatus = "OPENING NATIVE LINK"
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -139,7 +99,6 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         reconnectWork?.cancel()
         reconnectWork = nil
         closeTransport()
-        resetCaptureRecovery()
         deckURL = nil
         pairedHost = nil
         snapshot = nil
@@ -157,12 +116,6 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
     }
 
     private func closeTransport() {
-        capture.abort()
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
-        pttActive = false
-        capturePhase = .idle
-        inputLevel = 0
         stopLocalPlayback()
         socket?.cancel(with: .goingAway, reason: nil)
         socket = nil
@@ -208,15 +161,16 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
                 guard next.rev > (self.snapshot?.rev ?? -1) else { return }
                 self.snapshot = next
                 self.state = .connected
-                self.reconcileCapture(with: next)
-                if self.capturePhase == .idle { self.localStatus = nil }
+                self.localStatus = nil
                 self.syncPlayback(to: next)
             }
         case "ack":
             guard let ack = try? JSONDecoder().decode(DeckAck.self, from: data) else { return }
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                if self.handleCaptureEndAck(ack) { return }
+                // Voice claims the acks for its own intents and reports them in
+                // its own words; everything else falls through to transport status.
+                if self.onAck?(ack) == true { return }
                 if !ack.ok { self.localStatus = (ack.error ?? "COMMAND REJECTED").uppercased() }
             }
         default:
@@ -229,13 +183,6 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         state = .disconnected
         localStatus = "CONNECTION LOST · RETRYING"
         stopLocalPlayback()
-        capture.abort()
-        pttActive = false
-        if serverCaptureStarted && pendingCaptureText == nil {
-            cancelCaptureOnReconnect = true
-        }
-        capturePhase = pendingCaptureText == nil ? .idle : .transcribing
-        inputLevel = 0
         socket = nil
 
         guard let reconnectURL = deckURL else { return }
@@ -279,21 +226,28 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         sendIntent("lane.assign", ["index": index, "threadId": threadID ?? NSNull(), "activate": threadID != nil])
     }
 
+    /// Start a fresh deck-owned thread on a pad. The codex thread is created on
+    /// the first turn, so the pad is speakable the moment this returns.
+    func newThread(_ index: Int, cwd: String? = nil) {
+        var payload: [String: Any] = ["index": index]
+        if let cwd, !cwd.isEmpty { payload["cwd"] = cwd }
+        sendIntent("lane.new", payload)
+    }
+
     func refreshCatalog() {
         sendIntent("catalog.refresh")
     }
 
     func stop() {
-        if serverCaptureStarted { sendIntent("capture.cancel", ["reason": "CANCELLED ON IPAD"]) }
-        capture.abort()
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
-        pttActive = false
-        resetCaptureRecovery()
-        capturePhase = .idle
-        inputLevel = 0
         stopLocalPlayback()
         sendIntent("playback.stop")
+    }
+
+    /// Withdraw a turn already sent. Silences this device too, because a reply
+    /// to a cancelled question should not keep talking.
+    func abortTurn() {
+        stopLocalPlayback()
+        sendIntent("turn.abort")
     }
 
     func replay() { sendIntent("playback.replay") }
@@ -305,208 +259,53 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         sendIntent("playback.toggle", ["id": "\(lane):\(message)"])
     }
 
-    func pttBegan() {
-        guard state == .connected, capturePhase == .idle, let snapshot else {
-            localStatus = "MAC OFFLINE · OPEN SPEAKEASY"
-            return
+    /// Play/pause whatever is under the playhead right now.
+    ///
+    /// The device player is toggled first so the button answers the thumb
+    /// immediately, and the Mac is told in the same breath; its next snapshot
+    /// confirms us, or corrects us if it disagreed.
+    func togglePlayPause() {
+        guard let id = audioPlayingID else { return }
+        if let player = audioPlayer {
+            if player.isPlaying { player.pause() } else { player.play() }
         }
-        if snapshot.lane != 9, snapshot.activeLane?.threadId == nil {
-            localStatus = "ASSIGN THIS LANE BEFORE SPEAKING"
-            return
-        }
-        pttActive = true
-        capturePhase = .arming
-        localStatus = capturePhase.label
+        let parts = id.split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2 else { return }
+        togglePlayback(lane: parts[0], message: parts[1])
+    }
+
+    /// Move the playhead.
+    ///
+    /// `playback.scrub` is rejected by the Mac runtime -- afplay cannot seek --
+    /// but the Mac is not the one playing this. For runtime-file audio the
+    /// device owns the player, and the runtime explicitly adopts the device's
+    /// clock from `playback.progress` rather than estimating its own. So the
+    /// seek happens locally and is published upstream as progress, which is the
+    /// same channel normal playback already uses. Nothing new is asked of the
+    /// Mac, and the browser deck is unaffected.
+    func seek(to seconds: Double) {
+        guard let player = audioPlayer, let id = audioPlayingID else { return }
+        let target = min(max(0, seconds), player.duration)
+        player.currentTime = target
+        meter.moved(to: target)
+        lastLocalSeek = Date()
+        sendIntent("playback.progress", ["id": id, "pos": target, "dur": player.duration])
+    }
+
+    var playbackDuration: Double { audioPlayer?.duration ?? 0 }
+
+    /// Silence device narration for as long as the microphone is open.
+    func beginCapture() {
+        isCapturing = true
         stopLocalPlayback()
-        capture.start()
     }
 
-    func pttEnded() {
-        guard pttActive else { return }
-        pttActive = false
-        capture.finish()
+    func endCapture() {
+        isCapturing = false
     }
-
-    func pttCancelled() {
-        guard pttActive || capturePhase != .idle else { return }
-        pttActive = false
-        capture.abort()
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
-        if serverCaptureStarted { sendIntent("capture.cancel", ["reason": "VOICE HOLD CANCELLED"]) }
-        resetCaptureRecovery()
-        capturePhase = .idle
-        inputLevel = 0
-        localStatus = "CANCELLED"
-    }
-
-    private func captureDidStart() {
-        guard pttActive else {
-            capture.abort()
-            return
-        }
-        serverCaptureStarted = true
-        capturePhase = .recording
-        localStatus = capturePhase.label
-        sendIntent("capture.start")
-    }
-
-    private func captureDidFail(_ message: String) {
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
-        if serverCaptureStarted { sendIntent("capture.cancel", ["reason": message]) }
-        pttActive = false
-        resetCaptureRecovery()
-        capturePhase = .idle
-        inputLevel = 0
-        localStatus = message
-    }
-
-    private struct TranscriptionResult: Decodable {
-        let ok: Bool
-        let text: String?
-        let engine: String?
-        let error: String?
-    }
-
-    private func transcribeWithParakeet(_ fileURL: URL) {
-        guard serverCaptureStarted,
-              let endpoint = deckURL?.deckEndpoint(path: "/api/transcribe"),
-              let session else {
-            try? FileManager.default.removeItem(at: fileURL)
-            captureDidFail("LOCAL PARAKEET UNAVAILABLE")
-            return
-        }
-        inputLevel = 0
-        capturePhase = .transcribing
-        localStatus = capturePhase.label
-
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 185
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.setValue("audio/wav", forHTTPHeaderField: "Content-Type")
-
-        let task = session.uploadTask(with: request, fromFile: fileURL) { [weak self] data, response, error in
-            defer { try? FileManager.default.removeItem(at: fileURL) }
-            DispatchQueue.main.async {
-                guard let self,
-                      self.serverCaptureStarted,
-                      self.capturePhase == .transcribing else { return }
-                self.transcriptionTask = nil
-                if let error {
-                    self.captureDidFail(error.localizedDescription.uppercased())
-                    return
-                }
-                guard let http = response as? HTTPURLResponse,
-                      let data,
-                      let result = try? JSONDecoder().decode(TranscriptionResult.self, from: data),
-                      (200..<300).contains(http.statusCode), result.ok,
-                      let text = result.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-                      !text.isEmpty else {
-                    let result = data.flatMap { try? JSONDecoder().decode(TranscriptionResult.self, from: $0) }
-                    self.captureDidFail((result?.error ?? "NO SPEECH · TRY AGAIN").uppercased())
-                    return
-                }
-                // The Mac owns `listening`. Keep the native control in its
-                // transcribing state until an ack or corrective snapshot says
-                // the matching capture.end was accepted. If the socket drops,
-                // the retained transcript is retried after reconnect.
-                self.pendingCaptureText = String(text.prefix(500))
-                self.localStatus = "SENDING TRANSCRIPT TO MAC"
-                self.sendPendingCaptureEnd()
-            }
-        }
-        transcriptionTask = task
-        task.resume()
-    }
-
-    private func sendPendingCaptureEnd() {
-        guard pendingCaptureEndID == nil,
-              let text = pendingCaptureText else { return }
-        guard let id = sendIntent("capture.end", ["text": text]) else {
-            scheduleCaptureEndRetry(expectedID: nil)
-            return
-        }
-        pendingCaptureEndID = id
-        scheduleCaptureEndRetry(expectedID: id)
-    }
-
-    private func scheduleCaptureEndRetry(expectedID: Int?) {
-        captureEndRetryWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self, self.pendingCaptureText != nil else { return }
-            guard self.pendingCaptureEndID == expectedID else { return }
-            if self.snapshot?.listening == false {
-                self.completeCaptureEnd()
-                return
-            }
-            self.pendingCaptureEndID = nil
-            self.localStatus = self.state == .connected
-                ? "CONFIRMING TRANSCRIPT WITH MAC"
-                : "RECONNECTING TO FINISH CAPTURE"
-            self.sendPendingCaptureEnd()
-        }
-        captureEndRetryWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: work)
-    }
-
-    private func handleCaptureEndAck(_ ack: DeckAck) -> Bool {
-        guard let id = ack.id, id == pendingCaptureEndID else { return false }
-        captureEndRetryWork?.cancel()
-        captureEndRetryWork = nil
-        pendingCaptureEndID = nil
-        if ack.ok || ack.error?.lowercased() == "not recording" {
-            completeCaptureEnd()
-        } else {
-            localStatus = (ack.error ?? "TRANSCRIPT NOT ACCEPTED").uppercased()
-            scheduleCaptureEndRetry(expectedID: nil)
-        }
-        return true
-    }
-
-    private func reconcileCapture(with snapshot: DeckSnapshot) {
-        if pendingCaptureText != nil {
-            if !snapshot.listening {
-                completeCaptureEnd()
-            } else if pendingCaptureEndID == nil {
-                sendPendingCaptureEnd()
-            }
-            return
-        }
-        guard cancelCaptureOnReconnect else { return }
-        cancelCaptureOnReconnect = false
-        if snapshot.listening {
-            sendIntent("capture.cancel", ["reason": "IPAD CAPTURE INTERRUPTED"])
-        }
-        serverCaptureStarted = false
-    }
-
-    private func completeCaptureEnd() {
-        captureEndRetryWork?.cancel()
-        captureEndRetryWork = nil
-        pendingCaptureEndID = nil
-        pendingCaptureText = nil
-        serverCaptureStarted = false
-        cancelCaptureOnReconnect = false
-        capturePhase = .idle
-        inputLevel = 0
-        localStatus = "SENT · PARAKEET LOCAL"
-    }
-
-    private func resetCaptureRecovery() {
-        captureEndRetryWork?.cancel()
-        captureEndRetryWork = nil
-        pendingCaptureEndID = nil
-        pendingCaptureText = nil
-        serverCaptureStarted = false
-        cancelCaptureOnReconnect = false
-    }
-
-    private let speeds = [1.0, 1.25, 1.5, 0.75]
 
     private func syncPlayback(to snapshot: DeckSnapshot) {
-        guard capturePhase == .idle else { return }
+        guard !isCapturing else { return }
         guard let id = snapshot.playing else {
             stopLocalPlayback()
             return
@@ -536,8 +335,11 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
                     self.audioPlayer = player
                     player.delegate = self
                     player.enableRate = true
+                    player.isMeteringEnabled = true
+                    self.lastLocalSeek = nil
                     self.configure(player, from: snapshot)
                     player.prepareToPlay()
+                    self.meter.begin(id: expectedID, duration: player.duration)
                     if !snapshot.paused { player.play() }
                     self.startProgressTimer()
                 }
@@ -554,25 +356,57 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         } else if !player.isPlaying {
             player.play()
         }
-        if abs(player.currentTime - snapshot.pos) > 2 {
+
+        // Who owns the clock. For runtime-file audio this device is the player,
+        // and the runtime's `pos` is an echo of the progress intents we send it
+        // -- its own ticker deliberately declines to estimate while a live
+        // client is playing. So a snapshot that disagrees with us is normally
+        // just stale, and after a local seek it is guaranteed to be: the Mac
+        // cannot know about the new position until our progress lands. Snapping
+        // to it during that window is exactly how a scrub gets yanked back.
+        //
+        // The grace window ends the moment the Mac agrees with us, and expires
+        // on its own after 3 s so a dropped intent cannot leave the two clocks
+        // permanently divorced.
+        if let seekedAt = lastLocalSeek {
+            if abs(player.currentTime - snapshot.pos) <= 2 || Date().timeIntervalSince(seekedAt) > 3 {
+                lastLocalSeek = nil
+            }
+        } else if abs(player.currentTime - snapshot.pos) > 2 {
             player.currentTime = snapshot.pos
+            meter.moved(to: snapshot.pos)
         }
     }
 
     private func configure(_ player: AVAudioPlayer, from snapshot: DeckSnapshot) {
-        let speed = speeds.indices.contains(snapshot.speedIx) ? speeds[snapshot.speedIx] : 1
-        player.rate = Float(speed)
+        player.rate = Float(DeckPlaybackSpeeds.value(at: snapshot.speedIx))
         player.volume = Float(min(1, max(0, snapshot.vol)))
-        if player.currentTime == 0, snapshot.pos > 0 { player.currentTime = snapshot.pos }
+        // Joining a stream the Mac already started. Skipped after a local seek
+        // to zero, which would otherwise look identical to "never started".
+        if player.currentTime == 0, snapshot.pos > 0, lastLocalSeek == nil {
+            player.currentTime = snapshot.pos
+        }
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
         try? AVAudioSession.sharedInstance().setActive(true)
     }
 
+    /// One timer, two jobs. Metering runs at 20 Hz because that is what a
+    /// readable speech envelope costs; the Mac still hears from us twice a
+    /// second, which is all its snapshot rate can use.
     private func startProgressTimer() {
         progressTimer?.invalidate()
-        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let self, let player = self.audioPlayer, player.isPlaying, let id = self.audioPlayingID else { return }
-            self.sendIntent("playback.progress", ["id": id, "pos": player.currentTime, "dur": player.duration])
+        meterTick = 0
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            guard let self, let player = self.audioPlayer, let id = self.audioPlayingID else { return }
+            guard player.isPlaying else { return }
+            player.updateMeters()
+            self.meter.ingest(power: player.peakPower(forChannel: 0),
+                              position: player.currentTime,
+                              duration: player.duration)
+            self.meterTick &+= 1
+            if self.meterTick % 10 == 0 {
+                self.sendIntent("playback.progress", ["id": id, "pos": player.currentTime, "dur": player.duration])
+            }
         }
     }
 
@@ -584,6 +418,8 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         audioPlayer?.stop()
         audioPlayer = nil
         audioPlayingID = nil
+        lastLocalSeek = nil
+        meter.clear()
     }
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
@@ -592,6 +428,8 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         progressTimer = nil
         audioPlayer = nil
         audioPlayingID = nil
+        lastLocalSeek = nil
+        meter.clear()
         sendIntent("playback.ended", ["id": id])
     }
 

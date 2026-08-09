@@ -15,8 +15,8 @@ importers:
   .:
     dependencies:
       '@openscout/agent-sessions':
-        specifier: ^0.2.64
-        version: 0.2.64
+        specifier: ^0.2.78
+        version: 0.2.78
       bonjour-service:
         specifier: ^1.4.4
         version: 1.4.4
@@ -252,8 +252,9 @@ packages:
   '@leichtgewicht/ip-codec@2.0.5':
     resolution: {integrity: sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==}
 
-  '@openscout/agent-sessions@0.2.64':
-    resolution: {integrity: sha512-ZnrGDvyT+yMMcgd8Y+JEA1psrFA2yGTor4YaVnZ0lLCT9bkpTafFesd5sm41iZcN/1uhUVc6x1yyGt2ND5NKog==}
+  '@openscout/agent-sessions@0.2.78':
+    resolution: {integrity: sha512-XoMo62rqd8nV3LruQIljkfCbdj3nHDzpdlJGCAX3tYa9Hpo6oXDs3l2i/lV+8Owge+dnCKuDYXamihaRqcB5Hg==}
+    engines: {node: '>=18'}
 
   '@rollup/rollup-android-arm-eabi@4.62.2':
     resolution: {integrity: sha512-6o7ZLZK+BeenkZCFNDXqpbjw9bD6nuWonvS/lwQJp7NoVVxm6p3qE7qQ5jGuBjiFsgvqjD8mZAU5oWxTmbOeOg==}
@@ -1343,7 +1344,7 @@ snapshots:
 
   '@leichtgewicht/ip-codec@2.0.5': {}
 
-  '@openscout/agent-sessions@0.2.64': {}
+  '@openscout/agent-sessions@0.2.78': {}
 
   '@rollup/rollup-android-arm-eabi@4.62.2':
     optional: true
