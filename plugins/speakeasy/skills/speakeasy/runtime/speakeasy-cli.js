@@ -1967,6 +1967,97 @@ var init_registry = __esm(() => {
     "gemini"
   ];
 });
+
+// src/narration/chunk.ts
+function chunkLimitForProvider(provider, requested = NARRATION_CHUNK_CHARS) {
+  const providerLimit = provider ? PROVIDER_TEXT_LIMITS[provider] : undefined;
+  const limit = Math.min(requested, providerLimit ?? NARRATION_CHUNK_CHARS);
+  return Math.max(1, limit);
+}
+function significant(text) {
+  return text.replace(/\s+/g, "");
+}
+function splitParagraphs(text) {
+  return text.split(/\n\s*\n+/);
+}
+function splitSentences(text) {
+  return text.match(/[^.!?\u2026]+(?:[.!?\u2026]+["'\u201D\u2019)\]]*\s*|$)/g) ?? [text];
+}
+function splitClauses(text) {
+  return text.match(/[^,;:\u2014\u2013]+(?:[,;:\u2014\u2013]+\s*|$)/g) ?? [text];
+}
+function splitWords(text) {
+  return text.split(/\s+/).filter(Boolean);
+}
+function splitHard(text, max) {
+  const out = [];
+  for (let i = 0;i < text.length; i += max)
+    out.push(text.slice(i, i + max));
+  return out;
+}
+function pack(units, max, deeper) {
+  const out = [];
+  let current = "";
+  const flush = () => {
+    const trimmed = current.trim();
+    if (trimmed)
+      out.push(trimmed);
+    current = "";
+  };
+  for (const raw of units) {
+    const unit = raw.trim();
+    if (!unit)
+      continue;
+    if (unit.length > max) {
+      flush();
+      out.push(...deeper(unit));
+      continue;
+    }
+    const joined = current ? `${current} ${unit}` : unit;
+    if (joined.length > max) {
+      flush();
+      current = unit;
+    } else {
+      current = joined;
+    }
+  }
+  flush();
+  return out;
+}
+function chunkForNarration(text, options = {}) {
+  const max = Math.max(1, Math.floor(options.maxChars ?? NARRATION_CHUNK_CHARS));
+  const trimmed = text.trim();
+  if (!trimmed)
+    return [];
+  if (trimmed.length <= max)
+    return [trimmed];
+  const chunks = pack(splitParagraphs(trimmed), max, (paragraph) => pack(splitSentences(paragraph), max, (sentence) => pack(splitClauses(sentence), max, (clause) => pack(splitWords(clause), max, (word) => splitHard(word, max)))));
+  assertLossless(trimmed, chunks);
+  return chunks;
+}
+function assertLossless(source, chunks) {
+  const expected = significant(source);
+  const actual = significant(chunks.join(""));
+  if (expected === actual)
+    return;
+  throw new NarrationChunkError(`Narration chunking lost text: expected ${expected.length} characters, produced ${actual.length}.`);
+}
+var PROVIDER_TEXT_LIMITS, NARRATION_CHUNK_CHARS = 1200, NarrationChunkError;
+var init_chunk = __esm(() => {
+  PROVIDER_TEXT_LIMITS = {
+    openai: 4096,
+    elevenlabs: 9500,
+    groq: 9500,
+    gemini: 4000,
+    system: 32000
+  };
+  NarrationChunkError = class NarrationChunkError extends Error {
+    constructor(message) {
+      super(message);
+      this.name = "NarrationChunkError";
+    }
+  };
+});
 // src/player-protocol.ts
 var PLAYER_PROTOCOL_VERSION = 1, PLAYER_SOCKET_PATH = "/tmp/speakeasy-player.sock";
 
@@ -2077,14 +2168,19 @@ __export(exports_src, {
   getAvailableVoices: () => getAvailableVoices,
   enqueueInPlayer: () => enqueueInPlayer,
   createAdapterRegistry: () => createAdapterRegistry,
+  chunkLimitForProvider: () => chunkLimitForProvider,
+  chunkForNarration: () => chunkForNarration,
   TTSCache: () => TTSCache,
   SystemProvider: () => SystemProvider,
   SpeakEasy: () => SpeakEasy,
   PlayerUnavailableError: () => PlayerUnavailableError,
+  PROVIDER_TEXT_LIMITS: () => PROVIDER_TEXT_LIMITS,
   PROVIDER_ORDER: () => PROVIDER_ORDER,
   PLAYER_SOCKET_PATH: () => PLAYER_SOCKET_PATH,
   PLAYER_PROTOCOL_VERSION: () => PLAYER_PROTOCOL_VERSION,
   OpenAIProvider: () => OpenAIProvider,
+  NarrationSegmentError: () => NarrationSegmentError,
+  NARRATION_CHUNK_CHARS: () => NARRATION_CHUNK_CHARS,
   GroqProvider: () => GroqProvider,
   GeminiProvider: () => GeminiProvider,
   ElevenLabsProvider: () => ElevenLabsProvider,
@@ -2117,6 +2213,7 @@ class SpeakEasy {
   debug = false;
   hudEnabled = false;
   lastAudioFile = null;
+  lastAudioFiles = [];
   constructor(config) {
     const globalConfig = loadGlobalConfig();
     this.hudEnabled = globalConfig.hud?.enabled ?? false;
@@ -2158,32 +2255,57 @@ class SpeakEasy {
     if (options.interrupt && this.isPlaying) {
       this.stopSpeaking();
     }
+    const maxChars = chunkLimitForProvider(this.config.provider);
+    const segments = chunkForNarration(cleanText, { maxChars });
+    if (segments.length === 0)
+      return;
+    if (!this.isPlaying)
+      this.lastAudioFiles = [];
     if (options.priority === "high") {
-      this.queue.unshift({ text: cleanText, options });
+      for (let i = segments.length - 1;i >= 0; i--) {
+        this.queue.unshift({ text: segments[i], options });
+      }
     } else {
-      this.queue.push({ text: cleanText, options });
+      for (const segment of segments) {
+        this.queue.push({ text: segment, options });
+      }
+    }
+    if (this.debug && segments.length > 1) {
+      console.log(`\uD83E\uDDE9 Narrating ${cleanText.length} characters as ${segments.length} segments`);
     }
     if (!this.isPlaying) {
       await this.processQueue();
     }
   }
   async processQueue() {
-    if (this.queue.length === 0)
+    if (this.isPlaying)
       return;
     this.isPlaying = true;
-    const { text, options } = this.queue.shift();
+    const failures = [];
     try {
-      await this.speakText(text, options);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error("\u274C Speech error:", errorMsg);
-      throw error;
+      while (this.queue.length > 0) {
+        const { text, options } = this.queue.shift();
+        try {
+          await this.speakText(text, options);
+        } catch (error) {
+          const failure = error instanceof Error ? error : new Error(String(error));
+          console.error("\u274C Speech error:", failure.message);
+          failures.push({ text, error: failure });
+        }
+      }
     } finally {
       this.isPlaying = false;
-      if (this.queue.length > 0) {
-        await this.processQueue();
-      }
     }
+    if (failures.length > 0) {
+      throw new NarrationSegmentError(failures);
+    }
+  }
+  clearQueue() {
+    this.queue.length = 0;
+  }
+  cancel() {
+    this.clearQueue();
+    this.stopSpeaking();
   }
   async speakText(text, options = {}) {
     const requestedId = this.config.provider || "system";
@@ -2221,7 +2343,7 @@ class SpeakEasy {
           const cachedEntry = await this.cache.get(cacheKey);
           if (cachedEntry) {
             console.log("(already cached)");
-            this.lastAudioFile = cachedEntry.audioFilePath;
+            this.recordAudioFile(cachedEntry.audioFilePath);
             if (this.debug) {
               console.log(`\uD83D\uDCE6 Using cached audio from: ${cachedEntry.audioFilePath}`);
             }
@@ -2248,7 +2370,7 @@ class SpeakEasy {
             extension: result.format
           });
           if (stored) {
-            this.lastAudioFile = path6.join(this.cache.getCacheDir(), `${cacheKey}.${result.format}`);
+            this.recordAudioFile(path6.join(this.cache.getCacheDir(), `${cacheKey}.${result.format}`));
           }
           console.log("cached");
         }
@@ -2273,6 +2395,10 @@ class SpeakEasy {
       throw new Error(`All providers failed. Last error: ${lastError.message}`);
     }
     throw new Error(`No available TTS provider. Ensure you're on macOS for system voice.`);
+  }
+  recordAudioFile(file) {
+    this.lastAudioFile = file;
+    this.lastAudioFiles.push(file);
   }
   buildRequest(text, providerId) {
     return {
@@ -2411,7 +2537,7 @@ class SpeakEasy {
     return this.requireCache().findByProvider(provider);
   }
 }
-var API_KEY_HELP, API_KEY_URLS, say = (text, provider) => {
+var API_KEY_HELP, API_KEY_URLS, NarrationSegmentError, say = (text, provider) => {
   if (typeof text !== "string" || !text.trim()) {
     throw new Error("Text argument is required for say()");
   }
@@ -2432,7 +2558,9 @@ var init_src = __esm(() => {
   init_registry();
   init_audio();
   init_paths();
+  init_chunk();
   init_paths();
+  init_chunk();
   init_registry();
   init_audio();
   init_system();
@@ -2453,6 +2581,16 @@ var init_src = __esm(() => {
     elevenlabs: "https://elevenlabs.io/app/settings/api-keys",
     groq: "https://console.groq.com/keys",
     gemini: "https://makersuite.google.com/app/apikey"
+  };
+  NarrationSegmentError = class NarrationSegmentError extends Error {
+    failures;
+    constructor(failures) {
+      const detail = failures.map((f) => f.error.message).join("; ");
+      super(`${failures.length} narration segment${failures.length === 1 ? "" : "s"} failed: ${detail}`);
+      this.name = "NarrationSegmentError";
+      this.failures = failures;
+      this.cause = failures[0]?.error;
+    }
   };
 });
 
@@ -12891,15 +13029,29 @@ function storedThreadId(key) {
     return null;
   }
 }
-function conciseReply(value, emptyMessage) {
-  const text = value.trim();
-  if (!text)
-    throw new Error(emptyMessage);
-  return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, "") + "\u2026" : text;
-}
 function estimateDuration(text, rate = 1) {
   const words = text.split(/\s+/).filter(Boolean).length;
   return Math.max(1.5, words / (2.5 * rate));
+}
+function audioDurationOf(file) {
+  try {
+    const info = execFileSync2("afinfo", [file], {
+      encoding: "utf8",
+      timeout: 5000,
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+    const match = info.match(/estimated duration:\s*([\d.]+)\s*sec/i);
+    const seconds = match ? Number.parseFloat(match[1]) : Number.NaN;
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+  } catch {
+    return null;
+  }
+}
+function measureSegmentDurations(files, text) {
+  if (files.length === 0)
+    return [];
+  const fallback = Math.max(1.5, estimateDuration(text) / files.length);
+  return files.map((file) => audioDurationOf(file) ?? fallback);
 }
 function parseIntent(raw) {
   const parsed = intentSchema.safeParse(raw);
@@ -12969,6 +13121,7 @@ var init_deck_runtime = __esm(() => {
     playing = null;
     paused = false;
     pos = 0;
+    segIx = 0;
     speedIx = 0;
     vol = 0.8;
     autoplay = true;
@@ -13079,6 +13232,9 @@ var init_deck_runtime = __esm(() => {
         playing: this.playing,
         paused: this.paused,
         pos: this.pos,
+        segIx: this.segIx,
+        segStart: this.segmentStart(),
+        segCount: this.segmentCount(),
         speedIx: this.speedIx,
         vol: this.vol,
         autoplay: this.autoplay,
@@ -13293,6 +13449,7 @@ var init_deck_runtime = __esm(() => {
       this.playing = null;
       this.paused = false;
       this.pos = 0;
+      this.segIx = 0;
       this.setPhase("idle", "READY");
       this.log("PLAYBACK ENDED", "buffer complete");
     }
@@ -13304,6 +13461,7 @@ var init_deck_runtime = __esm(() => {
       this.playing = null;
       this.paused = false;
       this.pos = 0;
+      this.segIx = 0;
       if (confirm)
         this.setPhase(this.phase === "speaking" ? "idle" : this.phase, confirm);
     }
@@ -13364,8 +13522,7 @@ var init_deck_runtime = __esm(() => {
             this.stopPlayer();
             this.startPlayback(intent.id, "PLAYING");
             this.log("PLAYBACK STARTED", `${SPEEDS[this.speedIx].toFixed(2)}x`);
-            if (msg.file)
-              this.playFile(msg.file);
+            this.startSegments(msg);
           }
           this.ensureTicker();
           this.changed();
@@ -13406,7 +13563,7 @@ var init_deck_runtime = __esm(() => {
               this.startPlayback(`${this.laneIx}:${i}`, "REPLAYING LAST REPLY");
               this.ensureTicker();
               this.log("REPLAY", `lane ${this.laneIx + 1} \xB7 last reply`);
-              this.playFile(t[i].file);
+              this.startSegments(t[i]);
               this.changed();
               return { ok: true, rev: this.rev };
             }
@@ -13473,11 +13630,14 @@ var init_deck_runtime = __esm(() => {
         case "playback.progress": {
           if (this.playing !== intent.id)
             return { ok: false, rev: this.rev, error: "not playing" };
-          this.pos = intent.pos;
+          this.pos = this.segmentStart() + intent.pos;
           if (intent.dur) {
             const msg = this.messageAt(intent.id);
+            const durs = msg?.segmentDurs;
+            if (durs)
+              durs[this.segIx] = intent.dur;
             if (msg)
-              msg.dur = intent.dur;
+              msg.dur = durs ? durs.reduce((total, d) => total + d, 0) : intent.dur;
           }
           this.changed();
           return { ok: true, rev: this.rev };
@@ -13485,6 +13645,12 @@ var init_deck_runtime = __esm(() => {
         case "playback.ended": {
           if (this.playing !== intent.id)
             return { ok: false, rev: this.rev, error: "not playing" };
+          if (this.advanceSegment()) {
+            this.pos = this.segmentStart();
+            this.log("SEGMENT", `${this.segIx + 1}/${this.segmentCount()}`);
+            this.changed();
+            return { ok: true, rev: this.rev };
+          }
           this.finishPlayback(true);
           this.changed();
           return { ok: true, rev: this.rev };
@@ -13503,9 +13669,13 @@ var init_deck_runtime = __esm(() => {
       }
       this.changed();
       if (play) {
-        const file = await this.synthesize(text);
-        if (file)
-          this.playFile(file);
+        const files = await this.synthesizeSegments(text);
+        if (files.length === 0)
+          return;
+        this.attachSegments(msg, files, text, false);
+        if (this.playing === id)
+          this.startSegments(msg);
+        this.changed();
       }
     }
     pushMessage(lane, msg) {
@@ -13536,7 +13706,7 @@ var init_deck_runtime = __esm(() => {
         this.setPhase("preparingSpeech", `PREPARING SPEECH \xB7 ${laneNumber(lane)}`);
         this.log("AGENT REPLY", `${msg.dur.toFixed(0)}s queued`);
         this.changed();
-        const file = await this.synthesize(reply);
+        const files = await this.synthesizeSegments(reply);
         if (!alive()) {
           if (!msg.file) {
             msg.mirrored = true;
@@ -13544,22 +13714,23 @@ var init_deck_runtime = __esm(() => {
           }
           return;
         }
-        if (!file) {
+        if (files.length === 0) {
           msg.mirrored = true;
           this.setPhase("idle", `READY \xB7 ${laneNumber(lane)}`);
           this.log("NO AUDIO", "synthesis unavailable \xB7 text-only reply");
           this.changed();
           return;
         }
-        msg.file = file;
-        msg.audioUrl = `/audio/${path13.basename(file)}`;
+        this.attachSegments(msg, files, reply);
+        if (files.length > 1) {
+          this.log("NARRATION SEGMENTS", `${files.length} parts \xB7 ${msg.dur.toFixed(0)}s total`);
+        }
         if (this.autoplay && this.suppressAutoplayForGeneration !== gen) {
           this.startPlayback(id, `SPEAKING \xB7 ${laneNumber(lane)}`);
           this.setLaneState(lane, "speaking");
           this.ensureTicker();
           this.changed();
-          if (this.liveClients() === 0)
-            this.playFile(file);
+          this.startSegments(msg);
         } else {
           this.setPhase("idle", `READY \xB7 ${laneNumber(lane)}`);
           this.changed();
@@ -13594,7 +13765,10 @@ var init_deck_runtime = __esm(() => {
             this.canonicalSessionReady = true;
             lane.updatedAt = Date.now();
             this.log("CANONICAL TURN", result2.delivery === "steered-active-turn" ? `lane ${laneIx + 1} \xB7 steered active Codex task` : `lane ${laneIx + 1} \xB7 started in Codex Desktop`);
-            return conciseReply(result2.response, "empty reply from the canonical task");
+            const text2 = result2.response.trim();
+            if (!text2)
+              throw new Error("empty reply from the canonical task");
+            return text2;
           } finally {
             if (this.canonicalTurnAbort === controller)
               this.canonicalTurnAbort = null;
@@ -13616,7 +13790,10 @@ Operator asks: ${question.slice(0, 500)}`;
           }
           lane.updatedAt = Date.now();
         }
-        return conciseReply(result.text, "empty reply from session");
+        const text = result.text.trim();
+        if (!text)
+          throw new Error("empty reply from session");
+        return text;
       } catch (error) {
         const canonical = route.kind === "canonical";
         this.log(canonical ? "CANONICAL FAILED" : "AGENT FAILED", error.message.slice(0, 60));
@@ -13638,29 +13815,80 @@ Operator asks: ${question.slice(0, 500)}`;
       for (const { client } of this.laneClients.values())
         client.interrupt?.();
     }
-    async synthesize(text) {
+    async synthesizeSegments(text) {
+      const stamp = Date.now();
       try {
         const { SpeakEasy: SpeakEasy2 } = await Promise.resolve().then(() => (init_src(), exports_src));
         const speaker = new SpeakEasy2({
           volume: this.vol,
           cache: { enabled: true }
         });
-        await speaker.speak(text, { silent: true });
-        if (speaker.lastAudioFile && existsSync14(speaker.lastAudioFile)) {
-          const owned = path13.join(this.synthDir, `reply-${Date.now()}${path13.extname(speaker.lastAudioFile) || ".mp3"}`);
-          copyFileSync(speaker.lastAudioFile, owned);
-          return owned;
+        try {
+          await speaker.speak(text, { silent: true });
+        } catch (error) {
+          this.log("SYNTH PARTIAL", error.message.slice(0, 60));
         }
+        const owned = [];
+        speaker.lastAudioFiles.forEach((source, i) => {
+          if (!existsSync14(source))
+            return;
+          const target = path13.join(this.synthDir, `reply-${stamp}-${String(i).padStart(2, "0")}${path13.extname(source) || ".mp3"}`);
+          copyFileSync(source, target);
+          owned.push(target);
+        });
+        if (owned.length > 0)
+          return owned;
       } catch {}
-      const file = path13.join(this.synthDir, `reply-${Date.now()}.aiff`);
+      const file = path13.join(this.synthDir, `reply-${stamp}.aiff`);
       try {
-        await run("say", ["-o", file, text], 30000);
-        return file;
+        await run("say", ["-o", file, text], 120000);
+        return [file];
       } catch (error) {
         this.log("SYNTH FAILED", error.message.slice(0, 60));
         this.changed();
-        return null;
+        return [];
       }
+    }
+    attachSegments(msg, files, text, exposeToDeck = true) {
+      const durations = measureSegmentDurations(files, text);
+      msg.segments = files;
+      msg.segmentUrls = exposeToDeck ? files.map((f) => `/audio/${path13.basename(f)}`) : undefined;
+      msg.segmentDurs = durations;
+      msg.dur = durations.reduce((total, d) => total + d, 0);
+      this.focusSegment(msg, 0);
+    }
+    focusSegment(msg, ix) {
+      msg.file = msg.segments?.[ix];
+      msg.audioUrl = msg.segmentUrls?.[ix];
+    }
+    segmentStart() {
+      const msg = this.playing ? this.messageAt(this.playing) : null;
+      const durs = msg?.segmentDurs;
+      if (!durs)
+        return 0;
+      return durs.slice(0, this.segIx).reduce((total, d) => total + d, 0);
+    }
+    segmentCount() {
+      const msg = this.playing ? this.messageAt(this.playing) : null;
+      return msg?.segments?.length ?? (msg?.file ? 1 : 0);
+    }
+    advanceSegment() {
+      if (!this.playing)
+        return false;
+      const msg = this.messageAt(this.playing);
+      const segments = msg?.segments;
+      if (!msg || !segments || this.segIx + 1 >= segments.length)
+        return false;
+      this.segIx += 1;
+      this.focusSegment(msg, this.segIx);
+      return true;
+    }
+    startSegments(msg) {
+      this.segIx = 0;
+      this.focusSegment(msg, 0);
+      this.pos = 0;
+      if (this.liveClients() === 0 && msg.file)
+        this.playFile(msg.file);
     }
     playFile(file) {
       if (this.liveClients() > 0)
@@ -13678,10 +13906,20 @@ Operator asks: ${question.slice(0, 500)}`;
         if (this.player !== player)
           return;
         this.player = null;
-        if (this.playing && !this.paused) {
-          this.finishPlayback(true);
-          this.changed();
+        if (!this.playing || this.paused)
+          return;
+        if (this.advanceSegment()) {
+          const next = this.messageAt(this.playing)?.file;
+          this.pos = this.segmentStart();
+          if (next) {
+            this.log("SEGMENT", `${this.segIx + 1}/${this.segmentCount()}`);
+            this.changed();
+            this.playFile(next);
+            return;
+          }
         }
+        this.finishPlayback(true);
+        this.changed();
       });
     }
     stopPlayer() {
@@ -21293,12 +21531,12 @@ var require_packer_sync = __commonJS((exports, module) => {
 // node_modules/.pnpm/pngjs@5.0.0/node_modules/pngjs/lib/png-sync.js
 var require_png_sync = __commonJS((exports) => {
   var parse2 = require_parser_sync();
-  var pack = require_packer_sync();
+  var pack2 = require_packer_sync();
   exports.read = function(buffer, options) {
     return parse2(buffer, options || {});
   };
   exports.write = function(png, options) {
-    return pack(png, options);
+    return pack2(png, options);
   };
 });
 
