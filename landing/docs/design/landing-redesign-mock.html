@@ -350,25 +350,24 @@
     </div>
 
     <p class="hero-sub">
-      A TypeScript text-to-speech library and CLI. macOS system voices, OpenAI, ElevenLabs,
-      Groq, and Gemini behind one function — with automatic fallback, so it
-      <em>always says something</em>.
+      Give your coding agent a voice. One command installs the skill; after that it speaks
+      its own summaries, with a real player — transport, speed, and a synced transcript.
+      <em>Or use the library directly</em>: macOS voices, OpenAI, ElevenLabs, Groq, and Gemini
+      behind one function.
     </p>
 
     <div class="install">
       <div class="install-tabs" id="installTabs">
-        <button class="active" data-cmd="bun add @arach/speakeasy">bun</button>
-        <button data-cmd="pnpm add @arach/speakeasy">pnpm</button>
-        <button data-cmd="npm install @arach/speakeasy">npm</button>
-        <button data-cmd="yarn add @arach/speakeasy">yarn</button>
-        <button data-cmd='npx @arach/speakeasy "hello"'>npx</button>
+        <button class="active" data-cmd="bunx @arach/speakeasy plugin codex">Codex</button>
+        <button data-cmd="bunx @arach/speakeasy plugin claude">Claude Code</button>
       </div>
       <!-- Kept on one line deliberately: .codebox is white-space: pre, so a
            newline before the copy button renders as blank lines in the box. -->
-      <div class="codebox"><span class="prompt">$ </span><span id="installCmd">bun add @arach/speakeasy</span><button class="copy-btn" data-copy-target="installCmd">copy</button></div>
+      <div class="codebox"><span class="prompt">$ </span><span id="installCmd">bunx @arach/speakeasy plugin codex</span><button class="copy-btn" data-copy-target="installCmd">copy</button></div>
     </div>
 
     <div class="hero-links">
+      <a href="/agent.md">Point your agent here</a>
       <a href="/docs/">Read the docs</a>
       <a href="https://github.com/arach/SpeakEasy">Star on GitHub</a>
     </div>
