@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="flight">
+<html lang="en" data-theme="porcelain">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,7 +13,7 @@
    is an override — no color lives only inside a media query. */
 
 /* ---- finishes (instrument skins) ---- */
-:root, :root[data-theme="flight"], .theme-flight {
+:root[data-theme="flight"], .theme-flight {
   --f-text:#E8ECEF; --f-muted:#8A949C; --f-faint:#5A646C;
   --f-accent:#6FE3B4; --f-accent-ink:#062A1E; --f-amber:#F0B45A; --f-red:#F0645A;
   --f-slab-hi:#262E34; --f-slab-lo:#12171B; --f-slab-edge:#313A41;
@@ -41,7 +41,9 @@
   --f-pad-hi:#241B16; --f-pad-lo:#1A1310; --f-pad-edge:#3A2C25; --f-pad-text:#D9C8BC;
   --f-floor:rgba(0,0,0,.5);
 }
-:root[data-theme="porcelain"], .theme-porcelain {
+/* Porcelain is the default finish: it is the bare :root fallback as well as an
+   explicitly selectable theme, so an unset data-theme lands here, not on flight. */
+:root, :root[data-theme="porcelain"], .theme-porcelain {
   --f-text:#1D2328; --f-muted:#5F6C75; --f-faint:#93A1AA;
   --f-accent:#2E7D8C; --f-accent-ink:#F2F7F8; --f-amber:#B4762A; --f-red:#B4443C;
   --f-slab-hi:#FFFFFF; --f-slab-lo:#E4EAEE; --f-slab-edge:#C2CED6;
@@ -504,7 +506,7 @@ footer .label { line-height:2; }
       <div class="placard label">
         <span>MODEL SE-1</span>
         <span>9 LANES · PARAKEET ASR</span>
-        <span class="acc">GRAPHITE / MINT</span>
+        <span class="acc"><span id="chipFinish">PORCELAIN</span> / MINT</span>
       </div>
       <h1 class="display">A pad for the Codex tasks<br><em>you're already running.</em></h1>
       <p class="sub">It runs on an iPad as a web app, with nine lanes — one Codex task each.
@@ -522,7 +524,7 @@ footer .label { line-height:2; }
         <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
         <div class="unit-head">
           <span class="label">SPEAKEASY — THE PAD</span>
-          <span class="label">UNIT 001 · FLIGHT</span>
+          <span class="label">UNIT 001 · <span id="unitFinish">PORCELAIN</span></span>
         </div>
         <div class="unit-body">
           <div class="unit-side">
@@ -826,9 +828,9 @@ footer .label { line-height:2; }
         <div class="prev theme-paper"><span class="mini"></span><span class="mini"></span><span class="mini"></span><span class="mini"></span></div>
         <div class="swlabel"><span>PAPER</span><span class="mono" style="font-size:8px;color:var(--faint);">WARM CREAM</span></div>
       </div>
-      <div class="swatch current" data-set-theme="flight">
+      <div class="swatch" data-set-theme="flight">
         <div class="prev theme-flight"><span class="mini"></span><span class="mini"></span><span class="mini"></span><span class="mini"></span></div>
-        <div class="swlabel"><span>FLIGHT</span><span class="tag">SHOWN</span></div>
+        <div class="swlabel"><span>FLIGHT</span><span class="mono" style="font-size:8px;color:var(--faint);">COOL STEEL</span></div>
       </div>
       <div class="swatch" data-set-theme="obsidian">
         <div class="prev theme-obsidian"><span class="mini"></span><span class="mini"></span><span class="mini"></span><span class="mini"></span></div>
@@ -838,9 +840,9 @@ footer .label { line-height:2; }
         <div class="prev theme-ember"><span class="mini"></span><span class="mini"></span><span class="mini"></span><span class="mini"></span></div>
         <div class="swlabel"><span>EMBER</span><span class="mono" style="font-size:8px;color:var(--faint);">WARM DARK</span></div>
       </div>
-      <div class="swatch" data-set-theme="porcelain">
+      <div class="swatch current" data-set-theme="porcelain">
         <div class="prev theme-porcelain"><span class="mini"></span><span class="mini"></span><span class="mini"></span><span class="mini"></span></div>
-        <div class="swlabel"><span>PORCELAIN</span><span class="mono" style="font-size:8px;color:var(--faint);">COOL LIGHT</span></div>
+        <div class="swlabel"><span>PORCELAIN</span><span class="tag">SHOWN</span></div>
       </div>
     </div>
   </div>
@@ -904,9 +906,17 @@ footer .label { line-height:2; }
   var swatches = document.querySelectorAll('[data-set-theme]');
   swatches.forEach(function (sw) {
     sw.addEventListener('click', function () {
-      document.documentElement.setAttribute('data-theme', sw.getAttribute('data-set-theme'));
+      var finish = sw.getAttribute('data-set-theme');
+      document.documentElement.setAttribute('data-theme', finish);
       document.querySelectorAll('.swatch').forEach(function (s) { s.classList.remove('current'); });
       sw.classList.add('current');
+      // Keep the engraved plate honest — a unit skinned in ember should not
+      // still claim to be porcelain.
+      var name = finish.toUpperCase();
+      ['unitFinish', 'chipFinish'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = name;
+      });
     });
   });
 
