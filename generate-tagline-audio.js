@@ -3,8 +3,13 @@
 const { execSync } = require('child_process');
 const path = require('path');
 
-const text = "Simple text-to-speech for all your projects. Multiple providers, smart caching, and volume control.";
-const outputPath = path.join(__dirname, 'landing/public/audio/tagline-demo.mp3');
+// Shared with the landing page so the transcript shown on the site and the
+// line actually synthesized here cannot drift apart. Edit the JSON, not this
+// file, then re-run to regenerate the asset.
+const demoAudio = require('./landing/lib/demo-audio.json');
+
+const text = demoAudio.spokenText;
+const outputPath = path.join(__dirname, 'landing/public', demoAudio.src);
 
 console.log('🎵 Generating tagline audio...');
 console.log(`Text: "${text}"`);

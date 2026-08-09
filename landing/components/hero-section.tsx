@@ -10,6 +10,7 @@ import PackageManagerTabs from "@/components/package-manager-tabs"
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import GitHubRibbon from "@/components/github-ribbon"
+import { taglineDemo } from "@/lib/demo-audio"
 
 function HeroAudioPlayer({ onPlayingChange }: { onPlayingChange?: (playing: boolean) => void }) {
   const [isPlaying, setIsPlaying] = useState(false)
@@ -38,9 +39,10 @@ function HeroAudioPlayer({ onPlayingChange }: { onPlayingChange?: (playing: bool
 
   return (
     <div className="flex items-center gap-2 relative">
-      <audio 
+      <audio
         ref={audioRef}
-        src="/audio/tagline-demo.mp3"
+        src={taglineDemo.src}
+        aria-label={`Spoken sample: ${taglineDemo.spokenText}`}
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
