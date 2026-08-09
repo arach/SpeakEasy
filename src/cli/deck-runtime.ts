@@ -207,6 +207,7 @@ const OVERVIEW_MODEL = 'gpt-5.6-luna';
  * the board and report, never overthink or get clever. */
 const OVERVIEW_EFFORT = 'low';
 const TICK_MS = 250;
+const DEVICE_PLAYBACK_GRACE_MS = 10_000;
 /** Deep enough to hold a failure and the turn that caused it. */
 const TRACE_LIMIT = 24;
 const MAX_MESSAGES_PER_LANE = 50;
@@ -536,6 +537,8 @@ export class DeckRuntime extends EventEmitter {
   private catalogError: string | null = null;
   private catalogRefresh: Promise<void> | null = null;
   private ticker: NodeJS.Timeout | null = null;
+  /** Last proof that the device-owned playhead is still moving. */
+  private devicePlaybackObservedAt = 0;
   private busy = false;
   private destroyed = false;
   /** Bumped for each accepted capture and teardown; async phases retain only
@@ -1162,7 +1165,24 @@ export class DeckRuntime extends EventEmitter {
     this.playing = null;
     this.paused = false;
     this.pos = 0;
+    this.devicePlaybackObservedAt = 0;
     if (confirm) this.setPhase(this.phase === 'speaking' ? 'idle' : this.phase, confirm);
+  }
+
+  private beginDevicePlaybackWatch(): void {
+    this.devicePlaybackObservedAt = Date.now();
+  }
+
+  private finishPlayback(kind = 'PLAYBACK ENDED', detail = 'buffer complete'): void {
+    if (!this.playing) return;
+    const [li] = this.playing.split(':').map(Number);
+    this.playing = null;
+    this.pos = 0;
+    this.paused = false;
+    this.devicePlaybackObservedAt = 0;
+    this.setPhase('idle', 'READY');
+    this.setLaneState(li, 'idle');
+    this.log(kind, detail);
   }
 
   private ensureTicker(): void {
@@ -1170,8 +1190,17 @@ export class DeckRuntime extends EventEmitter {
     this.ticker = setInterval(() => {
       if (!this.playing || this.paused) return;
       if (!this.player && this.liveClients() > 0 && !this.messageAt(this.playing)?.mirrored) {
-        // a connected deck owns playback of runtime files — progress arrives
-        // as playback.progress intents; nothing to estimate here
+        // A connected deck owns this clock, but ownership expires. An iPad can
+        // vanish while other viewers keep liveClients nonzero, so waiting only
+        // for playback.ended can pin the phase forever.
+        const observedAt = this.devicePlaybackObservedAt || Date.now();
+        this.devicePlaybackObservedAt = observedAt;
+        const remainingMs = (Math.max(0, this.durOf(this.playing) - this.pos) / SPEEDS[this.speedIx]) * 1_000;
+        if (Date.now() - observedAt > remainingMs + DEVICE_PLAYBACK_GRACE_MS) {
+          const stalledID = this.playing;
+          this.finishPlayback('PLAYBACK WATCHDOG', `${stalledID} · device progress expired`);
+        }
+        this.changed();
         return;
       }
       // file-backed progress tracks the launch rate; completion for those is
@@ -1181,11 +1210,7 @@ export class DeckRuntime extends EventEmitter {
       this.pos += (TICK_MS / 1000) * rate;
       const dur = this.durOf(this.playing);
       if (!this.player && this.pos >= dur) {
-        this.playing = null;
-        this.pos = 0;
-        this.paused = false;
-        this.log('PLAYBACK ENDED', 'buffer complete');
-        this.setPhase('idle', 'READY');
+        this.finishPlayback();
       }
       this.changed();
     }, TICK_MS);
@@ -1225,6 +1250,7 @@ export class DeckRuntime extends EventEmitter {
           this.log('PLAYBACK PAUSED', `${Math.floor(this.pos)}s elapsed`);
         } else if (this.playing === intent.id && this.paused) {
           this.paused = false;
+          this.beginDevicePlaybackWatch();
           this.player?.kill('SIGCONT');
           this.log('PLAYBACK RESUMED', `${Math.floor(this.pos)}s elapsed`);
         } else {
@@ -1232,6 +1258,7 @@ export class DeckRuntime extends EventEmitter {
           this.playing = intent.id;
           this.paused = false;
           this.pos = 0;
+          this.beginDevicePlaybackWatch();
           this.setPhase('speaking', 'PLAYING');
           this.log('PLAYBACK STARTED', `${SPEEDS[this.speedIx].toFixed(2)}x`);
           if (msg.file) this.playFile(msg.file);
@@ -1280,6 +1307,7 @@ export class DeckRuntime extends EventEmitter {
             this.playing = `${this.laneIx}:${i}`;
             this.paused = false;
             this.pos = 0;
+            this.beginDevicePlaybackWatch();
             this.setPhase('speaking', 'REPLAYING LAST REPLY');
             this.ensureTicker();
             this.log('REPLAY', `lane ${this.laneIx + 1} · last reply`);
@@ -1412,6 +1440,7 @@ export class DeckRuntime extends EventEmitter {
         // the device owns playback of runtime files — adopt its clock
         if (this.playing !== intent.id) return { ok: false, rev: this.rev, error: 'not playing' };
         this.pos = intent.pos;
+        this.devicePlaybackObservedAt = Date.now();
         if (intent.dur) {
           const msg = this.messageAt(intent.id);
           if (msg) msg.dur = intent.dur;
@@ -1421,13 +1450,7 @@ export class DeckRuntime extends EventEmitter {
       }
       case 'playback.ended': {
         if (this.playing !== intent.id) return { ok: false, rev: this.rev, error: 'not playing' };
-        const [li] = intent.id.split(':').map(Number);
-        this.playing = null;
-        this.pos = 0;
-        this.paused = false;
-        this.setPhase('idle', 'READY');
-        this.setLaneState(li, 'idle');
-        this.log('PLAYBACK ENDED', 'buffer complete');
+        this.finishPlayback();
         this.changed();
         return { ok: true, rev: this.rev };
       }
@@ -1446,6 +1469,7 @@ export class DeckRuntime extends EventEmitter {
       this.playing = id;
       this.paused = false;
       this.pos = 0;
+      this.devicePlaybackObservedAt = 0;
       this.setPhase('speaking', 'SPEAKING');
       this.ensureTicker();
     }
@@ -1515,6 +1539,7 @@ export class DeckRuntime extends EventEmitter {
         this.playing = id;
         this.paused = false;
         this.pos = 0;
+        this.beginDevicePlaybackWatch();
         this.setPhase('speaking', `SPEAKING · LANE ${String(lane + 1).padStart(2, '0')}`);
         this.setLaneState(lane, 'speaking');
         this.ensureTicker();
@@ -1690,13 +1715,7 @@ export class DeckRuntime extends EventEmitter {
       this.player = null;
       // natural completion is authoritative — the audio really is done
       if (this.playing && !this.paused) {
-        const [li] = this.playing.split(':').map(Number);
-        this.playing = null;
-        this.pos = 0;
-        this.paused = false;
-        this.setPhase('idle', 'READY');
-        this.setLaneState(li, 'idle');
-        this.log('PLAYBACK ENDED', 'buffer complete');
+        this.finishPlayback();
         this.changed();
       }
     });
