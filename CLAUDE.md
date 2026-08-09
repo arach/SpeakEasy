@@ -42,9 +42,6 @@ npm run dev
 
 # Run tests
 npm test
-
-# Manual testing
-npm run build && node dist/test.js
 ```
 
 ## Environment Setup

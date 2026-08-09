@@ -1,13 +1,14 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdtempSync, readdirSync, renameSync, rmSync, cpSync, lstatSync, readdirSync as listDir } from 'node:fs';
+import { createWriteStream, existsSync, mkdtempSync, readdirSync, renameSync, rmSync, cpSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import os from 'node:os';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import chalk from 'chalk';
+import { getPackageVersion } from './constants';
+import { CLAUDE_SKILLS_DIR, CODEX_SKILLS_DIR } from '../paths';
 
-const REPO = 'arach/SpeakEasy';
+export const REPO = 'arach/SpeakEasy';
 const SKILL_SUBPATH = path.join('plugins', 'speakeasy', 'skills', 'speakeasy');
 const MAX_TARBALL_BYTES = 150 * 1024 * 1024;
 const KEEP_BACKUPS = 3;
@@ -15,7 +16,7 @@ const KEEP_BACKUPS = 3;
 interface Host {
   id: string;
   name: string;
-  skillsDir: () => string;
+  skillsDir: string;
   hint: string;
 }
 
@@ -23,35 +24,66 @@ const HOSTS: Host[] = [
   {
     id: 'codex',
     name: 'Codex',
-    skillsDir: () => path.join(os.homedir(), '.codex', 'skills'),
+    skillsDir: CODEX_SKILLS_DIR,
     hint: 'Start a new Codex session, then say: “Read this summary aloud in SpeakEasy.”',
   },
   {
     id: 'claude',
     name: 'Claude Code',
-    skillsDir: () => path.join(os.homedir(), '.claude', 'skills'),
+    skillsDir: CLAUDE_SKILLS_DIR,
     hint: 'Start a new Claude Code session, then ask it to read something aloud.',
   },
 ];
 
-function usage(): void {
-  console.error('');
-  console.error(chalk.bold('  🔌 speakeasy plugin <host>'));
-  console.error('');
-  console.error('  Install the SpeakEasy skill into an agent host:');
-  for (const h of HOSTS) console.error(`    ${chalk.cyan(h.id.padEnd(8))} ${h.name}  ${chalk.dim('→ ' + h.skillsDir())}`);
-  console.error('');
-  console.error(chalk.dim('  Example: speakeasy plugin codex          (latest release)'));
-  console.error(chalk.dim('           speakeasy plugin codex --ref v0.2.17'));
-  console.error('');
+/** Where a host's SpeakEasy skill lives once installed. */
+function installedPath(host: Host): string {
+  return path.join(host.skillsDir, 'speakeasy');
 }
 
-function parsePluginArgs(argv: string[]): { host: string; ref?: string } {
+/** The inventory. `speakeasy plugin` with no host is a question, not a mistake,
+ *  so it answers on stdout and exits 0 — it shows what we ship and what is
+ *  already on this machine. Errors still route through usage() on stderr. */
+function listHosts(): void {
+  console.log('');
+  console.log(chalk.bold('  🔌 SpeakEasy plugins'));
+  console.log('');
+  for (const h of HOSTS) {
+    const present = existsSync(installedPath(h));
+    const mark = present ? chalk.green('✓ installed') : chalk.dim('· not installed');
+    console.log(`    ${chalk.cyan(h.id.padEnd(8))} ${h.name.padEnd(13)} ${mark}`);
+    console.log(`    ${' '.repeat(8)} ${chalk.dim(installedPath(h))}`);
+  }
+  console.log('');
+  console.log(chalk.dim('  Install one:  speakeasy plugin <host>'));
+  console.log(chalk.dim('  Remove one:   speakeasy plugin <host> --remove'));
+  console.log(chalk.dim(`  Pin a build:  speakeasy plugin <host> --ref v${getPackageVersion()}`));
+  console.log('');
+}
+
+function usage(out: (line: string) => void = console.error): void {
+  out('');
+  out(chalk.bold('  🔌 speakeasy plugin <host>'));
+  out('');
+  out('  Install the SpeakEasy skill into an agent host:');
+  for (const h of HOSTS) out(`    ${chalk.cyan(h.id.padEnd(8))} ${h.name}  ${chalk.dim('→ ' + h.skillsDir)}`);
+  out('');
+  out(chalk.dim('  Example: speakeasy plugin codex          (latest release)'));
+  out(chalk.dim(`           speakeasy plugin codex --ref v${getPackageVersion()}`));
+  out('');
+}
+
+function parsePluginArgs(argv: string[]): { host: string; ref?: string; remove: boolean } {
   let host = '';
   let ref: string | undefined;
+  let remove = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--ref') {
+    if (arg === '-h' || arg === '--help') {
+      usage(console.log);
+      process.exit(0);
+    } else if (arg === '--remove') {
+      remove = true;
+    } else if (arg === '--ref') {
       const value = argv[i + 1];
       if (!value || value.startsWith('-')) {
         console.error('❌ --ref requires a value, e.g. --ref v0.2.17');
@@ -71,7 +103,37 @@ function parsePluginArgs(argv: string[]): { host: string; ref?: string } {
       process.exit(1);
     }
   }
-  return { host, ref };
+  return { host, ref, remove };
+}
+
+/** Take the skill back out, along with the backups the installer left. The
+ *  inverse of installSkill() — same directory, nothing else touched. */
+function removeSkill(target: Host): void {
+  const dest = installedPath(target);
+  const skillsDir = target.skillsDir;
+  const backups = existsSync(skillsDir)
+    ? readdirSync(skillsDir).filter((e) => e.startsWith('speakeasy.backup-'))
+    : [];
+
+  if (!existsSync(dest) && !backups.length) {
+    console.log(`  ${chalk.dim('Nothing to remove —')} ${chalk.dim(dest)} ${chalk.dim('does not exist.')}`);
+    console.log('');
+    return;
+  }
+
+  if (existsSync(dest)) {
+    rmSync(dest, { recursive: true, force: true });
+    console.log(`  ${chalk.dim('Removed')}   ${dest}`);
+  }
+  for (const backup of backups) {
+    rmSync(path.join(skillsDir, backup), { recursive: true, force: true });
+  }
+  if (backups.length) {
+    console.log(`  ${chalk.dim('Removed')}   ${backups.length} backup${backups.length === 1 ? '' : 's'}`);
+  }
+  console.log('');
+  console.log(`  ${chalk.green('✓')} Start a new ${target.name} session so it stops offering the skill.`);
+  console.log('');
 }
 
 /** Resolve the latest release tag. Fails closed — never silently falls back to a moving branch. */
@@ -93,7 +155,7 @@ async function latestReleaseTag(): Promise<string> {
   return data.tag_name;
 }
 
-async function downloadTarball(ref: string, dest: string): Promise<void> {
+export async function downloadTarball(ref: string, dest: string): Promise<void> {
   const isBranch = ref === 'master' || ref === 'main';
   const candidates = isBranch ? [`heads/${ref}`] : [`tags/${ref}`, `heads/${ref}`];
   let lastError: Error | undefined;
@@ -131,7 +193,7 @@ async function downloadTarball(ref: string, dest: string): Promise<void> {
 }
 
 /** Reject archive entries that could escape the extraction directory. */
-function validateTarballPaths(tarball: string): void {
+export function validateTarballPaths(tarball: string): void {
   const listing = execFileSync('tar', ['-tzf', tarball], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   for (const entry of listing.split('\n')) {
     if (!entry) continue;
@@ -151,9 +213,9 @@ function extractSkill(tarball: string, workdir: string): string {
   throw new Error(`skill not found at ${SKILL_SUBPATH} in that ref — the plugin may not exist there yet`);
 }
 
-/** The installed skill must be plain files — no symlinks pointing who-knows-where. */
-function assertNoSymlinks(dir: string): void {
-  for (const entry of listDir(dir, { withFileTypes: true })) {
+/** The installed tree must be plain files — no symlinks pointing who-knows-where. */
+export function assertNoSymlinks(dir: string): void {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (lstatSync(full).isSymbolicLink()) throw new Error(`refusing to install symlink: ${entry.name}`);
     if (entry.isDirectory()) assertNoSymlinks(full);
@@ -209,21 +271,28 @@ function pruneBackups(destDir: string): void {
 }
 
 export async function runPlugin(argv: string[]): Promise<void> {
-  const { host, ref } = parsePluginArgs(argv);
+  const { host, ref, remove } = parsePluginArgs(argv);
   const target = HOSTS.find((h) => h.id === host);
 
   if (!target) {
-    usage();
-    if (host) {
-      console.error(`❌ Unknown host: ${host}`);
-      process.exit(1);
+    // No host named: this is the inventory, not a failure.
+    if (!host) {
+      listHosts();
+      return;
     }
-    return;
+    console.error(`❌ Unknown host: ${host}`);
+    usage();
+    process.exit(1);
   }
 
   console.log('');
   console.log(chalk.bold(`  🔌 SpeakEasy skill for ${target.name}`));
   console.log('');
+
+  if (remove) {
+    removeSkill(target);
+    return;
+  }
 
   if (process.platform !== 'darwin') {
     console.log(chalk.yellow('  ⚠️  The native SpeakEasy player needs macOS 14+ — installing the skill anyway.'));
@@ -245,7 +314,7 @@ export async function runPlugin(argv: string[]): Promise<void> {
     validateTarballPaths(tarball);
     const skillSrc = extractSkill(tarball, workdir);
 
-    const { backup, dest } = installSkill(skillSrc, target.skillsDir());
+    const { backup, dest } = installSkill(skillSrc, target.skillsDir);
     if (backup) console.log(`  ${chalk.dim('Previous')}  ${chalk.yellow('moved to')} ${chalk.dim(backup)}`);
     console.log(`  ${chalk.dim('Installed')} ${chalk.green(dest)}`);
 
@@ -266,7 +335,7 @@ export async function runPlugin(argv: string[]): Promise<void> {
       console.log(chalk.dim('      Install it, then verify: bun ' + path.join(dest, 'scripts', 'speakeasy-runtime.ts') + ' --doctor'));
     }
     // only prune once the new install has proven itself — backups are the way back
-    if (healthy) pruneBackups(target.skillsDir());
+    if (healthy) pruneBackups(target.skillsDir);
 
     console.log('');
     console.log(`  ${chalk.green('✓')} ${target.hint}`);

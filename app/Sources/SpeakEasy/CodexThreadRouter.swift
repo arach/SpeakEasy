@@ -165,11 +165,22 @@ actor CodexThreadRouter {
         let outputData = try output.fileHandleForReading.readToEnd() ?? Data()
         let errorData = try error.fileHandleForReading.readToEnd() ?? Data()
         guard let envelope = try? JSONDecoder().decode(BridgeEnvelope.self, from: outputData) else {
+            // The bridge produced something that is not a result envelope. Report
+            // enough to tell the cases apart: a crash before any output, a non-zero
+            // exit with a diagnostic on stderr, or unparseable stdout. A bare
+            // "exited unexpectedly" hides all three and is not actionable.
             let detail = String(data: errorData, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw CodexThreadRouterError.requestFailed(
-                detail?.isEmpty == false ? detail! : "Codex Desktop bridge exited unexpectedly."
-            )
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let stdout = String(data: outputData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            var parts: [String] = []
+            if !detail.isEmpty { parts.append(detail) }
+            if detail.isEmpty && !stdout.isEmpty {
+                parts.append("unreadable bridge output: \(stdout.prefix(200))")
+            }
+            if parts.isEmpty { parts.append("Codex Desktop bridge produced no output.") }
+            parts.append("(exit \(process.terminationStatus))")
+            throw CodexThreadRouterError.requestFailed(parts.joined(separator: " "))
         }
         return envelope
     }

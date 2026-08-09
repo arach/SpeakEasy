@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, Star } from "lucide-react"
+import { ArrowRight, ExternalLink, Star } from "lucide-react"
 import { Volume2, BookOpen, Play, Pause, Copy, Check } from "./icons"
 import Link from "next/link"
 import PackageManagerTabs from "@/components/package-manager-tabs"
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import GitHubRibbon from "@/components/github-ribbon"
+import { taglineDemo } from "@/lib/demo-audio"
 
 function HeroAudioPlayer({ onPlayingChange }: { onPlayingChange?: (playing: boolean) => void }) {
   const [isPlaying, setIsPlaying] = useState(false)
@@ -38,9 +39,10 @@ function HeroAudioPlayer({ onPlayingChange }: { onPlayingChange?: (playing: bool
 
   return (
     <div className="flex items-center gap-2 relative">
-      <audio 
+      <audio
         ref={audioRef}
-        src="/audio/tagline-demo.mp3"
+        src={taglineDemo.src}
+        aria-label={`Spoken sample: ${taglineDemo.spokenText}`}
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
@@ -109,12 +111,15 @@ function TinyAudioPlayer() {
   return (
     <div className="flex flex-col items-center gap-3">
       {/* Show Example Command Button */}
+      {/* Quiet by design: this sits in the secondary library block, so it must not
+          outweigh the two primary app CTAs above the rule. */}
       <Button
+        variant="outline"
         onClick={() => setShowDemo(!showDemo)}
-        className="h-10 px-6 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white rounded-full font-medium text-sm shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+        className="h-9 rounded-full border border-slate-300 bg-white/70 px-5 text-xs font-medium text-slate-600 shadow-none transition-all duration-200 hover:border-slate-400 hover:bg-white hover:text-slate-900"
       >
-        <Volume2 className="w-4 h-4 mr-2" />
-        {showDemo ? 'Hide Audio Demo' : '🔊 Hear SpeakEasy Demo'}
+        <Volume2 className="w-3.5 h-3.5 mr-2" />
+        {showDemo ? 'Hide sample' : 'Hear a sample'}
       </Button>
 
       {/* Animated Demo Container */}
@@ -280,7 +285,7 @@ export default function HeroSection() {
           <span className="font-silkscreen">SpeakEasy</span>
           <br />
           <span className="font-display font-light bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
-            Voice for Codex
+            Unified text-to-speech
           </span>
         </h1>
 
@@ -296,7 +301,7 @@ export default function HeroSection() {
               </span>
               {/* Main tagline text */}
               <span className="text-slate-700 font-light">
-                Speak to the task you’re already in. Hear its real answer come back.
+                One API for macOS, OpenAI, ElevenLabs, Groq, and Gemini voices.
               </span>
               {/* Close quote */}
               <span className={`font-mono text-emerald-600 font-medium tracking-tight transition-opacity duration-300 ${
@@ -318,26 +323,49 @@ export default function HeroSection() {
         </div>
 
         {/* Always Visible Mini Audio Demo */}
-        <div className="mb-4 flex justify-center">
+        <div className="mb-5 flex justify-center">
           <div className="bg-white/80 backdrop-blur-sm rounded-full border border-emerald-200/50 shadow-sm hover:shadow-md transition-all duration-200 px-4 py-2">
             <div className="flex items-center gap-3">
               <div className="flex items-center text-sm text-slate-600">
                 <Volume2 className="w-4 h-4 mr-2 text-emerald-600" />
-                Hear the TTS side:
+                Hear it speak:
               </div>
               <HeroAudioPlayer onPlayingChange={setIsHeroPlaying} />
             </div>
           </div>
         </div>
 
-        {/* Demo Command & Audio Player */}
-        <div className="mb-4 md:mb-6 flex justify-center">
-          <TinyAudioPlayer />
-        </div>
-
+        {/* Primary — SpeakEasy is a unified TTS library first. Installing it is the
+            action for the audience that actually exists today. */}
         <div className="flex flex-col items-center">
           <PackageManagerTabs />
+          <div className="mt-4 flex justify-center">
+            <TinyAudioPlayer />
+          </div>
         </div>
+
+        {/* The Codex companion is the flagship use case, announced here and sold in
+            full on its own page rather than competing with the library in this hero. */}
+        <Link
+          href="/codex/"
+          className="group mt-8 flex w-full max-w-2xl flex-col items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/70 px-5 py-4 text-center shadow-sm backdrop-blur-sm transition-all duration-200 hover:border-emerald-300/70 hover:shadow-md sm:flex-row sm:gap-4 sm:text-left"
+        >
+          <Badge
+            variant="outline"
+            className="shrink-0 rounded-lg border-emerald-300/60 bg-emerald-50 text-[10px] font-semibold uppercase tracking-wider text-emerald-700"
+          >
+            New
+          </Badge>
+          <span className="flex-1">
+            <span className="block text-sm font-medium text-slate-900">
+              Introducing SpeakEasy for Codex
+            </span>
+            <span className="mt-0.5 block text-xs font-light leading-relaxed text-slate-500">
+              Speak to the task you’re already in, and hear its real answer come back — on your Mac, a browser, or an iPad.
+            </span>
+          </span>
+          <ArrowRight className="hidden h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-emerald-600 sm:block" />
+        </Link>
       </div>
     </section>
     </>

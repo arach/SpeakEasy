@@ -261,7 +261,7 @@ var init_system = __esm(() => {
   ];
 });
 
-// node_modules/uuid/dist-node/rng.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/rng.js
 function rng() {
   return crypto.getRandomValues(rnds8);
 }
@@ -270,13 +270,13 @@ var init_rng = __esm(() => {
   rnds8 = new Uint8Array(16);
 });
 
-// node_modules/uuid/dist-node/regex.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/regex.js
 var regex_default;
 var init_regex = __esm(() => {
   regex_default = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/i;
 });
 
-// node_modules/uuid/dist-node/validate.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/validate.js
 function validate(uuid) {
   return typeof uuid === "string" && regex_default.test(uuid);
 }
@@ -286,7 +286,7 @@ var init_validate = __esm(() => {
   validate_default = validate;
 });
 
-// node_modules/uuid/dist-node/stringify.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/stringify.js
 function unsafeStringify(arr, offset = 0) {
   return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
 }
@@ -298,7 +298,7 @@ var init_stringify = __esm(() => {
   }
 });
 
-// node_modules/uuid/dist-node/v4.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/v4.js
 function v4(options, buf, offset) {
   if (!buf && !options && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -332,7 +332,7 @@ var init_v4 = __esm(() => {
   v4_default = v4;
 });
 
-// node_modules/uuid/dist-node/sha1.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/sha1.js
 import { createHash } from "crypto";
 function sha1(bytes) {
   if (Array.isArray(bytes)) {
@@ -347,7 +347,7 @@ var init_sha1 = __esm(() => {
   sha1_default = sha1;
 });
 
-// node_modules/uuid/dist-node/parse.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/parse.js
 function parse(uuid) {
   if (!validate_default(uuid)) {
     throw TypeError("Invalid UUID");
@@ -361,7 +361,7 @@ var init_parse = __esm(() => {
   parse_default = parse;
 });
 
-// node_modules/uuid/dist-node/v35.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/v35.js
 function stringToBytes(str) {
   str = unescape(encodeURIComponent(str));
   const bytes = new Uint8Array(str.length);
@@ -403,7 +403,7 @@ var init_v35 = __esm(() => {
   init_stringify();
 });
 
-// node_modules/uuid/dist-node/v5.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/v5.js
 function v5(value, namespace, buf, offset) {
   return v35(80, sha1_default, value, namespace, buf, offset);
 }
@@ -416,7 +416,7 @@ var init_v5 = __esm(() => {
   v5_default = v5;
 });
 
-// node_modules/uuid/dist-node/index.js
+// node_modules/.pnpm/uuid@14.0.1/node_modules/uuid/dist-node/index.js
 var init_dist_node = __esm(() => {
   init_v4();
   init_v5();
@@ -470,12 +470,37 @@ function parseSize(size) {
   return value * units[unit];
 }
 
+// src/paths.ts
+import { homedir, tmpdir } from "os";
+import path3 from "path";
+function defaultCacheDir(tempDir = "/tmp") {
+  return path3.join(tempDir, "speakeasy-cache");
+}
+var HOME_DIR, CONFIG_DIR, CONFIG_FILE, HISTORY_DIR, USER_APP_DIR, USER_APP_PATH, USER_APP_VERSION_FILE, SYSTEM_APP_PATH = "/Applications/SpeakEasy.app", CODEX_SKILLS_DIR, CLAUDE_SKILLS_DIR, CODEX_SESSIONS_DIR, DECK_DIR, DECK_LANES_FILE, DECK_TOKEN_FILE, DECK_LOCK_FILE, CACHE_DIRS;
+var init_paths = __esm(() => {
+  HOME_DIR = homedir();
+  CONFIG_DIR = path3.join(HOME_DIR, ".config", "speakeasy");
+  CONFIG_FILE = path3.join(CONFIG_DIR, "settings.json");
+  HISTORY_DIR = path3.join(CONFIG_DIR, "history");
+  USER_APP_DIR = path3.join(HOME_DIR, ".speakeasy");
+  USER_APP_PATH = path3.join(USER_APP_DIR, "SpeakEasy.app");
+  USER_APP_VERSION_FILE = path3.join(USER_APP_DIR, ".app-version");
+  CODEX_SKILLS_DIR = path3.join(HOME_DIR, ".codex", "skills");
+  CLAUDE_SKILLS_DIR = path3.join(HOME_DIR, ".claude", "skills");
+  CODEX_SESSIONS_DIR = path3.join(HOME_DIR, ".codex", "sessions");
+  DECK_DIR = path3.join(CONFIG_DIR, "deck");
+  DECK_LANES_FILE = path3.join(CONFIG_DIR, "deck-lanes.json");
+  DECK_TOKEN_FILE = path3.join(CONFIG_DIR, "deck-token");
+  DECK_LOCK_FILE = path3.join(CONFIG_DIR, "deck-runtime.lock");
+  CACHE_DIRS = [...new Set([defaultCacheDir(tmpdir()), defaultCacheDir()])];
+});
+
 // src/cache.ts
 var exports_cache = {};
 __export(exports_cache, {
   TTSCache: () => TTSCache
 });
-import * as path3 from "path";
+import * as path4 from "path";
 import * as fs3 from "fs";
 function wrapNodeDatabase(db) {
   return db;
@@ -543,10 +568,10 @@ class TTSCache {
   cacheHits = 0;
   cacheMisses = 0;
   constructor(cacheDir, ttl = "7d", maxSize, logger) {
-    this.cacheDir = cacheDir || path3.join("/tmp", "speakeasy-cache");
-    this.dbPath = path3.join(this.cacheDir, "cache.sqlite");
-    this.metadataFile = path3.join(this.cacheDir, "metadata.json");
-    this.statsFile = path3.join(this.cacheDir, "stats.json");
+    this.cacheDir = cacheDir || defaultCacheDir();
+    this.dbPath = path4.join(this.cacheDir, "cache.sqlite");
+    this.metadataFile = path4.join(this.cacheDir, "metadata.json");
+    this.statsFile = path4.join(this.cacheDir, "stats.json");
     this.ttlMs = parseTTL(ttl);
     this.maxSize = maxSize ? parseSize(maxSize) : undefined;
     this.logger = logger || this.createDefaultLogger();
@@ -617,8 +642,8 @@ class TTSCache {
   migrateLegacySqliteIfNeeded() {
     if (!this.db)
       return;
-    const legacyMetadataPath = path3.join(this.cacheDir, "metadata.sqlite");
-    const legacyKeyvPath = path3.join(this.cacheDir, "tts-cache.sqlite");
+    const legacyMetadataPath = path4.join(this.cacheDir, "metadata.sqlite");
+    const legacyKeyvPath = path4.join(this.cacheDir, "tts-cache.sqlite");
     this.importLegacyMetadataDb(legacyMetadataPath);
     this.importLegacyKeyvDb(legacyKeyvPath);
   }
@@ -1078,7 +1103,7 @@ class TTSCache {
   async set(key, entry, audioBuffer, options) {
     try {
       const extension = options?.extension || detectAudioExtension(audioBuffer);
-      const audioFilePath = path3.join(this.cacheDir, `${key}.${extension}`);
+      const audioFilePath = path4.join(this.cacheDir, `${key}.${extension}`);
       fs3.writeFileSync(audioFilePath, audioBuffer, { mode: 384 });
       fs3.chmodSync(audioFilePath, 384);
       const timestamp = Date.now();
@@ -1191,7 +1216,7 @@ class TTSCache {
     try {
       for (const file of fs3.readdirSync(this.cacheDir)) {
         if (file.endsWith(".mp3") || file.endsWith(".wav")) {
-          fs3.unlinkSync(path3.join(this.cacheDir, file));
+          fs3.unlinkSync(path4.join(this.cacheDir, file));
         }
       }
       if (this.useJsonFallback) {
@@ -1293,11 +1318,12 @@ var CREATE_ENTRIES_TABLE = `
 `;
 var init_cache = __esm(() => {
   init_dist_node();
+  init_paths();
 });
 
 // src/history.ts
 import * as fs4 from "fs";
-import * as path4 from "path";
+import * as path5 from "path";
 function getWeekNumber(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -1309,7 +1335,7 @@ function getWeekNumber(date) {
 function getHistoryFile(historyDir, date = new Date) {
   const { year, week } = getWeekNumber(date);
   const weekStr = week.toString().padStart(2, "0");
-  return path4.join(historyDir, `history-${year}-W${weekStr}.json`);
+  return path5.join(historyDir, `history-${year}-W${weekStr}.json`);
 }
 
 class NotificationHistory {
@@ -1383,7 +1409,7 @@ class NotificationHistory {
       const files = fs4.readdirSync(this.historyDir).filter((f) => f.startsWith("history-") && f.endsWith(".json")).sort().reverse();
       for (const file of files) {
         try {
-          const data = fs4.readFileSync(path4.join(this.historyDir, file), "utf8");
+          const data = fs4.readFileSync(path5.join(this.historyDir, file), "utf8");
           const entries = JSON.parse(data);
           allEntries.push(...entries);
         } catch {}
@@ -1403,11 +1429,11 @@ function getHistory() {
   }
   return historyInstance;
 }
-var CONFIG_DIR, HISTORY_DIR, historyInstance = null;
+var historyInstance = null;
 var init_history = __esm(() => {
   init_dist_node();
-  CONFIG_DIR = path4.join(__require("os").homedir(), ".config", "speakeasy");
-  HISTORY_DIR = path4.join(CONFIG_DIR, "history");
+  init_paths();
+  init_paths();
 });
 
 // src/providers/openai.ts
@@ -1941,6 +1967,97 @@ var init_registry = __esm(() => {
     "gemini"
   ];
 });
+
+// src/narration/chunk.ts
+function chunkLimitForProvider(provider, requested = NARRATION_CHUNK_CHARS) {
+  const providerLimit = provider ? PROVIDER_TEXT_LIMITS[provider] : undefined;
+  const limit = Math.min(requested, providerLimit ?? NARRATION_CHUNK_CHARS);
+  return Math.max(1, limit);
+}
+function significant(text) {
+  return text.replace(/\s+/g, "");
+}
+function splitParagraphs(text) {
+  return text.split(/\n\s*\n+/);
+}
+function splitSentences(text) {
+  return text.match(/[^.!?\u2026]+(?:[.!?\u2026]+["'\u201D\u2019)\]]*\s*|$)/g) ?? [text];
+}
+function splitClauses(text) {
+  return text.match(/[^,;:\u2014\u2013]+(?:[,;:\u2014\u2013]+\s*|$)/g) ?? [text];
+}
+function splitWords(text) {
+  return text.split(/\s+/).filter(Boolean);
+}
+function splitHard(text, max) {
+  const out = [];
+  for (let i = 0;i < text.length; i += max)
+    out.push(text.slice(i, i + max));
+  return out;
+}
+function pack(units, max, deeper) {
+  const out = [];
+  let current = "";
+  const flush = () => {
+    const trimmed = current.trim();
+    if (trimmed)
+      out.push(trimmed);
+    current = "";
+  };
+  for (const raw of units) {
+    const unit = raw.trim();
+    if (!unit)
+      continue;
+    if (unit.length > max) {
+      flush();
+      out.push(...deeper(unit));
+      continue;
+    }
+    const joined = current ? `${current} ${unit}` : unit;
+    if (joined.length > max) {
+      flush();
+      current = unit;
+    } else {
+      current = joined;
+    }
+  }
+  flush();
+  return out;
+}
+function chunkForNarration(text, options = {}) {
+  const max = Math.max(1, Math.floor(options.maxChars ?? NARRATION_CHUNK_CHARS));
+  const trimmed = text.trim();
+  if (!trimmed)
+    return [];
+  if (trimmed.length <= max)
+    return [trimmed];
+  const chunks = pack(splitParagraphs(trimmed), max, (paragraph) => pack(splitSentences(paragraph), max, (sentence) => pack(splitClauses(sentence), max, (clause) => pack(splitWords(clause), max, (word) => splitHard(word, max)))));
+  assertLossless(trimmed, chunks);
+  return chunks;
+}
+function assertLossless(source, chunks) {
+  const expected = significant(source);
+  const actual = significant(chunks.join(""));
+  if (expected === actual)
+    return;
+  throw new NarrationChunkError(`Narration chunking lost text: expected ${expected.length} characters, produced ${actual.length}.`);
+}
+var PROVIDER_TEXT_LIMITS, NARRATION_CHUNK_CHARS = 1200, NarrationChunkError;
+var init_chunk = __esm(() => {
+  PROVIDER_TEXT_LIMITS = {
+    openai: 4096,
+    elevenlabs: 9500,
+    groq: 9500,
+    gemini: 4000,
+    system: 32000
+  };
+  NarrationChunkError = class NarrationChunkError extends Error {
+    constructor(message) {
+      super(message);
+      this.name = "NarrationChunkError";
+    }
+  };
+});
 // src/player-protocol.ts
 var PLAYER_PROTOCOL_VERSION = 1, PLAYER_SOCKET_PATH = "/tmp/speakeasy-player.sock";
 
@@ -2051,21 +2168,26 @@ __export(exports_src, {
   getAvailableVoices: () => getAvailableVoices,
   enqueueInPlayer: () => enqueueInPlayer,
   createAdapterRegistry: () => createAdapterRegistry,
+  chunkLimitForProvider: () => chunkLimitForProvider,
+  chunkForNarration: () => chunkForNarration,
   TTSCache: () => TTSCache,
   SystemProvider: () => SystemProvider,
   SpeakEasy: () => SpeakEasy,
   PlayerUnavailableError: () => PlayerUnavailableError,
+  PROVIDER_TEXT_LIMITS: () => PROVIDER_TEXT_LIMITS,
   PROVIDER_ORDER: () => PROVIDER_ORDER,
   PLAYER_SOCKET_PATH: () => PLAYER_SOCKET_PATH,
   PLAYER_PROTOCOL_VERSION: () => PLAYER_PROTOCOL_VERSION,
   OpenAIProvider: () => OpenAIProvider,
+  NarrationSegmentError: () => NarrationSegmentError,
+  NARRATION_CHUNK_CHARS: () => NARRATION_CHUNK_CHARS,
   GroqProvider: () => GroqProvider,
   GeminiProvider: () => GeminiProvider,
   ElevenLabsProvider: () => ElevenLabsProvider,
   CONFIG_FILE: () => CONFIG_FILE
 });
 import * as fs5 from "fs";
-import * as path5 from "path";
+import * as path6 from "path";
 function loadGlobalConfig() {
   try {
     if (fs5.existsSync(CONFIG_FILE)) {
@@ -2091,6 +2213,7 @@ class SpeakEasy {
   debug = false;
   hudEnabled = false;
   lastAudioFile = null;
+  lastAudioFiles = [];
   constructor(config) {
     const globalConfig = loadGlobalConfig();
     this.hudEnabled = globalConfig.hud?.enabled ?? false;
@@ -2118,7 +2241,7 @@ class SpeakEasy {
     const cacheEnabled = cacheConfig?.enabled ?? (hasApiKeys && this.config.provider !== "system");
     this.useCache = cacheEnabled;
     if (this.useCache) {
-      const cacheDir = cacheConfig?.dir || path5.join(this.config.tempDir || "/tmp", "speakeasy-cache");
+      const cacheDir = cacheConfig?.dir || defaultCacheDir(this.config.tempDir || "/tmp");
       this.cache = new TTSCache(cacheDir, cacheConfig?.ttl || "7d", cacheConfig?.maxSize);
     }
     this.adapters = createAdapterRegistry(this.config);
@@ -2132,32 +2255,57 @@ class SpeakEasy {
     if (options.interrupt && this.isPlaying) {
       this.stopSpeaking();
     }
+    const maxChars = chunkLimitForProvider(this.config.provider);
+    const segments = chunkForNarration(cleanText, { maxChars });
+    if (segments.length === 0)
+      return;
+    if (!this.isPlaying)
+      this.lastAudioFiles = [];
     if (options.priority === "high") {
-      this.queue.unshift({ text: cleanText, options });
+      for (let i = segments.length - 1;i >= 0; i--) {
+        this.queue.unshift({ text: segments[i], options });
+      }
     } else {
-      this.queue.push({ text: cleanText, options });
+      for (const segment of segments) {
+        this.queue.push({ text: segment, options });
+      }
+    }
+    if (this.debug && segments.length > 1) {
+      console.log(`\uD83E\uDDE9 Narrating ${cleanText.length} characters as ${segments.length} segments`);
     }
     if (!this.isPlaying) {
       await this.processQueue();
     }
   }
   async processQueue() {
-    if (this.queue.length === 0)
+    if (this.isPlaying)
       return;
     this.isPlaying = true;
-    const { text, options } = this.queue.shift();
+    const failures = [];
     try {
-      await this.speakText(text, options);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error("\u274C Speech error:", errorMsg);
-      throw error;
+      while (this.queue.length > 0) {
+        const { text, options } = this.queue.shift();
+        try {
+          await this.speakText(text, options);
+        } catch (error) {
+          const failure = error instanceof Error ? error : new Error(String(error));
+          console.error("\u274C Speech error:", failure.message);
+          failures.push({ text, error: failure });
+        }
+      }
     } finally {
       this.isPlaying = false;
-      if (this.queue.length > 0) {
-        await this.processQueue();
-      }
     }
+    if (failures.length > 0) {
+      throw new NarrationSegmentError(failures);
+    }
+  }
+  clearQueue() {
+    this.queue.length = 0;
+  }
+  cancel() {
+    this.clearQueue();
+    this.stopSpeaking();
   }
   async speakText(text, options = {}) {
     const requestedId = this.config.provider || "system";
@@ -2195,7 +2343,7 @@ class SpeakEasy {
           const cachedEntry = await this.cache.get(cacheKey);
           if (cachedEntry) {
             console.log("(already cached)");
-            this.lastAudioFile = cachedEntry.audioFilePath;
+            this.recordAudioFile(cachedEntry.audioFilePath);
             if (this.debug) {
               console.log(`\uD83D\uDCE6 Using cached audio from: ${cachedEntry.audioFilePath}`);
             }
@@ -2222,7 +2370,7 @@ class SpeakEasy {
             extension: result.format
           });
           if (stored) {
-            this.lastAudioFile = path5.join(this.cache.getCacheDir(), `${cacheKey}.${result.format}`);
+            this.recordAudioFile(path6.join(this.cache.getCacheDir(), `${cacheKey}.${result.format}`));
           }
           console.log("cached");
         }
@@ -2247,6 +2395,10 @@ class SpeakEasy {
       throw new Error(`All providers failed. Last error: ${lastError.message}`);
     }
     throw new Error(`No available TTS provider. Ensure you're on macOS for system voice.`);
+  }
+  recordAudioFile(file) {
+    this.lastAudioFile = file;
+    this.lastAudioFiles.push(file);
   }
   buildRequest(text, providerId) {
     return {
@@ -2385,7 +2537,7 @@ class SpeakEasy {
     return this.requireCache().findByProvider(provider);
   }
 }
-var CONFIG_DIR2, CONFIG_FILE, API_KEY_HELP, API_KEY_URLS, say = (text, provider) => {
+var API_KEY_HELP, API_KEY_URLS, NarrationSegmentError, say = (text, provider) => {
   if (typeof text !== "string" || !text.trim()) {
     throw new Error("Text argument is required for say()");
   }
@@ -2405,6 +2557,10 @@ var init_src = __esm(() => {
   init_history();
   init_registry();
   init_audio();
+  init_paths();
+  init_chunk();
+  init_paths();
+  init_chunk();
   init_registry();
   init_audio();
   init_system();
@@ -2414,8 +2570,6 @@ var init_src = __esm(() => {
   init_gemini();
   init_cache();
   init_player_client();
-  CONFIG_DIR2 = path5.join(__require("os").homedir(), ".config", "speakeasy");
-  CONFIG_FILE = path5.join(CONFIG_DIR2, "settings.json");
   API_KEY_HELP = {
     openai: "export OPENAI_API_KEY=your_key_here",
     elevenlabs: "export ELEVENLABS_API_KEY=your_key_here",
@@ -2427,6 +2581,16 @@ var init_src = __esm(() => {
     elevenlabs: "https://elevenlabs.io/app/settings/api-keys",
     groq: "https://console.groq.com/keys",
     gemini: "https://makersuite.google.com/app/apikey"
+  };
+  NarrationSegmentError = class NarrationSegmentError extends Error {
+    failures;
+    constructor(failures) {
+      const detail = failures.map((f) => f.error.message).join("; ");
+      super(`${failures.length} narration segment${failures.length === 1 ? "" : "s"} failed: ${detail}`);
+      this.name = "NarrationSegmentError";
+      this.failures = failures;
+      this.cause = failures[0]?.error;
+    }
   };
 });
 
@@ -2444,15 +2608,10 @@ var require_package = __commonJS((exports, module) => {
     bugs: {
       url: "https://github.com/arach/SpeakEasy/issues"
     },
-    private: false,
     main: "dist/index.js",
     types: "dist/index.d.ts",
     files: [
-      "dist",
-      "!dist/test.*",
-      "deck/index.html",
-      "deck/themes.json",
-      "deck/variants"
+      "dist"
     ],
     exports: {
       ".": "./dist/index.js"
@@ -2465,9 +2624,9 @@ var require_package = __commonJS((exports, module) => {
       "build:plugin-runtime": "bun build src/bin/speakeasy-cli.ts --target=bun --outfile plugins/speakeasy/skills/speakeasy/runtime/speakeasy-cli.js",
       "package:plugin-submission": "plugins/speakeasy/tools/build-submission.sh",
       "verify:plugin-bundle": "plugins/speakeasy/tools/verify-skill-bundle.sh",
-      prepublishOnly: "pnpm run build && rm -f dist/test.js dist/test.d.ts dist/test.js.map dist/test.d.ts.map",
-      dev: "tsc --watch",
-      test: "node dist/test.js",
+      prepublishOnly: "pnpm run build",
+      dev: "pnpm run build --watch",
+      test: "bun test src",
       "test:privacy": "bun test src/privacy-permissions.test.ts",
       "test:cache": "pnpm run build && node scripts/cache-test.js",
       example: "pnpm run build && node examples/basic-usage.js",
@@ -2528,9 +2687,7 @@ var require_package = __commonJS((exports, module) => {
 });
 
 // src/cli/constants.ts
-import * as path6 from "path";
-import { homedir } from "os";
-var CONFIG_DIR3, CONFIG_FILE2, PROVIDERS, DEFAULT_VOICES, DEFAULTS, getPackageVersion = () => {
+var PROVIDERS, DEFAULT_VOICES, DEFAULTS, getPackageVersion = () => {
   try {
     const pkg = require_package();
     return pkg.version || "0.0.0";
@@ -2539,8 +2696,7 @@ var CONFIG_DIR3, CONFIG_FILE2, PROVIDERS, DEFAULT_VOICES, DEFAULTS, getPackageVe
   }
 };
 var init_constants = __esm(() => {
-  CONFIG_DIR3 = path6.join(homedir(), ".config", "speakeasy");
-  CONFIG_FILE2 = path6.join(CONFIG_DIR3, "settings.json");
+  init_paths();
   PROVIDERS = [
     { name: "OpenAI", key: "openai", env: "OPENAI_API_KEY" },
     { name: "ElevenLabs", key: "elevenlabs", env: "ELEVENLABS_API_KEY" },
@@ -2561,7 +2717,7 @@ var init_constants = __esm(() => {
   };
 });
 
-// node_modules/chalk/source/vendor/ansi-styles/index.js
+// node_modules/.pnpm/chalk@5.6.2/node_modules/chalk/source/vendor/ansi-styles/index.js
 function assembleStyles() {
   const codes = new Map;
   for (const [groupName, group] of Object.entries(styles)) {
@@ -2737,7 +2893,7 @@ var init_ansi_styles = __esm(() => {
   ansi_styles_default = ansiStyles;
 });
 
-// node_modules/chalk/source/vendor/supports-color/index.js
+// node_modules/.pnpm/chalk@5.6.2/node_modules/chalk/source/vendor/supports-color/index.js
 import process2 from "process";
 import os from "os";
 import tty from "tty";
@@ -2871,7 +3027,7 @@ var init_supports_color = __esm(() => {
   supports_color_default = supportsColor;
 });
 
-// node_modules/chalk/source/utilities.js
+// node_modules/.pnpm/chalk@5.6.2/node_modules/chalk/source/utilities.js
 function stringReplaceAll(string, substring, replacer) {
   let index = string.indexOf(substring);
   if (index === -1) {
@@ -2904,7 +3060,7 @@ function stringEncaseCRLFWithFirstIndex(string, prefix, postfix, index) {
   return returnValue;
 }
 
-// node_modules/chalk/source/index.js
+// node_modules/.pnpm/chalk@5.6.2/node_modules/chalk/source/index.js
 function createChalk(options) {
   return chalkFactory(options);
 }
@@ -3494,8 +3650,8 @@ class ParseStatus {
   }
 }
 var makeIssue = (params) => {
-  const { data, path: path11, errorMaps, issueData } = params;
-  const fullPath = [...path11, ...issueData.path || []];
+  const { data, path: path10, errorMaps, issueData } = params;
+  const fullPath = [...path10, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -3541,11 +3697,11 @@ var init_errorUtil = __esm(() => {
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 class ParseInputLazyPath {
-  constructor(parent, value, path11, key) {
+  constructor(parent, value, path10, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path11;
+    this._path = path10;
     this._key = key;
   }
   get path() {
@@ -7015,7 +7171,7 @@ var init_zod = __esm(() => {
   init_external();
   init_external();
 });
-// node_modules/@openscout/agent-sessions/src/protocol/adapter.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/protocol/adapter.ts
 class BaseAdapter {
   config;
   session;
@@ -7059,7 +7215,7 @@ class BaseAdapter {
   }
 }
 
-// node_modules/@openscout/agent-sessions/src/protocol/approval-normalization.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/protocol/approval-normalization.ts
 function defaultApprovalTitle(block) {
   switch (block.action.kind) {
     case "command":
@@ -7122,7 +7278,7 @@ function extractPendingApprovalRequests(snapshot) {
   return approvals;
 }
 
-// node_modules/@openscout/agent-sessions/src/protocol/cost.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/protocol/cost.ts
 function normalizeAdapterCostProvider(input) {
   const provider = input.provider?.trim().toLowerCase() ?? "";
   const adapterType = input.adapterType?.trim().toLowerCase() ?? "";
@@ -7326,7 +7482,7 @@ var init_cost = __esm(() => {
   };
 });
 
-// node_modules/@openscout/agent-sessions/src/state.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/state.ts
 function normalizeTrackedTimestamp(value) {
   if (value == null) {
     return null;
@@ -7554,7 +7710,7 @@ class StateTracker {
   }
 }
 
-// node_modules/@openscout/agent-sessions/src/buffer.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/buffer.ts
 class OutboundBuffer {
   ring;
   capacity;
@@ -7620,7 +7776,7 @@ class OutboundBuffer {
 }
 var DEFAULT_CAPACITY = 500;
 
-// node_modules/@openscout/agent-sessions/src/registry.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/registry.ts
 function isSessionRegistryError(error) {
   return error instanceof SessionRegistryError;
 }
@@ -7815,7 +7971,7 @@ var init_registry2 = __esm(() => {
   };
 });
 
-// node_modules/@openscout/agent-sessions/src/history.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/history.ts
 import { basename as basename2, dirname } from "path";
 function decodeClaudeProjectsSlug(name) {
   if (!name || !name.startsWith("-")) {
@@ -7827,17 +7983,17 @@ function decodeClaudeProjectsSlug(name) {
   }
   return `/${tail.replace(/-/g, "/")}`;
 }
-function inferClaudeHistoryCwd(path11) {
-  const parent = basename2(dirname(path11));
+function inferClaudeHistoryCwd(path10) {
+  const parent = basename2(dirname(path10));
   return decodeClaudeProjectsSlug(parent);
 }
-function deriveHistoryName(path11) {
-  const claudeCwd = inferClaudeHistoryCwd(path11);
+function deriveHistoryName(path10) {
+  const claudeCwd = inferClaudeHistoryCwd(path10);
   if (claudeCwd) {
     return basename2(claudeCwd) || claudeCwd;
   }
-  const parent = basename2(dirname(path11));
-  return parent || basename2(path11) || "History Session";
+  const parent = basename2(dirname(path10));
+  return parent || basename2(path10) || "History Session";
 }
 function normalizeTimestamp(value) {
   if (typeof value === "number") {
@@ -7947,7 +8103,7 @@ function parseQuestionAnswer(content) {
   }
   return text.split(/\s*,\s*/u).map((part) => part.trim()).filter(Boolean);
 }
-function inferHistoryAdapterType(path11, adapterType) {
+function inferHistoryAdapterType(path10, adapterType) {
   const normalizedAdapter = adapterType?.trim();
   if (normalizedAdapter === "claude-code") {
     return "claude-code";
@@ -7955,7 +8111,7 @@ function inferHistoryAdapterType(path11, adapterType) {
   if (normalizedAdapter === "codex") {
     return "codex";
   }
-  const normalizedPath = path11.toLowerCase();
+  const normalizedPath = path10.toLowerCase();
   if (normalizedPath.includes("/.claude/projects/")) {
     return "claude-code";
   }
@@ -8639,11 +8795,11 @@ class ClaudeCodeHistoryParser {
     });
   }
 }
-function inferHistorySessionAdapterType(path11, adapterType) {
-  return inferHistoryAdapterType(path11, adapterType);
+function inferHistorySessionAdapterType(path10, adapterType) {
+  return inferHistoryAdapterType(path10, adapterType);
 }
-function supportsHistorySessionSnapshotForPath(path11, adapterType) {
-  return inferHistoryAdapterType(path11, adapterType) === "claude-code";
+function supportsHistorySessionSnapshotForPath(path10, adapterType) {
+  return inferHistoryAdapterType(path10, adapterType) === "claude-code";
 }
 function createHistorySessionSnapshot(input) {
   const adapterType = inferHistoryAdapterType(input.path, input.adapterType);
@@ -8674,17 +8830,17 @@ function createHistorySessionSnapshot(input) {
 }
 var init_history2 = () => {};
 
-// node_modules/@openscout/agent-sessions/src/adapters/claude-code.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/adapters/claude-code.ts
 import { existsSync as existsSync11, readdirSync as readdirSync3, statSync as statSync3 } from "fs";
-import { homedir as homedir3 } from "os";
-import { join as join9 } from "path";
+import { homedir as homedir2 } from "os";
+import { join as join7 } from "path";
 function resolveClaudeResumeContext(config) {
   const rawResumeId = config.options?.["resume"];
   const resumeId = typeof rawResumeId === "string" ? rawResumeId.trim().replace(/\.jsonl$/u, "") : "";
   if (!resumeId) {
     return null;
   }
-  const projectsRoot = join9(homedir3(), ".claude", "projects");
+  const projectsRoot = join7(homedir2(), ".claude", "projects");
   if (!existsSync11(projectsRoot)) {
     return null;
   }
@@ -8695,7 +8851,7 @@ function resolveClaudeResumeContext(config) {
     return null;
   }
   for (const slug of projectSlugs) {
-    const sessionPath = join9(projectsRoot, slug, `${resumeId}.jsonl`);
+    const sessionPath = join7(projectsRoot, slug, `${resumeId}.jsonl`);
     if (!existsSync11(sessionPath)) {
       continue;
     }
@@ -9236,10 +9392,10 @@ Referenced files: ${prompt.files.join(", ")}` });
   };
 });
 
-// node_modules/@openscout/agent-sessions/src/codex-launch-config.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/codex-launch-config.ts
 import { accessSync as accessSync2, constants as constants3, existsSync as existsSync12 } from "fs";
-import { homedir as homedir4 } from "os";
-import { basename as basename3, delimiter, dirname as dirname2, join as join10, resolve } from "path";
+import { homedir as homedir3 } from "os";
+import { basename as basename3, delimiter, dirname as dirname2, join as join8, resolve } from "path";
 import { fileURLToPath } from "url";
 function isExecutable(filePath) {
   if (!filePath) {
@@ -9270,14 +9426,14 @@ function ancestorChain(start) {
 function resolveExecutableFromSearchPath(names, env2) {
   const pathEntries = (env2.PATH ?? "").split(delimiter).filter(Boolean);
   const commonDirectories = [
-    join10(homedir4(), ".local", "bin"),
-    join10(homedir4(), ".bun", "bin"),
+    join8(homedir3(), ".local", "bin"),
+    join8(homedir3(), ".bun", "bin"),
     "/opt/homebrew/bin",
     "/usr/local/bin"
   ];
   for (const directory of [...pathEntries, ...commonDirectories]) {
     for (const name of names) {
-      const candidate = join10(directory, name);
+      const candidate = join8(directory, name);
       if (isExecutable(candidate)) {
         return candidate;
       }
@@ -9320,7 +9476,7 @@ function resolveRepoScoutScript(currentDirectory) {
   const starts = uniquePaths([currentDirectory, moduleDirectory]);
   for (const start of starts) {
     for (const candidate of ancestorChain(start)) {
-      const scriptPath = join10(candidate, "apps", "desktop", "bin", "scout.ts");
+      const scriptPath = join8(candidate, "apps", "desktop", "bin", "scout.ts");
       if (existsSync12(scriptPath)) {
         return scriptPath;
       }
@@ -9370,11 +9526,11 @@ function buildScoutMcpCodexLaunchArgs(options) {
 }
 var init_codex_launch_config = () => {};
 
-// node_modules/@openscout/agent-sessions/src/adapters/codex.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/adapters/codex.ts
 import { spawn as spawn5 } from "child_process";
 import { access, appendFile, constants as constants4, mkdir, readFile, rm, writeFile } from "fs/promises";
-import { delimiter as delimiter2, join as join11 } from "path";
-import { homedir as homedir5 } from "os";
+import { delimiter as delimiter2, join as join9 } from "path";
+import { homedir as homedir4 } from "os";
 function parseJsonLine(line) {
   try {
     return JSON.parse(line);
@@ -9524,7 +9680,7 @@ async function resolveCodexExecutable() {
     "/usr/local/bin"
   ].filter(Boolean);
   for (const directory of [...pathEntries, ...commonDirectories]) {
-    const candidate = join11(directory, "codex");
+    const candidate = join9(directory, "codex");
     if (await isExecutable2(candidate)) {
       return candidate;
     }
@@ -9638,7 +9794,7 @@ var init_codex = __esm(() => {
       await this.persistState();
     }
     get codexOptions() {
-      const runtimeRoot = join11(homedir5(), ".scout/pairing", "codex", this.session.id);
+      const runtimeRoot = join9(homedir4(), ".scout/pairing", "codex", this.session.id);
       const configuredThreadId = this.config.options?.["threadId"];
       const requireExistingThread = this.config.options?.["requireExistingThread"];
       const rawLaunchArgs = this.config.options?.["launchArgs"];
@@ -9648,8 +9804,8 @@ var init_codex = __esm(() => {
         sessionId: this.session.id,
         cwd: this.config.cwd ?? process.cwd(),
         systemPrompt: this.systemPrompt,
-        runtimeDirectory: join11(runtimeRoot, "runtime"),
-        logsDirectory: join11(runtimeRoot, "logs"),
+        runtimeDirectory: join9(runtimeRoot, "runtime"),
+        logsDirectory: join9(runtimeRoot, "logs"),
         launchArgs,
         threadId: typeof configuredThreadId === "string" && configuredThreadId.trim().length > 0 ? configuredThreadId.trim() : undefined,
         requireExistingThread: requireExistingThread ?? Boolean(configuredThreadId)
@@ -9660,16 +9816,16 @@ var init_codex = __esm(() => {
       return typeof raw === "string" && raw.trim().length > 0 ? raw : "You are a helpful agent working through Pairing.";
     }
     get threadIdPath() {
-      return join11(this.codexOptions.runtimeDirectory, "codex-thread-id.txt");
+      return join9(this.codexOptions.runtimeDirectory, "codex-thread-id.txt");
     }
     get statePath() {
-      return join11(this.codexOptions.runtimeDirectory, "state.json");
+      return join9(this.codexOptions.runtimeDirectory, "state.json");
     }
     get stdoutLogPath() {
-      return join11(this.codexOptions.logsDirectory, "stdout.log");
+      return join9(this.codexOptions.logsDirectory, "stdout.log");
     }
     get stderrLogPath() {
-      return join11(this.codexOptions.logsDirectory, "stderr.log");
+      return join9(this.codexOptions.logsDirectory, "stderr.log");
     }
     enqueue(task) {
       const next = this.serialized.then(task, task);
@@ -9698,7 +9854,7 @@ var init_codex = __esm(() => {
       const options = this.codexOptions;
       await mkdir(options.runtimeDirectory, { recursive: true });
       await mkdir(options.logsDirectory, { recursive: true });
-      await writeFile(join11(options.runtimeDirectory, "prompt.txt"), options.systemPrompt);
+      await writeFile(join9(options.runtimeDirectory, "prompt.txt"), options.systemPrompt);
       const codexExecutable = await resolveCodexExecutable();
       const childEnv = {
         ...process.env,
@@ -10451,7 +10607,7 @@ var init_codex = __esm(() => {
   };
 });
 
-// node_modules/@openscout/agent-sessions/src/adapters/openai-compat.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/adapters/openai-compat.ts
 function parseOptions(raw) {
   if (!raw) {
     throw new Error("openai adapter requires options with at least baseUrl and model");
@@ -10828,7 +10984,7 @@ Referenced files: ${prompt.files.join(", ")}`
   };
 });
 
-// node_modules/@openscout/agent-sessions/src/adapters/opencode.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/adapters/opencode.ts
 var OpenCodeAdapter, createAdapter4 = (config) => new OpenCodeAdapter(config);
 var init_opencode = __esm(() => {
   OpenCodeAdapter = class OpenCodeAdapter extends BaseAdapter {
@@ -11226,7 +11382,7 @@ var init_opencode = __esm(() => {
   };
 });
 
-// node_modules/@openscout/agent-sessions/src/adapters/pi.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/adapters/pi.ts
 function readEnvValue(source, key) {
   const value = source?.[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
@@ -11743,7 +11899,7 @@ var init_pi = __esm(() => {
   };
 });
 
-// node_modules/@openscout/agent-sessions/src/adapters/echo.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/adapters/echo.ts
 var DEFAULT_STEP_DELAY_MS = 5, EchoAdapter, createAdapter6 = (config) => new EchoAdapter(config);
 var init_echo = __esm(() => {
   EchoAdapter = class EchoAdapter extends BaseAdapter {
@@ -11987,7 +12143,7 @@ var init_echo = __esm(() => {
   };
 });
 
-// node_modules/@openscout/agent-sessions/src/index.ts
+// node_modules/.pnpm/@openscout+agent-sessions@0.2.64/node_modules/@openscout/agent-sessions/src/index.ts
 var exports_src2 = {};
 __export(exports_src2, {
   supportsHistorySessionSnapshotForPath: () => supportsHistorySessionSnapshotForPath,
@@ -12031,16 +12187,16 @@ var init_src2 = __esm(() => {
 // src/cli/deck-agent-client.ts
 import { randomUUID as randomUUID3 } from "crypto";
 import { mkdir as mkdir2, readFile as readFile2, writeFile as writeFile2 } from "fs/promises";
-import { homedir as homedir6 } from "os";
-import path11 from "path";
+import { homedir as homedir5 } from "os";
+import path10 from "path";
 function safeSessionSegment(value) {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120) || "codex";
 }
 function deckAgentRuntimeDir(sessionId) {
-  return path11.join(homedir6(), ".scout", "local", "codex", safeSessionSegment(sessionId), "runtime");
+  return path10.join(homedir5(), ".scout", "local", "codex", safeSessionSegment(sessionId), "runtime");
 }
 function threadIdPath(sessionId) {
-  return path11.join(deckAgentRuntimeDir(sessionId), "codex-thread-id.txt");
+  return path10.join(deckAgentRuntimeDir(sessionId), "codex-thread-id.txt");
 }
 async function readThreadId(sessionId) {
   try {
@@ -12215,11 +12371,331 @@ async function createDeckAgentClient(options, dependencies = {}) {
 var DEFAULT_TIMEOUT_MS = 300000;
 var init_deck_agent_client = () => {};
 
-// src/cli/codex-thread-catalog.ts
+// src/cli/codex-desktop-submit.ts
+import { randomUUID as randomUUID4 } from "crypto";
 import { spawn as spawn6 } from "child_process";
+import { existsSync as existsSync13 } from "fs";
+import path11 from "path";
+function resolveCodexDesktopBridge(override = process.env.SPEAKEASY_CODEX_BRIDGE_PATH) {
+  const candidates = [
+    override?.trim(),
+    path11.resolve(__dirname, "..", "..", "app", "Sources", "SpeakEasy", "Resources", "codex-desktop-bridge.cjs"),
+    "/Applications/SpeakEasy.app/Contents/Resources/SpeakEasy_SpeakEasy.bundle/codex-desktop-bridge.cjs"
+  ].filter((candidate) => Boolean(candidate));
+  const bridge = candidates.find((candidate) => existsSync13(candidate));
+  if (!bridge) {
+    throw new Error("The Codex Desktop bridge is not installed. Update SpeakEasy, then try again.");
+  }
+  return bridge;
+}
+function parseBridgeEnvelope(result, expectedThreadId) {
+  if (!result.ok) {
+    throw new Error(result.error?.trim() || `Codex Desktop bridge failed (${result.code || "unknown error"}).`);
+  }
+  if (result.threadId !== expectedThreadId) {
+    throw new Error("Codex Desktop returned the wrong task; the turn was not accepted.");
+  }
+  if (result.delivery !== "started-turn" && result.delivery !== "steered-active-turn") {
+    throw new Error("Codex Desktop did not confirm how the turn was delivered.");
+  }
+  const response = result.response?.trim();
+  const turnId = result.turnId?.trim();
+  if (!response || !turnId) {
+    throw new Error("Codex Desktop completed without a correlatable response.");
+  }
+  return {
+    response,
+    delivery: result.delivery,
+    threadId: result.threadId,
+    turnId
+  };
+}
+function stop(child) {
+  if (child.exitCode !== null || child.signalCode !== null)
+    return;
+  child.kill("SIGTERM");
+  const hardStop = setTimeout(() => child.kill("SIGKILL"), 1000);
+  hardStop.unref();
+}
+
+class CodexDesktopSession {
+  threadId;
+  bridgePath;
+  runtimePath;
+  readyTimeoutMs;
+  child = null;
+  readyPromise = null;
+  readyResolve = null;
+  readyReject = null;
+  readyTimer = null;
+  stdout = "";
+  stderr = "";
+  pending = new Map;
+  disposed = false;
+  constructor(threadId, options = {}) {
+    const exactThreadId = threadId.trim();
+    if (!exactThreadId)
+      throw new Error("The lane has no exact Codex task ID.");
+    this.threadId = exactThreadId;
+    this.bridgePath = options.bridgePath ?? resolveCodexDesktopBridge();
+    this.runtimePath = options.runtimePath ?? process.execPath;
+    this.readyTimeoutMs = Math.max(5000, options.readyTimeoutMs ?? 125000);
+  }
+  warm() {
+    if (this.disposed)
+      return Promise.reject(new Error("The Codex Desktop session is closed."));
+    if (this.readyPromise)
+      return this.readyPromise;
+    this.readyPromise = new Promise((resolve2, reject) => {
+      this.readyResolve = resolve2;
+      this.readyReject = reject;
+    });
+    const child = spawn6(this.runtimePath, [this.bridgePath, "serve", this.threadId], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: process.env
+    });
+    this.child = child;
+    this.stdout = "";
+    this.stderr = "";
+    this.readyTimer = setTimeout(() => {
+      this.reset(new Error(`Timed out warming the exact Codex task after ${this.readyTimeoutMs}ms.`), child);
+    }, this.readyTimeoutMs);
+    this.readyTimer.unref();
+    child.stdout.on("data", (chunk) => this.consumeStdout(chunk, child));
+    child.stderr.on("data", (chunk) => {
+      this.stderr = (this.stderr + chunk.toString("utf8")).slice(-64 * 1024);
+    });
+    child.stdin.on("error", (error) => this.reset(error, child));
+    child.on("error", (error) => this.reset(error, child));
+    child.on("close", (code) => {
+      if (this.child !== child)
+        return;
+      const detail = this.stderr.trim();
+      this.reset(new Error(detail || `Codex Desktop warm bridge exited (${code ?? "signal"}).`), child);
+    });
+    return this.readyPromise;
+  }
+  async turn(text, options = {}) {
+    const transcript = text.trim();
+    if (!transcript)
+      throw new Error("The transcript is empty.");
+    if (options.signal?.aborted)
+      throw new Error("The Codex turn was cancelled.");
+    await this.warm();
+    const child = this.child;
+    if (!child?.stdin.writable)
+      throw new Error("Codex Desktop warm bridge is unavailable.");
+    if (this.pending.size > 0)
+      throw new Error("A canonical Codex turn is already in flight.");
+    const requestId = randomUUID4();
+    const timeoutMs = Math.max(1, options.timeoutMs ?? DEFAULT_TIMEOUT_MS2);
+    return new Promise((resolve2, reject) => {
+      const onAbort = () => this.reset(new Error("The Codex turn was cancelled."), child);
+      const timer = setTimeout(() => {
+        this.reset(new Error(`Timed out waiting for the exact Codex task after ${timeoutMs}ms.`), child);
+      }, timeoutMs);
+      timer.unref();
+      const pending = { resolve: resolve2, reject, timer, signal: options.signal, onAbort };
+      this.pending.set(requestId, pending);
+      options.signal?.addEventListener("abort", onAbort, { once: true });
+      child.stdin.write(`${JSON.stringify({ type: "submit", requestId, text: transcript })}
+`);
+    });
+  }
+  close() {
+    this.disposed = true;
+    this.reset(new Error("The Codex Desktop session was closed."), this.child);
+  }
+  consumeStdout(chunk, child) {
+    if (this.child !== child)
+      return;
+    this.stdout += chunk.toString("utf8");
+    if (Buffer.byteLength(this.stdout, "utf8") > MAX_OUTPUT_BYTES) {
+      this.reset(new Error("Codex Desktop bridge output exceeded its safety limit."), child);
+      return;
+    }
+    const lines = this.stdout.split(`
+`);
+    this.stdout = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim())
+        continue;
+      let envelope;
+      try {
+        envelope = JSON.parse(line);
+      } catch {
+        this.reset(new Error("Codex Desktop returned an unreadable bridge result."), child);
+        return;
+      }
+      if (envelope.type === "ready") {
+        if (!envelope.ok || envelope.threadId !== this.threadId) {
+          this.reset(new Error(envelope.error || "Codex Desktop warmed the wrong task."), child);
+          return;
+        }
+        if (this.readyTimer)
+          clearTimeout(this.readyTimer);
+        this.readyTimer = null;
+        const resolve2 = this.readyResolve;
+        this.readyResolve = null;
+        this.readyReject = null;
+        resolve2?.();
+        continue;
+      }
+      if (this.readyResolve && envelope.ok === false && !envelope.requestId) {
+        this.reset(new Error(envelope.error || "Codex Desktop could not warm the exact task."), child);
+        return;
+      }
+      const requestId = envelope.requestId;
+      if (!requestId)
+        continue;
+      const pending = this.pending.get(requestId);
+      if (!pending)
+        continue;
+      this.pending.delete(requestId);
+      clearTimeout(pending.timer);
+      if (pending.onAbort)
+        pending.signal?.removeEventListener("abort", pending.onAbort);
+      try {
+        pending.resolve(parseBridgeEnvelope(envelope, this.threadId));
+      } catch (error) {
+        pending.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+  }
+  reset(error, child) {
+    if (child && this.child !== child)
+      return;
+    const active = this.child;
+    this.child = null;
+    if (this.readyTimer)
+      clearTimeout(this.readyTimer);
+    this.readyTimer = null;
+    const rejectReady = this.readyReject;
+    this.readyResolve = null;
+    this.readyReject = null;
+    this.readyPromise = null;
+    rejectReady?.(error);
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      if (pending.onAbort)
+        pending.signal?.removeEventListener("abort", pending.onAbort);
+      pending.reject(error);
+    }
+    this.pending.clear();
+    if (active)
+      stop(active);
+  }
+}
+var __dirname = "/Users/arach/dev/SpeakEasy/.claude/worktrees/landing-polish/src/cli", DEFAULT_TIMEOUT_MS2 = 185000, MAX_OUTPUT_BYTES;
+var init_codex_desktop_submit = __esm(() => {
+  MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+});
+
+// src/cli/codex-thread-catalog.ts
+import { spawn as spawn7 } from "child_process";
+import { closeSync as closeSync2, openSync as openSync2, readSync, readdirSync as readdirSync4, statSync as statSync4 } from "fs";
 import { readFile as readFile3 } from "fs/promises";
-import { homedir as homedir7 } from "os";
+import { homedir as homedir6 } from "os";
 import path12 from "path";
+function readHead(file, bytes) {
+  const fd = openSync2(file, "r");
+  try {
+    const buffer = Buffer.alloc(bytes);
+    return buffer.toString("utf8", 0, readSync(fd, buffer, 0, bytes, 0));
+  } finally {
+    closeSync2(fd);
+  }
+}
+function parseRollout(file, at) {
+  let head;
+  try {
+    head = readHead(file, 65536);
+  } catch {
+    return null;
+  }
+  let id = "";
+  let cwd = "";
+  let source = "";
+  let preview = "";
+  for (const line of head.split(`
+`)) {
+    if (!line)
+      continue;
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const payload = record.payload;
+    if (record.type === "session_meta" && payload) {
+      id = String(payload.session_id ?? payload.id ?? "");
+      cwd = String(payload.cwd ?? "");
+      source = String(payload.originator ?? "");
+    } else if (!preview && record.type === "response_item" && payload?.type === "message" && payload?.role === "user") {
+      const content = Array.isArray(payload.content) ? payload.content : [];
+      const text = content.filter((item) => item.type === "input_text").map((item) => String(item.text ?? "")).join(" ").trim();
+      if (text && !text.startsWith("<"))
+        preview = text.replace(/\s+/g, " ").slice(0, 90);
+    }
+    if (id && preview)
+      break;
+  }
+  if (!id)
+    return null;
+  return {
+    id,
+    cwd,
+    title: displayCodexThreadTitle(preview || `${path12.basename(cwd)} thread`),
+    preview,
+    project: path12.basename(cwd) || "Codex",
+    at,
+    source
+  };
+}
+function findCodexRollout(threadId) {
+  let names;
+  try {
+    names = readdirSync4(CODEX_SESSIONS_DIR, { recursive: true });
+  } catch {
+    return null;
+  }
+  const match = names.find((name) => name.includes(threadId) && name.endsWith(".jsonl"));
+  if (!match)
+    return null;
+  const file = path12.join(CODEX_SESSIONS_DIR, match);
+  try {
+    return parseRollout(file, statSync4(file).mtimeMs);
+  } catch {
+    return null;
+  }
+}
+function listCodexRolloutReferences(limit = 25) {
+  let names;
+  try {
+    names = readdirSync4(CODEX_SESSIONS_DIR, { recursive: true });
+  } catch {
+    return null;
+  }
+  const rollouts = [];
+  for (const file of names) {
+    if (!/rollout-.*\.jsonl$/.test(file))
+      continue;
+    try {
+      rollouts.push({ file, at: statSync4(path12.join(CODEX_SESSIONS_DIR, file)).mtimeMs });
+    } catch {}
+  }
+  rollouts.sort((a, b) => b.at - a.at);
+  const references = [];
+  for (const { file, at } of rollouts.slice(0, limit * 3)) {
+    const reference = parseRollout(path12.join(CODEX_SESSIONS_DIR, file), at);
+    if (reference)
+      references.push(reference);
+    if (references.length >= limit)
+      break;
+  }
+  return references;
+}
 function stringValue(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -12320,7 +12796,7 @@ class AppServerClient {
   closed = false;
   constructor(cwd) {
     const executable = process.env.CODEX_BIN?.trim() || "codex";
-    this.child = spawn6(executable, ["app-server"], {
+    this.child = spawn7(executable, ["app-server"], {
       cwd,
       env: process.env,
       stdio: ["pipe", "pipe", "pipe"]
@@ -12464,14 +12940,15 @@ async function listCodexThreadReferences(cwd = process.cwd(), limit = DEFAULT_LI
 }
 var APP_STATE_FILE, DEFAULT_LIMIT = 150, REQUEST_TIMEOUT_MS = 12000;
 var init_codex_thread_catalog = __esm(() => {
-  APP_STATE_FILE = path12.join(homedir7(), ".codex", ".codex-global-state.json");
+  init_paths();
+  APP_STATE_FILE = path12.join(homedir6(), ".codex", ".codex-global-state.json");
 });
 
 // src/cli/deck-runtime.ts
 import { EventEmitter as EventEmitter2 } from "events";
-import { spawn as spawn7, execFile, execFileSync as execFileSync2 } from "child_process";
-import { mkdtempSync as mkdtempSync2, rmSync as rmSync2, existsSync as existsSync13, copyFileSync, readFileSync as readFileSync8, writeFileSync as writeFileSync6, readdirSync as readdirSync4, statSync as statSync4, mkdirSync as mkdirSync5, openSync as openSync2, readSync, closeSync as closeSync2 } from "fs";
-import { tmpdir as tmpdir2, homedir as homedir8, hostname } from "os";
+import { spawn as spawn8, execFile, execFileSync as execFileSync2 } from "child_process";
+import { mkdtempSync as mkdtempSync2, rmSync as rmSync2, existsSync as existsSync14, copyFileSync, readFileSync as readFileSync8, writeFileSync as writeFileSync6, mkdirSync as mkdirSync5 } from "fs";
+import { tmpdir as tmpdir3, hostname } from "os";
 import path13 from "path";
 function run(cmd, args, timeout) {
   return new Promise((resolve2, reject) => {
@@ -12504,113 +12981,28 @@ function gitBranchFor(cwd) {
     return "";
   }
 }
-function readHead(file, bytes) {
-  const fd = openSync2(file, "r");
-  try {
-    const buf = Buffer.alloc(bytes);
-    const n = readSync(fd, buf, 0, bytes, 0);
-    return buf.toString("utf8", 0, n);
-  } finally {
-    closeSync2(fd);
-  }
+function resolveDeckTurnRoute(laneIx, taskId) {
+  if (laneIx === MASTER_IX)
+    return { kind: "overview" };
+  const exactTaskId = taskId?.trim();
+  return exactTaskId ? { kind: "canonical", taskId: exactTaskId } : { kind: "unassigned" };
 }
-function parseRollout(file, at) {
-  let head;
-  try {
-    head = readHead(file, 65536);
-  } catch {
-    return null;
-  }
-  let id = "";
-  let cwd = "";
-  let originator = "";
-  let snippet = "";
-  for (const line of head.split(`
-`)) {
-    if (!line)
-      continue;
-    let rec;
-    try {
-      rec = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    const p = rec.payload;
-    if (rec.type === "session_meta" && p) {
-      id = String(p.session_id ?? p.id ?? "");
-      cwd = String(p.cwd ?? "");
-      originator = String(p.originator ?? "");
-    } else if (!snippet && rec.type === "response_item" && p?.type === "message" && p?.role === "user") {
-      const content = Array.isArray(p.content) ? p.content : [];
-      const text = content.filter((c) => c.type === "input_text").map((c) => String(c.text ?? "")).join(" ").trim();
-      if (text && !text.startsWith("<"))
-        snippet = text.replace(/\s+/g, " ").slice(0, 90);
-    }
-    if (id && snippet)
-      break;
-  }
-  if (!id)
-    return null;
+function deckThreadInfo(thread) {
   return {
-    id,
-    cwd,
-    snippet: displayCodexThreadTitle(snippet || `${path13.basename(cwd)} thread`),
-    preview: snippet,
-    project: path13.basename(cwd) || "Codex",
-    at,
-    originator
+    id: thread.id,
+    cwd: thread.cwd,
+    snippet: thread.title,
+    preview: thread.preview,
+    project: thread.project,
+    at: thread.at,
+    originator: thread.source,
+    isPinned: thread.isPinned
   };
-}
-function laneRuntimeDir(key) {
-  return deckAgentRuntimeDir(key);
-}
-function findRollout(threadId) {
-  let names;
-  try {
-    names = readdirSync4(CODEX_SESSIONS_DIR, { recursive: true });
-  } catch {
-    return null;
-  }
-  const match = names.find((n) => n.includes(threadId) && n.endsWith(".jsonl"));
-  if (!match)
-    return null;
-  const file = path13.join(CODEX_SESSIONS_DIR, match);
-  try {
-    return parseRollout(file, statSync4(file).mtimeMs);
-  } catch {
-    return null;
-  }
-}
-function scanCodexThreadsFallback() {
-  let names;
-  try {
-    names = readdirSync4(CODEX_SESSIONS_DIR, { recursive: true });
-  } catch {
-    return null;
-  }
-  const rollouts = [];
-  for (const n of names) {
-    if (!/rollout-.*\.jsonl$/.test(n))
-      continue;
-    try {
-      rollouts.push({ file: n, at: statSync4(path13.join(CODEX_SESSIONS_DIR, n)).mtimeMs });
-    } catch {}
-  }
-  rollouts.sort((a, b) => b.at - a.at);
-  const out = [];
-  for (const { file, at } of rollouts.slice(0, CATALOG_LIMIT * 3)) {
-    const info = parseRollout(path13.join(CODEX_SESSIONS_DIR, file), at);
-    if (info)
-      out.push(info);
-    if (out.length >= CATALOG_LIMIT)
-      break;
-  }
-  return out;
 }
 function loadLaneKeys() {
   const base = Array.from({ length: LANE_COUNT }, (_, i) => `speakeasy-deck-lane-${i}`);
   try {
-    const saved = JSON.parse(readFileSync8(LANES_FILE, "utf8"));
+    const saved = JSON.parse(readFileSync8(DECK_LANES_FILE, "utf8"));
     return base.map((b, i) => {
       const v = saved[String(i)];
       return typeof v === "string" && v.startsWith("speakeasy-deck-lane-") ? v : b;
@@ -12624,9 +13016,42 @@ function clock() {
   const p = (n) => String(n).padStart(2, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
+function laneNumber(index) {
+  return `LANE ${String(index + 1).padStart(2, "0")}`;
+}
+function threadAlias(threadId) {
+  return threadId.replace(/-/g, "").slice(-8);
+}
+function storedThreadId(key) {
+  try {
+    return readFileSync8(path13.join(deckAgentRuntimeDir(key), "codex-thread-id.txt"), "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
 function estimateDuration(text, rate = 1) {
   const words = text.split(/\s+/).filter(Boolean).length;
   return Math.max(1.5, words / (2.5 * rate));
+}
+function audioDurationOf(file) {
+  try {
+    const info = execFileSync2("afinfo", [file], {
+      encoding: "utf8",
+      timeout: 5000,
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+    const match = info.match(/estimated duration:\s*([\d.]+)\s*sec/i);
+    const seconds = match ? Number.parseFloat(match[1]) : Number.NaN;
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+  } catch {
+    return null;
+  }
+}
+function measureSegmentDurations(files, text) {
+  if (files.length === 0)
+    return [];
+  const fallback = Math.max(1.5, estimateDuration(text) / files.length);
+  return files.map((file) => audioDurationOf(file) ?? fallback);
 }
 function parseIntent(raw) {
   const parsed = intentSchema.safeParse(raw);
@@ -12637,11 +13062,13 @@ function parseIntent(raw) {
 function wait(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
-var intentSchema, SPEEDS, LANE_COUNT = 9, MASTER_IX = 9, MASTER_REUSE_KEY = "speakeasy-deck-master-v2", OVERVIEW_MODEL = "gpt-5.6-luna", OVERVIEW_EFFORT = "low", TICK_MS = 250, MAX_MESSAGES_PER_LANE = 50, LANES_FILE, CODEX_SESSIONS_DIR, CATALOG_LIMIT = 25, VOICE_SYSTEM_PROMPT, OVERVIEW_SYSTEM_PROMPT, DeckRuntime;
+var intentSchema, SPEEDS, LANE_COUNT = 9, MASTER_IX = 9, MASTER_REUSE_KEY = "speakeasy-deck-master-v2", OVERVIEW_MODEL = "gpt-5.6-luna", OVERVIEW_EFFORT = "low", TICK_MS = 250, MAX_MESSAGES_PER_LANE = 50, OVERVIEW_SYSTEM_PROMPT, DeckRuntime;
 var init_deck_runtime = __esm(() => {
   init_zod();
   init_deck_agent_client();
+  init_codex_desktop_submit();
   init_codex_thread_catalog();
+  init_paths();
   intentSchema = exports_external.discriminatedUnion("name", [
     exports_external.object({ name: exports_external.literal("lane.select"), index: exports_external.number().int().min(0).max(9) }),
     exports_external.object({ name: exports_external.literal("playback.toggle"), id: exports_external.string().regex(/^\d:\d{1,3}$/) }),
@@ -12657,14 +13084,16 @@ var init_deck_runtime = __esm(() => {
     exports_external.object({ name: exports_external.literal("speak"), text: exports_external.string().min(1).max(4000) }),
     exports_external.object({ name: exports_external.literal("lane.cycle"), index: exports_external.number().int().min(0).max(8) }),
     exports_external.object({ name: exports_external.literal("catalog.refresh") }),
-    exports_external.object({ name: exports_external.literal("lane.assign"), index: exports_external.number().int().min(0).max(8), threadId: exports_external.string().max(64).nullable() }),
+    exports_external.object({
+      name: exports_external.literal("lane.assign"),
+      index: exports_external.number().int().min(0).max(8),
+      threadId: exports_external.string().max(64).nullable(),
+      activate: exports_external.boolean().optional()
+    }),
     exports_external.object({ name: exports_external.literal("playback.progress"), id: exports_external.string().regex(/^\d:\d{1,3}$/), pos: exports_external.number().min(0), dur: exports_external.number().positive().optional() }),
     exports_external.object({ name: exports_external.literal("playback.ended"), id: exports_external.string().regex(/^\d:\d{1,3}$/) })
   ]);
   SPEEDS = [1, 1.25, 1.5, 0.75];
-  LANES_FILE = path13.join(homedir8(), ".config", "speakeasy", "deck-lanes.json");
-  CODEX_SESSIONS_DIR = path13.join(homedir8(), ".codex", "sessions");
-  VOICE_SYSTEM_PROMPT = "You are a voice responder for a spoken interface. Do not use tools, do not read or write files, do not access the network. " + "Answer from general knowledge only, in one or two spoken-style sentences, plain words, no lists, no code.";
   OVERVIEW_SYSTEM_PROMPT = "You are the overview officer of a voice-command deck with nine lanes, each a live codex thread. " + "Every question arrives with a DECK STATUS digest that is live and authoritative. " + "Report exactly what the digest shows and nothing more \u2014 no interpretation, no suggestions, no color commentary, never invent state. " + "Do not use tools, do not read or write files, do not access the network. " + "Plain spoken words, no lists, no code: one or two sentences for a status question, a few plain sentences for a summary.";
   DeckRuntime = class DeckRuntime extends EventEmitter2 {
     rev = 0;
@@ -12673,7 +13102,7 @@ var init_deck_runtime = __esm(() => {
       ...Array.from({ length: LANE_COUNT }, (_, i) => ({
         num: String(i + 1).padStart(2, "0"),
         name: `LANE ${i + 1}`,
-        title: "new codex session on first ask",
+        title: "assign a Codex task before speaking",
         state: "idle"
       })),
       {
@@ -12685,10 +13114,14 @@ var init_deck_runtime = __esm(() => {
     ];
     laneKeys = loadLaneKeys();
     laneClients = new Map;
+    canonicalTurnAbort = null;
+    canonicalSession = null;
+    canonicalSessionReady = false;
     threads = Array.from({ length: LANE_COUNT + 1 }, () => []);
     playing = null;
     paused = false;
     pos = 0;
+    segIx = 0;
     speedIx = 0;
     vol = 0.8;
     autoplay = true;
@@ -12704,17 +13137,21 @@ var init_deck_runtime = __esm(() => {
     busy = false;
     destroyed = false;
     gen = 0;
+    suppressAutoplayForGeneration = null;
     player = null;
     playerRate = 1;
-    synthDir = mkdtempSync2(path13.join(tmpdir2(), "speakeasy-deck-synth-"));
+    synthDir = mkdtempSync2(path13.join(tmpdir3(), "speakeasy-deck-synth-"));
     liveClients = () => 0;
     get audioDir() {
       return this.synthDir;
     }
-    constructor() {
+    constructor(options = {}) {
       super();
       this.restoreLaneBindings();
-      this.refreshThreadCatalog();
+      if (options.warmCatalog !== false)
+        this.refreshThreadCatalog();
+      if (options.warmCanonical !== false)
+        queueMicrotask(() => this.warmCanonicalLane(this.laneIx));
     }
     applyThreadIdentity(lane, info) {
       lane.title = info.snippet;
@@ -12731,19 +13168,11 @@ var init_deck_runtime = __esm(() => {
         let fallback = false;
         try {
           const refs = await listCodexThreadReferences(process.cwd());
-          next = refs.map((thread) => ({
-            id: thread.id,
-            cwd: thread.cwd,
-            snippet: thread.title,
-            preview: thread.preview,
-            project: thread.project,
-            at: thread.at,
-            originator: thread.source,
-            isPinned: thread.isPinned
-          }));
+          next = refs.map(deckThreadInfo);
         } catch {
-          next = scanCodexThreadsFallback();
-          fallback = next !== null;
+          const references = listCodexRolloutReferences();
+          next = references?.map(deckThreadInfo) ?? null;
+          fallback = references !== null;
         }
         if (this.destroyed)
           return;
@@ -12771,27 +13200,22 @@ var init_deck_runtime = __esm(() => {
       const claimed = new Set;
       let rotated = false;
       this.laneKeys.forEach((key, i) => {
-        let threadId = "";
-        try {
-          threadId = readFileSync8(path13.join(laneRuntimeDir(key), "codex-thread-id.txt"), "utf8").trim();
-        } catch {
-          return;
-        }
+        const threadId = storedThreadId(key);
         if (!threadId)
           return;
         if (claimed.has(threadId)) {
           this.laneKeys[i] = `speakeasy-deck-lane-${i}-${Date.now().toString(36)}`;
           rotated = true;
-          this.log("LANE DEDUPED", `lane ${i + 1} \u2192 fresh session (thread already bound)`);
+          this.log("LANE DEDUPED", `lane ${i + 1} \u2192 unassigned (task already bound)`);
           return;
         }
         claimed.add(threadId);
         const lane = this.lanes[i];
         lane.threadId = threadId;
-        lane.sessionAlias = threadId.replace(/-/g, "").slice(-8);
-        const info = findRollout(threadId);
+        lane.sessionAlias = threadAlias(threadId);
+        const info = findCodexRollout(threadId);
         if (info)
-          this.applyThreadIdentity(lane, info);
+          this.applyThreadIdentity(lane, deckThreadInfo(info));
         else
           lane.title = "codex thread";
       });
@@ -12808,6 +13232,9 @@ var init_deck_runtime = __esm(() => {
         playing: this.playing,
         paused: this.paused,
         pos: this.pos,
+        segIx: this.segIx,
+        segStart: this.segmentStart(),
+        segCount: this.segmentCount(),
         speedIx: this.speedIx,
         vol: this.vol,
         autoplay: this.autoplay,
@@ -12829,7 +13256,9 @@ var init_deck_runtime = __esm(() => {
       this.trace = [{ at: clock(), kind, detail }, ...this.trace].slice(0, 7);
     }
     async laneClient(ix) {
-      const key = ix === MASTER_IX ? MASTER_REUSE_KEY : this.laneKeys[ix];
+      if (ix !== MASTER_IX)
+        throw new Error("Assign a Codex task to this lane before speaking.");
+      const key = MASTER_REUSE_KEY;
       const existing = this.laneClients.get(ix);
       if (existing && existing.key === key)
         return existing.client;
@@ -12844,14 +13273,12 @@ var init_deck_runtime = __esm(() => {
         cwd: process.cwd(),
         reuseKey: key,
         warmth: "lazy",
-        systemPrompt: ix === MASTER_IX ? OVERVIEW_SYSTEM_PROMPT : VOICE_SYSTEM_PROMPT
+        systemPrompt: OVERVIEW_SYSTEM_PROMPT,
+        model: OVERVIEW_MODEL,
+        effort: OVERVIEW_EFFORT
       };
-      if (ix === MASTER_IX) {
-        options.model = OVERVIEW_MODEL;
-        options.effort = OVERVIEW_EFFORT;
-      }
       const client = await createDeckAgentClient(options);
-      const currentKey = ix === MASTER_IX ? MASTER_REUSE_KEY : this.laneKeys[ix];
+      const currentKey = MASTER_REUSE_KEY;
       if (this.destroyed || currentKey !== key) {
         client.close().catch(() => {
           return;
@@ -12867,27 +13294,15 @@ var init_deck_runtime = __esm(() => {
         this.laneKeys.forEach((k, i) => {
           out[String(i)] = k;
         });
-        writeFileSync6(LANES_FILE, JSON.stringify(out), { mode: 384 });
+        writeFileSync6(DECK_LANES_FILE, JSON.stringify(out), { mode: 384 });
       } catch {}
     }
     masterThreadId() {
       const live = this.lanes[MASTER_IX].threadId;
-      if (live)
-        return live;
-      try {
-        const id = readFileSync8(path13.join(laneRuntimeDir(MASTER_REUSE_KEY), "codex-thread-id.txt"), "utf8").trim();
-        return id || null;
-      } catch {
-        return null;
-      }
+      return live || storedThreadId(MASTER_REUSE_KEY);
     }
     laneThreadId(index) {
-      try {
-        const id = readFileSync8(path13.join(laneRuntimeDir(this.laneKeys[index]), "codex-thread-id.txt"), "utf8").trim();
-        return id || null;
-      } catch {
-        return null;
-      }
+      return storedThreadId(this.laneKeys[index]);
     }
     assignLane(index, threadId) {
       if (threadId && this.laneThreadId(index) === threadId) {
@@ -12904,7 +13319,7 @@ var init_deck_runtime = __esm(() => {
       let bound = false;
       if (threadId) {
         try {
-          const dir = laneRuntimeDir(key);
+          const dir = deckAgentRuntimeDir(key);
           mkdirSync5(dir, { recursive: true });
           writeFileSync6(path13.join(dir, "codex-thread-id.txt"), threadId);
           bound = true;
@@ -12931,7 +13346,7 @@ var init_deck_runtime = __esm(() => {
         else
           lane.title = "codex thread";
         lane.threadId = threadId;
-        lane.sessionAlias = threadId.replace(/-/g, "").slice(-8);
+        lane.sessionAlias = threadAlias(threadId);
         this.log("LANE ASSIGNED", `lane ${index + 1} \u2192 thread ${lane.sessionAlias}`);
         for (let j = 0;j < LANE_COUNT; j++) {
           if (j !== index && this.laneThreadId(j) === threadId) {
@@ -12940,23 +13355,64 @@ var init_deck_runtime = __esm(() => {
           }
         }
       } else {
-        lane.title = "new codex session on first ask";
+        lane.title = "assign a Codex task before speaking";
         lane.threadId = undefined;
         lane.sessionAlias = undefined;
         lane.project = undefined;
         lane.cwd = undefined;
         lane.branch = undefined;
         lane.updatedAt = undefined;
-        this.log(threadId ? "ASSIGN FAILED" : "LANE RESET", `lane ${index + 1} \u2192 fresh session`);
+        this.log(threadId ? "ASSIGN FAILED" : "LANE CLEARED", `lane ${index + 1} \u2192 unassigned`);
       }
       this.changed();
     }
     laneLabel(ix) {
       return this.lanes[ix]?.name.toLowerCase() ?? `lane ${ix + 1}`;
     }
+    selectLane(index) {
+      this.laneIx = index;
+      const label = index === MASTER_IX ? "OVERVIEW" : laneNumber(index);
+      const state = this.lanes[index]?.state;
+      const status = state === "working" ? "WORKING" : state === "speaking" ? "SPEAKING" : "READY";
+      this.setPhase(this.phase, `${status} \xB7 ${label}`);
+      this.log("LANE SELECTED", index === MASTER_IX ? "overview" : `lane ${index + 1}`);
+      this.changed();
+      this.warmCanonicalLane(index);
+    }
+    canonicalSessionFor(taskId) {
+      if (this.canonicalSession?.threadId === taskId)
+        return this.canonicalSession;
+      this.canonicalSession?.close();
+      this.canonicalSession = new CodexDesktopSession(taskId);
+      this.canonicalSessionReady = false;
+      return this.canonicalSession;
+    }
+    warmCanonicalLane(index) {
+      if (this.destroyed || this.busy)
+        return;
+      const route = resolveDeckTurnRoute(index, this.lanes[index]?.threadId);
+      if (route.kind !== "canonical")
+        return;
+      const session = this.canonicalSessionFor(route.taskId);
+      if (this.canonicalSessionReady)
+        return;
+      session.warm().then(() => {
+        if (this.destroyed || this.canonicalSession !== session || this.canonicalSessionReady)
+          return;
+        this.canonicalSessionReady = true;
+        this.log("CODEX LINK READY", `lane ${index + 1} \xB7 exact task owner verified`);
+        this.changed();
+      }).catch((error) => {
+        if (this.destroyed || this.canonicalSession !== session)
+          return;
+        this.canonicalSessionReady = false;
+        this.log("CODEX LINK FAILED", error.message.slice(0, 60));
+        this.changed();
+      });
+    }
     systemDigest() {
       const lines = this.lanes.slice(0, LANE_COUNT).map((lane, i) => {
-        const bound = lane.threadId ? `bound ${lane.sessionAlias}` : "fresh session";
+        const bound = lane.threadId ? `bound ${lane.sessionAlias}` : "unassigned";
         let line = `lane ${i + 1}: ${bound} \xB7 ${lane.state} \xB7 "${lane.title}"`;
         const msgs = this.threads[i];
         const lastYou = [...msgs].reverse().find((m) => m.role === "you")?.text;
@@ -12979,6 +13435,24 @@ var init_deck_runtime = __esm(() => {
       lane.state = state;
       return true;
     }
+    startPlayback(id, confirm) {
+      this.playing = id;
+      this.paused = false;
+      this.pos = 0;
+      this.setPhase("speaking", confirm);
+    }
+    finishPlayback(settleLane = false) {
+      if (settleLane && this.playing) {
+        const [lane] = this.playing.split(":").map(Number);
+        this.setLaneState(lane, "idle");
+      }
+      this.playing = null;
+      this.paused = false;
+      this.pos = 0;
+      this.segIx = 0;
+      this.setPhase("idle", "READY");
+      this.log("PLAYBACK ENDED", "buffer complete");
+    }
     clearPlayback(confirm) {
       if (this.playing) {
         const [li] = this.playing.split(":").map(Number);
@@ -12987,6 +13461,7 @@ var init_deck_runtime = __esm(() => {
       this.playing = null;
       this.paused = false;
       this.pos = 0;
+      this.segIx = 0;
       if (confirm)
         this.setPhase(this.phase === "speaking" ? "idle" : this.phase, confirm);
     }
@@ -13003,11 +13478,7 @@ var init_deck_runtime = __esm(() => {
         this.pos += TICK_MS / 1000 * rate;
         const dur = this.durOf(this.playing);
         if (!this.player && this.pos >= dur) {
-          this.playing = null;
-          this.pos = 0;
-          this.paused = false;
-          this.log("PLAYBACK ENDED", "buffer complete");
-          this.setPhase("idle", "READY");
+          this.finishPlayback();
         }
         this.changed();
       }, TICK_MS);
@@ -13030,15 +13501,7 @@ var init_deck_runtime = __esm(() => {
     async apply(intent) {
       switch (intent.name) {
         case "lane.select": {
-          this.gen++;
-          this.cancelAgentWork();
-          this.laneIx = intent.index;
-          this.stopPlayer();
-          this.clearPlayback();
-          const label = intent.index === MASTER_IX ? "OVERVIEW" : `LANE ${String(intent.index + 1).padStart(2, "0")}`;
-          this.setPhase(this.phase, `READY \xB7 ${label}`);
-          this.log("LANE SELECTED", intent.index === MASTER_IX ? "overview" : `lane ${intent.index + 1}`);
-          this.changed();
+          this.selectLane(intent.index);
           return { ok: true, rev: this.rev };
         }
         case "playback.toggle": {
@@ -13057,13 +13520,9 @@ var init_deck_runtime = __esm(() => {
             this.log("PLAYBACK RESUMED", `${Math.floor(this.pos)}s elapsed`);
           } else {
             this.stopPlayer();
-            this.playing = intent.id;
-            this.paused = false;
-            this.pos = 0;
-            this.setPhase("speaking", "PLAYING");
+            this.startPlayback(intent.id, "PLAYING");
             this.log("PLAYBACK STARTED", `${SPEEDS[this.speedIx].toFixed(2)}x`);
-            if (msg.file)
-              this.playFile(msg.file);
+            this.startSegments(msg);
           }
           this.ensureTicker();
           this.changed();
@@ -13087,13 +13546,13 @@ var init_deck_runtime = __esm(() => {
           this.changed();
           return { ok: true, rev: this.rev };
         case "playback.stop":
-          this.gen++;
-          this.cancelAgentWork();
+          if (this.busy)
+            this.suppressAutoplayForGeneration = this.gen;
           this.stopPlayer();
           this.clearPlayback();
           this.listening = false;
-          this.setPhase("idle", "CANCELLED");
-          this.log("PLAYBACK STOPPED", "buffer cleared");
+          this.setPhase("idle", this.busy ? "AUDIO STOPPED \xB7 TASK CONTINUES" : "AUDIO STOPPED");
+          this.log("PLAYBACK STOPPED", this.busy ? "audio cleared \xB7 canonical task continues" : "buffer cleared");
           this.changed();
           return { ok: true, rev: this.rev };
         case "playback.replay": {
@@ -13101,13 +13560,10 @@ var init_deck_runtime = __esm(() => {
           for (let i = t.length - 1;i >= 0; i--) {
             if (t[i].role === "agent" && t[i].file) {
               this.stopPlayer();
-              this.playing = `${this.laneIx}:${i}`;
-              this.paused = false;
-              this.pos = 0;
-              this.setPhase("speaking", "REPLAYING LAST REPLY");
+              this.startPlayback(`${this.laneIx}:${i}`, "REPLAYING LAST REPLY");
               this.ensureTicker();
               this.log("REPLAY", `lane ${this.laneIx + 1} \xB7 last reply`);
-              this.playFile(t[i].file);
+              this.startSegments(t[i]);
               this.changed();
               return { ok: true, rev: this.rev };
             }
@@ -13115,8 +13571,9 @@ var init_deck_runtime = __esm(() => {
           return { ok: false, rev: this.rev, error: "no replayable reply" };
         }
         case "capture.start":
+          if (this.busy)
+            return { ok: false, rev: this.rev, error: "response already in flight" };
           this.gen++;
-          this.cancelAgentWork();
           this.stopPlayer();
           this.clearPlayback();
           this.listening = true;
@@ -13165,16 +13622,22 @@ var init_deck_runtime = __esm(() => {
             return { ok: false, rev: this.rev, error: "that thread belongs to the overview lane" };
           }
           this.assignLane(intent.index, intent.threadId);
+          if (intent.activate && intent.threadId && this.lanes[intent.index]?.threadId === intent.threadId) {
+            this.selectLane(intent.index);
+          }
           return { ok: true, rev: this.rev };
         }
         case "playback.progress": {
           if (this.playing !== intent.id)
             return { ok: false, rev: this.rev, error: "not playing" };
-          this.pos = intent.pos;
+          this.pos = this.segmentStart() + intent.pos;
           if (intent.dur) {
             const msg = this.messageAt(intent.id);
+            const durs = msg?.segmentDurs;
+            if (durs)
+              durs[this.segIx] = intent.dur;
             if (msg)
-              msg.dur = intent.dur;
+              msg.dur = durs ? durs.reduce((total, d) => total + d, 0) : intent.dur;
           }
           this.changed();
           return { ok: true, rev: this.rev };
@@ -13182,13 +13645,13 @@ var init_deck_runtime = __esm(() => {
         case "playback.ended": {
           if (this.playing !== intent.id)
             return { ok: false, rev: this.rev, error: "not playing" };
-          const [li] = intent.id.split(":").map(Number);
-          this.playing = null;
-          this.pos = 0;
-          this.paused = false;
-          this.setPhase("idle", "READY");
-          this.setLaneState(li, "idle");
-          this.log("PLAYBACK ENDED", "buffer complete");
+          if (this.advanceSegment()) {
+            this.pos = this.segmentStart();
+            this.log("SEGMENT", `${this.segIx + 1}/${this.segmentCount()}`);
+            this.changed();
+            return { ok: true, rev: this.rev };
+          }
+          this.finishPlayback(true);
           this.changed();
           return { ok: true, rev: this.rev };
         }
@@ -13201,17 +13664,18 @@ var init_deck_runtime = __esm(() => {
       const id = `${lane}:${this.threads[lane].length - 1}`;
       this.log("NARRATION", `lane ${lane + 1} \xB7 ${msg.dur.toFixed(0)}s`);
       if (this.autoplay) {
-        this.playing = id;
-        this.paused = false;
-        this.pos = 0;
-        this.setPhase("speaking", "SPEAKING");
+        this.startPlayback(id, "SPEAKING");
         this.ensureTicker();
       }
       this.changed();
       if (play) {
-        const file = await this.synthesize(text);
-        if (file)
-          this.playFile(file);
+        const files = await this.synthesizeSegments(text);
+        if (files.length === 0)
+          return;
+        this.attachSegments(msg, files, text, false);
+        if (this.playing === id)
+          this.startSegments(msg);
+        this.changed();
       }
     }
     pushMessage(lane, msg) {
@@ -13224,13 +13688,13 @@ var init_deck_runtime = __esm(() => {
       const alive = () => this.gen === gen;
       this.setLaneState(lane, "working");
       try {
-        this.setPhase("transcribing", "TRANSCRIBING");
+        this.setPhase("transcribing", `TRANSCRIBING \xB7 ${laneNumber(lane)}`);
         this.changed();
         await wait(600);
         if (!alive())
           return;
         this.pushMessage(lane, { role: "you", text: command, dur: estimateDuration(command) });
-        this.setPhase("submitting", "SUBMITTING");
+        this.setPhase("submitting", `SUBMITTING \xB7 ${laneNumber(lane)}`);
         this.log("AGENT ASKED", `${this.laneLabel(lane)} \xB7 ${command.slice(0, 40)}`);
         this.changed();
         const reply = await this.askAgent(command, lane);
@@ -13239,10 +13703,10 @@ var init_deck_runtime = __esm(() => {
         const msg = { role: "agent", text: reply, dur: estimateDuration(reply) };
         this.pushMessage(lane, msg);
         const id = `${lane}:${this.threads[lane].length - 1}`;
-        this.setPhase("preparingSpeech", "PREPARING SPEECH");
+        this.setPhase("preparingSpeech", `PREPARING SPEECH \xB7 ${laneNumber(lane)}`);
         this.log("AGENT REPLY", `${msg.dur.toFixed(0)}s queued`);
         this.changed();
-        const file = await this.synthesize(reply);
+        const files = await this.synthesizeSegments(reply);
         if (!alive()) {
           if (!msg.file) {
             msg.mirrored = true;
@@ -13250,47 +13714,75 @@ var init_deck_runtime = __esm(() => {
           }
           return;
         }
-        if (!file) {
+        if (files.length === 0) {
           msg.mirrored = true;
-          this.setPhase("idle", "READY");
+          this.setPhase("idle", `READY \xB7 ${laneNumber(lane)}`);
           this.log("NO AUDIO", "synthesis unavailable \xB7 text-only reply");
           this.changed();
           return;
         }
-        msg.file = file;
-        msg.audioUrl = `/audio/${path13.basename(file)}`;
-        if (this.autoplay) {
-          this.playing = id;
-          this.paused = false;
-          this.pos = 0;
-          this.setPhase("speaking", "SPEAKING");
+        this.attachSegments(msg, files, reply);
+        if (files.length > 1) {
+          this.log("NARRATION SEGMENTS", `${files.length} parts \xB7 ${msg.dur.toFixed(0)}s total`);
+        }
+        if (this.autoplay && this.suppressAutoplayForGeneration !== gen) {
+          this.startPlayback(id, `SPEAKING \xB7 ${laneNumber(lane)}`);
           this.setLaneState(lane, "speaking");
           this.ensureTicker();
           this.changed();
-          if (this.liveClients() === 0)
-            this.playFile(file);
+          this.startSegments(msg);
         } else {
-          this.setPhase("idle", "READY");
+          this.setPhase("idle", `READY \xB7 ${laneNumber(lane)}`);
           this.changed();
         }
       } finally {
         this.busy = false;
+        if (this.suppressAutoplayForGeneration === gen)
+          this.suppressAutoplayForGeneration = null;
         if (this.lanes[lane]?.state !== "speaking" && this.setLaneState(lane, "idle"))
           this.changed();
+        if (this.laneIx !== lane)
+          this.warmCanonicalLane(this.laneIx);
       }
     }
     async askAgent(question, laneIx) {
       const lane = this.lanes[laneIx];
+      const route = resolveDeckTurnRoute(laneIx, lane?.threadId);
       try {
-        const client = await this.laneClient(laneIx);
-        const input = laneIx === MASTER_IX ? `${this.systemDigest()}
+        if (route.kind === "unassigned") {
+          this.log("LANE UNASSIGNED", `lane ${laneIx + 1} \xB7 no Codex task`);
+          return "Assign a Codex task to this lane before speaking.";
+        }
+        if (route.kind === "canonical") {
+          const controller = new AbortController;
+          this.canonicalTurnAbort = controller;
+          try {
+            const session = this.canonicalSessionFor(route.taskId);
+            const result2 = await session.turn(question, {
+              signal: controller.signal,
+              timeoutMs: 180000
+            });
+            this.canonicalSessionReady = true;
+            lane.updatedAt = Date.now();
+            this.log("CANONICAL TURN", result2.delivery === "steered-active-turn" ? `lane ${laneIx + 1} \xB7 steered active Codex task` : `lane ${laneIx + 1} \xB7 started in Codex Desktop`);
+            const text2 = result2.response.trim();
+            if (!text2)
+              throw new Error("empty reply from the canonical task");
+            return text2;
+          } finally {
+            if (this.canonicalTurnAbort === controller)
+              this.canonicalTurnAbort = null;
+          }
+        }
+        const client = await this.laneClient(MASTER_IX);
+        const input = `${this.systemDigest()}
 
-Operator asks: ${question.slice(0, 500)}` : question.slice(0, 500);
+Operator asks: ${question.slice(0, 500)}`;
         const result = await client.turn({ input, timeoutMs: 180000 });
         const thread = result.session.nativeId;
         if (lane && thread) {
           lane.threadId = thread;
-          lane.sessionAlias = thread.replace(/-/g, "").slice(-8);
+          lane.sessionAlias = threadAlias(thread);
           if (!lane.cwd) {
             lane.cwd = process.cwd();
             lane.project = path13.basename(lane.cwd) || "Codex";
@@ -13301,40 +13793,102 @@ Operator asks: ${question.slice(0, 500)}` : question.slice(0, 500);
         const text = result.text.trim();
         if (!text)
           throw new Error("empty reply from session");
-        return text.length > 600 ? text.slice(0, 600).replace(/\s+\S*$/, "") + "\u2026" : text;
+        return text;
       } catch (error) {
-        this.log("AGENT FAILED", error.message.slice(0, 60));
+        const canonical = route.kind === "canonical";
+        this.log(canonical ? "CANONICAL FAILED" : "AGENT FAILED", error.message.slice(0, 60));
+        if (canonical) {
+          return "I could not reach the exact Codex task. Open that task in Codex Desktop and try again. SpeakEasy did not send this turn anywhere else.";
+        }
+        if (route.kind === "unassigned")
+          return "Assign a Codex task to this lane before speaking.";
         const who = this.lanes[laneIx]?.name.toLowerCase();
         return who ? `${who[0].toUpperCase() + who.slice(1)} didn't answer that one \u2014 try again in a moment.` : "Sorry, the agent did not answer that one. Try again in a moment.";
       }
     }
     cancelAgentWork() {
+      this.canonicalTurnAbort?.abort();
+      this.canonicalTurnAbort = null;
+      this.canonicalSession?.close();
+      this.canonicalSession = null;
+      this.canonicalSessionReady = false;
       for (const { client } of this.laneClients.values())
         client.interrupt?.();
     }
-    async synthesize(text) {
+    async synthesizeSegments(text) {
+      const stamp = Date.now();
       try {
         const { SpeakEasy: SpeakEasy2 } = await Promise.resolve().then(() => (init_src(), exports_src));
         const speaker = new SpeakEasy2({
           volume: this.vol,
           cache: { enabled: true }
         });
-        await speaker.speak(text, { silent: true });
-        if (speaker.lastAudioFile && existsSync13(speaker.lastAudioFile)) {
-          const owned = path13.join(this.synthDir, `reply-${Date.now()}${path13.extname(speaker.lastAudioFile) || ".mp3"}`);
-          copyFileSync(speaker.lastAudioFile, owned);
-          return owned;
+        try {
+          await speaker.speak(text, { silent: true });
+        } catch (error) {
+          this.log("SYNTH PARTIAL", error.message.slice(0, 60));
         }
+        const owned = [];
+        speaker.lastAudioFiles.forEach((source, i) => {
+          if (!existsSync14(source))
+            return;
+          const target = path13.join(this.synthDir, `reply-${stamp}-${String(i).padStart(2, "0")}${path13.extname(source) || ".mp3"}`);
+          copyFileSync(source, target);
+          owned.push(target);
+        });
+        if (owned.length > 0)
+          return owned;
       } catch {}
-      const file = path13.join(this.synthDir, `reply-${Date.now()}.aiff`);
+      const file = path13.join(this.synthDir, `reply-${stamp}.aiff`);
       try {
-        await run("say", ["-o", file, text], 30000);
-        return file;
+        await run("say", ["-o", file, text], 120000);
+        return [file];
       } catch (error) {
         this.log("SYNTH FAILED", error.message.slice(0, 60));
         this.changed();
-        return null;
+        return [];
       }
+    }
+    attachSegments(msg, files, text, exposeToDeck = true) {
+      const durations = measureSegmentDurations(files, text);
+      msg.segments = files;
+      msg.segmentUrls = exposeToDeck ? files.map((f) => `/audio/${path13.basename(f)}`) : undefined;
+      msg.segmentDurs = durations;
+      msg.dur = durations.reduce((total, d) => total + d, 0);
+      this.focusSegment(msg, 0);
+    }
+    focusSegment(msg, ix) {
+      msg.file = msg.segments?.[ix];
+      msg.audioUrl = msg.segmentUrls?.[ix];
+    }
+    segmentStart() {
+      const msg = this.playing ? this.messageAt(this.playing) : null;
+      const durs = msg?.segmentDurs;
+      if (!durs)
+        return 0;
+      return durs.slice(0, this.segIx).reduce((total, d) => total + d, 0);
+    }
+    segmentCount() {
+      const msg = this.playing ? this.messageAt(this.playing) : null;
+      return msg?.segments?.length ?? (msg?.file ? 1 : 0);
+    }
+    advanceSegment() {
+      if (!this.playing)
+        return false;
+      const msg = this.messageAt(this.playing);
+      const segments = msg?.segments;
+      if (!msg || !segments || this.segIx + 1 >= segments.length)
+        return false;
+      this.segIx += 1;
+      this.focusSegment(msg, this.segIx);
+      return true;
+    }
+    startSegments(msg) {
+      this.segIx = 0;
+      this.focusSegment(msg, 0);
+      this.pos = 0;
+      if (this.liveClients() === 0 && msg.file)
+        this.playFile(msg.file);
     }
     playFile(file) {
       if (this.liveClients() > 0)
@@ -13346,22 +13900,26 @@ Operator asks: ${question.slice(0, 500)}` : question.slice(0, 500);
       this.playerRate = SPEEDS[this.speedIx];
       if (this.playerRate !== 1)
         args.push("-r", String(this.playerRate));
-      const player = spawn7("afplay", [...args, file]);
+      const player = spawn8("afplay", [...args, file]);
       this.player = player;
       player.once("exit", () => {
         if (this.player !== player)
           return;
         this.player = null;
-        if (this.playing && !this.paused) {
-          const [li] = this.playing.split(":").map(Number);
-          this.playing = null;
-          this.pos = 0;
-          this.paused = false;
-          this.setPhase("idle", "READY");
-          this.setLaneState(li, "idle");
-          this.log("PLAYBACK ENDED", "buffer complete");
-          this.changed();
+        if (!this.playing || this.paused)
+          return;
+        if (this.advanceSegment()) {
+          const next = this.messageAt(this.playing)?.file;
+          this.pos = this.segmentStart();
+          if (next) {
+            this.log("SEGMENT", `${this.segIx + 1}/${this.segmentCount()}`);
+            this.changed();
+            this.playFile(next);
+            return;
+          }
         }
+        this.finishPlayback(true);
+        this.changed();
       });
     }
     stopPlayer() {
@@ -13389,10 +13947,10 @@ Operator asks: ${question.slice(0, 500)}` : question.slice(0, 500);
 
 // src/cli/deck-live.ts
 import { createServer } from "http";
-import { randomUUID as randomUUID4 } from "crypto";
-import { mkdirSync as mkdirSync6, mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync7, renameSync as renameSync3, rmSync as rmSync3, existsSync as existsSync14, chmodSync as chmodSync4, readFileSync as readFileSync9, statSync as statSync5, lstatSync, createReadStream, openSync as openSync3, readSync as readSync2, closeSync as closeSync3 } from "fs";
+import { randomUUID as randomUUID5 } from "crypto";
+import { mkdirSync as mkdirSync6, mkdtempSync as mkdtempSync3, writeFileSync as writeFileSync7, renameSync as renameSync3, rmSync as rmSync3, existsSync as existsSync15, chmodSync as chmodSync4, readFileSync as readFileSync9, statSync as statSync5, lstatSync, createReadStream, openSync as openSync3, readSync as readSync2, closeSync as closeSync3 } from "fs";
 import { createConnection as createConnection2 } from "net";
-import { tmpdir as tmpdir3 } from "os";
+import { tmpdir as tmpdir4 } from "os";
 import path14 from "path";
 import { WebSocketServer, WebSocket } from "ws";
 function requestLocalTranscription(audioPath) {
@@ -13407,7 +13965,7 @@ function requestLocalTranscription(audioPath) {
       reject(new Error("LOCAL TRANSCRIBER UNAVAILABLE \xB7 OPEN SPEAKEASY"));
       return;
     }
-    const requestId = randomUUID4();
+    const requestId = randomUUID5();
     const socket = createConnection2(PLAYER_SOCKET_PATH2);
     let settled = false;
     let body = "";
@@ -13455,7 +14013,7 @@ function requestLocalTranscription(audioPath) {
 }
 function writeDiscovery(info) {
   try {
-    mkdirSync6(CONFIG_DIR3, { recursive: true });
+    mkdirSync6(CONFIG_DIR, { recursive: true });
     const tmp = `${DISCOVERY_FILE}.${process.pid}.tmp`;
     writeFileSync7(tmp, JSON.stringify(info), { mode: 384 });
     chmodSync4(tmp, 384);
@@ -13464,7 +14022,7 @@ function writeDiscovery(info) {
 }
 function clearDiscovery() {
   try {
-    if (!existsSync14(DISCOVERY_FILE))
+    if (!existsSync15(DISCOVERY_FILE))
       return;
     const info = JSON.parse(readFileSync9(DISCOVERY_FILE, "utf8"));
     if (info.pid === process.pid)
@@ -13505,7 +14063,7 @@ async function startDataPlane(runtime, dataPort, token) {
         res.writeHead(400).end();
         return;
       }
-      if (!file.startsWith(runtime.audioDir) || !existsSync14(file)) {
+      if (!file.startsWith(runtime.audioDir) || !existsSync15(file)) {
         res.writeHead(404).end();
         return;
       }
@@ -13568,7 +14126,7 @@ async function startDataPlane(runtime, dataPort, token) {
         res.end(JSON.stringify({ ok: false, error: "EMPTY RECORDING" }));
         return;
       }
-      const directory = mkdtempSync3(path14.join(tmpdir3(), "speakeasy-deck-transcribe-"));
+      const directory = mkdtempSync3(path14.join(tmpdir4(), "speakeasy-deck-transcribe-"));
       const audioPath = path14.join(directory, `capture${extension}`);
       try {
         chmodSync4(directory, 448);
@@ -13742,11 +14300,331 @@ var DISCOVERY_FILE, MAX_SPEAK_BYTES, MAX_TRANSCRIBE_BYTES, MAX_WS_PAYLOAD, MAX_B
 var init_deck_live = __esm(() => {
   init_constants();
   init_deck_runtime();
-  DISCOVERY_FILE = path14.join(CONFIG_DIR3, "deck-listener.json");
+  DISCOVERY_FILE = path14.join(CONFIG_DIR, "deck-listener.json");
   MAX_SPEAK_BYTES = 64 * 1024;
   MAX_TRANSCRIBE_BYTES = 16 * 1024 * 1024;
   MAX_WS_PAYLOAD = 16 * 1024;
   MAX_BUFFERED = 256 * 1024;
+});
+
+// src/cli/plugin.ts
+var exports_plugin = {};
+__export(exports_plugin, {
+  validateTarballPaths: () => validateTarballPaths,
+  runPlugin: () => runPlugin,
+  downloadTarball: () => downloadTarball,
+  assertNoSymlinks: () => assertNoSymlinks,
+  REPO: () => REPO
+});
+import { execFileSync as execFileSync3, spawnSync as spawnSync2 } from "child_process";
+import { createWriteStream as createWriteStream2, existsSync as existsSync16, mkdtempSync as mkdtempSync4, readdirSync as readdirSync5, renameSync as renameSync4, rmSync as rmSync4, cpSync, lstatSync as lstatSync2 } from "fs";
+import { tmpdir as tmpdir5 } from "os";
+import path15 from "path";
+import { Readable, Transform } from "stream";
+import { pipeline } from "stream/promises";
+function installedPath(host) {
+  return path15.join(host.skillsDir, "speakeasy");
+}
+function listHosts() {
+  console.log("");
+  console.log(source_default.bold("  \uD83D\uDD0C SpeakEasy plugins"));
+  console.log("");
+  for (const h of HOSTS) {
+    const present = existsSync16(installedPath(h));
+    const mark = present ? source_default.green("\u2713 installed") : source_default.dim("\xB7 not installed");
+    console.log(`    ${source_default.cyan(h.id.padEnd(8))} ${h.name.padEnd(13)} ${mark}`);
+    console.log(`    ${" ".repeat(8)} ${source_default.dim(installedPath(h))}`);
+  }
+  console.log("");
+  console.log(source_default.dim("  Install one:  speakeasy plugin <host>"));
+  console.log(source_default.dim("  Remove one:   speakeasy plugin <host> --remove"));
+  console.log(source_default.dim(`  Pin a build:  speakeasy plugin <host> --ref v${getPackageVersion()}`));
+  console.log("");
+}
+function usage(out = console.error) {
+  out("");
+  out(source_default.bold("  \uD83D\uDD0C speakeasy plugin <host>"));
+  out("");
+  out("  Install the SpeakEasy skill into an agent host:");
+  for (const h of HOSTS)
+    out(`    ${source_default.cyan(h.id.padEnd(8))} ${h.name}  ${source_default.dim("\u2192 " + h.skillsDir)}`);
+  out("");
+  out(source_default.dim("  Example: speakeasy plugin codex          (latest release)"));
+  out(source_default.dim(`           speakeasy plugin codex --ref v${getPackageVersion()}`));
+  out("");
+}
+function parsePluginArgs(argv) {
+  let host = "";
+  let ref;
+  let remove = false;
+  for (let i = 0;i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "-h" || arg === "--help") {
+      usage(console.log);
+      process.exit(0);
+    } else if (arg === "--remove") {
+      remove = true;
+    } else if (arg === "--ref") {
+      const value = argv[i + 1];
+      if (!value || value.startsWith("-")) {
+        console.error("\u274C --ref requires a value, e.g. --ref v0.2.17");
+        process.exit(1);
+      }
+      ref = value;
+      i++;
+    } else if (arg.startsWith("-")) {
+      console.error(`\u274C Unknown flag: ${arg}`);
+      usage();
+      process.exit(1);
+    } else if (!host) {
+      host = arg;
+    } else {
+      console.error(`\u274C Unexpected argument: ${arg}`);
+      usage();
+      process.exit(1);
+    }
+  }
+  return { host, ref, remove };
+}
+function removeSkill(target) {
+  const dest = installedPath(target);
+  const skillsDir = target.skillsDir;
+  const backups = existsSync16(skillsDir) ? readdirSync5(skillsDir).filter((e) => e.startsWith("speakeasy.backup-")) : [];
+  if (!existsSync16(dest) && !backups.length) {
+    console.log(`  ${source_default.dim("Nothing to remove \u2014")} ${source_default.dim(dest)} ${source_default.dim("does not exist.")}`);
+    console.log("");
+    return;
+  }
+  if (existsSync16(dest)) {
+    rmSync4(dest, { recursive: true, force: true });
+    console.log(`  ${source_default.dim("Removed")}   ${dest}`);
+  }
+  for (const backup of backups) {
+    rmSync4(path15.join(skillsDir, backup), { recursive: true, force: true });
+  }
+  if (backups.length) {
+    console.log(`  ${source_default.dim("Removed")}   ${backups.length} backup${backups.length === 1 ? "" : "s"}`);
+  }
+  console.log("");
+  console.log(`  ${source_default.green("\u2713")} Start a new ${target.name} session so it stops offering the skill.`);
+  console.log("");
+}
+async function latestReleaseTag() {
+  let res;
+  try {
+    res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { "user-agent": "speakeasy-cli" },
+      signal: AbortSignal.timeout(1e4)
+    });
+  } catch (error) {
+    throw new Error(`could not reach GitHub to resolve the latest release (${error.message}) \u2014 retry, or pass --ref <tag>`);
+  }
+  if (!res.ok) {
+    throw new Error(`could not resolve the latest release (HTTP ${res.status}) \u2014 retry, or pass --ref <tag>`);
+  }
+  const data = await res.json();
+  if (!data.tag_name)
+    throw new Error("latest release response had no tag \u2014 pass --ref <tag>");
+  return data.tag_name;
+}
+async function downloadTarball(ref, dest) {
+  const isBranch = ref === "master" || ref === "main";
+  const candidates = isBranch ? [`heads/${ref}`] : [`tags/${ref}`, `heads/${ref}`];
+  let lastError;
+  for (const candidate of candidates) {
+    const url = `https://codeload.github.com/${REPO}/tar.gz/refs/${candidate}`;
+    try {
+      const res = await fetch(url, {
+        headers: { "user-agent": "speakeasy-cli" },
+        redirect: "follow",
+        signal: AbortSignal.timeout(30000)
+      });
+      if (!res.ok || !res.body) {
+        lastError = new Error(`HTTP ${res.status}`);
+        continue;
+      }
+      const declared = Number(res.headers.get("content-length") ?? 0);
+      if (declared > MAX_TARBALL_BYTES)
+        throw new Error(`tarball too large (${declared} bytes)`);
+      let received = 0;
+      const counter = new Transform({
+        transform(chunk, _enc, cb) {
+          received += chunk.length;
+          if (received > MAX_TARBALL_BYTES)
+            cb(new Error(`tarball exceeded ${MAX_TARBALL_BYTES} bytes`));
+          else
+            cb(null, chunk);
+        }
+      });
+      await pipeline(Readable.fromWeb(res.body), counter, createWriteStream2(dest));
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(`download failed for ref "${ref}" (${lastError?.message ?? "no response"})`);
+}
+function validateTarballPaths(tarball) {
+  const listing = execFileSync3("tar", ["-tzf", tarball], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  for (const entry of listing.split(`
+`)) {
+    if (!entry)
+      continue;
+    if (entry.startsWith("/") || entry.split("/").includes("..")) {
+      throw new Error(`unsafe archive entry: ${entry}`);
+    }
+  }
+}
+function extractSkill(tarball, workdir) {
+  execFileSync3("tar", ["-xzf", tarball, "-C", workdir], { stdio: "pipe" });
+  const top = readdirSync5(workdir).filter((e) => e !== ".DS_Store");
+  for (const dir of top) {
+    const candidate = path15.join(workdir, dir, SKILL_SUBPATH);
+    if (existsSync16(path15.join(candidate, "SKILL.md")))
+      return candidate;
+  }
+  throw new Error(`skill not found at ${SKILL_SUBPATH} in that ref \u2014 the plugin may not exist there yet`);
+}
+function assertNoSymlinks(dir) {
+  for (const entry of readdirSync5(dir, { withFileTypes: true })) {
+    const full = path15.join(dir, entry.name);
+    if (lstatSync2(full).isSymbolicLink())
+      throw new Error(`refusing to install symlink: ${entry.name}`);
+    if (entry.isDirectory())
+      assertNoSymlinks(full);
+  }
+}
+function timestamp() {
+  return new Date().toISOString().replace(/[:.]/g, "-");
+}
+function installSkill(skillSrc, destDir) {
+  const dest = path15.join(destDir, "speakeasy");
+  const staging = path15.join(destDir, `.speakeasy-staging-${process.pid}`);
+  try {
+    cpSync(skillSrc, staging, { recursive: true });
+    if (!existsSync16(path15.join(staging, "SKILL.md")))
+      throw new Error("staged skill is missing SKILL.md");
+    assertNoSymlinks(staging);
+    let backup = null;
+    try {
+      if (existsSync16(dest)) {
+        backup = `${dest}.backup-${timestamp()}`;
+        renameSync4(dest, backup);
+      }
+      renameSync4(staging, dest);
+    } catch (error) {
+      if (backup && existsSync16(backup) && !existsSync16(dest))
+        renameSync4(backup, dest);
+      throw error;
+    }
+    return { backup, dest };
+  } finally {
+    rmSync4(staging, { recursive: true, force: true });
+  }
+}
+function rollbackInstall(dest, backup) {
+  rmSync4(dest, { recursive: true, force: true });
+  if (backup && existsSync16(backup))
+    renameSync4(backup, dest);
+}
+function pruneBackups(destDir) {
+  const backups = readdirSync5(destDir).filter((e) => e.startsWith("speakeasy.backup-")).sort().reverse();
+  for (const old of backups.slice(KEEP_BACKUPS)) {
+    rmSync4(path15.join(destDir, old), { recursive: true, force: true });
+  }
+}
+async function runPlugin(argv) {
+  const { host, ref, remove } = parsePluginArgs(argv);
+  const target = HOSTS.find((h) => h.id === host);
+  if (!target) {
+    if (!host) {
+      listHosts();
+      return;
+    }
+    console.error(`\u274C Unknown host: ${host}`);
+    usage();
+    process.exit(1);
+  }
+  console.log("");
+  console.log(source_default.bold(`  \uD83D\uDD0C SpeakEasy skill for ${target.name}`));
+  console.log("");
+  if (remove) {
+    removeSkill(target);
+    return;
+  }
+  if (process.platform !== "darwin") {
+    console.log(source_default.yellow("  \u26A0\uFE0F  The native SpeakEasy player needs macOS 14+ \u2014 installing the skill anyway."));
+    console.log("");
+  }
+  const workdir = mkdtempSync4(path15.join(tmpdir5(), "speakeasy-plugin-"));
+  let exitCode = 0;
+  try {
+    const stage = ref ?? await latestReleaseTag();
+    console.log(`  ${source_default.dim("Source")}     ${source_default.cyan(`github.com/${REPO}`)} ${source_default.dim("@")} ${stage}`);
+    console.log(`  ${source_default.dim("Downloading\u2026")}`);
+    const tarball = path15.join(workdir, "repo.tar.gz");
+    await downloadTarball(stage, tarball);
+    console.log(`  ${source_default.dim("Extracting\u2026")}`);
+    validateTarballPaths(tarball);
+    const skillSrc = extractSkill(tarball, workdir);
+    const { backup, dest } = installSkill(skillSrc, target.skillsDir);
+    if (backup)
+      console.log(`  ${source_default.dim("Previous")}  ${source_default.yellow("moved to")} ${source_default.dim(backup)}`);
+    console.log(`  ${source_default.dim("Installed")} ${source_default.green(dest)}`);
+    const bun = spawnSync2("which", ["bun"], { stdio: "pipe" });
+    let healthy = false;
+    if (bun.status === 0) {
+      console.log("");
+      console.log(`  ${source_default.dim("Health check\u2026")}`);
+      const doctor = spawnSync2("bun", [path15.join(dest, "scripts", "speakeasy-runtime.ts"), "--doctor"], { stdio: "inherit" });
+      if (doctor.status !== 0) {
+        rollbackInstall(dest, backup);
+        throw new Error("health check failed \u2014 rolled back to the previous install");
+      }
+      healthy = true;
+    } else {
+      console.log("");
+      console.log(source_default.yellow("  \u26A0\uFE0F  Bun not found \u2014 the skill scripts need it: https://bun.sh"));
+      console.log(source_default.dim("      Install it, then verify: bun " + path15.join(dest, "scripts", "speakeasy-runtime.ts") + " --doctor"));
+    }
+    if (healthy)
+      pruneBackups(target.skillsDir);
+    console.log("");
+    console.log(`  ${source_default.green("\u2713")} ${target.hint}`);
+    console.log("");
+  } catch (error) {
+    console.error("");
+    console.error(`  \u274C Install failed: ${error.message}`);
+    console.error(source_default.dim("     Check your network, or pick a ref explicitly with --ref <tag> (e.g. --ref master)"));
+    console.error("");
+    exitCode = 1;
+  } finally {
+    rmSync4(workdir, { recursive: true, force: true });
+  }
+  if (exitCode !== 0)
+    process.exit(exitCode);
+}
+var REPO = "arach/SpeakEasy", SKILL_SUBPATH, MAX_TARBALL_BYTES, KEEP_BACKUPS = 3, HOSTS;
+var init_plugin = __esm(() => {
+  init_source();
+  init_constants();
+  init_paths();
+  SKILL_SUBPATH = path15.join("plugins", "speakeasy", "skills", "speakeasy");
+  MAX_TARBALL_BYTES = 150 * 1024 * 1024;
+  HOSTS = [
+    {
+      id: "codex",
+      name: "Codex",
+      skillsDir: CODEX_SKILLS_DIR,
+      hint: "Start a new Codex session, then say: \u201CRead this summary aloud in SpeakEasy.\u201D"
+    },
+    {
+      id: "claude",
+      name: "Claude Code",
+      skillsDir: CLAUDE_SKILLS_DIR,
+      hint: "Start a new Claude Code session, then ask it to read something aloud."
+    }
+  ];
 });
 
 // node_modules/.pnpm/bonjour-service@1.4.4/node_modules/bonjour-service/dist/lib/utils/dns-equal.js
@@ -13870,10 +14748,10 @@ var require_service = __commonJS((exports) => {
   var TLD = ".local";
 
   class Service extends events_1.EventEmitter {
-    constructor(config, start, stop) {
+    constructor(config, start, stop2) {
       super();
       this.start = start;
-      this.stop = stop;
+      this.stop = stop2;
       this.probe = true;
       this.published = false;
       this.activated = false;
@@ -14009,7 +14887,7 @@ var require_registry = __commonJS((exports) => {
     }
     publish(config) {
       const configProbe = config.probe !== false;
-      const service = new service_1.default(config, start.bind(null, this), stop.bind(null, this));
+      const service = new service_1.default(config, start.bind(null, this), stop2.bind(null, this));
       function start(registry, { probe = configProbe } = {}) {
         if (service.activated)
           return;
@@ -14031,7 +14909,7 @@ var require_registry = __commonJS((exports) => {
           registry.announce(registry.server, service);
         }
       }
-      function stop(registry, callback) {
+      function stop2(registry, callback) {
         if (!callback)
           callback = noop;
         if (!service.activated)
@@ -18627,10 +19505,10 @@ var require_segments = __commonJS((exports) => {
     const segs = getSegmentsFromString(data, Utils.isKanjiModeEnabled());
     const nodes = buildNodes(segs);
     const graph = buildGraph(nodes, version);
-    const path15 = dijkstra.find_path(graph.map, "start", "end");
+    const path16 = dijkstra.find_path(graph.map, "start", "end");
     const optimizedSegs = [];
-    for (let i = 1;i < path15.length - 1; i++) {
-      optimizedSegs.push(graph.table[path15[i]].node);
+    for (let i = 1;i < path16.length - 1; i++) {
+      optimizedSegs.push(graph.table[path16[i]].node);
     }
     return exports.fromArray(mergeSegments(optimizedSegs));
   };
@@ -20653,12 +21531,12 @@ var require_packer_sync = __commonJS((exports, module) => {
 // node_modules/.pnpm/pngjs@5.0.0/node_modules/pngjs/lib/png-sync.js
 var require_png_sync = __commonJS((exports) => {
   var parse2 = require_parser_sync();
-  var pack = require_packer_sync();
+  var pack2 = require_packer_sync();
   exports.read = function(buffer, options) {
     return parse2(buffer, options || {});
   };
   exports.write = function(png, options) {
-    return pack(png, options);
+    return pack2(png, options);
   };
 });
 
@@ -20911,7 +21789,7 @@ var require_png2 = __commonJS((exports) => {
     });
     png.pack();
   };
-  exports.renderToFile = function renderToFile(path15, qrData, options, cb) {
+  exports.renderToFile = function renderToFile(path16, qrData, options, cb) {
     if (typeof cb === "undefined") {
       cb = options;
       options = undefined;
@@ -20923,7 +21801,7 @@ var require_png2 = __commonJS((exports) => {
       called = true;
       cb.apply(null, args);
     };
-    const stream = fs11.createWriteStream(path15);
+    const stream = fs11.createWriteStream(path16);
     stream.on("error", done);
     stream.on("close", done);
     exports.renderToFileStream(stream, qrData, options);
@@ -20988,14 +21866,14 @@ var require_utf8 = __commonJS((exports) => {
     }
     return output;
   };
-  exports.renderToFile = function renderToFile(path15, qrData, options, cb) {
+  exports.renderToFile = function renderToFile(path16, qrData, options, cb) {
     if (typeof cb === "undefined") {
       cb = options;
       options = undefined;
     }
     const fs11 = __require("fs");
     const utf8 = exports.render(qrData, options);
-    fs11.writeFile(path15, utf8, cb);
+    fs11.writeFile(path16, utf8, cb);
   };
 });
 
@@ -21114,7 +21992,7 @@ var require_svg_tag = __commonJS((exports) => {
     return str;
   }
   function qrToPath(data, size, margin) {
-    let path15 = "";
+    let path16 = "";
     let moveBy = 0;
     let newRow = false;
     let lineLength = 0;
@@ -21126,19 +22004,19 @@ var require_svg_tag = __commonJS((exports) => {
       if (data[i]) {
         lineLength++;
         if (!(i > 0 && col > 0 && data[i - 1])) {
-          path15 += newRow ? svgCmd("M", col + margin, 0.5 + row + margin) : svgCmd("m", moveBy, 0);
+          path16 += newRow ? svgCmd("M", col + margin, 0.5 + row + margin) : svgCmd("m", moveBy, 0);
           moveBy = 0;
           newRow = false;
         }
         if (!(col + 1 < size && data[i + 1])) {
-          path15 += svgCmd("h", lineLength);
+          path16 += svgCmd("h", lineLength);
           lineLength = 0;
         }
       } else {
         moveBy++;
       }
     }
-    return path15;
+    return path16;
   }
   exports.render = function render(qrData, options, cb) {
     const opts = Utils.getOptions(options);
@@ -21146,10 +22024,10 @@ var require_svg_tag = __commonJS((exports) => {
     const data = qrData.modules.data;
     const qrcodesize = size + opts.margin * 2;
     const bg = !opts.color.light.a ? "" : "<path " + getColorAttrib(opts.color.light, "fill") + ' d="M0 0h' + qrcodesize + "v" + qrcodesize + 'H0z"/>';
-    const path15 = "<path " + getColorAttrib(opts.color.dark, "stroke") + ' d="' + qrToPath(data, size, opts.margin) + '"/>';
+    const path16 = "<path " + getColorAttrib(opts.color.dark, "stroke") + ' d="' + qrToPath(data, size, opts.margin) + '"/>';
     const viewBox = 'viewBox="' + "0 0 " + qrcodesize + " " + qrcodesize + '"';
     const width = !opts.width ? "" : 'width="' + opts.width + '" height="' + opts.width + '" ';
-    const svgTag = '<svg xmlns="http://www.w3.org/2000/svg" ' + width + viewBox + ' shape-rendering="crispEdges">' + bg + path15 + `</svg>
+    const svgTag = '<svg xmlns="http://www.w3.org/2000/svg" ' + width + viewBox + ' shape-rendering="crispEdges">' + bg + path16 + `</svg>
 `;
     if (typeof cb === "function") {
       cb(null, svgTag);
@@ -21162,7 +22040,7 @@ var require_svg_tag = __commonJS((exports) => {
 var require_svg = __commonJS((exports) => {
   var svgTagRenderer = require_svg_tag();
   exports.render = svgTagRenderer.render;
-  exports.renderToFile = function renderToFile(path15, qrData, options, cb) {
+  exports.renderToFile = function renderToFile(path16, qrData, options, cb) {
     if (typeof cb === "undefined") {
       cb = options;
       options = undefined;
@@ -21170,7 +22048,7 @@ var require_svg = __commonJS((exports) => {
     const fs11 = __require("fs");
     const svgTag = exports.render(qrData, options);
     const xmlStr = '<?xml version="1.0" encoding="utf-8"?>' + '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">' + svgTag;
-    fs11.writeFile(path15, xmlStr, cb);
+    fs11.writeFile(path16, xmlStr, cb);
   };
 });
 
@@ -21324,8 +22202,8 @@ var require_server = __commonJS((exports) => {
       cb
     };
   }
-  function getTypeFromFilename(path15) {
-    return path15.slice((path15.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
+  function getTypeFromFilename(path16) {
+    return path16.slice((path16.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
   }
   function getRendererFromType(type) {
     switch (type) {
@@ -21389,17 +22267,17 @@ var require_server = __commonJS((exports) => {
     const renderer = getRendererFromType(params.opts.type);
     return render(renderer.renderToBuffer, text, params);
   };
-  exports.toFile = function toFile(path15, text, opts, cb) {
-    if (typeof path15 !== "string" || !(typeof text === "string" || typeof text === "object")) {
+  exports.toFile = function toFile(path16, text, opts, cb) {
+    if (typeof path16 !== "string" || !(typeof text === "string" || typeof text === "object")) {
       throw new Error("Invalid argument");
     }
     if (arguments.length < 3 && !canPromise()) {
       throw new Error("Too few arguments provided");
     }
     const params = checkParams(text, opts, cb);
-    const type = params.opts.type || getTypeFromFilename(path15);
+    const type = params.opts.type || getTypeFromFilename(path16);
     const renderer = getRendererFromType(type);
-    const renderToFile = renderer.renderToFile.bind(null, path15);
+    const renderToFile = renderer.renderToFile.bind(null, path16);
     return render(renderToFile, text, params);
   };
   exports.toFileStream = function toFileStream(stream, text, opts) {
@@ -21425,14 +22303,14 @@ __export(exports_deck, {
 });
 import { createServer as createServer2, request as httpRequest } from "http";
 import { readFile as readFile4, writeFile as writeFile3, mkdtemp, rm as rm2 } from "fs/promises";
-import { existsSync as existsSync15, readFileSync as readFileSync10, writeFileSync as writeFileSync8, mkdirSync as mkdirSync7, chmodSync as chmodSync5, lstatSync as lstatSync2, renameSync as renameSync4, openSync as openSync4, closeSync as closeSync4, unlinkSync as unlinkSync4 } from "fs";
-import { execFileSync as execFileSync3, spawn as spawn8, spawnSync as spawnSync2 } from "child_process";
+import { existsSync as existsSync17, readFileSync as readFileSync10, writeFileSync as writeFileSync8, mkdirSync as mkdirSync7, mkdtempSync as mkdtempSync5, cpSync as cpSync2, rmSync as rmSync5, readdirSync as readdirSync6, chmodSync as chmodSync5, lstatSync as lstatSync3, renameSync as renameSync5, openSync as openSync4, closeSync as closeSync4, unlinkSync as unlinkSync4 } from "fs";
+import { execFileSync as execFileSync4, spawn as spawn9, spawnSync as spawnSync3 } from "child_process";
 import { randomBytes } from "crypto";
-import path15 from "path";
+import path16 from "path";
 import os3 from "os";
 import { WebSocket as WebSocket2, WebSocketServer as WebSocketServer2 } from "ws";
 function acquireDeckProcessLock(lockFile = DECK_LOCK_FILE) {
-  mkdirSync7(path15.dirname(lockFile), { recursive: true });
+  mkdirSync7(path16.dirname(lockFile), { recursive: true });
   for (let attempt = 0;attempt < 2; attempt++) {
     const nonce = randomBytes(8).toString("hex");
     try {
@@ -21486,8 +22364,51 @@ function acquireDeckProcessLock(lockFile = DECK_LOCK_FILE) {
 function deckRoot() {
   const bundledRoot = process.env.SPEAKEASY_DECK_ROOT?.trim();
   if (bundledRoot)
-    return path15.resolve(bundledRoot);
-  return path15.resolve(__dirname, "..", "..", "deck");
+    return path16.resolve(bundledRoot);
+  const checkoutRoot = path16.resolve(__dirname, "..", "..", "deck");
+  if (existsSync17(path16.join(checkoutRoot, "index.html")))
+    return checkoutRoot;
+  return DECK_DIR;
+}
+async function installDeckSurface(dest) {
+  const ref = `v${getPackageVersion()}`;
+  console.log(source_default.dim(`  Fetching the Deck surface from github.com/${REPO} @ ${ref}\u2026`));
+  const workdir = mkdtempSync5(path16.join(os3.tmpdir(), "speakeasy-deck-fetch-"));
+  try {
+    const tarball = path16.join(workdir, "repo.tar.gz");
+    await downloadTarball(ref, tarball);
+    validateTarballPaths(tarball);
+    execFileSync4("tar", ["-xzf", tarball, "-C", workdir], { stdio: "pipe" });
+    const top = readdirSync6(workdir).find((e) => existsSync17(path16.join(workdir, e, "deck", "index.html")));
+    if (!top)
+      throw new Error(`no deck surface in the ${ref} tarball`);
+    const src = path16.join(workdir, top, "deck");
+    assertNoSymlinks(src);
+    const staging = `${dest}.staging-${process.pid}`;
+    rmSync5(staging, { recursive: true, force: true });
+    mkdirSync7(path16.dirname(dest), { recursive: true });
+    mkdirSync7(staging);
+    for (const asset of ["index.html", "themes.json", "variants"]) {
+      const from = path16.join(src, asset);
+      if (!existsSync17(from))
+        throw new Error(`release tarball is missing deck/${asset}`);
+      cpSync2(from, path16.join(staging, asset), { recursive: true });
+    }
+    writeFileSync8(path16.join(staging, DECK_VERSION_MARKER), getPackageVersion());
+    rmSync5(dest, { recursive: true, force: true });
+    renameSync5(staging, dest);
+  } finally {
+    rmSync5(workdir, { recursive: true, force: true });
+  }
+}
+function installedSurfaceIsCurrent(root) {
+  if (!existsSync17(path16.join(root, "index.html")))
+    return false;
+  try {
+    return readFileSync10(path16.join(root, DECK_VERSION_MARKER), "utf8").trim() === getPackageVersion();
+  } catch {
+    return false;
+  }
 }
 function lanAddress() {
   for (const addrs of Object.values(os3.networkInterfaces())) {
@@ -21502,7 +22423,7 @@ function deviceSlug() {
   let name = "";
   if (process.platform === "darwin") {
     try {
-      name = execFileSync3("scutil", ["--get", "LocalHostName"], { encoding: "utf8" }).trim();
+      name = execFileSync4("scutil", ["--get", "LocalHostName"], { encoding: "utf8" }).trim();
     } catch {}
   }
   if (!name)
@@ -21514,10 +22435,10 @@ function macBonjourName() {
   return slug ? `${slug}.local` : undefined;
 }
 function deckToken(rotate) {
-  const file = path15.join(os3.homedir(), ".config", "speakeasy", "deck-token");
+  const file = DECK_TOKEN_FILE;
   if (!rotate) {
     try {
-      const st = lstatSync2(file);
+      const st = lstatSync3(file);
       const uid = typeof process.getuid === "function" ? process.getuid() : -1;
       if (st.isFile() && !st.isSymbolicLink() && (uid === -1 || st.uid === uid)) {
         if ((st.mode & 511) !== 384)
@@ -21530,12 +22451,12 @@ function deckToken(rotate) {
   }
   const token = randomBytes(12).toString("hex");
   try {
-    const dir = path15.dirname(file);
+    const dir = path16.dirname(file);
     mkdirSync7(dir, { recursive: true });
-    const tmp = path15.join(dir, `.deck-token.${process.pid}.tmp`);
+    const tmp = path16.join(dir, `.deck-token.${process.pid}.tmp`);
     writeFileSync8(tmp, token, { mode: 384 });
     chmodSync5(tmp, 384);
-    renameSync4(tmp, file);
+    renameSync5(tmp, file);
   } catch {}
   return token;
 }
@@ -21620,13 +22541,13 @@ async function registerEdgeRoute(host, port) {
   }
 }
 function findCaddy(runtimeExecutable = process.execPath) {
-  const bundled = path15.join(path15.dirname(runtimeExecutable), "caddy");
+  const bundled = path16.join(path16.dirname(runtimeExecutable), "caddy");
   try {
-    const stat = lstatSync2(bundled);
+    const stat = lstatSync3(bundled);
     if (stat.isFile() && (stat.mode & 73) !== 0)
       return bundled;
   } catch {}
-  const res = spawnSync2("which", ["caddy"], { encoding: "utf8" });
+  const res = spawnSync3("which", ["caddy"], { encoding: "utf8" });
   return res.status === 0 ? res.stdout.trim() : null;
 }
 function caddyConfig(root, port, tlsHost, caCert, live) {
@@ -21652,7 +22573,7 @@ function caddyConfig(root, port, tlsHost, caCert, live) {
   const caRoute = caCert ? `
 	@cacert path /ca.crt
 	handle @cacert {
-		root * "${path15.dirname(caCert)}"
+		root * "${path16.dirname(caCert)}"
 		rewrite * /root.crt
 		header Content-Type application/x-x509-ca-cert
 		file_server
@@ -21708,26 +22629,26 @@ ${tlsSite}`;
 function trustLocalCA(rootCert) {
   if (process.platform !== "darwin")
     return false;
-  const keychain = path15.join(os3.homedir(), "Library", "Keychains", "login.keychain-db");
-  const found = spawnSync2("security", ["find-certificate", "-c", "Caddy Local Authority", keychain], { stdio: "pipe" });
+  const keychain = path16.join(os3.homedir(), "Library", "Keychains", "login.keychain-db");
+  const found = spawnSync3("security", ["find-certificate", "-c", "Caddy Local Authority", keychain], { stdio: "pipe" });
   if (found.status === 0)
     return true;
-  const added = spawnSync2("security", ["add-trusted-cert", "-r", "trustRoot", "-k", keychain, rootCert], { stdio: "pipe" });
+  const added = spawnSync3("security", ["add-trusted-cert", "-r", "trustRoot", "-k", keychain, rootCert], { stdio: "pipe" });
   return added.status === 0;
 }
 function caddyRootCert(expected = false) {
   const candidates = [
-    path15.join(os3.homedir(), "Library", "Application Support", "Caddy", "pki", "authorities", "local", "root.crt"),
-    path15.join(os3.homedir(), ".local", "share", "caddy", "pki", "authorities", "local", "root.crt")
+    path16.join(os3.homedir(), "Library", "Application Support", "Caddy", "pki", "authorities", "local", "root.crt"),
+    path16.join(os3.homedir(), ".local", "share", "caddy", "pki", "authorities", "local", "root.crt")
   ];
-  const existing = candidates.find((p) => existsSync15(p));
+  const existing = candidates.find((p) => existsSync17(p));
   return existing ?? (expected ? candidates[process.platform === "darwin" ? 0 : 1] : undefined);
 }
 async function startCaddy(caddy, root, port, tlsHost, caCert, live) {
-  const dir = await mkdtemp(path15.join(os3.tmpdir(), "speakeasy-deck-"));
-  const config = path15.join(dir, "Caddyfile");
+  const dir = await mkdtemp(path16.join(os3.tmpdir(), "speakeasy-deck-"));
+  const config = path16.join(dir, "Caddyfile");
   await writeFile3(config, caddyConfig(root, port, tlsHost, caCert, live));
-  const child = spawn8(caddy, ["run", "--config", config], { stdio: ["ignore", "ignore", "pipe"] });
+  const child = spawn9(caddy, ["run", "--config", config], { stdio: ["ignore", "ignore", "pipe"] });
   let errBuf = "";
   child.stderr?.on("data", (d) => errBuf += d);
   const cleanup = () => rm2(dir, { recursive: true, force: true }).catch(() => {});
@@ -21824,7 +22745,7 @@ async function startNodeServer(root, port, live) {
     }
     if (pathname === "/")
       pathname = "/index.html";
-    const file = path15.join(root, path15.normalize(pathname));
+    const file = path16.join(root, path16.normalize(pathname));
     if (!file.startsWith(root)) {
       res.writeHead(403).end();
       return;
@@ -21832,7 +22753,7 @@ async function startNodeServer(root, port, live) {
     try {
       const body = await readFile4(file);
       res.writeHead(200, {
-        "content-type": TYPES[path15.extname(file)] ?? "application/octet-stream",
+        "content-type": TYPES[path16.extname(file)] ?? "application/octet-stream",
         "cache-control": "no-store"
       });
       res.end(body);
@@ -21911,7 +22832,7 @@ Connection: close\r
     exited: new Promise((resolve2) => server.once("close", () => resolve2(0)))
   };
 }
-function deckConfigDefaults(configFile = CONFIG_FILE2) {
+function deckConfigDefaults(configFile = CONFIG_FILE) {
   try {
     const raw = JSON.parse(readFileSync10(configFile, "utf8"));
     const port = typeof raw.deck?.port === "number" && raw.deck.port > 0 && raw.deck.port <= 65535 ? raw.deck.port : null;
@@ -21977,9 +22898,19 @@ function parseDeckArgs(argv) {
 async function runDeck(argv) {
   const args = parseDeckArgs(argv);
   const root = deckRoot();
-  if (!existsSync15(path15.join(root, "index.html"))) {
+  if (root === DECK_DIR && !installedSurfaceIsCurrent(root)) {
+    try {
+      await installDeckSurface(root);
+      console.log(source_default.dim(`  Deck surface installed at ${root}`));
+    } catch (error) {
+      console.error(`\u274C Could not fetch the Deck surface: ${error.message}`);
+      console.error("   Check your network, install the SpeakEasy Mac app (speakeasy --app), or run from a repo checkout.");
+      process.exit(1);
+    }
+  }
+  if (!existsSync17(path16.join(root, "index.html"))) {
     console.error("\u274C Deck assets not found at", root);
-    console.error("   The deck ships with the @arach/speakeasy package \u2014 reinstall or run from the repo.");
+    console.error("   The Deck ships with the SpeakEasy Mac app (speakeasy --app), or run from a repo checkout.");
     process.exit(1);
   }
   const processLock = acquireDeckProcessLock();
@@ -22070,7 +23001,7 @@ async function runDeck(argv) {
   const stopVanity = mdns && lan ? await advertiseVanity(host, port) : null;
   const stopEdge = stopVanity && port !== 80 ? await registerEdgeRoute(host, port) : null;
   const tlsUrl = stopVanity && tlsHost && handle.engine === "caddy" ? `https://${host}` : null;
-  const macTrusted = tlsUrl && caCert && existsSync15(caCert) ? trustLocalCA(caCert) : false;
+  const macTrusted = tlsUrl && caCert && existsSync17(caCert) ? trustLocalCA(caCert) : false;
   const bonjour = macBonjourName();
   const padUrlBase = tlsUrl ?? (stopVanity ? stopEdge ? `http://${host}` : hostUrl(host, port) : bonjour ? hostUrl(bonjour, port) : `http://${lan ?? "your-macs-ip"}:${port}`);
   const padUrl = dataPlane && token ? `${padUrlBase}#k=${token}` : padUrlBase;
@@ -22164,12 +23095,14 @@ async function runDeck(argv) {
     handle.exited.then(onExit);
   });
 }
-var __dirname = "/Users/arach/dev/SpeakEasy/src/cli", TYPES, DEFAULT_PORT = 43211, DECK_LOCK_FILE, EDGE_ROUTE_ID = "speakeasy-deck";
+var __dirname = "/Users/arach/dev/SpeakEasy/.claude/worktrees/landing-polish/src/cli", TYPES, DEFAULT_PORT = 43211, DECK_VERSION_MARKER = ".speakeasy-version", EDGE_ROUTE_ID = "speakeasy-deck";
 var init_deck = __esm(() => {
   init_source();
   init_deck_runtime();
   init_deck_live();
   init_constants();
+  init_plugin();
+  init_paths();
   TYPES = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
@@ -22179,269 +23112,178 @@ var init_deck = __esm(() => {
     ".svg": "image/svg+xml",
     ".m4a": "audio/mp4"
   };
-  DECK_LOCK_FILE = path15.join(os3.homedir(), ".config", "speakeasy", "deck-runtime.lock");
 });
 
-// src/cli/plugin.ts
-var exports_plugin = {};
-__export(exports_plugin, {
-  runPlugin: () => runPlugin
+// src/cli/uninstall.ts
+var exports_uninstall = {};
+__export(exports_uninstall, {
+  runUninstall: () => runUninstall
 });
-import { execFileSync as execFileSync4, spawnSync as spawnSync3 } from "child_process";
-import { createWriteStream as createWriteStream2, existsSync as existsSync16, mkdtempSync as mkdtempSync4, readdirSync as readdirSync5, renameSync as renameSync5, rmSync as rmSync4, cpSync, lstatSync as lstatSync3, readdirSync as listDir } from "fs";
-import { tmpdir as tmpdir4 } from "os";
-import path16 from "path";
+import { execFileSync as execFileSync5 } from "child_process";
+import { existsSync as existsSync18, rmSync as rmSync6, readdirSync as readdirSync7, readFileSync as readFileSync11, statSync as statSync6 } from "fs";
+import path17 from "path";
 import os4 from "os";
-import { Readable, Transform } from "stream";
-import { pipeline } from "stream/promises";
-function usage() {
-  console.error("");
-  console.error(source_default.bold("  \uD83D\uDD0C speakeasy plugin <host>"));
-  console.error("");
-  console.error("  Install the SpeakEasy skill into an agent host:");
-  for (const h of HOSTS)
-    console.error(`    ${source_default.cyan(h.id.padEnd(8))} ${h.name}  ${source_default.dim("\u2192 " + h.skillsDir())}`);
-  console.error("");
-  console.error(source_default.dim("  Example: speakeasy plugin codex          (latest release)"));
-  console.error(source_default.dim("           speakeasy plugin codex --ref v0.2.17"));
-  console.error("");
-}
-function parsePluginArgs(argv) {
-  let host = "";
-  let ref;
-  for (let i = 0;i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--ref") {
-      const value = argv[i + 1];
-      if (!value || value.startsWith("-")) {
-        console.error("\u274C --ref requires a value, e.g. --ref v0.2.17");
-        process.exit(1);
-      }
-      ref = value;
-      i++;
-    } else if (arg.startsWith("-")) {
-      console.error(`\u274C Unknown flag: ${arg}`);
-      usage();
-      process.exit(1);
-    } else if (!host) {
-      host = arg;
-    } else {
-      console.error(`\u274C Unexpected argument: ${arg}`);
-      usage();
-      process.exit(1);
-    }
-  }
-  return { host, ref };
-}
-async function latestReleaseTag() {
-  let res;
-  try {
-    res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { "user-agent": "speakeasy-cli" },
-      signal: AbortSignal.timeout(1e4)
-    });
-  } catch (error) {
-    throw new Error(`could not reach GitHub to resolve the latest release (${error.message}) \u2014 retry, or pass --ref <tag>`);
-  }
-  if (!res.ok) {
-    throw new Error(`could not resolve the latest release (HTTP ${res.status}) \u2014 retry, or pass --ref <tag>`);
-  }
-  const data = await res.json();
-  if (!data.tag_name)
-    throw new Error("latest release response had no tag \u2014 pass --ref <tag>");
-  return data.tag_name;
-}
-async function downloadTarball(ref, dest) {
-  const isBranch = ref === "master" || ref === "main";
-  const candidates = isBranch ? [`heads/${ref}`] : [`tags/${ref}`, `heads/${ref}`];
-  let lastError;
-  for (const candidate of candidates) {
-    const url = `https://codeload.github.com/${REPO}/tar.gz/refs/${candidate}`;
-    try {
-      const res = await fetch(url, {
-        headers: { "user-agent": "speakeasy-cli" },
-        redirect: "follow",
-        signal: AbortSignal.timeout(30000)
-      });
-      if (!res.ok || !res.body) {
-        lastError = new Error(`HTTP ${res.status}`);
-        continue;
-      }
-      const declared = Number(res.headers.get("content-length") ?? 0);
-      if (declared > MAX_TARBALL_BYTES)
-        throw new Error(`tarball too large (${declared} bytes)`);
-      let received = 0;
-      const counter = new Transform({
-        transform(chunk, _enc, cb) {
-          received += chunk.length;
-          if (received > MAX_TARBALL_BYTES)
-            cb(new Error(`tarball exceeded ${MAX_TARBALL_BYTES} bytes`));
-          else
-            cb(null, chunk);
+function items() {
+  const all = [
+    { kind: "App", path: SYSTEM_APP_PATH },
+    { kind: "App", path: USER_APP_DIR },
+    { kind: "Plugin", path: path17.join(CODEX_SKILLS_DIR, "speakeasy") },
+    { kind: "Plugin", path: path17.join(CLAUDE_SKILLS_DIR, "speakeasy") },
+    { kind: "Deck", path: DECK_DIR },
+    { kind: "Deck", path: DECK_LANES_FILE },
+    { kind: "Deck", path: DECK_TOKEN_FILE },
+    { kind: "Deck", path: DECK_LOCK_FILE },
+    ...CACHE_DIRS.map((cacheDir) => ({ kind: "Cache", path: cacheDir })),
+    { kind: "Settings", path: CONFIG_FILE, personal: true },
+    { kind: "History", path: HISTORY_DIR, personal: true }
+  ];
+  for (const skills of [CODEX_SKILLS_DIR, CLAUDE_SKILLS_DIR]) {
+    if (existsSync18(skills)) {
+      for (const entry of readdirSync7(skills)) {
+        if (entry.startsWith("speakeasy.backup-")) {
+          all.push({ kind: "Backup", path: path17.join(skills, entry) });
         }
-      });
-      await pipeline(Readable.fromWeb(res.body), counter, createWriteStream2(dest));
-      return;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw new Error(`download failed for ref "${ref}" (${lastError?.message ?? "no response"})`);
-}
-function validateTarballPaths(tarball) {
-  const listing = execFileSync4("tar", ["-tzf", tarball], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-  for (const entry of listing.split(`
-`)) {
-    if (!entry)
-      continue;
-    if (entry.startsWith("/") || entry.split("/").includes("..")) {
-      throw new Error(`unsafe archive entry: ${entry}`);
-    }
-  }
-}
-function extractSkill(tarball, workdir) {
-  execFileSync4("tar", ["-xzf", tarball, "-C", workdir], { stdio: "pipe" });
-  const top = readdirSync5(workdir).filter((e) => e !== ".DS_Store");
-  for (const dir of top) {
-    const candidate = path16.join(workdir, dir, SKILL_SUBPATH);
-    if (existsSync16(path16.join(candidate, "SKILL.md")))
-      return candidate;
-  }
-  throw new Error(`skill not found at ${SKILL_SUBPATH} in that ref \u2014 the plugin may not exist there yet`);
-}
-function assertNoSymlinks(dir) {
-  for (const entry of listDir(dir, { withFileTypes: true })) {
-    const full = path16.join(dir, entry.name);
-    if (lstatSync3(full).isSymbolicLink())
-      throw new Error(`refusing to install symlink: ${entry.name}`);
-    if (entry.isDirectory())
-      assertNoSymlinks(full);
-  }
-}
-function timestamp() {
-  return new Date().toISOString().replace(/[:.]/g, "-");
-}
-function installSkill(skillSrc, destDir) {
-  const dest = path16.join(destDir, "speakeasy");
-  const staging = path16.join(destDir, `.speakeasy-staging-${process.pid}`);
-  try {
-    cpSync(skillSrc, staging, { recursive: true });
-    if (!existsSync16(path16.join(staging, "SKILL.md")))
-      throw new Error("staged skill is missing SKILL.md");
-    assertNoSymlinks(staging);
-    let backup = null;
-    try {
-      if (existsSync16(dest)) {
-        backup = `${dest}.backup-${timestamp()}`;
-        renameSync5(dest, backup);
       }
-      renameSync5(staging, dest);
-    } catch (error) {
-      if (backup && existsSync16(backup) && !existsSync16(dest))
-        renameSync5(backup, dest);
-      throw error;
     }
-    return { backup, dest };
-  } finally {
-    rmSync4(staging, { recursive: true, force: true });
+  }
+  if (existsSync18(CONFIG_DIR)) {
+    for (const entry of readdirSync7(CONFIG_DIR)) {
+      if (entry.endsWith(".log"))
+        all.push({ kind: "Logs", path: path17.join(CONFIG_DIR, entry) });
+      else if (entry.startsWith("deck-listener"))
+        all.push({ kind: "State", path: path17.join(CONFIG_DIR, entry) });
+    }
+  }
+  const seen = new Set;
+  return all.filter((i) => {
+    const real = path17.resolve(i.path);
+    if (seen.has(real))
+      return false;
+    seen.add(real);
+    return existsSync18(real);
+  });
+}
+function runningDeckPid() {
+  if (!existsSync18(DECK_LOCK_FILE))
+    return null;
+  let pid;
+  try {
+    ({ pid } = JSON.parse(readFileSync11(DECK_LOCK_FILE, "utf8")));
+  } catch {
+    return null;
+  }
+  if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0)
+    return null;
+  try {
+    process.kill(pid, 0);
+    return pid;
+  } catch {
+    return null;
   }
 }
-function rollbackInstall(dest, backup) {
-  rmSync4(dest, { recursive: true, force: true });
-  if (backup && existsSync16(backup))
-    renameSync5(backup, dest);
-}
-function pruneBackups(destDir) {
-  const backups = readdirSync5(destDir).filter((e) => e.startsWith("speakeasy.backup-")).sort().reverse();
-  for (const old of backups.slice(KEEP_BACKUPS)) {
-    rmSync4(path16.join(destDir, old), { recursive: true, force: true });
+function humanSize(target) {
+  try {
+    const kb = Number(execFileSync5("du", ["-sk", target], { encoding: "utf8" }).trim().split(/\s+/)[0]);
+    if (!Number.isFinite(kb))
+      return "";
+    if (kb < 1024)
+      return `${kb} KB`;
+    if (kb < 1024 * 1024)
+      return `${(kb / 1024).toFixed(1)} MB`;
+    return `${(kb / 1024 / 1024).toFixed(1)} GB`;
+  } catch {
+    return "";
   }
 }
-async function runPlugin(argv) {
-  const { host, ref } = parsePluginArgs(argv);
-  const target = HOSTS.find((h) => h.id === host);
-  if (!target) {
-    usage();
-    if (host) {
-      console.error(`\u274C Unknown host: ${host}`);
+function display(target) {
+  const home = os4.homedir();
+  return target.startsWith(home) ? `~${target.slice(home.length)}` : target;
+}
+function remove(target, allowed) {
+  const real = path17.resolve(target);
+  if (!allowed.has(real))
+    throw new Error(`refusing to remove an unlisted path: ${real}`);
+  if (real === os4.homedir() || real === "/" || real.split(path17.sep).length < 3) {
+    throw new Error(`refusing to remove a root path: ${real}`);
+  }
+  rmSync6(real, { recursive: true, force: true });
+}
+function runUninstall(argv) {
+  const confirmed = argv.includes("--yes") || argv.includes("-y");
+  const purge = argv.includes("--purge");
+  for (const arg of argv) {
+    if (!["--yes", "-y", "--purge"].includes(arg)) {
+      console.error(`\u274C Unknown flag: ${arg}`);
+      console.error("   Usage: speakeasy uninstall [--yes] [--purge]");
       process.exit(1);
     }
+  }
+  const found = items();
+  const targets = found.filter((i) => purge || !i.personal);
+  const kept = found.filter((i) => !purge && i.personal);
+  console.log("");
+  console.log(source_default.bold("  \uD83E\uDDF9 SpeakEasy \u2014 what is installed"));
+  console.log("");
+  if (!found.length) {
+    console.log(source_default.dim("    Nothing found. This machine is already clean."));
+    console.log("");
     return;
   }
-  console.log("");
-  console.log(source_default.bold(`  \uD83D\uDD0C SpeakEasy skill for ${target.name}`));
-  console.log("");
-  if (process.platform !== "darwin") {
-    console.log(source_default.yellow("  \u26A0\uFE0F  The native SpeakEasy player needs macOS 14+ \u2014 installing the skill anyway."));
-    console.log("");
+  const width = Math.max(...targets.map((i) => display(i.path).length));
+  for (const item of targets) {
+    const size = statSync6(item.path).isDirectory() ? humanSize(item.path) : "";
+    console.log(`    ${source_default.cyan(item.kind.padEnd(9))} ${display(item.path).padEnd(width)}  ${source_default.dim(size)}`);
   }
-  const workdir = mkdtempSync4(path16.join(tmpdir4(), "speakeasy-plugin-"));
-  let exitCode = 0;
-  try {
-    const stage = ref ?? await latestReleaseTag();
-    console.log(`  ${source_default.dim("Source")}     ${source_default.cyan(`github.com/${REPO}`)} ${source_default.dim("@")} ${stage}`);
-    console.log(`  ${source_default.dim("Downloading\u2026")}`);
-    const tarball = path16.join(workdir, "repo.tar.gz");
-    await downloadTarball(stage, tarball);
-    console.log(`  ${source_default.dim("Extracting\u2026")}`);
-    validateTarballPaths(tarball);
-    const skillSrc = extractSkill(tarball, workdir);
-    const { backup, dest } = installSkill(skillSrc, target.skillsDir());
-    if (backup)
-      console.log(`  ${source_default.dim("Previous")}  ${source_default.yellow("moved to")} ${source_default.dim(backup)}`);
-    console.log(`  ${source_default.dim("Installed")} ${source_default.green(dest)}`);
-    const bun = spawnSync3("which", ["bun"], { stdio: "pipe" });
-    let healthy = false;
-    if (bun.status === 0) {
-      console.log("");
-      console.log(`  ${source_default.dim("Health check\u2026")}`);
-      const doctor = spawnSync3("bun", [path16.join(dest, "scripts", "speakeasy-runtime.ts"), "--doctor"], { stdio: "inherit" });
-      if (doctor.status !== 0) {
-        rollbackInstall(dest, backup);
-        throw new Error("health check failed \u2014 rolled back to the previous install");
-      }
-      healthy = true;
-    } else {
-      console.log("");
-      console.log(source_default.yellow("  \u26A0\uFE0F  Bun not found \u2014 the skill scripts need it: https://bun.sh"));
-      console.log(source_default.dim("      Install it, then verify: bun " + path16.join(dest, "scripts", "speakeasy-runtime.ts") + " --doctor"));
+  if (kept.length) {
+    console.log("");
+    console.log(source_default.dim("    Kept \u2014 pass --purge to remove these too:"));
+    for (const item of kept) {
+      console.log(source_default.dim(`    ${item.kind.padEnd(9)} ${display(item.path)}`));
     }
-    if (healthy)
-      pruneBackups(target.skillsDir());
-    console.log("");
-    console.log(`  ${source_default.green("\u2713")} ${target.hint}`);
-    console.log("");
-  } catch (error) {
-    console.error("");
-    console.error(`  \u274C Install failed: ${error.message}`);
-    console.error(source_default.dim("     Check your network, or pick a ref explicitly with --ref <tag> (e.g. --ref master)"));
-    console.error("");
-    exitCode = 1;
-  } finally {
-    rmSync4(workdir, { recursive: true, force: true });
   }
-  if (exitCode !== 0)
-    process.exit(exitCode);
+  console.log("");
+  const deckPid = runningDeckPid();
+  if (deckPid) {
+    console.log(source_default.yellow(`    \u26A0\uFE0F  The deck is running (pid ${deckPid}). Stop it first \u2014 otherwise it`));
+    console.log(source_default.yellow("       keeps serving from memory and rewrites its token and lock on exit."));
+    console.log("");
+  }
+  if (!confirmed) {
+    console.log(source_default.yellow("    Nothing was removed."));
+    console.log(source_default.dim("    Re-run with --yes to remove the items above."));
+    console.log("");
+    return;
+  }
+  if (deckPid) {
+    console.error(source_default.red(`\u274C Refusing to uninstall while the deck is running (pid ${deckPid}).`));
+    console.error("   Stop it, then re-run.");
+    process.exit(1);
+  }
+  const allowed = new Set(targets.map((i) => path17.resolve(i.path)));
+  let removed = 0;
+  let failed = 0;
+  for (const item of targets) {
+    try {
+      remove(item.path, allowed);
+      removed++;
+    } catch (error) {
+      failed++;
+      console.error(source_default.red(`    \u2717 ${display(item.path)} \u2014 ${error.message}`));
+    }
+  }
+  console.log(`    ${source_default.green("\u2713")} Removed ${removed} item${removed === 1 ? "" : "s"}.`);
+  if (failed) {
+    console.log(source_default.yellow(`    ${failed} could not be removed \u2014 check permissions and re-run.`));
+  }
+  console.log("");
+  console.log(source_default.dim("    The npm package is separate: npm uninstall -g @arach/speakeasy"));
+  console.log("");
+  if (failed)
+    process.exitCode = 1;
 }
-var REPO = "arach/SpeakEasy", SKILL_SUBPATH, MAX_TARBALL_BYTES, KEEP_BACKUPS = 3, HOSTS;
-var init_plugin = __esm(() => {
+var init_uninstall = __esm(() => {
   init_source();
-  SKILL_SUBPATH = path16.join("plugins", "speakeasy", "skills", "speakeasy");
-  MAX_TARBALL_BYTES = 150 * 1024 * 1024;
-  HOSTS = [
-    {
-      id: "codex",
-      name: "Codex",
-      skillsDir: () => path16.join(os4.homedir(), ".codex", "skills"),
-      hint: "Start a new Codex session, then say: \u201CRead this summary aloud in SpeakEasy.\u201D"
-    },
-    {
-      id: "claude",
-      name: "Claude Code",
-      skillsDir: () => path16.join(os4.homedir(), ".claude", "skills"),
-      hint: "Start a new Claude Code session, then ask it to read something aloud."
-    }
-  ];
+  init_paths();
 });
 
 // src/bin/speakeasy-cli.ts
@@ -22471,7 +23313,7 @@ We didn't find a configuration file. Let's create one to get you started!
    A unified text-to-speech CLI that works with multiple providers.
 
    Supported Providers:
-   \u2022 System Voices - macOS, Windows, Linux (no key needed)
+   \u2022 System Voices - macOS built-in (no key needed)
    \u2022 ElevenLabs - Premium voices (\uD83D\uDD11 key required)
    \u2022 OpenAI - High quality voices (\uD83D\uDD11 key required)
    \u2022 Groq - Fast & cheap (\uD83D\uDD11 key required)
@@ -22501,7 +23343,7 @@ We didn't find a configuration file. Let's create one to get you started!
    Get key: ${source_default.underline("https://makersuite.google.com/app/apikey")}
 
 \uD83D\uDCBE Configuration:
-   Config file: ${source_default.gray(CONFIG_FILE2)}
+   Config file: ${source_default.gray(CONFIG_FILE)}
    Create config: ${source_default.yellow("speakeasy --config --edit")}
    View settings: ${source_default.yellow("speakeasy --config")}
 
@@ -22523,6 +23365,12 @@ Usage:
   speakeasy --text "Hello world" --provider openai
   speakeasy --config
   speakeasy --cache --clear
+
+Commands:
+  deck                Serve the Deck control surface on the local network
+                      (first run fetches the surface from the matching release)
+  plugin [host]       Install the SpeakEasy skill into an agent host
+                      (no host: list hosts and what's installed)
 
 Options:
   --text, -t          Text to speak (can be positional argument)
@@ -22551,6 +23399,12 @@ Options:
   --id KEY            Show detailed info for specific cache entry
   --play KEY          Play cached audio by ID
   --out FILE          Save audio to file (in addition to playing)
+  --silent, -s        Generate audio without playing it
+  --premium           Use best available system voice (Premium > Enhanced > Standard)
+  --list-voices       List available macOS system voices
+  --app               Open the SpeakEasy settings app (downloads on first use)
+  --update-app        Update the settings app
+  --version, -V       Show the CLI version
 
 Examples:
   speakeasy "Hello world"
@@ -22584,10 +23438,10 @@ init_constants();
 import * as fs6 from "fs";
 import { spawn as spawn3 } from "child_process";
 function writeConfig(config) {
-  fs6.mkdirSync(CONFIG_DIR3, { recursive: true, mode: 448 });
-  fs6.chmodSync(CONFIG_DIR3, 448);
-  fs6.writeFileSync(CONFIG_FILE2, JSON.stringify(config, null, 2), { mode: 384 });
-  fs6.chmodSync(CONFIG_FILE2, 384);
+  fs6.mkdirSync(CONFIG_DIR, { recursive: true, mode: 448 });
+  fs6.chmodSync(CONFIG_DIR, 448);
+  fs6.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 384 });
+  fs6.chmodSync(CONFIG_FILE, 384);
 }
 function redactConfigSecrets(value) {
   if (Array.isArray(value))
@@ -22601,8 +23455,8 @@ function redactConfigSecrets(value) {
 }
 function loadGlobalConfig2() {
   try {
-    if (fs6.existsSync(CONFIG_FILE2)) {
-      const configData = fs6.readFileSync(CONFIG_FILE2, "utf8");
+    if (fs6.existsSync(CONFIG_FILE)) {
+      const configData = fs6.readFileSync(CONFIG_FILE, "utf8");
       return JSON.parse(configData);
     }
   } catch (error) {
@@ -22611,18 +23465,18 @@ function loadGlobalConfig2() {
   return {};
 }
 function hasConfig() {
-  return fs6.existsSync(CONFIG_FILE2);
+  return fs6.existsSync(CONFIG_FILE);
 }
 function showConfig(edit = false) {
   try {
     console.log("\uD83D\uDCCA Configuration Location:");
-    console.log(`   File: ${CONFIG_FILE2}`);
+    console.log(`   File: ${CONFIG_FILE}`);
     console.log("");
     if (edit) {
-      if (!fs6.existsSync(CONFIG_FILE2)) {
+      if (!fs6.existsSync(CONFIG_FILE)) {
         console.log("\uD83D\uDCDD Creating new configuration file...");
-        if (!fs6.existsSync(CONFIG_DIR3)) {
-          fs6.mkdirSync(CONFIG_DIR3, { recursive: true });
+        if (!fs6.existsSync(CONFIG_DIR)) {
+          fs6.mkdirSync(CONFIG_DIR, { recursive: true });
         }
         const defaultConfig = {
           providers: {
@@ -22645,7 +23499,7 @@ function showConfig(edit = false) {
       }
       const editor = process.env.EDITOR || process.env.VISUAL || "nano";
       console.log(`\uD83D\uDD27 Opening config file with ${editor}...`);
-      const child = spawn3(editor, [CONFIG_FILE2], {
+      const child = spawn3(editor, [CONFIG_FILE], {
         stdio: "inherit",
         detached: false
       });
@@ -22658,8 +23512,8 @@ function showConfig(edit = false) {
       });
       return;
     }
-    if (fs6.existsSync(CONFIG_FILE2)) {
-      const configData = fs6.readFileSync(CONFIG_FILE2, "utf8");
+    if (fs6.existsSync(CONFIG_FILE)) {
+      const configData = fs6.readFileSync(CONFIG_FILE, "utf8");
       const config = JSON.parse(configData);
       console.log("\uD83D\uDCCB Current Configuration:");
       console.log(JSON.stringify(redactConfigSecrets(config), null, 2));
@@ -22667,8 +23521,8 @@ function showConfig(edit = false) {
       console.log("\uD83D\uDCCA No configuration file found");
       console.log("");
       console.log("\uD83D\uDCA1 To create a config file:");
-      console.log(`   mkdir -p ${CONFIG_DIR3}`);
-      console.log(`   echo '{"providers":{"system":{"voice":"Samantha"}}}' > ${CONFIG_FILE2}`);
+      console.log(`   mkdir -p ${CONFIG_DIR}`);
+      console.log(`   echo '{"providers":{"system":{"voice":"Samantha"}}}' > ${CONFIG_FILE}`);
       console.log("");
       console.log("\uD83D\uDD27 Or use: speakeasy --config --edit");
     }
@@ -22681,10 +23535,10 @@ function diagnoseConfig() {
     const globalConfig = loadGlobalConfig2();
     console.log("\uD83D\uDD0D Configuration Diagnostics");
     console.log("");
-    if (fs6.existsSync(CONFIG_FILE2)) {
-      console.log("\u2705 Config file found:", CONFIG_FILE2);
+    if (fs6.existsSync(CONFIG_FILE)) {
+      console.log("\u2705 Config file found:", CONFIG_FILE);
     } else {
-      console.log("\u274C No config file found at:", CONFIG_FILE2);
+      console.log("\u274C No config file found at:", CONFIG_FILE);
     }
     console.log("");
     console.log("\uD83D\uDCCA Settings Summary:");
@@ -22749,12 +23603,12 @@ function setApiKey(provider, apiKey) {
     process.exit(1);
   }
   try {
-    if (!fs6.existsSync(CONFIG_DIR3)) {
-      fs6.mkdirSync(CONFIG_DIR3, { recursive: true });
+    if (!fs6.existsSync(CONFIG_DIR)) {
+      fs6.mkdirSync(CONFIG_DIR, { recursive: true });
     }
     let config = {};
-    if (fs6.existsSync(CONFIG_FILE2)) {
-      const configData = fs6.readFileSync(CONFIG_FILE2, "utf8");
+    if (fs6.existsSync(CONFIG_FILE)) {
+      const configData = fs6.readFileSync(CONFIG_FILE, "utf8");
       config = JSON.parse(configData);
     }
     if (!config.providers) {
@@ -22792,12 +23646,12 @@ function setDefaultProvider(provider) {
     process.exit(1);
   }
   try {
-    if (!fs6.existsSync(CONFIG_DIR3)) {
-      fs6.mkdirSync(CONFIG_DIR3, { recursive: true });
+    if (!fs6.existsSync(CONFIG_DIR)) {
+      fs6.mkdirSync(CONFIG_DIR, { recursive: true });
     }
     let config = {};
-    if (fs6.existsSync(CONFIG_FILE2)) {
-      const configData = fs6.readFileSync(CONFIG_FILE2, "utf8");
+    if (fs6.existsSync(CONFIG_FILE)) {
+      const configData = fs6.readFileSync(CONFIG_FILE, "utf8");
       config = JSON.parse(configData);
     }
     if (!config.defaults) {
@@ -22817,8 +23671,8 @@ function setDefaultProvider(provider) {
 
 // src/cli/doctor.ts
 init_constants();
+init_paths();
 import * as fs7 from "fs";
-import * as path7 from "path";
 import { execSync as execSync3 } from "child_process";
 function runDoctor() {
   const version = getPackageVersion();
@@ -22850,10 +23704,10 @@ function runDoctor() {
   console.log("");
   console.log("\uD83D\uDD27 Configuration Health:");
   const globalConfig = loadGlobalConfig2();
-  if (fs7.existsSync(CONFIG_FILE2)) {
+  if (fs7.existsSync(CONFIG_FILE)) {
     console.log("   \u2705 Config file exists");
     try {
-      const configData = fs7.readFileSync(CONFIG_FILE2, "utf8");
+      const configData = fs7.readFileSync(CONFIG_FILE, "utf8");
       JSON.parse(configData);
       console.log("   \u2705 Config file is valid JSON");
     } catch (error) {
@@ -22866,7 +23720,7 @@ function runDoctor() {
     issues++;
   }
   try {
-    fs7.accessSync(CONFIG_DIR3, fs7.constants.R_OK | fs7.constants.W_OK);
+    fs7.accessSync(CONFIG_DIR, fs7.constants.R_OK | fs7.constants.W_OK);
     console.log("   \u2705 Config directory permissions OK");
   } catch {
     console.log("   \u274C Cannot read/write config directory");
@@ -22917,7 +23771,7 @@ function runDoctor() {
   console.log("");
   console.log("\uD83D\uDCE6 Cache Configuration:");
   const cacheEnabled = globalConfig.cache?.enabled;
-  const cacheDir = globalConfig.cache?.dir || path7.join("/tmp", "speakeasy-cache");
+  const cacheDir = globalConfig.cache?.dir || defaultCacheDir();
   if (cacheEnabled) {
     console.log("   \u2705 Cache enabled");
     console.log(`   \uD83D\uDCC1 Cache dir: ${cacheDir}`);
@@ -22947,7 +23801,7 @@ function runDoctor() {
       if (process.platform !== "darwin") {
         console.log("   \u2022 On non-macOS, ensure API keys are configured");
       }
-      if (!fs7.existsSync(CONFIG_FILE2)) {
+      if (!fs7.existsSync(CONFIG_FILE)) {
         console.log("   \u2022 Create config: mkdir -p ~/.config/speakeasy");
         console.log(`   \u2022 Add: echo '{"providers":{"system":{"voice":"Samantha"}}}' > ~/.config/speakeasy/settings.json`);
       }
@@ -22967,7 +23821,7 @@ function runDoctor() {
 init_src();
 init_cache();
 import * as fs8 from "fs";
-import * as path8 from "path";
+import * as path7 from "path";
 import { execSync as execSync4 } from "child_process";
 async function clearCache() {
   try {
@@ -23101,7 +23955,7 @@ ${index + 1}. ${entry.cacheKey}`);
       console.log(`   Rate: ${entry.rate} WPM`);
       console.log(`   Size: ${(entry.fileSize / 1024).toFixed(1)} KB`);
       console.log(`   Created: ${new Date(entry.timestamp).toLocaleString()}`);
-      console.log(`   File: ${path8.basename(entry.filePath)}`);
+      console.log(`   File: ${path7.basename(entry.filePath)}`);
       if (entry.model)
         console.log(`   Model: ${entry.model}`);
     });
@@ -23113,30 +23967,28 @@ ${index + 1}. ${entry.cacheKey}`);
 }
 
 // src/app-manager.ts
+init_paths();
 import * as fs9 from "fs";
 import { mkdtempSync } from "fs";
-import * as path9 from "path";
+import * as path8 from "path";
 import * as os2 from "os";
 import { randomUUID as randomUUID2 } from "crypto";
 import { execFileSync, spawn as spawn4, spawnSync } from "child_process";
 import https from "https";
-var APP_DIR = path9.join(os2.homedir(), ".speakeasy");
-var APP_PATH = path9.join(APP_DIR, "SpeakEasy.app");
-var VERSION_FILE = path9.join(APP_DIR, ".app-version");
 var GITHUB_REPO = "arach/SpeakEasy";
 var RELEASE_APP_ASSET_NAMES = ["SpeakEasy.dmg"];
 var EXPECTED_DEVELOPER_TEAM_ID = "2U83JFPW66";
 function isAppInstalled() {
-  return fs9.existsSync(APP_PATH) && fs9.existsSync(path9.join(APP_PATH, "Contents", "MacOS", "SpeakEasy"));
+  return fs9.existsSync(USER_APP_PATH) && fs9.existsSync(path8.join(USER_APP_PATH, "Contents", "MacOS", "SpeakEasy"));
 }
 function getInstalledVersion() {
-  if (fs9.existsSync(VERSION_FILE)) {
-    return fs9.readFileSync(VERSION_FILE, "utf8").trim();
+  if (fs9.existsSync(USER_APP_VERSION_FILE)) {
+    return fs9.readFileSync(USER_APP_VERSION_FILE, "utf8").trim();
   }
   return readBundleShortVersion();
 }
 function readBundleShortVersion() {
-  const plist = path9.join(APP_PATH, "Contents", "Info.plist");
+  const plist = path8.join(USER_APP_PATH, "Contents", "Info.plist");
   if (!fs9.existsSync(plist))
     return null;
   try {
@@ -23153,11 +24005,11 @@ function reportAppLocation(onProgress, headline) {
     onProgress(headline);
   const version = getInstalledVersion() ?? "unknown";
   onProgress(`   Version: ${version}`);
-  onProgress(`   Path:    ${APP_PATH}`);
+  onProgress(`   Path:    ${USER_APP_PATH}`);
 }
 function ensureAppDir() {
-  if (!fs9.existsSync(APP_DIR)) {
-    fs9.mkdirSync(APP_DIR, { recursive: true });
+  if (!fs9.existsSync(USER_APP_DIR)) {
+    fs9.mkdirSync(USER_APP_DIR, { recursive: true });
   }
 }
 async function fetchJson(url) {
@@ -23237,28 +24089,28 @@ function verifyDiskImage(dmgPath) {
   execFileSync("/usr/sbin/spctl", ["--assess", "--type", "open", "--context", "context:primary-signature", "--verbose=4", dmgPath], { stdio: "pipe" });
 }
 function replaceInstalledBundle(sourceBundle) {
-  const stagingPath = path9.join(APP_DIR, `.SpeakEasy.app.installing-${randomUUID2()}`);
-  const backupPath = path9.join(APP_DIR, `.SpeakEasy.app.backup-${randomUUID2()}`);
+  const stagingPath = path8.join(USER_APP_DIR, `.SpeakEasy.app.installing-${randomUUID2()}`);
+  const backupPath = path8.join(USER_APP_DIR, `.SpeakEasy.app.backup-${randomUUID2()}`);
   let movedExistingBundle = false;
   let installedReplacement = false;
   try {
     execFileSync("/usr/bin/ditto", [sourceBundle, stagingPath], { stdio: "pipe" });
     verifyAppBundle(stagingPath);
-    if (fs9.existsSync(APP_PATH)) {
-      fs9.renameSync(APP_PATH, backupPath);
+    if (fs9.existsSync(USER_APP_PATH)) {
+      fs9.renameSync(USER_APP_PATH, backupPath);
       movedExistingBundle = true;
     }
-    fs9.renameSync(stagingPath, APP_PATH);
+    fs9.renameSync(stagingPath, USER_APP_PATH);
     installedReplacement = true;
     if (movedExistingBundle) {
       fs9.rmSync(backupPath, { recursive: true, force: true });
     }
   } catch (error) {
-    if (installedReplacement && fs9.existsSync(APP_PATH)) {
-      fs9.rmSync(APP_PATH, { recursive: true, force: true });
+    if (installedReplacement && fs9.existsSync(USER_APP_PATH)) {
+      fs9.rmSync(USER_APP_PATH, { recursive: true, force: true });
     }
     if (movedExistingBundle && fs9.existsSync(backupPath)) {
-      fs9.renameSync(backupPath, APP_PATH);
+      fs9.renameSync(backupPath, USER_APP_PATH);
     }
     throw error;
   } finally {
@@ -23269,11 +24121,11 @@ function replaceInstalledBundle(sourceBundle) {
   }
 }
 function installBundleFromDmg(dmgPath) {
-  const mountPoint = mkdtempSync(path9.join(os2.tmpdir(), "speakeasy-mount-"));
+  const mountPoint = mkdtempSync(path8.join(os2.tmpdir(), "speakeasy-mount-"));
   try {
     verifyDiskImage(dmgPath);
     execFileSync("/usr/bin/hdiutil", ["attach", "-nobrowse", "-readonly", "-mountpoint", mountPoint, dmgPath], { stdio: "pipe" });
-    const mountedBundle = path9.join(mountPoint, "SpeakEasy.app");
+    const mountedBundle = path8.join(mountPoint, "SpeakEasy.app");
     if (!fs9.existsSync(mountedBundle)) {
       throw new Error("SpeakEasy.app not found in mounted disk image");
     }
@@ -23314,8 +24166,8 @@ async function downloadAndInstallApp(onProgress) {
   }
   onProgress?.(`\uD83D\uDCE5 Downloading ${dmgAsset.name}...`);
   try {
-    const tempDir = mkdtempSync(path9.join(os2.tmpdir(), "speakeasy-download-"));
-    const dmgPath = path9.join(tempDir, dmgAsset.name);
+    const tempDir = mkdtempSync(path8.join(os2.tmpdir(), "speakeasy-download-"));
+    const dmgPath = path8.join(tempDir, dmgAsset.name);
     try {
       await downloadFile(dmgAsset.browser_download_url, dmgPath);
       onProgress?.("\uD83D\uDD10 Verifying signed and notarized disk image...");
@@ -23327,7 +24179,7 @@ async function downloadAndInstallApp(onProgress) {
     onProgress?.(`\u274C Install failed: ${error.message}`);
     return false;
   }
-  fs9.writeFileSync(VERSION_FILE, release.tag_name);
+  fs9.writeFileSync(USER_APP_VERSION_FILE, release.tag_name);
   reportAppLocation(onProgress, `\u2705 Installed SpeakEasy.app (${release.tag_name})`);
   return true;
 }
@@ -23345,7 +24197,7 @@ function launchApp(onProgress) {
     return false;
   }
   try {
-    spawn4("open", [APP_PATH], { detached: true, stdio: "ignore" }).unref();
+    spawn4("open", [USER_APP_PATH], { detached: true, stdio: "ignore" }).unref();
     reportAppLocation(onProgress, "\uD83D\uDE80 Opened SpeakEasy settings app");
     return true;
   } catch (error) {
@@ -23368,7 +24220,7 @@ async function updateApp(onProgress) {
   return await downloadAndInstallApp(onProgress);
 }
 
-// node_modules/commander/lib/error.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/error.js
 class CommanderError extends Error {
   constructor(exitCode, code, message) {
     super(message);
@@ -23388,7 +24240,7 @@ class InvalidArgumentError extends CommanderError {
   }
 }
 
-// node_modules/commander/lib/argument.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/argument.js
 class Argument {
   constructor(name, description) {
     this.description = description || "";
@@ -23462,15 +24314,15 @@ function humanReadableArgName(arg) {
   return arg.required ? "<" + nameOutput + ">" : "[" + nameOutput + "]";
 }
 
-// node_modules/commander/lib/command.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/command.js
 import { EventEmitter } from "events";
 import childProcess from "child_process";
-import path10 from "path";
+import path9 from "path";
 import fs10 from "fs";
 import process3 from "process";
 import { stripVTControlCharacters as stripVTControlCharacters2 } from "util";
 
-// node_modules/commander/lib/help.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/help.js
 import { stripVTControlCharacters } from "util";
 
 class Help {
@@ -23819,7 +24671,7 @@ ${itemIndentStr}`);
   }
 }
 
-// node_modules/commander/lib/option.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/option.js
 class Option {
   constructor(flags, description) {
     this.flags = flags;
@@ -23997,7 +24849,7 @@ function splitOptionFlags(flags) {
   return { shortFlag, longFlag };
 }
 
-// node_modules/commander/lib/suggestSimilar.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/suggestSimilar.js
 var maxDistance = 3;
 function editDistance(a, b) {
   if (Math.abs(a.length - b.length) > maxDistance)
@@ -24067,7 +24919,7 @@ function suggestSimilar(word, candidates) {
   return "";
 }
 
-// node_modules/commander/lib/command.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/lib/command.js
 class Command extends EventEmitter {
   constructor(name) {
     super();
@@ -24609,10 +25461,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
     args = args.slice();
     const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
     function findFile(baseDir, baseName) {
-      const localBin = path10.resolve(baseDir, baseName);
+      const localBin = path9.resolve(baseDir, baseName);
       if (fs10.existsSync(localBin))
         return localBin;
-      if (sourceExt.includes(path10.extname(baseName)))
+      if (sourceExt.includes(path9.extname(baseName)))
         return;
       const foundExt = sourceExt.find((ext) => fs10.existsSync(`${localBin}${ext}`));
       if (foundExt)
@@ -24630,19 +25482,19 @@ Expecting one of '${allowedValues.join("', '")}'`);
       } catch {
         resolvedScriptPath = this._scriptPath;
       }
-      executableDir = path10.resolve(path10.dirname(resolvedScriptPath), executableDir);
+      executableDir = path9.resolve(path9.dirname(resolvedScriptPath), executableDir);
     }
     if (executableDir) {
       let localFile = findFile(executableDir, executableFile);
       if (!localFile && !subcommand._executableFile && this._scriptPath) {
-        const legacyName = path10.basename(this._scriptPath, path10.extname(this._scriptPath));
+        const legacyName = path9.basename(this._scriptPath, path9.extname(this._scriptPath));
         if (legacyName !== this._name) {
           localFile = findFile(executableDir, `${legacyName}-${subcommand._name}`);
         }
       }
       executableFile = localFile || executableFile;
     }
-    const launchWithNode = sourceExt.includes(path10.extname(executableFile));
+    const launchWithNode = sourceExt.includes(path9.extname(executableFile));
     let proc;
     if (process3.platform !== "win32") {
       if (launchWithNode) {
@@ -25233,13 +26085,13 @@ Expecting one of '${allowedValues.join("', '")}'`);
       cmd.helpGroup(this._defaultCommandGroup);
   }
   nameFromFilename(filename) {
-    this._name = path10.basename(filename, path10.extname(filename));
+    this._name = path9.basename(filename, path9.extname(filename));
     return this;
   }
-  executableDir(path11) {
-    if (path11 === undefined)
+  executableDir(path10) {
+    if (path10 === undefined)
       return this._executableDir;
-    this._executableDir = path11;
+    this._executableDir = path10;
     return this;
   }
   helpInformation(contextOptions) {
@@ -25409,7 +26261,7 @@ function useColor() {
   return;
 }
 
-// node_modules/commander/index.js
+// node_modules/.pnpm/commander@15.0.0/node_modules/commander/index.js
 var program = new Command;
 
 // src/bin/speakeasy-cli.ts
@@ -25465,8 +26317,8 @@ function mirrorToDeck(text) {
   (async () => {
     try {
       const fs11 = await import("fs");
-      const path17 = await import("path");
-      const infoFile = path17.join(CONFIG_DIR3, "deck-listener.json");
+      const path18 = await import("path");
+      const infoFile = path18.join(CONFIG_DIR, "deck-listener.json");
       if (!fs11.existsSync(infoFile))
         return;
       const info = JSON.parse(fs11.readFileSync(infoFile, "utf8"));
@@ -25495,6 +26347,11 @@ async function run2() {
   if (process.argv[2] === "plugin") {
     const { runPlugin: runPlugin2 } = await Promise.resolve().then(() => (init_plugin(), exports_plugin));
     await runPlugin2(process.argv.slice(3));
+    return;
+  }
+  if (process.argv[2] === "uninstall") {
+    const { runUninstall: runUninstall2 } = await Promise.resolve().then(() => (init_uninstall(), exports_uninstall));
+    runUninstall2(process.argv.slice(3));
     return;
   }
   const program2 = new Command;

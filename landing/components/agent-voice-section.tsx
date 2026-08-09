@@ -7,7 +7,7 @@ import { Check, Copy, ExternalLink, MonitorSpeaker, Terminal } from "lucide-reac
 import { releaseVersion } from "@/lib/release"
 
 const agentPrompt = `Read https://speakeasy.arach.dev/agent.md and follow it.`
-const codexPrompt = `Install SpeakEasy ${releaseVersion} on this Mac. Read https://speakeasy.arach.dev/agent.md and follow Path A. Do not build from source or bypass Gatekeeper. Tell me which human-only steps remain.`
+const codexPrompt = `Install SpeakEasy ${releaseVersion} on this Mac. Read https://speakeasy.arach.dev/agent.md and follow Path 3. Do not build from source or bypass Gatekeeper. Tell me which human-only steps remain.`
 
 function CopyPrompt({
   payload,
@@ -181,7 +181,7 @@ export default function AgentVoiceSection() {
                   <div className="min-w-0">
                     <span>Codex reads the public runbook and inspects the pinned installer before running it:</span>
                     <code className="block text-[11px] font-mono bg-slate-900 text-teal-300 rounded-lg px-3 py-2 mt-1.5 whitespace-pre-wrap break-all">
-                      agent.md · Path A · v0.2.19
+                      agent.md · Path 3 · v0.2.19
                     </code>
                   </div>
                 </li>

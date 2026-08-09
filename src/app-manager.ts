@@ -5,10 +5,11 @@ import * as os from 'os';
 import { randomUUID } from 'crypto';
 import { execFileSync, spawn, spawnSync } from 'child_process';
 import https from 'https';
-
-const APP_DIR = path.join(os.homedir(), '.speakeasy');
-const APP_PATH = path.join(APP_DIR, 'SpeakEasy.app');
-const VERSION_FILE = path.join(APP_DIR, '.app-version');
+import {
+  USER_APP_DIR as APP_DIR,
+  USER_APP_PATH as APP_PATH,
+  USER_APP_VERSION_FILE as VERSION_FILE,
+} from './paths';
 
 const GITHUB_REPO = 'arach/SpeakEasy';
 const RELEASE_APP_ASSET_NAMES = ['SpeakEasy.dmg'];

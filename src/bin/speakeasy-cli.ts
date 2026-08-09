@@ -86,6 +86,14 @@ async function run(): Promise<void> {
     return;
   }
 
+  // `speakeasy uninstall` — show everything SpeakEasy put on this machine, and
+  // remove it on request. Reports by default; --yes is what actually deletes.
+  if (process.argv[2] === 'uninstall') {
+    const { runUninstall } = await import('../cli/uninstall');
+    runUninstall(process.argv.slice(3));
+    return;
+  }
+
   const program = new Command();
   program
     .name('speakeasy')

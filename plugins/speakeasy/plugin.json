@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "speakeasy",
+  "version": "0.1.0",
+  "description": "Give coding agents a controllable voice through the native SpeakEasy menu-bar player.",
+  "author": {
+    "name": "Arach",
+    "url": "https://arach.dev"
+  },
+  "homepage": "https://speakeasy.arach.dev",
+  "repository": "https://github.com/arach/SpeakEasy",
+  "license": "MIT",
+  "keywords": [
+    "audio",
+    "macos",
+    "narration",
+    "text-to-speech",
+    "voice"
+  ]
+}

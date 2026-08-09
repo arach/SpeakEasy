@@ -1,9 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { closeSync, openSync, readSync, readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { CODEX_SESSIONS_DIR } from '../paths';
 
-export interface CodexThreadReference {
+export interface CodexThreadCandidate {
   id: string;
   /** The same human-facing title returned to the Codex app. */
   title: string;
@@ -12,8 +14,12 @@ export interface CodexThreadReference {
   /** The Codex app project label, e.g. "speakeasy". */
   project: string;
   at: number;
-  createdAt: number;
   source: string;
+  isPinned?: boolean;
+}
+
+export interface CodexThreadReference extends CodexThreadCandidate {
+  createdAt: number;
   isPinned: boolean;
 }
 
@@ -53,6 +59,108 @@ interface JsonRpcResponse {
 const APP_STATE_FILE = path.join(homedir(), '.codex', '.codex-global-state.json');
 const DEFAULT_LIMIT = 150;
 const REQUEST_TIMEOUT_MS = 12_000;
+
+function readHead(file: string, bytes: number): string {
+  const fd = openSync(file, 'r');
+  try {
+    const buffer = Buffer.alloc(bytes);
+    return buffer.toString('utf8', 0, readSync(fd, buffer, 0, bytes, 0));
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function parseRollout(file: string, at: number): CodexThreadCandidate | null {
+  let head: string;
+  try {
+    head = readHead(file, 65_536);
+  } catch {
+    return null;
+  }
+  let id = '';
+  let cwd = '';
+  let source = '';
+  let preview = '';
+  for (const line of head.split('\n')) {
+    if (!line) continue;
+    let record: { type?: string; payload?: Record<string, unknown> };
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const payload = record.payload;
+    if (record.type === 'session_meta' && payload) {
+      id = String(payload.session_id ?? payload.id ?? '');
+      cwd = String(payload.cwd ?? '');
+      source = String(payload.originator ?? '');
+    } else if (!preview && record.type === 'response_item' && payload?.type === 'message' && payload?.role === 'user') {
+      const content = Array.isArray(payload.content) ? payload.content : [];
+      const text = content
+        .filter((item) => (item as { type?: string }).type === 'input_text')
+        .map((item) => String((item as { text?: string }).text ?? ''))
+        .join(' ')
+        .trim();
+      if (text && !text.startsWith('<')) preview = text.replace(/\s+/g, ' ').slice(0, 90);
+    }
+    if (id && preview) break;
+  }
+  if (!id) return null;
+  return {
+    id,
+    cwd,
+    title: displayCodexThreadTitle(preview || `${path.basename(cwd)} thread`),
+    preview,
+    project: path.basename(cwd) || 'Codex',
+    at,
+    source,
+  };
+}
+
+/** Locate a rollout by its thread id. Filenames carry the canonical id. */
+export function findCodexRollout(threadId: string): CodexThreadCandidate | null {
+  let names: string[];
+  try {
+    names = readdirSync(CODEX_SESSIONS_DIR, { recursive: true }) as string[];
+  } catch {
+    return null;
+  }
+  const match = names.find((name) => name.includes(threadId) && name.endsWith('.jsonl'));
+  if (!match) return null;
+  const file = path.join(CODEX_SESSIONS_DIR, match);
+  try {
+    return parseRollout(file, statSync(file).mtimeMs);
+  } catch {
+    return null;
+  }
+}
+
+/** Recent rollout references, newest first. Null means the catalog is unreadable. */
+export function listCodexRolloutReferences(limit = 25): CodexThreadCandidate[] | null {
+  let names: string[];
+  try {
+    names = readdirSync(CODEX_SESSIONS_DIR, { recursive: true }) as string[];
+  } catch {
+    return null;
+  }
+  const rollouts: { file: string; at: number }[] = [];
+  for (const file of names) {
+    if (!/rollout-.*\.jsonl$/.test(file)) continue;
+    try {
+      rollouts.push({ file, at: statSync(path.join(CODEX_SESSIONS_DIR, file)).mtimeMs });
+    } catch {
+      // The rollout vanished during the scan.
+    }
+  }
+  rollouts.sort((a, b) => b.at - a.at);
+  const references: CodexThreadCandidate[] = [];
+  for (const { file, at } of rollouts.slice(0, limit * 3)) {
+    const reference = parseRollout(path.join(CODEX_SESSIONS_DIR, file), at);
+    if (reference) references.push(reference);
+    if (references.length >= limit) break;
+  }
+  return references;
+}
 
 function stringValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -284,7 +392,7 @@ export async function listCodexThreadReferences(
     const threads: AppThread[] = [];
     let cursor: string | null = null;
     do {
-      const page = await client.request<AppThreadPage>('thread/list', {
+      const page: AppThreadPage = await client.request('thread/list', {
         cursor,
         limit: Math.min(100, Math.max(1, limit - threads.length)),
         sortKey: 'recency_at',

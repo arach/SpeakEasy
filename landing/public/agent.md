@@ -1,20 +1,96 @@
 # SpeakEasy — instructions for coding agents
 
-> SpeakEasy is a dual-mode voice companion: spoken agent responses through its
-> native player, and local dictation routed into an exact Codex Desktop task.
-> This page is an agent runbook. Pick the smallest path that satisfies the user's
-> request, follow it exactly, and report every check. No API keys are required;
-> the macOS system voice is the default.
+> SpeakEasy is unified text-to-speech: one API across the macOS system voice,
+> OpenAI, ElevenLabs, Groq, and Gemini. Most users want exactly that — a way to
+> speak a summary out loud without wiring up a provider.
+>
+> There is also a signed macOS app with a companion control surface built for
+> Codex. It is a distinct, larger commitment. Do not steer anyone toward it
+> unless they asked for it.
+>
+> Pick the smallest path that satisfies the request, follow it exactly, and
+> report every check. No API keys are required; the system voice is the default.
 
-## Path A — full Codex voice loop (recommended on Apple silicon Macs)
+## Choosing a path
 
-Use this when the user asks to install the native app, use Mac dictation, or
-speak with a real Codex task. Release `0.2.19` is the first complete dual-mode
-build for an Apple silicon Mac running macOS 14 or newer. It includes the
-paired-HTTPS browser/iPad Deck and exact-task Mac voice loop.
+| The user wants | Use |
+|---|---|
+| To speak text, or hear task summaries | **Path 1** — the CLI |
+| Spoken replies inside Codex or Claude Code, with player controls | **Path 2** — the skill |
+| The Mac app, dictation into an exact Codex task, or the Deck | **Path 3** — the app |
+
+When the request is ambiguous, choose Path 1. It installs nothing permanent,
+needs no keys, and is reversible.
+
+## Path 1 — text-to-speech (Node.js 22.12+ or Bun 1.0+)
+
+This is the default. Run it ad hoc; write nothing into the project:
+
+```bash
+npx @arach/speakeasy --version
+```
+
+Install as a dependency **only** if the user asked for it:
+
+```bash
+npm install @arach/speakeasy
+```
+
+**Verify before speaking anything real.** This exercises the full audio
+pipeline without making a sound:
+
+```bash
+npx @arach/speakeasy --provider system --silent "SpeakEasy check."
+```
+
+Exit code 0 means generation works. Non-zero means run
+`npx @arach/speakeasy --doctor`, read its output, and report what it found. Do
+not speak real summaries until this check passes.
+
+Then, at the end of a task, speak one sentence:
+
+```bash
+npx @arach/speakeasy --provider system "<one sentence, plain words>"
+```
+
+Summary rules: under ~15 words, spoken style, no emoji, no code, no file paths.
+Say what changed — "Done, the login form now validates email addresses."
+
+**Choosing a voice.** `--provider` selects the engine, `--voice` the voice
+within it, `--rate` the speed, `--out <path>` writes a file instead of playing.
+Defaults live in the user's config; `--doctor` prints the configured voice for
+each provider. Use `--provider system` unless the user has configured another
+one — it needs no key and always works on macOS.
+
+## Path 2 — spoken replies in Codex or Claude Code
+
+Installs a skill that generates audio and drives the native menu-bar player:
+autoplay, queue, transport controls, volume, playback speed, and a word-synced
+transcript HUD.
+
+```bash
+npx @arach/speakeasy plugin codex
+```
+
+This downloads the skill from the latest GitHub release into
+`~/.codex/skills/speakeasy` and runs a health check. Start a new Codex session
+afterwards so it scans the skill, then follow its `SKILL.md`.
+(`speakeasy plugin claude` installs the same skill for Claude Code.)
+
+Requires macOS 14 or newer and `bun`. On an older macOS or a non-Mac host, stop
+and say so rather than attempting it.
+
+## Path 3 — the Mac app and the Codex Deck
+
+Use this **only** when the user explicitly asks to install the native app, use
+Mac dictation, or drive a real Codex task by voice. It installs a signed
+application into `/Applications` and requires human approval of system prompts.
+Do not offer it as an upgrade to Path 1.
+
+Release `0.2.19` requires an Apple silicon Mac running macOS 14 or newer.
 
 Download the pinned installer to a temporary file. **Inspect it before running;
-do not pipe a network response directly into a shell.**
+do not pipe a network response into a shell.**
 
 ```bash
 installer="$(mktemp "${TMPDIR:-/tmp}/install-speakeasy.XXXXXX")"
@@ -27,94 +103,80 @@ bash "$installer"
 rm -f "$installer"
 ```
 
-The installer must pass all of these before it changes `/Applications`:
+The installer refuses to touch `/Applications` unless all of these pass:
 
 - published SHA-256 for the exact `0.2.19` DMG;
 - Gatekeeper acceptance of the signed, notarized DMG and app;
 - bundle ID `com.speakeasy.config` and Developer ID team `2U83JFPW66`;
 - exact app version `0.2.19`.
 
-It then opens **SpeakEasy Settings → Deck**. Report which checklist rows are
-ready and which human-only steps remain. The user—not the agent—approves
-microphone, local-network, and one-time certificate trust. Do not bypass
-Gatekeeper, remove quarantine attributes, install a floating `latest` build,
-or build from source.
+It then opens **SpeakEasy → Settings → Deck**.
 
-## Path B — TTS CLI only (Node.js 22.12+ or Bun 1.0+)
+### Walking the user through the human-only steps
 
-Install ad hoc, nothing written to the project (preferred):
+You cannot approve these; macOS requires a person. Say what is about to happen
+before it happens, then confirm each one landed. In order:
 
-```bash
-npx @arach/speakeasy --version
-```
+1. **Microphone.** "macOS will ask for microphone access — that is dictation
+    running on your Mac." Needed only for voice input.
+2. **Local network.** "It will ask to find devices on your local network. That
+    is how a phone or iPad reaches this Mac. Nothing leaves your network."
+3. **Settings → Deck checklist.** Read the rows back. Report which are ready
+    and which are still red, in plain words.
 
-Or into the project, if the user wants it as a dependency:
+Then stop and report. Do not attempt to clear a red row by changing system
+settings on the user's behalf.
 
-```bash
-npm install @arach/speakeasy
-```
+### The Deck (browser and iPad)
 
-Verify — exercise the full audio pipeline without playing sound:
-
-```bash
-npx @arach/speakeasy --provider system --silent "SpeakEasy check."
-```
-
-Exit code 0 means generation works. Non-zero means run
-`npx @arach/speakeasy --doctor`, read its output, and report what it found. Do
-not speak real summaries until this check passes.
-
-Then, when you finish a task, speak a one-sentence summary:
-
-```bash
-npx @arach/speakeasy --provider system "<one sentence, plain words>"
-```
-
-Summary rules: under ~15 words, spoken style, no emoji, no code, no file paths.
-Say what changed, e.g. "Done, the login form now validates email addresses."
-
-## Path C — Codex skill and native playback controls (macOS 14+, Bun)
-
-The native skill plays through the signed SpeakEasy menu-bar player: autoplay,
-queue, transport controls, playback speed, and a word-synced HUD. Install it:
-
-```bash
-npx @arach/speakeasy plugin codex
-```
-
-This downloads the skill from the latest GitHub release into
-`~/.codex/skills/speakeasy` and runs a health check. Then start a new Codex
-session so it scans the skill, and follow the SKILL.md. Use Path A for the
-full dual-mode app instead of relying on the older CLI app bootstrap.
-(`speakeasy plugin claude` installs the same skill for Claude Code.)
-
-## The Deck
+The app serves a control surface on the local network for a phone or iPad.
+Mention it only if the user asks about using another device.
 
 ```bash
 npx @arach/speakeasy deck
 ```
 
-The signed `0.2.19` app starts this runtime for you. For a CLI-only development
-run, leave the process running. It serves the paired HTTPS control surface on
-the local network and prints the certificate-bootstrap link plus QR code. Trust
-the local CA on the iPad first, then scan the HTTPS QR and pin the page to the
-Home Screen. Ctrl+C stops the server.
+For a CLI-only development run, leave the process going; Ctrl+C stops it. The
+signed app starts this runtime for you.
+
+Be honest about the cost: reaching it over HTTPS from a phone or iPad currently
+requires installing and trusting a local certificate authority on that device —
+several steps in iOS Settings. Plain HTTP works without any of that, but Safari
+withholds microphone access outside a secure context, so dictation will not
+work. Do not walk someone through certificate installation unless they have
+asked for the iPad path specifically and accepted that trade.
+
+## When something fails
+
+- **Checksum mismatch** — stop. Do not retry, do not fetch a different build.
+  Report the expected and actual values. This means the download is wrong.
+- **Gatekeeper or codesign rejection** — stop and report verbatim. Never
+  remove quarantine attributes, never `spctl --master-disable`, never bypass.
+- **Wrong version or team ID** — stop. The pin exists to catch exactly this.
+- **App installs but Deck rows stay red** — that is usually an unapproved
+  system prompt, not a broken install. Re-read the human-only steps above.
+- **`--silent` check fails** — run `--doctor` and report its output. Do not
+  work around it by switching providers.
+
+Never build from source, install a floating `latest` build, or bypass
+Gatekeeper as a workaround for any of the above.
 
 ## Boundaries
 
-- Always: preserve the exact release pin and trust checks in Path A. For the TTS
-  CLI, verify with the silent check or `--doctor` before the first real summary;
-  use `--provider system` unless the user has configured another provider.
-- Ask first: before installing into the project instead of `npx`; before
-  downloading the native app when the user's request did not already authorize
-  installation; before starting the deck server.
-- Never: speak secrets, tokens, keys, or credentials; ask the user for API keys
-  or write keys to config yourself. If a cloud voice is wanted, point the user
-  to `npx @arach/speakeasy --doctor`.
+- **Always:** preserve the exact release pin and trust checks in Path 3. Verify
+  with the silent check or `--doctor` before the first real summary. Use
+  `--provider system` unless the user configured another provider.
+- **Ask first:** before installing into the project instead of using `npx`;
+  before downloading the native app when the request did not already authorize
+  it; before starting the deck server.
+- **Never:** speak secrets, tokens, keys, or credentials. Never ask the user for
+  API keys or write keys to config yourself — point them at
+  `npx @arach/speakeasy --doctor`.
 
 ## Reference
 
 - [npm package](https://www.npmjs.com/package/@arach/speakeasy): versions and install stats
 - [Docs](https://speakeasy.arach.dev/docs): full CLI reference
+- [SpeakEasy for Codex](https://speakeasy.arach.dev/codex/): the Codex companion and Deck
 - [Codex plugin source](https://github.com/arach/SpeakEasy/tree/master/plugins/speakeasy): skill, runtime, submission notes
 - [GitHub](https://github.com/arach/SpeakEasy): source and issues

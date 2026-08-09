@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { v5 as uuidv5 } from 'uuid';
 import { parseTTL, parseSize } from './cache-config';
+import { defaultCacheDir } from './paths';
 
 interface CacheLogger {
   debug: (message: string, ...args: any[]) => void;
@@ -211,7 +212,7 @@ export class TTSCache {
   private cacheMisses = 0;
 
   constructor(cacheDir: string, ttl: string | number = '7d', maxSize?: string | number, logger?: CacheLogger) {
-    this.cacheDir = cacheDir || path.join('/tmp', 'speakeasy-cache');
+    this.cacheDir = cacheDir || defaultCacheDir();
     this.dbPath = path.join(this.cacheDir, 'cache.sqlite');
     this.metadataFile = path.join(this.cacheDir, 'metadata.json');
     this.statsFile = path.join(this.cacheDir, 'stats.json');

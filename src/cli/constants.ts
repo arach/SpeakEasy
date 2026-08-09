@@ -1,8 +1,4 @@
-import * as path from 'path';
-import { homedir } from 'os';
-
-export const CONFIG_DIR = path.join(homedir(), '.config', 'speakeasy');
-export const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
+export { CONFIG_DIR, CONFIG_FILE } from '../paths';
 
 export type ProviderKey = 'openai' | 'elevenlabs' | 'groq' | 'gemini' | 'system';
 
@@ -40,5 +36,4 @@ export const getPackageVersion = (): string => {
     return '0.0.0';
   }
 };
-
 

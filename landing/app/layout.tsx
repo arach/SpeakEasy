@@ -33,14 +33,14 @@ const silkscreen = Silkscreen({
 })
 
 export const metadata: Metadata = {
-  title: "SpeakEasy — Speak to Codex. Hear it answer.",
-  description: "A two-way voice layer for Codex on macOS: local speech recognition in, controllable narration out, locked to the task you choose.",
+  title: "SpeakEasy — Unified text-to-speech",
+  description: "One API for text-to-speech across macOS system voices, OpenAI, ElevenLabs, Groq, and Gemini. TypeScript-first, zero dependencies, with automatic fallback.",
   keywords: "Codex voice, speech recognition, ASR, text-to-speech, TTS, macOS, coding agent, voice lanes",
   authors: [{ name: "SpeakEasy" }],
   metadataBase: new URL("https://speakeasy.arach.dev"),
   openGraph: {
-    title: "SpeakEasy — Speak to Codex. Hear it answer.",
-    description: "A two-way voice layer for Codex on macOS: local speech recognition in, controllable narration out.",
+    title: "SpeakEasy — Unified text-to-speech",
+    description: "One API for text-to-speech across macOS system voices, OpenAI, ElevenLabs, Groq, and Gemini. TypeScript-first, zero dependencies.",
     type: "website",
     url: "https://speakeasy.arach.dev",
     siteName: "SpeakEasy",
@@ -55,8 +55,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SpeakEasy — Speak to Codex. Hear it answer.",
-    description: "A two-way voice layer for Codex on macOS: local speech recognition in, controllable narration out.",
+    title: "SpeakEasy — Unified text-to-speech",
+    description: "One API for text-to-speech across macOS system voices, OpenAI, ElevenLabs, Groq, and Gemini. TypeScript-first, zero dependencies.",
     images: ["/og-image.png"],
   },
   generator: 'SpeakEasy'

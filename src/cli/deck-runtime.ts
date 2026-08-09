@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFile, execFileSync, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, copyFileSync, readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, openSync, readSync, closeSync } from 'node:fs';
-import { tmpdir, homedir, hostname } from 'node:os';
+import { mkdtempSync, rmSync, existsSync, copyFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir, hostname } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import {
@@ -11,7 +11,13 @@ import {
   type DeckAgentClientOptions,
 } from './deck-agent-client.js';
 import { CodexDesktopSession } from './codex-desktop-submit.js';
-import { displayCodexThreadTitle, listCodexThreadReferences } from './codex-thread-catalog.js';
+import {
+  findCodexRollout,
+  listCodexRolloutReferences,
+  listCodexThreadReferences,
+  type CodexThreadCandidate,
+} from './codex-thread-catalog.js';
+import { DECK_LANES_FILE } from '../paths.js';
 
 /** execFile as a promise, capturing stdout, with a hard timeout. */
 function run(cmd: string, args: string[], timeout: number): Promise<string> {
@@ -185,10 +191,6 @@ const OVERVIEW_MODEL = 'gpt-5.6-luna';
 const OVERVIEW_EFFORT = 'low';
 const TICK_MS = 250;
 const MAX_MESSAGES_PER_LANE = 50;
-const LANES_FILE = path.join(homedir(), '.config', 'speakeasy', 'deck-lanes.json');
-
-const CODEX_SESSIONS_DIR = path.join(homedir(), '.codex', 'sessions');
-const CATALOG_LIMIT = 25;
 
 export type DeckTurnRoute =
   | { kind: 'canonical'; taskId: string }
@@ -202,118 +204,17 @@ export function resolveDeckTurnRoute(laneIx: number, taskId?: string): DeckTurnR
   return exactTaskId ? { kind: 'canonical', taskId: exactTaskId } : { kind: 'unassigned' };
 }
 
-/** Read at most `bytes` from the head of a file. */
-function readHead(file: string, bytes: number): string {
-  const fd = openSync(file, 'r');
-  try {
-    const buf = Buffer.alloc(bytes);
-    const n = readSync(fd, buf, 0, bytes, 0);
-    return buf.toString('utf8', 0, n);
-  } finally {
-    closeSync(fd);
-  }
-}
-
-/** Parse a rollout's head for its identity and first real human prompt. */
-function parseRollout(file: string, at: number): DeckThreadInfo | null {
-  let head: string;
-  try {
-    head = readHead(file, 65536);
-  } catch {
-    return null;
-  }
-  let id = '';
-  let cwd = '';
-  let originator = '';
-  let snippet = '';
-  for (const line of head.split('\n')) {
-    if (!line) continue;
-    let rec: { type?: string; payload?: Record<string, unknown> };
-    try {
-      rec = JSON.parse(line);
-    } catch {
-      continue; // a truncated tail line is not a thread problem
-    }
-    const p = rec.payload;
-    if (rec.type === 'session_meta' && p) {
-      id = String(p.session_id ?? p.id ?? '');
-      cwd = String(p.cwd ?? '');
-      originator = String(p.originator ?? '');
-    } else if (!snippet && rec.type === 'response_item' && p?.type === 'message' && p?.role === 'user') {
-      const content = Array.isArray(p.content) ? p.content : [];
-      const text = content
-        .filter((c) => (c as { type?: string }).type === 'input_text')
-        .map((c) => String((c as { text?: string }).text ?? ''))
-        .join(' ')
-        .trim();
-      // injected context blocks start with '<' — the first real prompt doesn't
-      if (text && !text.startsWith('<')) snippet = text.replace(/\s+/g, ' ').slice(0, 90);
-    }
-    if (id && snippet) break;
-  }
-  if (!id) return null;
+function deckThreadInfo(thread: CodexThreadCandidate): DeckThreadInfo {
   return {
-    id,
-    cwd,
-    snippet: displayCodexThreadTitle(snippet || `${path.basename(cwd)} thread`),
-    preview: snippet,
-    project: path.basename(cwd) || 'Codex',
-    at,
-    originator,
+    id: thread.id,
+    cwd: thread.cwd,
+    snippet: thread.title,
+    preview: thread.preview,
+    project: thread.project,
+    at: thread.at,
+    originator: thread.source,
+    isPinned: thread.isPinned,
   };
-}
-
-/** The adapter's per-key runtime dir (mirrors codexLocalSessionPaths). */
-function laneRuntimeDir(key: string): string {
-  return deckAgentRuntimeDir(key);
-}
-
-/** Locate and parse the rollout for a thread id — filenames carry the id. */
-function findRollout(threadId: string): DeckThreadInfo | null {
-  let names: string[];
-  try {
-    names = readdirSync(CODEX_SESSIONS_DIR, { recursive: true }) as string[];
-  } catch {
-    return null;
-  }
-  const match = names.find((n) => n.includes(threadId) && n.endsWith('.jsonl'));
-  if (!match) return null;
-  const file = path.join(CODEX_SESSIONS_DIR, match);
-  try {
-    return parseRollout(file, statSync(file).mtimeMs);
-  } catch {
-    return null;
-  }
-}
-
-/** Recent codex threads from local rollout files, newest first. Returns null
- * when the sessions dir is unreadable, so the caller can keep its stale list —
- * a stale list the user can read beats an empty one. */
-function scanCodexThreadsFallback(): DeckThreadInfo[] | null {
-  let names: string[];
-  try {
-    names = readdirSync(CODEX_SESSIONS_DIR, { recursive: true }) as string[];
-  } catch {
-    return null;
-  }
-  const rollouts: { file: string; at: number }[] = [];
-  for (const n of names) {
-    if (!/rollout-.*\.jsonl$/.test(n)) continue;
-    try {
-      rollouts.push({ file: n, at: statSync(path.join(CODEX_SESSIONS_DIR, n)).mtimeMs });
-    } catch {
-      // vanished mid-scan — skip
-    }
-  }
-  rollouts.sort((a, b) => b.at - a.at);
-  const out: DeckThreadInfo[] = [];
-  // scan a few extra — some rollouts carry no usable snippet
-  for (const { file, at } of rollouts.slice(0, CATALOG_LIMIT * 3)) {
-    const info = parseRollout(path.join(CODEX_SESSIONS_DIR, file), at);
-    if (info) out.push(info);
-    if (out.length >= CATALOG_LIMIT) break;
-  }
-  return out;
 }
 
 /** Per-lane binding keys. The files beneath these keys persist only the exact
@@ -322,7 +223,7 @@ function scanCodexThreadsFallback(): DeckThreadInfo[] | null {
 function loadLaneKeys(): string[] {
   const base = Array.from({ length: LANE_COUNT }, (_, i) => `speakeasy-deck-lane-${i}`);
   try {
-    const saved = JSON.parse(readFileSync(LANES_FILE, 'utf8')) as Record<string, unknown>;
+    const saved = JSON.parse(readFileSync(DECK_LANES_FILE, 'utf8')) as Record<string, unknown>;
     return base.map((b, i) => {
       const v = saved[String(i)];
       return typeof v === 'string' && v.startsWith('speakeasy-deck-lane-') ? v : b;
@@ -340,14 +241,26 @@ const OVERVIEW_SYSTEM_PROMPT =
   'Do not use tools, do not read or write files, do not access the network. ' +
   'Plain spoken words, no lists, no code: one or two sentences for a status question, a few plain sentences for a summary.';
 
-/** Options for the overview session factory. Worker pads never create one. */
-type LaneClientOptions = DeckAgentClientOptions;
-type LaneAgentClient = DeckAgentClient;
-
 function clock(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+function laneNumber(index: number): string {
+  return `LANE ${String(index + 1).padStart(2, '0')}`;
+}
+
+function threadAlias(threadId: string): string {
+  return threadId.replace(/-/g, '').slice(-8);
+}
+
+function storedThreadId(key: string): string | null {
+  try {
+    return readFileSync(path.join(deckAgentRuntimeDir(key), 'codex-thread-id.txt'), 'utf8').trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 /** Rough speech duration: ~2.5 words per second at 1x, floor 1.5s. */
@@ -382,7 +295,6 @@ export function measureSegmentDurations(files: string[], text: string): number[]
   const fallback = Math.max(1.5, estimateDuration(text) / files.length);
   return files.map((file) => audioDurationOf(file) ?? fallback);
 }
-
 
 export function parseIntent(raw: unknown): { intent?: DeckIntent; error?: string } {
   const parsed = intentSchema.safeParse(raw);
@@ -419,7 +331,7 @@ export class DeckRuntime extends EventEmitter {
   /** per-lane binding keys — clearing a lane rotates the persisted assignment */
   private laneKeys: string[] = loadLaneKeys();
   /** The single hidden overview client. Worker conversations never use it. */
-  private laneClients = new Map<number, { key: string; client: LaneAgentClient }>();
+  private laneClients = new Map<number, { key: string; client: DeckAgentClient }>();
   /** One direct turn currently owned by the Codex Desktop bridge. */
   private canonicalTurnAbort: AbortController | null = null;
   /** Warm exact-task channel. Owner discovery is intentionally amortized
@@ -489,21 +401,13 @@ export class DeckRuntime extends EventEmitter {
       let fallback = false;
       try {
         const refs = await listCodexThreadReferences(process.cwd());
-        next = refs.map((thread) => ({
-          id: thread.id,
-          cwd: thread.cwd,
-          snippet: thread.title,
-          preview: thread.preview,
-          project: thread.project,
-          at: thread.at,
-          originator: thread.source,
-          isPinned: thread.isPinned,
-        }));
+        next = refs.map(deckThreadInfo);
       } catch {
         // Older Codex builds may not have thread/list. Preserve a useful, if
         // less polished, catalog instead of making lane setup unusable.
-        next = scanCodexThreadsFallback();
-        fallback = next !== null;
+        const references = listCodexRolloutReferences();
+        next = references?.map(deckThreadInfo) ?? null;
+        fallback = references !== null;
       }
       if (this.destroyed) return;
       if (next) {
@@ -539,12 +443,7 @@ export class DeckRuntime extends EventEmitter {
     const claimed = new Set<string>();
     let rotated = false;
     this.laneKeys.forEach((key, i) => {
-      let threadId = '';
-      try {
-        threadId = readFileSync(path.join(laneRuntimeDir(key), 'codex-thread-id.txt'), 'utf8').trim();
-      } catch {
-        return; // unseeded lane — unassigned
-      }
+      const threadId = storedThreadId(key);
       if (!threadId) return;
       if (claimed.has(threadId)) {
         // double binding from an older build — rotate to an unassigned key
@@ -556,9 +455,9 @@ export class DeckRuntime extends EventEmitter {
       claimed.add(threadId);
       const lane = this.lanes[i];
       lane.threadId = threadId;
-      lane.sessionAlias = threadId.replace(/-/g, '').slice(-8);
-      const info = findRollout(threadId);
-      if (info) this.applyThreadIdentity(lane, info);
+      lane.sessionAlias = threadAlias(threadId);
+      const info = findCodexRollout(threadId);
+      if (info) this.applyThreadIdentity(lane, deckThreadInfo(info));
       else lane.title = 'codex thread';
     });
     if (rotated) this.persistLaneKeys();
@@ -606,7 +505,7 @@ export class DeckRuntime extends EventEmitter {
 
   /** The Deck-owned overview session. Worker pads are input/output peripherals
    * for explicit Codex tasks and must never create an app-server session. */
-  private async laneClient(ix: number): Promise<LaneAgentClient> {
+  private async laneClient(ix: number): Promise<DeckAgentClient> {
     if (ix !== MASTER_IX) throw new Error('Assign a Codex task to this lane before speaking.');
     const key = MASTER_REUSE_KEY;
     const existing = this.laneClients.get(ix);
@@ -615,7 +514,7 @@ export class DeckRuntime extends EventEmitter {
       this.laneClients.delete(ix);
       void existing.client.close().catch(() => undefined);
     }
-    const options: LaneClientOptions = {
+    const options: DeckAgentClientOptions = {
       harness: 'codex',
       cwd: process.cwd(),
       reuseKey: key,
@@ -641,7 +540,7 @@ export class DeckRuntime extends EventEmitter {
       this.laneKeys.forEach((k, i) => {
         out[String(i)] = k;
       });
-      writeFileSync(LANES_FILE, JSON.stringify(out), { mode: 0o600 });
+      writeFileSync(DECK_LANES_FILE, JSON.stringify(out), { mode: 0o600 });
     } catch {
       // best-effort
     }
@@ -652,23 +551,12 @@ export class DeckRuntime extends EventEmitter {
    * this guards (runtime dedupe only sweeps the nine worker lanes). */
   private masterThreadId(): string | null {
     const live = this.lanes[MASTER_IX].threadId;
-    if (live) return live;
-    try {
-      const id = readFileSync(path.join(laneRuntimeDir(MASTER_REUSE_KEY), 'codex-thread-id.txt'), 'utf8').trim();
-      return id || null;
-    } catch {
-      return null;
-    }
+    return live || storedThreadId(MASTER_REUSE_KEY);
   }
 
   /** The exact Codex task assigned to a worker pad, if one was recorded. */
   private laneThreadId(index: number): string | null {
-    try {
-      const id = readFileSync(path.join(laneRuntimeDir(this.laneKeys[index]), 'codex-thread-id.txt'), 'utf8').trim();
-      return id || null;
-    } catch {
-      return null;
-    }
+    return storedThreadId(this.laneKeys[index]);
   }
 
   /** Channel mapper: bind a pad to an existing Codex task, or clear its
@@ -695,7 +583,7 @@ export class DeckRuntime extends EventEmitter {
     let bound = false;
     if (threadId) {
       try {
-        const dir = laneRuntimeDir(key);
+        const dir = deckAgentRuntimeDir(key);
         mkdirSync(dir, { recursive: true });
         writeFileSync(path.join(dir, 'codex-thread-id.txt'), threadId);
         bound = true;
@@ -720,7 +608,7 @@ export class DeckRuntime extends EventEmitter {
       if (info) this.applyThreadIdentity(lane, info);
       else lane.title = 'codex thread';
       lane.threadId = threadId;
-      lane.sessionAlias = threadId.replace(/-/g, '').slice(-8);
+      lane.sessionAlias = threadAlias(threadId);
       this.log('LANE ASSIGNED', `lane ${index + 1} → thread ${lane.sessionAlias}`);
       // One exact thread occupies at most one lane: now that the destination
       // seed has landed, clear every other lane holding this thread — the
@@ -756,7 +644,7 @@ export class DeckRuntime extends EventEmitter {
    * waiter, bump its generation, or stop its audio. */
   private selectLane(index: number): void {
     this.laneIx = index;
-    const label = index === MASTER_IX ? 'OVERVIEW' : `LANE ${String(index + 1).padStart(2, '0')}`;
+    const label = index === MASTER_IX ? 'OVERVIEW' : laneNumber(index);
     const state = this.lanes[index]?.state;
     const status = state === 'working' ? 'WORKING' : state === 'speaking' ? 'SPEAKING' : 'READY';
     this.setPhase(this.phase, `${status} · ${label}`);
@@ -819,6 +707,27 @@ export class DeckRuntime extends EventEmitter {
     return true;
   }
 
+  private startPlayback(id: string, confirm: string): void {
+    this.playing = id;
+    this.paused = false;
+    this.pos = 0;
+    this.setPhase('speaking', confirm);
+  }
+
+  private finishPlayback(settleLane = false): void {
+    if (settleLane && this.playing) {
+      const [lane] = this.playing.split(':').map(Number);
+      this.setLaneState(lane, 'idle');
+    }
+    this.playing = null;
+    this.paused = false;
+    this.pos = 0;
+    // a finished narration starts over at its first segment, never mid-way
+    this.segIx = 0;
+    this.setPhase('idle', 'READY');
+    this.log('PLAYBACK ENDED', 'buffer complete');
+  }
+
   /** Reset playback and the state of whichever lane was playing. */
   private clearPlayback(confirm?: string): void {
     if (this.playing) {
@@ -848,11 +757,7 @@ export class DeckRuntime extends EventEmitter {
       this.pos += (TICK_MS / 1000) * rate;
       const dur = this.durOf(this.playing);
       if (!this.player && this.pos >= dur) {
-        this.playing = null;
-        this.pos = 0;
-        this.paused = false;
-        this.log('PLAYBACK ENDED', 'buffer complete');
-        this.setPhase('idle', 'READY');
+        this.finishPlayback();
       }
       this.changed();
     }, TICK_MS);
@@ -896,9 +801,7 @@ export class DeckRuntime extends EventEmitter {
           this.log('PLAYBACK RESUMED', `${Math.floor(this.pos)}s elapsed`);
         } else {
           this.stopPlayer();
-          this.playing = intent.id;
-          this.paused = false;
-          this.setPhase('speaking', 'PLAYING');
+          this.startPlayback(intent.id, 'PLAYING');
           this.log('PLAYBACK STARTED', `${SPEEDS[this.speedIx].toFixed(2)}x`);
           this.startSegments(msg);
         }
@@ -943,9 +846,7 @@ export class DeckRuntime extends EventEmitter {
           // only file-backed replies can actually replay — mirrors have no audio here
           if (t[i].role === 'agent' && t[i].file) {
             this.stopPlayer();
-            this.playing = `${this.laneIx}:${i}`;
-            this.paused = false;
-            this.setPhase('speaking', 'REPLAYING LAST REPLY');
+            this.startPlayback(`${this.laneIx}:${i}`, 'REPLAYING LAST REPLY');
             this.ensureTicker();
             this.log('REPLAY', `lane ${this.laneIx + 1} · last reply`);
             this.startSegments(t[i]);
@@ -1044,14 +945,7 @@ export class DeckRuntime extends EventEmitter {
           this.changed();
           return { ok: true, rev: this.rev };
         }
-        const [li] = intent.id.split(':').map(Number);
-        this.playing = null;
-        this.segIx = 0;
-        this.pos = 0;
-        this.paused = false;
-        this.setPhase('idle', 'READY');
-        this.setLaneState(li, 'idle');
-        this.log('PLAYBACK ENDED', 'narration complete');
+        this.finishPlayback(true);
         this.changed();
         return { ok: true, rev: this.rev };
       }
@@ -1067,10 +961,7 @@ export class DeckRuntime extends EventEmitter {
     const id = `${lane}:${this.threads[lane].length - 1}`;
     this.log('NARRATION', `lane ${lane + 1} · ${msg.dur.toFixed(0)}s`);
     if (this.autoplay) {
-      this.playing = id;
-      this.paused = false;
-      this.pos = 0;
-      this.setPhase('speaking', 'SPEAKING');
+      this.startPlayback(id, 'SPEAKING');
       this.ensureTicker();
     }
     this.changed();
@@ -1097,13 +988,13 @@ export class DeckRuntime extends EventEmitter {
     const alive = () => this.gen === gen;
     this.setLaneState(lane, 'working');
     try {
-      this.setPhase('transcribing', `TRANSCRIBING · LANE ${String(lane + 1).padStart(2, '0')}`);
+      this.setPhase('transcribing', `TRANSCRIBING · ${laneNumber(lane)}`);
       this.changed();
       await wait(600);
       if (!alive()) return;
 
       this.pushMessage(lane, { role: 'you', text: command, dur: estimateDuration(command) });
-      this.setPhase('submitting', `SUBMITTING · LANE ${String(lane + 1).padStart(2, '0')}`);
+      this.setPhase('submitting', `SUBMITTING · ${laneNumber(lane)}`);
       this.log('AGENT ASKED', `${this.laneLabel(lane)} · ${command.slice(0, 40)}`);
       this.changed();
 
@@ -1114,7 +1005,7 @@ export class DeckRuntime extends EventEmitter {
       this.pushMessage(lane, msg);
       const id = `${lane}:${this.threads[lane].length - 1}`;
 
-      this.setPhase('preparingSpeech', `PREPARING SPEECH · LANE ${String(lane + 1).padStart(2, '0')}`);
+      this.setPhase('preparingSpeech', `PREPARING SPEECH · ${laneNumber(lane)}`);
       this.log('AGENT REPLY', `${msg.dur.toFixed(0)}s queued`);
       this.changed();
 
@@ -1130,7 +1021,7 @@ export class DeckRuntime extends EventEmitter {
       if (files.length === 0) {
         // synthesis failed — show the reply without audio, never fake playback
         msg.mirrored = true;
-        this.setPhase('idle', `READY · LANE ${String(lane + 1).padStart(2, '0')}`);
+        this.setPhase('idle', `READY · ${laneNumber(lane)}`);
         this.log('NO AUDIO', 'synthesis unavailable · text-only reply');
         this.changed();
         return;
@@ -1140,9 +1031,7 @@ export class DeckRuntime extends EventEmitter {
         this.log('NARRATION SEGMENTS', `${files.length} parts · ${msg.dur.toFixed(0)}s total`);
       }
       if (this.autoplay && this.suppressAutoplayForGeneration !== gen) {
-        this.playing = id;
-        this.paused = false;
-        this.setPhase('speaking', `SPEAKING · LANE ${String(lane + 1).padStart(2, '0')}`);
+        this.startPlayback(id, `SPEAKING · ${laneNumber(lane)}`);
         this.setLaneState(lane, 'speaking');
         this.ensureTicker();
         this.changed();
@@ -1150,7 +1039,7 @@ export class DeckRuntime extends EventEmitter {
         // when nobody is watching
         this.startSegments(msg);
       } else {
-        this.setPhase('idle', `READY · LANE ${String(lane + 1).padStart(2, '0')}`);
+        this.setPhase('idle', `READY · ${laneNumber(lane)}`);
         this.changed();
       }
     } finally {
@@ -1210,7 +1099,7 @@ export class DeckRuntime extends EventEmitter {
       // alias from the random tail to tell threads apart
       if (lane && thread) {
         lane.threadId = thread;
-        lane.sessionAlias = thread.replace(/-/g, '').slice(-8);
+        lane.sessionAlias = threadAlias(thread);
         if (!lane.cwd) {
           lane.cwd = process.cwd();
           lane.project = path.basename(lane.cwd) || 'Codex';
@@ -1395,14 +1284,7 @@ export class DeckRuntime extends EventEmitter {
         }
       }
 
-      const [li] = this.playing.split(':').map(Number);
-      this.playing = null;
-      this.segIx = 0;
-      this.pos = 0;
-      this.paused = false;
-      this.setPhase('idle', 'READY');
-      this.setLaneState(li, 'idle');
-      this.log('PLAYBACK ENDED', 'narration complete');
+      this.finishPlayback(true);
       this.changed();
     });
   }
