@@ -149,6 +149,8 @@
   .say-line .play .icon { width: 2.8rem; height: 2.8rem; }
   .hero-sub { max-width: 42rem; margin: 2.2rem auto 0; color: var(--ink-2); font-size: 1.15rem; }
   .hero-sub em { color: var(--ink); }
+  .hero-sub a { color: var(--emerald); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .hero-sub a:hover { color: var(--ink); }
 
   .install { margin-top: 2.8rem; display: inline-block; text-align: left; }
   .install-tabs { display: flex; gap: 1.1rem; padding: 0 .3rem; margin-bottom: .45rem; }
@@ -350,20 +352,21 @@
     </div>
 
     <p class="hero-sub">
-      Give your coding agent a voice. One command installs the skill; after that it speaks
-      its own summaries, with a real player — transport, speed, and a synced transcript.
-      <em>Or use the library directly</em>: macOS voices, OpenAI, ElevenLabs, Groq, and Gemini
-      behind one function.
+      One function, every voice: macOS system voices, OpenAI, ElevenLabs, Groq, and Gemini.
+      The system voice needs no key and works out of the box, so the first line you write
+      already makes sound. <em>Want your coding agent to speak its own summaries?</em>
+      <a href="/codex/">That's the Codex companion</a>.
     </p>
 
     <div class="install">
       <div class="install-tabs" id="installTabs">
-        <button class="active" data-cmd="bunx @arach/speakeasy plugin codex">Codex</button>
-        <button data-cmd="bunx @arach/speakeasy plugin claude">Claude Code</button>
+        <button class="active" data-cmd="bun add @arach/speakeasy">bun</button>
+        <button data-cmd="npm install @arach/speakeasy">npm</button>
+        <button data-cmd="pnpm add @arach/speakeasy">pnpm</button>
       </div>
       <!-- Kept on one line deliberately: .codebox is white-space: pre, so a
            newline before the copy button renders as blank lines in the box. -->
-      <div class="codebox"><span class="prompt">$ </span><span id="installCmd">bunx @arach/speakeasy plugin codex</span><button class="copy-btn" data-copy-target="installCmd">copy</button></div>
+      <div class="codebox"><span class="prompt">$ </span><span id="installCmd">bun add @arach/speakeasy</span><button class="copy-btn" data-copy-target="installCmd">copy</button></div>
     </div>
 
     <div class="hero-links">
