@@ -87,15 +87,15 @@ Mac dictation, or drive a real Codex task by voice. It installs a signed
 application into `/Applications` and requires human approval of system prompts.
 Do not offer it as an upgrade to Path 1.
 
-Release `0.2.19` requires an Apple silicon Mac running macOS 14 or newer.
+Requires an Apple silicon Mac running macOS 14 or newer.
 
-Download the pinned installer to a temporary file. **Inspect it before running;
+Download the current installer to a temporary file. **Inspect it before running;
 do not pipe a network response into a shell.**
 
 ```bash
 installer="$(mktemp "${TMPDIR:-/tmp}/install-speakeasy.XXXXXX")"
 curl --fail --location --proto '=https' --tlsv1.2 \
-  https://github.com/arach/SpeakEasy/releases/download/v0.2.19/install-speakeasy.sh \
+  https://github.com/arach/SpeakEasy/releases/latest/download/install-speakeasy.sh \
   --output "$installer"
 sed -n '1,260p' "$installer"
 bash -n "$installer"
@@ -103,12 +103,22 @@ bash "$installer"
 rm -f "$installer"
 ```
 
+That URL always resolves to the current release, so there is no version for you
+to look up or keep in sync. The installer names the version it is about to
+install in its own output and in its `DEFAULT_VERSION` line — read it there
+rather than assuming one. Report that version back to the user when you are
+done.
+
 The installer refuses to touch `/Applications` unless all of these pass:
 
-- published SHA-256 for the exact `0.2.19` DMG;
+- the published SHA-256 for the exact DMG it names;
 - Gatekeeper acceptance of the signed, notarized DMG and app;
 - bundle ID `com.speakeasy.config` and Developer ID team `2U83JFPW66`;
-- exact app version `0.2.19`.
+- an installed app version matching the release it downloaded.
+
+If you need a specific older release instead, set `SPEAKEASY_VERSION` and the
+installer will verify against that release's published checksum. Do not do this
+unless the user asked for a particular version.
 
 It then opens **SpeakEasy → Settings → Deck**.
 

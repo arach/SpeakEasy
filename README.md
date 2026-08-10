@@ -22,12 +22,13 @@ Mac, a browser, or an iPad on your local network.
 
 Paste this bounded task into Codex Desktop:
 
-> Install SpeakEasy 0.2.19 on this Mac. Read
-> https://speakeasy.arach.dev/agent.md and follow Path 3. Do not build from
-> source or bypass Gatekeeper. Tell me which human-only steps remain.
+> Install SpeakEasy on this Mac. Read https://speakeasy.arach.dev/agent.md and
+> follow Path 3. Do not build from source or bypass Gatekeeper. Tell me which
+> version you installed and which human-only steps remain.
 
-`0.2.19` is the first public **Latest** train, covering the Mac core and the
-browser/iPad deck. The earlier `0.2.18` build remains a GitHub prerelease
+The prompt names no version on purpose — the installer resolves the current
+release and verifies against that release's own published checksum, so a pasted
+prompt does not go stale. The `0.2.18` build remains a GitHub prerelease
 permanently and is a Mac-core-only preview — do not use it to evaluate the
 browser/iPad path.
 See [SpeakEasy for Codex](https://speakeasy.arach.dev/codex/) for the product
@@ -168,18 +169,19 @@ For the complete macOS app—local dictation, exact Codex task lanes, native
 narration, and the Deck—the recommended installation flow is a bounded Codex
 task. Paste this into Codex:
 
-> Install SpeakEasy 0.2.19 on this Mac. Read
-> https://speakeasy.arach.dev/agent.md and follow Path 3. Do not build from
-> source or bypass Gatekeeper. Tell me which human-only steps remain.
+> Install SpeakEasy on this Mac. Read https://speakeasy.arach.dev/agent.md and
+> follow Path 3. Do not build from source or bypass Gatekeeper. Tell me which
+> version you installed and which human-only steps remain.
 
-Codex downloads and inspects the pinned installer, verifies the published
-checksum, Gatekeeper acceptance, Developer ID, and exact version, safely
-replaces the app, and opens **Settings → Deck**. You only approve the microphone
-and local-network prompts that macOS requires a person to handle.
+Codex downloads and inspects the installer, verifies the published checksum,
+Gatekeeper acceptance, Developer ID, and the app version against the release it
+downloaded, safely replaces the app, and opens **Settings → Deck**. You only
+approve the microphone and local-network prompts that macOS requires a person to
+handle.
 
 For a manual install, download the same signed and notarized release:
 
-**[Download SpeakEasy 0.2.19 for macOS](https://github.com/arach/SpeakEasy/releases/download/v0.2.19/SpeakEasy.dmg)**
+**[Download SpeakEasy for macOS](https://github.com/arach/SpeakEasy/releases/latest/download/SpeakEasy.dmg)**
 
 1. Drag SpeakEasy to **Applications**.
 2. Open it and approve microphone and local-network access when macOS asks.
