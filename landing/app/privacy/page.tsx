@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       summary="SpeakEasy is a local-network voice companion and text-to-speech tool. This policy describes how its Mac, browser, and iPad surfaces handle microphone audio, transcripts, narration, and credentials."
-      updated="August 2, 2026"
+      updated="August 10, 2026"
     >
       <section>
         <h2>What SpeakEasy processes</h2>
@@ -133,6 +133,28 @@ export default function PrivacyPage() {
       </section>
 
       <section>
+        <h2>Pad interest list</h2>
+        <p>
+          If you enter your email address in the interest form on this site, that address is stored
+          so Arach can contact you when the iPad Pad preview is available. The record holds your
+          email address, a label for the form you used, and the two-letter country code Cloudflare
+          reports for the request. It does not hold your name, IP address, user agent, or any
+          tracking identifier.
+        </p>
+        <p>
+          The list lives in a Cloudflare D1 database operated by Arach and is used only to send you
+          that invitation. It is not sold, shared, or added to a marketing list. Your IP address is
+          used at Cloudflare&apos;s edge to rate-limit submissions and is never stored.
+        </p>
+        <p>
+          Ask to be removed at any time by opening an issue in the{" "}
+          <a href="https://github.com/arach/SpeakEasy/issues">SpeakEasy issue tracker</a>; you do not
+          need to post your address publicly to make the request. The list is deleted once the
+          preview it was collected for has shipped.
+        </p>
+      </section>
+
+      <section>
         <h2>Your choices</h2>
         <ul>
           <li>Use only the Mac microphone path to keep capture and transcription on the Mac.</li>
@@ -141,6 +163,7 @@ export default function PrivacyPage() {
           <li>Remove cached audio, history, or configuration from your local SpeakEasy directories.</li>
           <li>Revoke provider credentials with the provider that issued them.</li>
           <li>Uninstall the plugin or macOS app at any time.</li>
+          <li>Ask to be removed from the Pad interest list at any time.</li>
         </ul>
       </section>
 

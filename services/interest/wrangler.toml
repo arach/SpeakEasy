@@ -1,0 +1,34 @@
+name = "speakeasy-interest"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# The landing site is a static export on GitHub Pages, so it cannot receive a
+# form post. This Worker is the only server SpeakEasy runs, and it does exactly
+# one thing: record that somebody wants the Pad.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "speakeasy-interest"
+database_id = "c9bf5d7a-2de0-4ca8-9f78-af1963afc675"
+
+# Per-IP throttle, enforced at Cloudflare's edge before the Worker does any
+# work. Using the platform's limiter rather than a table of our own is what lets
+# this service keep its promise of storing no IP addresses — the address is used
+# for counting at the edge and never reaches us.
+#
+# `period` accepts only 10 or 60. Five signups a minute from one address is
+# generous for a form a person fills in once, and still leaves shared office or
+# CGNAT addresses plenty of room.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 5, period = 60 }
+
+[vars]
+# Comma-separated. Anything not on this list is refused at the CORS layer, so a
+# random page cannot post to this endpoint from someone's browser.
+ALLOWED_ORIGINS = "https://speakeasy.arach.dev"
+
+# ADMIN_TOKEN is a secret, never a var:
+#   wrangler secret put ADMIN_TOKEN

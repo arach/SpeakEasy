@@ -1,0 +1,7 @@
+# Local secrets for `wrangler dev`. The real ADMIN_TOKEN lives in
+# `wrangler secret put ADMIN_TOKEN`, never in the repo.
+.dev.vars
+
+# Local D1 state and build output.
+.wrangler/
+node_modules/
