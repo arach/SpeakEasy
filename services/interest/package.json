@@ -1,0 +1,19 @@
+{
+  "name": "@arach/speakeasy-interest",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Records who wants the SpeakEasy Pad. The only server SpeakEasy runs.",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "db:local": "wrangler d1 execute speakeasy-interest --local --file=./schema.sql",
+    "db:remote": "wrangler d1 execute speakeasy-interest --remote --file=./schema.sql",
+    "deploy": "wrangler deploy",
+    "list": "wrangler d1 execute speakeasy-interest --remote --command \"SELECT created_at, email, source, country FROM interest ORDER BY id DESC LIMIT 100\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^3.99.0"
+  }
+}

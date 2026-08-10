@@ -1,0 +1,21 @@
+name = "speakeasy-interest"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# The landing site is a static export on GitHub Pages, so it cannot receive a
+# form post. This Worker is the only server SpeakEasy runs, and it does exactly
+# one thing: record that somebody wants the Pad.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "speakeasy-interest"
+# Filled in by `wrangler d1 create speakeasy-interest` — see README.
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+# Comma-separated. Anything not on this list is refused at the CORS layer, so a
+# random page cannot post to this endpoint from someone's browser.
+ALLOWED_ORIGINS = "https://speakeasy.arach.dev"
+
+# ADMIN_TOKEN is a secret, never a var:
+#   wrangler secret put ADMIN_TOKEN
