@@ -670,6 +670,8 @@ nav .wrap { display:flex; align-items:center; justify-content:space-between; hei
 @media (max-width:520px) { .interest { flex-direction:column; } .interest .key { justify-content:center; } }
 .step .key { margin-top:22px; align-self:flex-start; }
 .step .foot { font-family:ui-monospace,Menlo,monospace; font-size:9.5px; letter-spacing:.16em; color:var(--faint); margin-top:16px; }
+.step .foot a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
+.step .foot a:hover { color:var(--ink); }
 
 footer { border-top:1px solid var(--hairline); padding:44px 0 60px; }
 footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; }
@@ -1113,7 +1115,7 @@ footer .wrap > div:last-child { margin-right:-.22em; }
           <button class="key solid" type="submit" id="interestSubmit">TELL ME WHEN</button>
         </form>
         <p class="interest-note" id="interestNote" role="status" aria-live="polite"></p>
-        <p class="foot">IPADOS 17+ · IPAD AND IPHONE</p>
+        <p class="foot">IPADOS 17+ · IPAD AND IPHONE · <a href="/privacy/">HOW WE HANDLE YOUR EMAIL</a></p>
       </div>
     </div>
   </div>
