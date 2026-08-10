@@ -9,8 +9,7 @@ compatibility_date = "2026-08-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "speakeasy-interest"
-# Filled in by `wrangler d1 create speakeasy-interest` — see README.
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "c9bf5d7a-2de0-4ca8-9f78-af1963afc675"
 
 # Per-IP throttle, enforced at Cloudflare's edge before the Worker does any
 # work. Using the platform's limiter rather than a table of our own is what lets
