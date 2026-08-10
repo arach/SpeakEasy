@@ -30,7 +30,17 @@ targets:
     info:
       path: Sources/Info.plist
       properties:
-        CFBundleDisplayName: SpeakEasy Deck
+        CFBundleDisplayName: SpeakEasy Pad
+        # Take the version from the build settings below rather than pinning it
+        # here. Without these two lines xcodegen writes a literal 1.0/1 and
+        # MARKETING_VERSION is silently ignored — the build reports a version
+        # nobody set.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # The app speaks to the Mac over HTTPS and transcribes on device. That
+        # is exempt encryption, so declaring it here spares a manual compliance
+        # answer on every TestFlight upload.
+        ITSAppUsesNonExemptEncryption: false
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSBonjourServices:
