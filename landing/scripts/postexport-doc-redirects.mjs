@@ -28,25 +28,32 @@ function redirectHtml(target) {
 `
 }
 
+/** `index` must never get a stub. The stub for slug X is written to
+ *  out/docs/X.html, and out/docs/index.html is the exported /docs/ page itself
+ *  — so stubbing `index` overwrites the real page with a redirect to /docs/,
+ *  which is the page it just replaced. The browser then spins forever.
+ *
+ *  Nothing is lost by skipping it: /docs/index already resolves to
+ *  out/docs/index.html, which is the page a redirect would have sent you to. */
+const isIndex = (name) => name === "index"
+
 async function main() {
   const meta = JSON.parse(await readFile(META_PATH, "utf8"))
-  const slugs = meta.pages.filter((entry) => !entry.startsWith("---"))
+  const slugs = meta.pages.filter((entry) => !entry.startsWith("---") && !isIndex(entry))
 
   for (const slug of slugs) {
-    const canonical = slug === "index" ? "/docs/" : `/docs/${slug}/`
-    await writeFile(join(OUT_DOCS, `${slug}.html`), redirectHtml(canonical), "utf8")
+    await writeFile(join(OUT_DOCS, `${slug}.html`), redirectHtml(`/docs/${slug}/`), "utf8")
   }
 
   // Also stub any exported doc folders not listed in meta (e.g. legacy aliases)
   const entries = await readdir(OUT_DOCS, { withFileTypes: true })
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name === "_next") continue
+    if (!entry.isDirectory() || entry.name === "_next" || isIndex(entry.name)) continue
     const htmlPath = join(OUT_DOCS, `${entry.name}.html`)
     try {
       await readFile(htmlPath)
     } catch {
-      const canonical = entry.name === "index" ? "/docs/" : `/docs/${entry.name}/`
-      await writeFile(htmlPath, redirectHtml(canonical), "utf8")
+      await writeFile(htmlPath, redirectHtml(`/docs/${entry.name}/`), "utf8")
     }
   }
 
