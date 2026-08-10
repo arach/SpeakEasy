@@ -4,12 +4,12 @@
   "version": "0.1.0",
   "description": "Records who wants the SpeakEasy Pad. The only server SpeakEasy runs.",
   "scripts": {
-    "dev": "wrangler dev --local",
-    "db:local": "wrangler d1 execute speakeasy-interest --local --file=./schema.sql",
-    "db:remote": "wrangler d1 execute speakeasy-interest --remote --file=./schema.sql",
-    "deploy": "wrangler deploy",
-    "list": "wrangler d1 execute speakeasy-interest --remote --command \"SELECT created_at, email, source, country FROM interest ORDER BY id DESC LIMIT 100\"",
-    "typecheck": "tsc --noEmit"
+    "dev": "bunx wrangler dev --local",
+    "db:local": "bunx wrangler d1 execute speakeasy-interest --local --file=./schema.sql",
+    "db:remote": "bunx wrangler d1 execute speakeasy-interest --remote --file=./schema.sql",
+    "deploy": "bunx wrangler deploy",
+    "list": "bunx wrangler d1 execute speakeasy-interest --remote --command \"SELECT created_at, email, source, country FROM interest ORDER BY id DESC LIMIT 100\"",
+    "typecheck": "bunx tsc --noEmit"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250109.0",

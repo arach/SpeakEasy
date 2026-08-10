@@ -10,12 +10,20 @@
  *   GET  /health                               public
  */
 
+/** Cloudflare's rate-limit binding. Counting happens at the edge, so the
+ *  address never reaches this Worker and never gets stored. */
+interface RateLimiter {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface Env {
   DB: D1Database;
   /** Set with `wrangler secret put ADMIN_TOKEN`. Never a plain var. */
   ADMIN_TOKEN?: string;
   /** Comma-separated origin allowlist. */
   ALLOWED_ORIGINS?: string;
+  /** Configured in wrangler.toml. Absent under some local dev setups. */
+  RATE_LIMITER?: RateLimiter;
 }
 
 /** Bigger than any honest signup, small enough that nobody can post a novel. */
@@ -80,6 +88,33 @@ function authorized(request: Request, env: Env): boolean {
   const prefix = 'Bearer ';
   if (!header.startsWith(prefix)) return false;
   return tokensMatch(header.slice(prefix.length), env.ADMIN_TOKEN);
+}
+
+/** The caller's address, as Cloudflare sees it. Used only as a counting key for
+ *  the limiter — never logged, never written to the database. */
+function clientKey(request: Request): string {
+  return (
+    request.headers.get('CF-Connecting-IP') ??
+    request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ??
+    'unknown'
+  );
+}
+
+/** True when the caller is over the limit and should be turned away.
+ *
+ *  Fails open when the binding is missing, which is the case in some local dev
+ *  setups. That is a real risk in production — a typo in wrangler.toml would
+ *  silently remove the throttle — so /health reports whether the limiter is
+ *  actually wired, and the deploy checklist says to look. */
+async function overLimit(request: Request, env: Env): Promise<boolean> {
+  if (!env.RATE_LIMITER) return false;
+  try {
+    const { success } = await env.RATE_LIMITER.limit({ key: clientKey(request) });
+    return !success;
+  } catch {
+    // A limiter that errors must not take the endpoint down with it.
+    return false;
+  }
 }
 
 async function readBody(request: Request): Promise<Record<string, unknown> | null> {
@@ -156,7 +191,9 @@ export default {
     }
 
     if (url.pathname === '/health') {
-      return json({ ok: true }, { status: 200 }, cors);
+      // Report whether the throttle is actually wired. A missing binding fails
+      // open, so this is the only way to notice a misconfigured deploy.
+      return json({ ok: true, rateLimit: env.RATE_LIMITER ? 'enabled' : 'disabled' }, { status: 200 }, cors);
     }
 
     if (url.pathname === '/interest') {
@@ -167,6 +204,12 @@ export default {
       if (origin && !cors['Access-Control-Allow-Origin']) {
         return json({ ok: false, error: 'forbidden_origin' }, { status: 403 }, cors);
       }
+      // Throttle before reading the body or touching the database, so a flood
+      // costs the edge a counter increment and nothing else.
+      if (await overLimit(request, env)) {
+        return json({ ok: false, error: 'rate_limited' }, { status: 429 }, { ...cors, 'Retry-After': '60' });
+      }
+
       if (request.method === 'POST') return recordInterest(request, env, cors);
       if (request.method === 'GET') return listInterest(request, env, cors);
       return json({ ok: false, error: 'method_not_allowed' }, { status: 405 }, cors);

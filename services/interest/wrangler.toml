@@ -12,6 +12,20 @@ database_name = "speakeasy-interest"
 # Filled in by `wrangler d1 create speakeasy-interest` — see README.
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 
+# Per-IP throttle, enforced at Cloudflare's edge before the Worker does any
+# work. Using the platform's limiter rather than a table of our own is what lets
+# this service keep its promise of storing no IP addresses — the address is used
+# for counting at the edge and never reaches us.
+#
+# `period` accepts only 10 or 60. Five signups a minute from one address is
+# generous for a form a person fills in once, and still leaves shared office or
+# CGNAT addresses plenty of room.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 5, period = 60 }
+
 [vars]
 # Comma-separated. Anything not on this list is refused at the CORS layer, so a
 # random page cannot post to this endpoint from someone's browser.
