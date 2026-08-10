@@ -652,6 +652,22 @@ nav .wrap { display:flex; align-items:center; justify-content:space-between; hei
 .ask .body { padding:16px; font-size:14px; font-weight:300; line-height:1.65; color:var(--text); }
 .step .orelse { font-size:12.5px; font-weight:300; line-height:1.6; color:var(--faint); margin-top:14px; }
 .step .orelse code { font-family:ui-monospace,Menlo,monospace; font-size:11.5px; letter-spacing:.02em; color:var(--muted); }
+
+/* Interest, not a waiting list. One field, no promises about position or date. */
+.interest { display:flex; gap:10px; margin-top:22px; flex-wrap:wrap; }
+.interest input {
+  flex:1; min-width:0; font-family:inherit; font-size:14px; font-weight:300; color:var(--text);
+  background:var(--panel); border:1px solid var(--hairline2); border-radius:12px; padding:14px 16px;
+  transition:border-color .16s ease;
+}
+.interest input::placeholder { color:var(--faint); }
+.interest input:focus { outline:none; border-color:color-mix(in srgb, var(--accent) 60%, var(--hairline2)); }
+.interest input:disabled { opacity:.55; }
+.interest .key { padding:14px 18px; border:none; }
+.interest .key:disabled { cursor:default; filter:saturate(.4) brightness(.98); }
+.interest-note { font-size:12.5px; font-weight:300; line-height:1.6; margin-top:12px; min-height:1.2em; color:var(--muted); }
+.interest-note.bad { color:#B3261E; }
+@media (max-width:520px) { .interest { flex-direction:column; } .interest .key { justify-content:center; } }
 .step .key { margin-top:22px; align-self:flex-start; }
 .step .foot { font-family:ui-monospace,Menlo,monospace; font-size:9.5px; letter-spacing:.16em; color:var(--faint); margin-top:16px; }
 
@@ -1061,9 +1077,10 @@ footer .wrap > div:last-child { margin-right:-.22em; }
 <section class="sec install hairline-t" id="install" style="background:var(--bg2);">
   <div class="wrap">
     <span class="label acc">GET THE PAD</span>
-    <h2 class="display" style="font-size:clamp(34px,4.6vw,58px);margin-top:18px;">Two steps.</h2>
+    <h2 class="display" style="font-size:clamp(34px,4.6vw,58px);margin-top:18px;">One step, for now.</h2>
     <p style="margin:20px auto 0;max-width:480px;font-size:15.5px;font-weight:300;line-height:1.7;color:var(--muted);">
-    One on the Mac, one on the iPad. They find each other after that.</p>
+    The Mac half works today. The iPad half is going to TestFlight first — once both are
+    on, they find each other with nothing to pair.</p>
 
     <div class="twostep">
       <div class="step">
@@ -1086,10 +1103,16 @@ footer .wrap > div:last-child { margin-right:-.22em; }
       </div>
       <div class="step">
         <span class="n">STEP 02 · ON YOUR IPAD</span>
-        <h3>Install the Pad.</h3>
-        <p>Open it once on the same Wi-Fi as your Mac. There's no QR code and nothing to type —
-        it finds the Mac and the nine lanes fill in.</p>
-        <a class="key solid" href="#honesty">▶&nbsp;&nbsp;DOWNLOAD ON THE APP STORE</a>
+        <h3>Not out yet.</h3>
+        <p>The Pad goes to TestFlight before the App Store. Say you want it and I'll send an
+        invite when the build is up — that is the only thing this does with your address.
+        Once it's installed there's nothing to pair: same Wi-Fi, and the nine lanes fill in.</p>
+        <form class="interest" id="interestForm" novalidate>
+          <input type="email" id="interestEmail" name="email" required autocomplete="email"
+                 placeholder="you@example.com" aria-label="Your email address">
+          <button class="key solid" type="submit" id="interestSubmit">TELL ME WHEN</button>
+        </form>
+        <p class="interest-note" id="interestNote" role="status" aria-live="polite"></p>
         <p class="foot">IPADOS 17+ · IPAD AND IPHONE</p>
       </div>
     </div>
@@ -1174,6 +1197,64 @@ footer .wrap > div:last-child { margin-right:-.22em; }
   }
 
   // Copy the install command.
+  /* ---- interest ----
+     This page is a static export on GitHub Pages: there is no server here to
+     receive a post, so the address has to go to a third-party endpoint. Set
+     INTEREST_ENDPOINT to one that accepts a JSON POST of {email, source}.
+
+     Deliberately fails loud when it is empty. A form that accepts an address
+     and quietly drops it is worse than no form — it looks like it worked, and
+     the person never hears back. */
+  var INTEREST_ENDPOINT = '';
+
+  var interestForm = document.getElementById('interestForm');
+  if (interestForm) {
+    var emailField = document.getElementById('interestEmail');
+    var submitBtn = document.getElementById('interestSubmit');
+    var note = document.getElementById('interestNote');
+
+    var say = function (message, bad) {
+      note.textContent = message;
+      note.classList.toggle('bad', !!bad);
+    };
+
+    interestForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var email = (emailField.value || '').trim();
+      // The browser's own check, without the native bubble (form is novalidate).
+      if (!email || !emailField.checkValidity()) {
+        say('That does not look like an email address.', true);
+        emailField.focus();
+        return;
+      }
+      if (!INTEREST_ENDPOINT) {
+        say('Sign-ups are not switched on yet — nothing was sent.', true);
+        return;
+      }
+
+      submitBtn.disabled = true;
+      emailField.disabled = true;
+      say('Sending…');
+
+      fetch(INTEREST_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ email: email, source: 'pad-testflight' }),
+      }).then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        interestForm.hidden = true;
+        say('Got it. You will hear from me when the TestFlight build is up.');
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'interest_submit', { source: 'pad-testflight' });
+        }
+      }).catch(function () {
+        submitBtn.disabled = false;
+        emailField.disabled = false;
+        say('That did not go through. Try again in a moment.', true);
+      });
+    });
+  }
+
   // Copy whatever is actually on screen. The previous version held its own
   // hardcoded string, which quietly drifted from the visible text — you read one
   // thing and pasted another.
