@@ -394,90 +394,120 @@ struct DeckCompanionView: View {
     let onFindDecks: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var copied = false
+    @State private var transcriptToDiscard: DeckTranscriptOutbox.Entry?
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("COMPANION LINK")
-                        .deckMono(9, weight: .semibold)
-                        .tracking(1.8)
-                        .foregroundStyle(DeckPalette.accent)
-                    Text(deck.displayName)
-                        .font(.system(size: 27, weight: .semibold, design: .rounded))
-                        .foregroundStyle(DeckPalette.ink)
-                    Text("The native controls and WebKit lane viewer share the same authoritative Mac runtime.")
-                        .font(.system(size: 12.5, design: .monospaced))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("COMPANION LINK")
+                            .deckMono(9, weight: .semibold)
+                            .tracking(1.8)
+                            .foregroundStyle(DeckPalette.accent)
+                        Text(deck.displayName)
+                            .font(.system(size: 27, weight: .semibold, design: .rounded))
+                            .foregroundStyle(DeckPalette.ink)
+                        Text("The native controls and WebKit lane viewer share the same authoritative Mac runtime.")
+                            .font(.system(size: 12.5, design: .monospaced))
+                            .foregroundStyle(DeckPalette.ink3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    HStack(spacing: 12) {
+                        SignalBars(active: connection.state == .connected)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(connection.state.label)
+                                .deckMono(10, weight: .semibold)
+                                .tracking(1.4)
+                                .foregroundStyle(DeckPalette.accent)
+                            Text(connection.localStatus ?? "Native link ready")
+                                .deckMono(9)
+                                .foregroundStyle(DeckPalette.ink3)
+                        }
+                        Spacer()
+                    }
+                    .padding(14)
+                    .background(DeckPalette.cell, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay { RoundedRectangle(cornerRadius: 10).stroke(DeckPalette.line) }
+
+                    VStack(spacing: 0) {
+                        fact("PAIRING", "Approved iPad · Keychain")
+                        Divider().overlay(DeckPalette.lineSoft)
+                        fact("ROUTE", deck.url.scheme == "https" ? "Private HTTPS + WebSocket" : "Local network")
+                        Divider().overlay(DeckPalette.lineSoft)
+                        fact("HOST", deck.url.host ?? "Unknown Mac")
+                        Divider().overlay(DeckPalette.lineSoft)
+                        fact("AUDIO", "Native iPad player · on-device Parakeet")
+                        Divider().overlay(DeckPalette.lineSoft)
+                        fact("VOICE MODEL", modelSummary)
+                        if voice.heldAudio > 0 || voice.undelivered > 0 {
+                            Divider().overlay(DeckPalette.lineSoft)
+                            // Speech the device is still carrying is never a silent
+                            // condition — it is the operator's words, in writing.
+                            fact("HELD FOR YOU", heldSummary)
+                        }
+                    }
+                    .background(DeckPalette.panel, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay { RoundedRectangle(cornerRadius: 10).stroke(DeckPalette.line) }
+
+                    if let transcript = voice.pendingTranscripts.first {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("UNSENT TRANSCRIPT · LANE \(String(format: "%02d", transcript.lane + 1))")
+                                .deckMono(8, weight: .semibold)
+                                .tracking(1.2)
+                                .foregroundStyle(DeckPalette.accent)
+                            Text(transcript.text)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(DeckPalette.ink2)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .textSelection(.enabled)
+                            HStack {
+                                if voice.pendingTranscripts.count > 1 {
+                                    Text("+\(voice.pendingTranscripts.count - 1) MORE WAITING")
+                                        .deckMono(8)
+                                        .foregroundStyle(DeckPalette.ink3)
+                                }
+                                Spacer()
+                                Button("DISCARD…", role: .destructive) {
+                                    transcriptToDiscard = transcript
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(14)
+                        .background(DeckPalette.cell, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay { RoundedRectangle(cornerRadius: 10).stroke(DeckPalette.line) }
+                    }
+
+                    // CC-BY-4.0 on the weights makes this attribution required, not
+                    // decorative. Naming the three layers is also just honest about
+                    // what is running on the device.
+                    Text("Speech recognized on this iPad by Parakeet TDT 0.6B v3 — trained by NVIDIA (CC-BY-4.0), converted to Core ML by FluidInference (Apache 2.0), executed by Vox.")
+                        .deckMono(8)
                         .foregroundStyle(DeckPalette.ink3)
                         .fixedSize(horizontal: false, vertical: true)
-                }
 
-                HStack(spacing: 12) {
-                    SignalBars(active: connection.state == .connected)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(connection.state.label)
-                            .deckMono(10, weight: .semibold)
-                            .tracking(1.4)
-                            .foregroundStyle(DeckPalette.accent)
-                        Text(connection.localStatus ?? "Native link ready")
-                            .deckMono(9)
-                            .foregroundStyle(DeckPalette.ink3)
+                    HStack(spacing: 10) {
+                        Button("RECONNECT NOW") { connection.reconnectNow() }
+                            .buttonStyle(.borderedProminent)
+                            .tint(DeckPalette.accent)
+                            .foregroundStyle(DeckPalette.accentDark)
+                        Button("FIND MACS AGAIN") {
+                            onFindDecks()
+                            dismiss()
+                        }
+                        .buttonStyle(.bordered)
+                        Button(copied ? "COPIED" : "COPY DIAGNOSTICS") {
+                            UIPasteboard.general.string = diagnostics
+                            copied = true
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    Spacer()
+                    .deckMono(8.5, weight: .semibold)
                 }
-                .padding(14)
-                .background(DeckPalette.cell, in: RoundedRectangle(cornerRadius: 10))
-                .overlay { RoundedRectangle(cornerRadius: 10).stroke(DeckPalette.line) }
-
-                VStack(spacing: 0) {
-                    fact("PAIRING", "Approved iPad · Keychain")
-                    Divider().overlay(DeckPalette.lineSoft)
-                    fact("ROUTE", deck.url.scheme == "https" ? "Private HTTPS + WebSocket" : "Local network")
-                    Divider().overlay(DeckPalette.lineSoft)
-                    fact("HOST", deck.url.host ?? "Unknown Mac")
-                    Divider().overlay(DeckPalette.lineSoft)
-                    fact("AUDIO", "Native iPad player · on-device Parakeet")
-                    Divider().overlay(DeckPalette.lineSoft)
-                    fact("VOICE MODEL", modelSummary)
-                    if voice.heldAudio > 0 || voice.undelivered > 0 {
-                        Divider().overlay(DeckPalette.lineSoft)
-                        // Speech the device is still carrying is never a silent
-                        // condition — it is the operator's words, in writing.
-                        fact("HELD FOR YOU", heldSummary)
-                    }
-                }
-                .background(DeckPalette.panel, in: RoundedRectangle(cornerRadius: 10))
-                .overlay { RoundedRectangle(cornerRadius: 10).stroke(DeckPalette.line) }
-
-                // CC-BY-4.0 on the weights makes this attribution required, not
-                // decorative. Naming the three layers is also just honest about
-                // what is running on the device.
-                Text("Speech recognized on this iPad by Parakeet TDT 0.6B v3 — trained by NVIDIA (CC-BY-4.0), converted to Core ML by FluidInference (Apache 2.0), executed by Vox.")
-                    .deckMono(8)
-                    .foregroundStyle(DeckPalette.ink3)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    Button("RECONNECT NOW") { connection.reconnectNow() }
-                        .buttonStyle(.borderedProminent)
-                        .tint(DeckPalette.accent)
-                        .foregroundStyle(DeckPalette.accentDark)
-                    Button("FIND MACS AGAIN") {
-                        onFindDecks()
-                        dismiss()
-                    }
-                    .buttonStyle(.bordered)
-                    Button(copied ? "COPIED" : "COPY DIAGNOSTICS") {
-                        UIPasteboard.general.string = diagnostics
-                        copied = true
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .deckMono(8.5, weight: .semibold)
-
-                Spacer()
+                .padding(24)
             }
-            .padding(24)
             .background(DeckPalette.page)
             .navigationTitle("Companion Link")
             .navigationBarTitleDisplayMode(.inline)
@@ -489,6 +519,16 @@ struct DeckCompanionView: View {
             }
         }
         .preferredColorScheme(DeckThemeSelection.current.colorScheme)
+        .alert(item: $transcriptToDiscard) { transcript in
+            Alert(
+                title: Text("Discard this transcript?"),
+                message: Text("This removes the words from this iPad and they cannot be delivered later."),
+                primaryButton: .destructive(Text("Discard")) {
+                    voice.discardTranscript(transcript.id)
+                },
+                secondaryButton: .cancel()
+            )
+        }
     }
 
     private func fact(_ label: String, _ value: String) -> some View {

@@ -6,7 +6,8 @@ import OSLog
 /// Transcription happens on this device, so by the time a transcript exists the
 /// user has already said the words — losing it because a socket blinked, a lane
 /// was busy, or the app was backgrounded is never acceptable. An entry leaves
-/// this queue for exactly one reason: the Mac acknowledged it by id.
+/// only after the Mac acknowledges it or the operator explicitly discards the
+/// visible transcript.
 ///
 /// One file per entry, named by capture time, so a plain lexicographic sort
 /// replays utterances in the order they were spoken and no single index file
@@ -94,10 +95,19 @@ struct DeckTranscriptOutbox {
     }
 
     var first: Entry? { entries().first }
-    var count: Int { entries().count }
 
     /// Drop a transcript the Mac has confirmed. Anything else keeps it.
     func retire(_ id: String) {
+        remove(id)
+    }
+
+    /// The only non-delivery removal path. Callers must put the transcript in
+    /// front of the operator and ask before invoking it.
+    func discard(_ id: String) {
+        remove(id)
+    }
+
+    private func remove(_ id: String) {
         guard let files = try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: nil,

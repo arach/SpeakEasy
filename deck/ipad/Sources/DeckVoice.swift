@@ -52,6 +52,9 @@ final class DeckVoice: ObservableObject {
     @Published private(set) var status: String?
     /// Transcripts produced but not yet accepted by the Mac.
     @Published private(set) var undelivered: Int = 0
+    /// Full text is exposed only so the operator can inspect and deliberately
+    /// dismiss words that would otherwise remain pinned indefinitely.
+    @Published private(set) var pendingTranscripts: [DeckTranscriptOutbox.Entry] = []
     /// Recordings waiting on the Parakeet model.
     @Published private(set) var heldAudio: Int = 0
     @Published private(set) var modelReady = false
@@ -329,6 +332,21 @@ final class DeckVoice: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
     }
 
+    func discardTranscript(_ id: String) {
+        guard pendingTranscripts.contains(where: { $0.id == id }) else { return }
+        outbox.discard(id)
+        if inFlight?.entry.id == id {
+            inFlight = nil
+            retryWork?.cancel()
+            retryWork = nil
+        }
+        logger.notice("Operator discarded a held transcript")
+        status = "TRANSCRIPT DISCARDED"
+        refreshQueues()
+        refreshPhase()
+        pump()
+    }
+
     // MARK: - Engine observation
 
     /// `HudDictation` is `@Observable`; mirror the parts this surface publishes.
@@ -368,7 +386,8 @@ final class DeckVoice: ObservableObject {
     }
 
     private func refreshQueues() {
-        undelivered = outbox.count
+        pendingTranscripts = outbox.entries()
+        undelivered = pendingTranscripts.count
         heldAudio = dictation.queuedCount
     }
 
