@@ -829,7 +829,7 @@ export class DeckRuntime extends EventEmitter {
       lane.branch = undefined;
       lane.updatedAt = undefined;
       try {
-        clearLaneTailCursor(laneRuntimeDir(this.laneKeys[index]));
+        clearLaneTailCursor(deckAgentRuntimeDir(this.laneKeys[index]));
       } catch {
         // ignore
       }
@@ -850,7 +850,7 @@ export class DeckRuntime extends EventEmitter {
     const lane = this.lanes[index];
     const workingDir = cwd?.trim() || process.cwd();
     try {
-      const dir = laneRuntimeDir(key);
+      const dir = deckAgentRuntimeDir(key);
       mkdirSync(dir, { recursive: true });
       writeFileSync(path.join(dir, DECK_ORIGIN_FILE), workingDir);
     } catch {
@@ -874,7 +874,7 @@ export class DeckRuntime extends EventEmitter {
   /** The working directory recorded for a deck-owned lane, if it has one. */
   private laneDeckOrigin(index: number): string | null {
     try {
-      const dir = readFileSync(path.join(laneRuntimeDir(this.laneKeys[index]), DECK_ORIGIN_FILE), 'utf8').trim();
+      const dir = readFileSync(path.join(deckAgentRuntimeDir(this.laneKeys[index]), DECK_ORIGIN_FILE), 'utf8').trim();
       return dir || null;
     } catch {
       return null;
@@ -927,7 +927,7 @@ export class DeckRuntime extends EventEmitter {
     const taskId = this.lanes[index]?.threadId?.trim();
     if (!taskId) return;
 
-    const runtimeDir = laneRuntimeDir(this.laneKeys[index]);
+    const runtimeDir = deckAgentRuntimeDir(this.laneKeys[index]);
     const stored = loadLaneTailCursor(runtimeDir);
     // Empty presentation always rehydrates last-N. A stored cursor alone is not
     // enough to rebuild the visible thread after a process restart.
@@ -1049,7 +1049,8 @@ export class DeckRuntime extends EventEmitter {
 
   private warmCanonicalLane(index: number): void {
     if (this.destroyed || this.busy) return;
-    const route = resolveDeckTurnRoute(index, this.lanes[index]?.threadId);
+    const lane = this.lanes[index];
+    const route = resolveDeckTurnRoute(index, lane?.threadId, lane?.origin);
     if (route.kind !== 'canonical') return;
     const session = this.canonicalSessionFor(route.taskId);
     if (this.canonicalSessionReady) return;
