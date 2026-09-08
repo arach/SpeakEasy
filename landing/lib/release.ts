@@ -16,6 +16,7 @@ export const releaseRequirements = {
   os: "macOS 14 or newer",
 } as const
 
-// Set only after Apple enables the public beta invitation for external testers.
-export const testFlightUrl: string | null = null
-export const iPadBetaAvailable = testFlightUrl !== null
+// The invitation exists before Apple approves the first external beta build.
+export const testFlightUrl = "https://testflight.apple.com/join/UwGnTzFm"
+// Change only after the external build is approved and publicly installable.
+export const iPadBetaAvailable = false
