@@ -15,3 +15,7 @@ export const releaseRequirements = {
   platform: "Apple silicon",
   os: "macOS 14 or newer",
 } as const
+
+// Set only after Apple enables the public beta invitation for external testers.
+export const testFlightUrl: string | null = null
+export const iPadBetaAvailable = testFlightUrl !== null

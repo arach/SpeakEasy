@@ -1,6 +1,6 @@
 import { readFileSync } from "fs"
 import { join } from "path"
-import { releaseDownloadUrl, releasePageUrl, releaseVersion, codexInstallPrompt } from "./release"
+import { releaseDownloadUrl, releasePageUrl, releaseVersion, codexInstallPrompt, testFlightUrl, iPadBetaAvailable } from "./release"
 import { ApplyHtmlAttrs } from "./apply-html-attrs"
 
 /** Renders a standalone design mock as a real page.
@@ -25,9 +25,10 @@ interface MockDocument {
 
 function parseMock(file: string): MockDocument {
   const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
-  const values: Record<string, string> = { releaseDownloadUrl, releasePageUrl, releaseVersion, codexInstallPrompt }
+  const values: Record<string, string> = { releaseDownloadUrl, releasePageUrl, releaseVersion, codexInstallPrompt, testFlightUrl: testFlightUrl ?? "" }
   const html = readFileSync(join(process.cwd(), "mocks", file), "utf8")
-    .replace(/\{\{(releaseDownloadUrl|releasePageUrl|releaseVersion|codexInstallPrompt)\}\}/g, (_, key: string) => escapeHtml(values[key]))
+    .replace(/<!-- TESTFLIGHT_(AVAILABLE|PENDING) -->([\s\S]*?)<!-- \/TESTFLIGHT_\1 -->/g, (_, state: string, content: string) => (state === "AVAILABLE") === iPadBetaAvailable ? content : "")
+    .replace(/\{\{(releaseDownloadUrl|releasePageUrl|releaseVersion|codexInstallPrompt|testFlightUrl)\}\}/g, (_, key: string) => escapeHtml(values[key]))
 
   const style = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join("\n")
   const script = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]

@@ -1293,8 +1293,9 @@ nav .wrap { height:72px; }
     <span class="label acc">GET THE PAD</span>
     <h2 class="display" style="font-size:clamp(34px,4.6vw,58px);margin-top:18px;">Start with your Mac.</h2>
     <p style="margin:20px auto 0;max-width:480px;font-size:15.5px;font-weight:300;line-height:1.7;color:var(--muted);">
-    Download the Mac app, then connect from the browser Deck. The native iPad app is
-    coming to TestFlight; join the list for an invite when it is available.</p>
+    Download SpeakEasy for Mac, then choose your companion.
+    <!-- TESTFLIGHT_AVAILABLE -->Get the native iPad beta on TestFlight, or open the browser Deck.<!-- /TESTFLIGHT_AVAILABLE -->
+    <!-- TESTFLIGHT_PENDING -->Use the browser Deck today; the native iPad beta is coming to TestFlight.<!-- /TESTFLIGHT_PENDING --></p>
 
     <div class="twostep">
       <div class="step">
@@ -1314,9 +1315,17 @@ nav .wrap { height:72px; }
         Prefer agent-assisted setup? Copy the prompt above.</p>
         <p class="foot">MACOS 14+ APPLE SILICON · CODEX DESKTOP</p>
       </div>
-      <div class="step">
+      <div class="step" id="ipad-beta">
         <span class="n">STEP 02 · ON YOUR IPAD</span>
-        <h3>Not out yet.</h3>
+        <!-- TESTFLIGHT_AVAILABLE -->
+        <h3>Your agents, on your iPad.</h3>
+        <p>Install the native SpeakEasy Deck beta through TestFlight. Keep SpeakEasy running
+        on your Mac, then choose it on the same Wi-Fi to explore sessions and connect your lanes.</p>
+        <p><a class="key solid" href="{{testFlightUrl}}">JOIN THE IPAD TESTFLIGHT ↗</a></p>
+        <p class="orelse">A native iPad companion. The Mac app is a separate download.</p>
+        <!-- /TESTFLIGHT_AVAILABLE -->
+        <!-- TESTFLIGHT_PENDING -->
+        <h3>The iPad beta is coming.</h3>
         <p>The Pad goes to TestFlight before the App Store. Say you want it and I'll send an
         invite when the build is up — that is the only thing this does with your address.
         Once installed, choose your Mac on the same Wi-Fi and connect your lanes.</p>
@@ -1326,6 +1335,7 @@ nav .wrap { height:72px; }
           <button class="key solid" type="submit" id="interestSubmit">TELL ME WHEN</button>
         </form>
         <p class="interest-note" id="interestNote" role="status" aria-live="polite"></p>
+        <!-- /TESTFLIGHT_PENDING -->
         <p class="foot">IPADOS 26+ · IPAD · <a href="/privacy/">HOW WE HANDLE YOUR EMAIL</a></p>
       </div>
     </div>

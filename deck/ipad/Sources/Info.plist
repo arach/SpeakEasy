@@ -35,6 +35,8 @@
 	<string>Deck finds and connects to your Mac over your local network.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Hold to Speak transcribes your voice on this device so your Mac can answer.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Deck uses speech recognition to turn your spoken messages into text for the selected agent conversation.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UISupportedInterfaceOrientations</key>

@@ -120,7 +120,7 @@ no certificate profile and remains connected when it is opened normally later.
 ## TestFlight release
 
 `./release-testflight.sh export` creates a Release archive and App Store signed
-IPA under `.release/0.3.0-1/`. It uses the installed **SpeakEasy Pad App Store**
+IPA under `.release/0.3.0-2/`. It uses the installed **SpeakEasy Pad App Store**
 provisioning profile and distribution certificate from Keychain. The generated
 project keeps development signing for ordinary device builds; distribution
 signing is scoped to the app’s Release configuration.
