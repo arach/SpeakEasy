@@ -5,6 +5,7 @@ import SwiftUI
 struct DeckRootView: View {
     @StateObject private var discovery = DeckDiscovery()
     @StateObject private var connection = DeckConnection()
+    @StateObject private var voice = DeckVoice()
     @StateObject private var laneViewer = DeckLaneViewerController()
     @AppStorage(DeckThemeSelection.defaultsKey) private var selectedThemeRaw = DeckThemeID.flight.rawValue
 
@@ -14,11 +15,13 @@ struct DeckRootView: View {
                 ZStack(alignment: .bottomTrailing) {
                     NativeDeckView(
                         connection: connection,
+                        voice: voice,
                         laneViewer: laneViewer,
                         selectedDeck: deck,
                         onFindDecks: { discovery.refresh() }
                     )
                         .onAppear {
+                            voice.attach(to: connection)
                             connection.connect(to: deck.url)
                             laneViewer.deckURL = deck.url
                         }
@@ -35,13 +38,25 @@ struct DeckRootView: View {
                 }
             } else {
                 VStack(spacing: 16) {
+                    VStack(spacing: 9) {
+                        SpeakEasyMark(size: 48)
+                        Text("DECK")
+                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                            .tracking(3.2)
+                        Text("OPENSCOUT")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .tracking(2.2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.bottom, 14)
+
                     ProgressView()
                         .controlSize(.large)
-                    Text(discovery.searching ? "Finding your Mac…" : "No deck found")
+                    Text(discovery.searching ? "Finding your Mac…" : "Deck is offline")
                         .font(.system(.headline, design: .monospaced))
                     Text(discovery.searching
-                         ? "Run `speakeasy deck` on your Mac — it shows up here on its own."
-                         : "Start the deck on your Mac with `speakeasy deck`, on the same Wi-Fi.")
+                         ? "Start Deck on your Mac with `speakeasy deck` — it shows up here on its own."
+                         : "Start Deck with `speakeasy deck` on a Mac connected to this Wi-Fi network.")
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -77,6 +92,6 @@ struct DeckRootView: View {
                 .overlay { Capsule().stroke(DeckPalette.accentEdge, lineWidth: 1) }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Current SpeakEasy Mac: \(selected.displayName)")
+        .accessibilityLabel("Current Deck Mac: \(selected.displayName)")
     }
 }

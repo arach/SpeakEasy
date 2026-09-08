@@ -13,7 +13,10 @@ const MAX_SPEAK_BYTES = 64 * 1024;
 const MAX_TRANSCRIBE_BYTES = 16 * 1024 * 1024;
 const MAX_WS_PAYLOAD = 16 * 1024;
 const MAX_BUFFERED = 256 * 1024;
+const WS_HEARTBEAT_MS = 15_000;
 const PLAYER_SOCKET_PATH = '/tmp/speakeasy-player.sock';
+
+type HeartbeatWebSocket = WebSocket & { isAlive?: boolean };
 
 interface TranscriptionResponse {
   protocolVersion?: number;
@@ -142,8 +145,13 @@ function authorized(req: IncomingMessage, token: string | null): boolean {
  * Open by default (trusted local network); a token is enforced when the deck
  * is started with --pair.
  */
-export async function startDataPlane(runtime: DeckRuntime, dataPort: number, token: string | null): Promise<DataPlane> {
-  const clients = new Set<WebSocket>();
+export async function startDataPlane(
+  runtime: DeckRuntime,
+  dataPort: number,
+  token: string | null,
+  options: { heartbeatIntervalMs?: number } = {},
+): Promise<DataPlane> {
+  const clients = new Set<HeartbeatWebSocket>();
   // the runtime only plays through the Mac when no deck is watching
   runtime.liveClients = () => clients.size;
 
@@ -371,9 +379,13 @@ export async function startDataPlane(runtime: DeckRuntime, dataPort: number, tok
     },
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws: HeartbeatWebSocket) => {
+    ws.isAlive = true;
     clients.add(ws);
     ws.send(JSON.stringify(runtime.snapshot()));
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
     ws.on('message', (data) => {
       void (async () => {
         let raw: unknown;
@@ -397,6 +409,21 @@ export async function startDataPlane(runtime: DeckRuntime, dataPort: number, tok
     ws.on('error', () => clients.delete(ws));
   });
 
+  // Mobile radios can disappear without completing a TCP close. Requiring a
+  // pong keeps a suspended device from retaining playback ownership forever.
+  const heartbeat = setInterval(() => {
+    for (const ws of clients) {
+      if (ws.isAlive === false) {
+        clients.delete(ws);
+        ws.terminate();
+        continue;
+      }
+      ws.isAlive = false;
+      ws.ping();
+    }
+  }, options.heartbeatIntervalMs ?? WS_HEARTBEAT_MS);
+  heartbeat.unref();
+
   runtime.on('changed', (snap: DeckSnapshot) => {
     const payload = JSON.stringify(snap);
     for (const ws of clients) {
@@ -416,10 +443,14 @@ export async function startDataPlane(runtime: DeckRuntime, dataPort: number, tok
     server.listen(dataPort, '127.0.0.1', () => resolve());
   });
 
+  const address = server.address();
+  const boundPort = typeof address === 'object' && address ? address.port : dataPort;
+
   return {
-    dataPort,
+    dataPort: boundPort,
     token,
     stop: () => {
+      clearInterval(heartbeat);
       for (const ws of clients) ws.terminate();
       wss.close();
       server.close();

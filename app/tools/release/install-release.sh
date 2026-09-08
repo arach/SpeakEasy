@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-DEFAULT_VERSION="0.2.19"
+DEFAULT_VERSION="0.3.0"
 VERSION="${SPEAKEASY_VERSION:-$DEFAULT_VERSION}"
 RELEASE_REPO="${SPEAKEASY_RELEASE_REPO:-arach/SpeakEasy}"
 RELEASE_ROOT="https://github.com/$RELEASE_REPO/releases/download/v$VERSION"
@@ -213,7 +213,8 @@ CURRENT_STEP="finishing"
 printf '\n\033[1;32mSpeakEasy %s is installed.\033[0m\n' "$VERSION"
 printf 'The release, signature, Developer ID, and app version all passed.\n'
 if [[ "$OPEN_AFTER_INSTALL" == "1" ]]; then
-    printf 'In Deck settings, finish only the human steps macOS asks for: microphone and local-network access.\n'
+    printf 'Approve microphone access for dictation and local-network access for the browser/iPad Deck when prompted.\n'
+    printf 'For browser/iPad use, follow the bootstrap link to install and trust the local certificate on that device, then allow browser microphone access.\n'
     printf 'SpeakEasy will check the runtime, Codex, and live bridge before it shows a device link.\n'
 fi
 printf '\n'

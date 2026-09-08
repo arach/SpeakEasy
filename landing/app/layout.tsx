@@ -33,14 +33,16 @@ const silkscreen = Silkscreen({
 })
 
 export const metadata: Metadata = {
-  title: "SpeakEasy — Unified text-to-speech",
-  description: "One API for text-to-speech across macOS system voices, OpenAI, ElevenLabs, Groq, and Gemini. TypeScript-first, zero dependencies, with automatic fallback.",
-  keywords: "Codex voice, speech recognition, ASR, text-to-speech, TTS, macOS, coding agent, voice lanes",
+  title: "SpeakEasy — A voice for every agent",
+  description:
+    "The voice layer for coding agents on a Mac. Each system needs its own two-way hook. Codex is first. Your agent reads a short runbook and sets it up.",
+  keywords: "coding agent, Codex, Claude, Cursor, text-to-speech, dictation, macOS, SpeakEasy, agent voice",
   authors: [{ name: "SpeakEasy" }],
   metadataBase: new URL("https://speakeasy.arach.dev"),
   openGraph: {
-    title: "SpeakEasy — Unified text-to-speech",
-    description: "One API for text-to-speech across macOS system voices, OpenAI, ElevenLabs, Groq, and Gemini. TypeScript-first, zero dependencies.",
+    title: "SpeakEasy — A voice for every agent",
+    description:
+      "Each agentic system needs its own two-way voice hook. Codex is first. Paste one paragraph; the agent reads the runbook.",
     type: "website",
     url: "https://speakeasy.arach.dev",
     siteName: "SpeakEasy",
@@ -49,17 +51,18 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "SpeakEasy — two-way voice for Codex",
+        alt: "SpeakEasy — a voice for every coding agent",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SpeakEasy — Unified text-to-speech",
-    description: "One API for text-to-speech across macOS system voices, OpenAI, ElevenLabs, Groq, and Gemini. TypeScript-first, zero dependencies.",
+    title: "SpeakEasy — A voice for every agent",
+    description:
+      "Each agentic system needs its own two-way voice hook. Codex is first. Paste one paragraph; the agent reads the runbook.",
     images: ["/og-image.png"],
   },
-  generator: 'SpeakEasy'
+  generator: "SpeakEasy",
 }
 
 export default function RootLayout({

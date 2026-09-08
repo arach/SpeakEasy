@@ -29,4 +29,4 @@ const server = Bun.serve({
   },
 });
 
-console.log(`SpeakEasy Pad running at http://localhost:${server.port}`);
+console.log(`Deck running at http://localhost:${server.port}`);

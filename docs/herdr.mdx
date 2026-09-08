@@ -1,0 +1,64 @@
+---
+title: Herdr channels
+description: Talk to local terminal agents from the SpeakEasy Deck
+---
+
+# Herdr channels
+
+The development build can connect a Deck lane to an existing local agent in
+[Herdr](https://herdr.dev). Herdr owns the agent terminal; SpeakEasy handles
+Mac/iPad dictation, speech generation, and playback. Codex Desktop tasks remain
+available in the same picker.
+
+## Connect a channel
+
+1. Open Herdr on the Mac running SpeakEasy and start or resume your terminal
+   agent there. Enable the agent's Herdr integration so it reports a conversation
+   identity. The initial bridge requires that identity before sending dictation.
+2. Open **SpeakEasy → Settings → Deck** and start the Deck.
+3. Open lane setup on the browser or native iPad Deck and refresh the list.
+4. Choose an agent under **Herdr**, then hold to speak. Use an idle agent for
+   the first turn.
+
+The Mac does not need Codex to start the Deck when a Herdr socket is present.
+The overview assistant and creation of new Codex threads still require Codex.
+An empty Herdr section means no agents were discovered in the selected local
+Herdr session.
+
+## How replies work
+
+SpeakEasy appends a request for a temporary JSON response file to each dictated
+message. The agent must be able to write a local file containing its final
+answer. SpeakEasy validates the request identifier and file, reads the answer,
+and removes the temporary directory. It never narrates terminal scrollback.
+
+This is an initial integration, not a verified compatibility claim for every
+agent Herdr can launch. It requires:
+
+- A current Herdr API with agent discovery, inspection, and prompt-with-wait.
+- A local agent reporting its session identity through Herdr.
+- An agent that can follow the response-file request and write on the same Mac.
+
+Herdr's wait tracks activity rather than individual turns. SpeakEasy therefore
+refuses agents already working, blocked, or in an unknown state, and checks
+conversation identity before submission and after the wait. Do not replace or
+manually prompt the selected agent during a voice turn: Herdr's prompt API does
+not accept an expected-session condition atomically with submission.
+
+If the agent asks for approval, times out, or fails to write a valid reply, check
+its Herdr pane. SpeakEasy does not automatically resend. Cancelling reply capture
+stops SpeakEasy waiting; it does not promise to stop the agent's work.
+
+## Local session selection
+
+SpeakEasy discovers the default socket and sockets under
+`~/.config/herdr/sessions/`. To restrict discovery to one local
+Herdr session, set `SPEAKEASY_HERDR_SOCKET` to its socket path in the environment
+that launches SpeakEasy or its Deck runtime. The socket must be private and
+owned by the current user. Each saved binding includes its socket, pane,
+terminal, agent, and session identity.
+
+Remote SSH agents and chats in Claude, Kimi, or Grok websites are outside this
+initial bridge. The separate SpeakEasy Pad protocol and Mac listening task picker
+still use their existing Codex routing; this integration targets the Deck runtime
+and its browser/native iPad clients.

@@ -20,15 +20,12 @@ Requirements:
 
 Paste this bounded task into Codex Desktop:
 
-> Install SpeakEasy 0.2.19 on this Mac. Read
+> Install the latest signed SpeakEasy release on this Mac. Read
 > https://speakeasy.arach.dev/agent.md and follow Path 3. Do not build from
-> source or bypass Gatekeeper. Tell me which human-only steps remain.
+> source or bypass Gatekeeper. Tell me which version you installed and which
+> human-only permissions or setup steps remain.
 
-`0.2.19` is the first complete dual-mode release: exact-task dictation and
-narration on the Mac, plus the paired-HTTPS browser/iPad Deck. The older
-`0.2.18` artifact remains an immutable Mac-only proof build.
-
-Codex downloads and inspects the pinned installer. The installer verifies the
+Codex downloads and inspects the latest release installer. The installer verifies the
 published checksum, Gatekeeper acceptance, Developer ID team, bundle identity,
 and exact app version before replacing `/Applications/SpeakEasy.app`. It then
 opens **Settings → Deck**.
@@ -36,7 +33,12 @@ opens **Settings → Deck**.
 The packaged app does not require Bun, Node, Xcode, a terminal workflow, or a
 SpeakEasy checkout.
 
-### First voice turn
+Prefer to install manually? [Download the latest signed DMG](https://github.com/arach/SpeakEasy/releases/latest/download/SpeakEasy.dmg),
+drag SpeakEasy to **Applications**, and open it. Open **Settings → Deck** to
+check the runtime and Codex connection. Approve microphone access when asked
+if you want to dictate.
+
+### First voice turn on the Mac
 
 1. In **Settings → Deck**, wait for the SpeakEasy runtime and Codex checks.
 2. Start the Deck and assign a lane to the Codex task you want to control.
@@ -44,9 +46,21 @@ SpeakEasy checkout.
 4. Confirm the dictation appears once in that same Codex task.
 5. Hear the task's real response and try replay, speed, or volume.
 
-Install and trust the one-time local CA from the shown bootstrap link, then open
-the paired HTTPS device link on another Mac or iPad. The browser/PWA is the
-supported device path; the native iPad shell remains a developer preview.
+### Optional: use the Deck from a browser or iPad
+
+Device setup takes a few extra steps:
+
+1. Connect the device to the same local network as the Mac and allow SpeakEasy
+   local-network access when macOS asks.
+2. Open the bootstrap link shown in **Settings → Deck** on that device.
+3. Follow its instructions to install and trust SpeakEasy's local certificate
+   authority (CA). On iPad, this requires several steps in iOS Settings.
+4. Open the paired HTTPS device link, allow browser microphone access, and try
+   one dictation in the assigned task.
+
+The certificate enables trusted local HTTPS, which the browser needs for
+microphone access. It is only needed for this device path. The browser/PWA is
+the supported device path; the native iPad shell remains a developer preview.
 
 See [Listening mode](listening-mode.mdx) for routing and privacy details.
 

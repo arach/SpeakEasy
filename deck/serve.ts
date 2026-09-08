@@ -25,4 +25,4 @@ Bun.serve({
   },
 });
 
-console.log(`SpeakEasy deck at http://localhost:${port}`);
+console.log(`Deck at http://localhost:${port}`);

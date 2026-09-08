@@ -59,9 +59,12 @@ release_notes_file() {
     cat > "$notes_path" <<EOF
 Release $VERSION
 
-SpeakEasy is now a dual-mode voice companion for Codex: explicit local dictation
-goes to the exact task you choose, and the real response returns through the
-native player.
+SpeakEasy brings voice channels to Codex and Herdr agent conversations. Explore
+sessions on the connected Mac, bind a conversation to a lane, dictate locally,
+and hear replies through the native player.
+
+This release adds the refined monochrome Deck, a native iPad companion, full
+waveform previews, and recovery improvements for everyday use.
 
 ### Install
 
@@ -78,8 +81,9 @@ Or install manually:
 4. Complete the three readiness checks, then open the device link.
 
 The app is Developer ID signed, Apple-notarized, and self-contained. This build
-supports Apple silicon Macs running macOS 14 or newer. Codex Desktop is required
-for exact-task voice lanes; the system narration voice works without an API key.
+supports Apple silicon Macs running macOS 14 or newer. Codex Desktop or a running Herdr session is required
+for agent voice lanes; the system narration voice works without an API key.
+The optional native iPad companion requires iPadOS 26 or newer.
 EOF
 }
 
@@ -174,10 +178,10 @@ elif gh release view "$TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
     edit_flags=()
     [ "$PRERELEASE" -eq 0 ] || edit_flags+=(--prerelease=true)
     [ "$DRAFT" -eq 0 ] || edit_flags+=(--draft=true)
-    run gh release edit "$TAG" --repo "$RELEASE_REPO" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" "${edit_flags[@]}"
+    run gh release edit "$TAG" --repo "$RELEASE_REPO" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" ${edit_flags[@]+"${edit_flags[@]}"}
 else
     echo "==> Creating GitHub release $TAG in $RELEASE_REPO..."
-    run gh release create "$TAG" --repo "$RELEASE_REPO" --target "$RELEASE_TARGET" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" "${release_flags[@]}"
+    run gh release create "$TAG" --repo "$RELEASE_REPO" --target "$RELEASE_TARGET" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" ${release_flags[@]+"${release_flags[@]}"}
 fi
 
 echo "==> Uploading release asset(s)..."

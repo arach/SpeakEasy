@@ -57,6 +57,84 @@ export const pages: readonly StudioAppPage[] = [
     source: ["docs/design/deck-connect-brief.md"],
   },
   {
+    href: "/studio/studies/audio-instrument",
+    label: "SE-STU · Audio instrument",
+    bucket: "studies",
+    surface: "pad",
+    status: "wip",
+    blurb:
+      "The Micro Deck bottom-right panel — every capture and playback state, driveable. 1U idle, 2U while playing, on the key-bank grid.",
+    source: ["deck/ipad/Sources/DeckAudioInstrument.swift"],
+  },
+  {
+    href: "/studio/studies/lane-console",
+    label: "SE-STU · Lane console",
+    bucket: "studies",
+    surface: "pad",
+    status: "wip",
+    blurb:
+      "One surface: identity + exchange (panel) over player foot (plate). Ring in numeral gutter; figure is scrub — no second rail.",
+    source: [
+      "deck/ipad/Sources/DeckPlayerConsole.swift",
+      "deck/ipad/Sources/NativeDeckView.swift",
+    ],
+  },
+  {
+    href: "/studio/studies/micro-themes-mature",
+    label: "SE-STU · Micro themes · Mature",
+    bucket: "studies",
+    surface: "pad",
+    status: "wip",
+    blurb:
+      "Product-grade full Micro Deck. Quiet surfaces, one accent as signal — Linear/Cursor/Apple maturity, not workshop cosplay.",
+    source: [
+      "design/studio/src/studio/MicroThemesMatureStudy.tsx",
+      "design/studio/src/studio/MicroDeckFullMock.tsx",
+      "deck/ipad/Sources/DeckTheme.swift",
+    ],
+  },
+  {
+    href: "/studio/studies/micro-themes-opus",
+    label: "SE-STU · Micro themes · Opus",
+    bucket: "studies",
+    surface: "pad",
+    status: "wip",
+    blurb:
+      "Exploratory materials (full Micro). Knobs and presets — workshop lab, not ship defaults.",
+    source: [
+      "docs/design/micro-deck-theme-material-brief.md",
+      "design/studio/src/studio/MicroDeckFullMock.tsx",
+      "deck/ipad/Sources/DeckTheme.swift",
+    ],
+  },
+  {
+    href: "/studio/studies/player-face",
+    label: "SE-STU · Player face",
+    bucket: "studies",
+    surface: "pad",
+    status: "wip",
+    blurb:
+      "Turn player — circular play ring, caption-first, one scrub, chip controls. State matrix 2a–2g (empty → finished).",
+    source: [
+      "design/studio/src/studio/PlayerFaceStudy.tsx",
+      "deck/ipad/Sources/DeckPlayerConsole.swift",
+    ],
+  },
+  {
+    href: "/studio/studies/micro-themes-kimi",
+    label: "SE-STU · Micro themes · Kimi",
+    bucket: "studies",
+    surface: "pad",
+    status: "wip",
+    blurb:
+      "Exploratory materials (full Micro). Texture lab — phosphor, glaze, bakelite. Use Mature for ship-grade.",
+    source: [
+      "design/studio/src/studio/MicroThemesKimiStudy.tsx",
+      "design/studio/src/studio/MicroDeckFullMock.tsx",
+      "deck/ipad/Sources/DeckTheme.swift",
+    ],
+  },
+  {
     href: "/studio/studies/deck-themes",
     label: "SE-STU · Seed themes",
     bucket: "studies",

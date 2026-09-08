@@ -1,7 +1,7 @@
 {
-  "name": "SpeakEasy Pad",
-  "short_name": "SpeakEasy",
-  "description": "A tactile iPad control surface for SpeakEasy voice lanes.",
+  "name": "Deck",
+  "short_name": "Deck",
+  "description": "A local control surface for your OpenScout agent lanes.",
   "id": "/",
   "start_url": "/?source=installed",
   "scope": "/",

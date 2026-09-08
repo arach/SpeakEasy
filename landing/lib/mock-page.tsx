@@ -1,5 +1,7 @@
 import { readFileSync } from "fs"
 import { join } from "path"
+import { releaseDownloadUrl, releasePageUrl, releaseVersion, codexInstallPrompt } from "./release"
+import { ApplyHtmlAttrs } from "./apply-html-attrs"
 
 /** Renders a standalone design mock as a real page.
  *
@@ -22,7 +24,10 @@ interface MockDocument {
 }
 
 function parseMock(file: string): MockDocument {
+  const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+  const values: Record<string, string> = { releaseDownloadUrl, releasePageUrl, releaseVersion, codexInstallPrompt }
   const html = readFileSync(join(process.cwd(), "mocks", file), "utf8")
+    .replace(/\{\{(releaseDownloadUrl|releasePageUrl|releaseVersion|codexInstallPrompt)\}\}/g, (_, key: string) => escapeHtml(values[key]))
 
   const style = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join("\n")
   const script = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
@@ -38,7 +43,10 @@ function parseMock(file: string): MockDocument {
   const openTag = html.match(/<html([^>]*)>/i)
   if (openTag) {
     for (const attr of openTag[1].matchAll(/([\w-]+)="([^"]*)"/g)) {
-      if (attr[1] !== "lang") htmlAttrs[attr[1]] = attr[2]
+      // <html> belongs to the root layout. Never copy lang, and never stamp
+      // interactive attrs onto it before hydrate — that mismatches the server tree.
+      if (attr[1] === "lang" || attr[1] === "data-view") continue
+      htmlAttrs[attr[1]] = attr[2]
     }
   }
 
@@ -48,17 +56,11 @@ function parseMock(file: string): MockDocument {
 export function MockPage({ file }: { file: string }) {
   const { style, body, script, htmlAttrs } = parseMock(file)
 
-  // The mock styles key off attributes on <html> (theme and finish), which the
-  // root layout owns — set them before first paint so nothing flashes unthemed.
-  const bootstrap = Object.entries(htmlAttrs)
-    .map(([k, v]) => `document.documentElement.setAttribute(${JSON.stringify(k)},${JSON.stringify(v)});`)
-    .join("")
-
   return (
     <>
-      {bootstrap ? <script dangerouslySetInnerHTML={{ __html: bootstrap }} /> : null}
+      {Object.keys(htmlAttrs).length > 0 ? <ApplyHtmlAttrs attrs={htmlAttrs} /> : null}
       <style dangerouslySetInnerHTML={{ __html: style }} />
-      <div dangerouslySetInnerHTML={{ __html: body }} />
+      <div suppressHydrationWarning dangerouslySetInnerHTML={{ __html: body }} />
       {script ? <script dangerouslySetInnerHTML={{ __html: script }} /> : null}
     </>
   )

@@ -3,667 +3,825 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SpeakEasy — One API. Every voice.</title>
+<title>SpeakEasy — A voice for every agent</title>
 <!--
-  This is the live home page — landing/app/page.tsx renders it through MockPage.
-  Self-contained: Google Fonts + hand-written CSS + vanilla JS.
-  Audio is site-absolute (/audio/*.mp3), served from landing/public/audio, so it
-  resolves when served but not when opened straight off disk as a file:// URL.
+  Home is a handoff. The object is a cream script under a lamp.
+  Audio is site-absolute (/audio/*.mp3) from landing/public/audio.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Spectral:ital,wght@0,300;0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --paper: #FBFAF7;
-    --paper-warm: #F5F2EB;
-    --ink: #1C1917;
-    --ink-2: #57534E;
-    --ink-3: #8A8580;
-    --emerald: #047857;
-    --emerald-deep: #065F46;
-    --emerald-bright: #34D399;
-    --hairline: #E7E2D9;
-    --dark: #0C0A09;
-    --dark-2: #161311;
-    --dark-ink: #E7E5E4;
-    --dark-ink-2: #A8A29E;
-    --radius: 10px;
-    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-    --serif: "Spectral", Georgia, serif;
-    --pixel: "Silkscreen", monospace;
+    color-scheme: dark;
+    --stage: #090C11;
+    --stage-2: #11161D;
+    --cream: #E8EEF5;
+    --paper: #F5F7FA;
+    --paper-2: #E4E9F0;
+    --ink: #10141A;
+    --ink-2: #3A424C;
+    --ink-3: #6A7380;
+    --mute: #8B95A2;
+    --faint: #5C6672;
+    --line: rgba(220,228,238,.1);
+    --accent: #8FB0FF;
+    --accent-deep: #5A7FE0;
+    --serif: "Newsreader", "Iowan Old Style", Georgia, serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    --pixel: "Silkscreen", ui-monospace, Menlo, monospace;
   }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
-    background: var(--paper);
-    color: var(--ink);
+    background: var(--stage);
+    color: var(--cream);
     font-family: var(--serif);
+    font-optical-sizing: auto;
     font-weight: 400;
-    font-size: 1.0625rem;
-    line-height: 1.65;
+    font-size: 1.125rem;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
   }
-  html, body { overflow-x: clip; }
-  ::selection { background: rgba(4,120,87,.16); }
 
-  .wrap { max-width: 64rem; margin: 0 auto; padding: 0 1.5rem; }
+  /* lamp + grain — the room, not a background color */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(ellipse 70% 55% at 18% 8%, rgba(143,176,255,.16), transparent 58%),
+      radial-gradient(ellipse 50% 40% at 88% 100%, rgba(143,176,255,.05), transparent 50%),
+      var(--stage);
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .09;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  nav, header, main, footer { position: relative; z-index: 2; }
 
-  /* ---------- nav ---------- */
+  ::selection { background: rgba(143,176,255,.32); color: var(--cream); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .skip {
+    position: absolute; left: 1rem; top: -4rem; z-index: 80;
+    background: var(--paper); color: var(--ink);
+    font-family: var(--mono); font-size: .75rem; padding: .5rem .8rem;
+  }
+  .skip:focus { top: 1rem; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: var(--cream); }
+
+  .wrap { width: min(1180px, calc(100% - 3rem)); margin: 0 auto; }
+  @media (max-width: 560px) { .wrap { width: min(1180px, calc(100% - 1.5rem)); } }
+
+  .kicker {
+    font-family: var(--mono); font-size: .68rem; font-weight: 500;
+    letter-spacing: .2em; text-transform: uppercase; color: var(--accent);
+  }
+
+  /* ---- nav ---- */
   nav {
     position: sticky; top: 0; z-index: 20;
-    background: rgba(251,250,247,.85);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--hairline);
+    background: color-mix(in srgb, var(--stage) 55%, transparent);
+    backdrop-filter: blur(18px) saturate(1.1);
+    -webkit-backdrop-filter: blur(18px) saturate(1.1);
+    border-bottom: 1px solid var(--line);
   }
   nav .wrap {
-    display: flex; align-items: center; justify-content: space-between; gap: 1.2rem;
-    padding-top: .8rem; padding-bottom: .8rem;
+    display: flex; align-items: center; justify-content: space-between;
+    min-height: 64px; gap: 1rem;
   }
-  .wordmark { font-family: var(--pixel); font-size: 1.05rem; color: var(--ink); text-decoration: none; letter-spacing: .02em; }
-  .nav-links { display: flex; align-items: center; gap: 1.4rem; }
+  .wordmark {
+    font-family: var(--pixel); font-style: normal; font-weight: 400;
+    font-size: 1.05rem; letter-spacing: .04em;
+    color: var(--cream); text-decoration: none;
+  }
+  .view-switch {
+    display: flex; flex: none; padding: 3px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: rgba(232,238,245,.05);
+  }
+  .view-switch button {
+    appearance: none; border: 0; cursor: pointer;
+    font-family: var(--mono); font-size: .62rem; font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase;
+    color: var(--mute); background: transparent;
+    border-radius: 999px; padding: .42rem .85rem; min-height: 32px;
+  }
+  .view-switch button[aria-checked="true"] {
+    color: var(--ink); background: var(--paper);
+  }
+  .view-switch button:hover:not([aria-checked="true"]) { color: var(--cream); }
+  .nav-links { display: flex; align-items: center; gap: 1.5rem; }
   .nav-links a {
-    font-family: var(--mono); font-size: .78rem; color: var(--ink-2);
-    text-decoration: none; transition: color .15s;
+    font-family: var(--mono); font-size: .7rem; color: var(--mute);
+    text-decoration: none; letter-spacing: .06em;
   }
-  .nav-links a:hover { color: var(--ink); }
-  .nav-pill {
-    border: 1px solid var(--hairline); border-radius: 999px;
-    padding: .3rem .8rem; color: var(--ink) !important;
-    display: inline-flex; gap: .4rem; align-items: center;
-    transition: border-color .15s, background .15s;
+  .nav-links a:hover { color: var(--cream); }
+  .nav-links a.pad {
+    color: var(--ink); background: var(--paper);
+    border-radius: 999px; padding: .38rem .85rem;
   }
-  .nav-pill:hover { border-color: var(--emerald); background: rgba(4,120,87,.05); }
-  .nav-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--emerald); }
+  .nav-links a.pad:hover { background: var(--cream); color: var(--ink); }
+  @media (max-width: 720px) {
+    .nav-links a:not(.pad) { display: none; }
+    .view-switch button { padding: .42rem .65rem; }
+  }
 
-  /* ---------- shared bits ---------- */
-  .eyebrow {
-    font-family: var(--mono); font-size: .78rem; font-weight: 500;
-    color: var(--emerald); letter-spacing: .04em;
+  /* ---- hero ---- */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 3.5rem 4rem;
+    align-items: start;
+    padding: 3.2rem 0 4rem;
   }
-  h1, h2 { font-weight: 300; letter-spacing: -0.015em; line-height: 1.08; }
-  h1 { font-size: clamp(2.75rem, 6vw, 4.4rem); }
-  h2 { font-size: clamp(1.75rem, 3.5vw, 2.5rem); }
-  section { padding: 6.5rem 0; }
+  @media (max-width: 980px) {
+    .hero { grid-template-columns: 1fr; gap: 2.4rem; padding: 2.2rem 0 2rem; }
+  }
 
-  /* play buttons + equalizer */
+  .hero h1 {
+    font-weight: 300; font-size: clamp(3.1rem, 6.4vw, 5.6rem);
+    line-height: .94; letter-spacing: -0.035em;
+    text-wrap: balance;
+    margin-top: .85rem;
+  }
+  .hero h1 em {
+    font-style: italic; font-weight: 300;
+    color: color-mix(in srgb, var(--cream) 82%, var(--accent));
+  }
+  .lede {
+    margin-top: 1.6rem; max-width: 34rem;
+    font-size: 1.2rem; font-weight: 300; line-height: 1.5;
+    color: color-mix(in srgb, var(--cream) 62%, var(--mute));
+    text-wrap: pretty;
+  }
+
+  .trace {
+    margin-top: 2.2rem; width: min(100%, 28rem); height: 52px;
+    color: var(--accent);
+  }
+  .trace path {
+    fill: none; stroke: currentColor; stroke-width: 1.4;
+    stroke-linecap: round; stroke-linejoin: round;
+    opacity: .85;
+  }
+  .trace .ghost { opacity: .22; }
+  @media (prefers-reduced-motion: no-preference) {
+    .trace .live {
+      stroke-dasharray: 8 14;
+      animation: crawl 7s linear infinite;
+    }
+  }
+  @keyframes crawl { to { stroke-dashoffset: -180; } }
+
+  /* ---- script card (the object) ---- */
+  .script {
+    position: relative;
+    background:
+      linear-gradient(180deg, #FBFCFE 0%, var(--paper) 46%, #E6EBF1 100%);
+    color: var(--ink);
+    border-radius: 3px 18px 16px 4px;
+    padding: 1.7rem 1.7rem 1.5rem 2rem;
+    transform: rotate(-1.1deg);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.85),
+      inset 0 -1px 0 rgba(40,60,90,.06),
+      0 1px 1px rgba(0,0,0,.12),
+      0 28px 50px -18px rgba(0,0,0,.55),
+      0 0 90px -30px rgba(143,176,255,.28);
+  }
+  .script::before {
+    content: "";
+    position: absolute; left: 18px; top: 0; bottom: 0; width: 1px;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0 10px,
+      rgba(90,127,224,.35) 10px 11px,
+      transparent 11px 22px
+    );
+  }
+  .script::after {
+    content: "";
+    position: absolute; right: 22px; top: 18px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #2A3340, #090C11 70%);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.08), 0 0 0 3px color-mix(in srgb, var(--paper) 70%, #C5CDD8);
+  }
+  .script .head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono); font-size: .62rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--ink-3);
+    padding-left: .4rem;
+  }
+  .script .head .to { color: var(--accent-deep); }
+  .script .prompt {
+    margin: 1.15rem 0 0;
+    font-family: var(--mono); font-size: .95rem; line-height: 1.6;
+    color: var(--ink);
+    padding-left: .4rem;
+    text-wrap: pretty;
+  }
+  .script .prompt u {
+    text-decoration-color: rgba(90,127,224,.45);
+    text-underline-offset: 4px;
+  }
+  .actions {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .75rem;
+    margin-top: 1.35rem; padding-left: .4rem;
+  }
+  .copy {
+    appearance: none; border: 0; cursor: pointer;
+    font-family: var(--mono); font-size: .68rem; font-weight: 500;
+    letter-spacing: .12em; text-transform: uppercase;
+    background: var(--ink); color: var(--paper);
+    border-radius: 999px; padding: .75rem 1.1rem; min-height: 44px;
+    transition: transform .12s ease, background .15s ease;
+  }
+  .copy:hover { background: #000; }
+  .copy:active { transform: translateY(1px); }
+  .copy.done { background: #1E2A44; color: var(--accent); }
+  .read {
+    font-family: var(--mono); font-size: .72rem; color: var(--ink-2);
+    text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;
+  }
+  .read:hover { color: var(--ink); }
+  .split {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem;
+    margin-top: 1.35rem; padding: 1.15rem 0 0 .4rem;
+    border-top: 1px dashed rgba(74,64,54,.28);
+  }
+  @media (max-width: 560px) { .split { grid-template-columns: 1fr; } }
+  .split h3 {
+    font-family: var(--mono); font-size: .6rem; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-3); font-weight: 500;
+  }
+  .split ul { list-style: none; margin-top: .4rem; }
+  .split li { font-size: .86rem; line-height: 1.4; color: var(--ink-2); padding: .12rem 0; }
+
+  /* ---- bands ---- */
+  .band { padding: 5rem 0 1rem; }
+  .band-head { max-width: 36rem; margin-bottom: 2.2rem; }
+  .band h2 {
+    font-weight: 300; font-size: clamp(2rem, 3.6vw, 2.8rem);
+    letter-spacing: -0.03em; line-height: 1.05;
+  }
+  .band-head p {
+    margin-top: .8rem; color: var(--mute); font-weight: 300; font-size: 1.1rem;
+  }
+
+  /* hooks as a patchbay */
+  .bay {
+    border-top: 1px solid var(--line);
+  }
+  .jack {
+    display: grid; grid-template-columns: 11.5rem 1fr;
+    gap: 1.4rem; align-items: start;
+    padding: 1.35rem 0 1.4rem;
+    border-bottom: 1px solid var(--line);
+  }
+  @media (max-width: 640px) { .jack { grid-template-columns: 1fr; gap: .5rem; } }
+  .who {
+    display: flex; align-items: center; gap: .75rem;
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--mute); padding-top: .15rem;
+  }
+  .mark {
+    width: 32px; height: 32px; flex: none;
+    display: grid; place-items: center;
+    color: var(--cream);
+    background: rgba(232,238,245,.06);
+    border: 1px solid rgba(232,238,245,.1);
+    border-radius: 9px;
+  }
+  .mark svg { width: 18px; height: 18px; fill: currentColor; display: block; }
+  .tags { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .55rem; }
+  .tags span {
+    font-family: var(--mono); font-size: .58rem; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--mute);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: .22rem .55rem;
+  }
+  .jack.turnkey .tags .mode {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  }
+  .jack h3 { font-weight: 400; font-size: 1.35rem; letter-spacing: -0.02em; }
+  .jack p { margin-top: .3rem; color: var(--mute); font-weight: 300; font-size: 1.02rem; max-width: 40rem; }
+
+  .tell {
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    gap: 0 .85rem; margin-top: .45rem;
+  }
+  .tell-btn {
+    appearance: none; border: 0; background: none; cursor: pointer;
+    font-family: var(--mono); font-size: .62rem; font-weight: 500;
+    letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent); padding: .2rem 0; min-height: 36px;
+  }
+  .tell-btn:hover { color: var(--cream); }
+  .tell-btn.done { color: var(--cream); }
+  .jack .tell-line {
+    margin: 0;
+    font-family: var(--mono); font-size: .75rem; font-weight: 400; line-height: 1.45;
+    color: var(--faint); letter-spacing: .01em; text-wrap: pretty;
+    max-width: 38rem;
+  }
+  .tell-line u {
+    text-decoration-color: color-mix(in srgb, var(--accent) 38%, transparent);
+    text-underline-offset: 3px;
+  }
+  .doc[data-view="you"] .tell:not(.open) .tell-line { display: none; }
+  .doc[data-view="agent"] .tell-line,
+  .tell.open .tell-line { order: 1; }
+  .doc[data-view="agent"] .tell-btn,
+  .tell.open .tell-btn { order: 2; color: var(--mute); }
+
+  /* hear — a wide instrument slab */
+  .hear {
+    margin-top: .4rem;
+    background: linear-gradient(180deg, #161C26, #10151C);
+    border: 1px solid rgba(220,228,238,.1);
+    border-radius: 22px;
+    padding: 1.2rem 1.3rem 1.15rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 20px 40px -28px rgba(0,0,0,.7);
+    display: grid; grid-template-columns: auto 1fr; gap: 1.1rem 1.3rem;
+    align-items: center;
+  }
+  @media (max-width: 640px) { .hear { grid-template-columns: 1fr; } }
   .play {
-    display: inline-flex; align-items: center; gap: .55rem;
-    font-family: var(--mono); font-size: .8rem; font-weight: 500;
-    border: none; cursor: pointer; background: none; color: inherit;
+    width: 4.2rem; height: 4.2rem; border-radius: 50%;
+    border: 0; cursor: pointer;
+    background: radial-gradient(circle at 35% 30%, #E8F0FF, var(--accent) 50%, var(--accent-deep));
+    color: #0E1420;
+    display: grid; place-items: center;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.45),
+      0 8px 20px -6px rgba(143,176,255,.45);
+    transition: transform .12s ease;
   }
-  .play .icon {
-    width: 2.4rem; height: 2.4rem; border-radius: 50%;
-    background: var(--emerald); color: #fff;
-    display: grid; place-items: center; flex: none;
-    transition: transform .15s, background .15s;
+  .play:hover { transform: scale(1.04); }
+  .play:active { transform: scale(.98); }
+  .play svg { width: 1.05rem; height: 1.05rem; margin-left: 2px; }
+  .hear .copyline {
+    font-size: 1.15rem; font-weight: 300; color: var(--cream);
   }
-  .play:hover .icon { transform: scale(1.07); background: var(--emerald-deep); }
-  .play .icon svg { width: .85rem; height: .85rem; }
-  .eq { display: none; align-items: flex-end; gap: 2.5px; height: 14px; }
-  .eq span { width: 3px; border-radius: 2px; background: var(--emerald); animation: eq .9s ease-in-out infinite; }
-  .eq span:nth-child(2) { animation-delay: .15s; }
-  .eq span:nth-child(3) { animation-delay: .3s; }
-  .eq span:nth-child(4) { animation-delay: .45s; }
-  .playing .eq { display: inline-flex; }
-  .playing .icon { background: var(--emerald-deep); }
-  @keyframes eq { 0%,100% { height: 4px; } 50% { height: 14px; } }
+  .hear .copyline em { font-style: italic; }
+  .wave {
+    grid-column: 1 / -1; height: 46px; width: 100%;
+    display: flex; align-items: center; gap: 3px;
+  }
+  .wave i {
+    display: block; flex: 1; height: 18%;
+    background: color-mix(in srgb, var(--accent) 55%, #1A2230);
+    border-radius: 2px;
+    transform-origin: center;
+  }
+  .playing .wave i { background: var(--accent); animation: bar 1s ease-in-out infinite; }
+  .wave i:nth-child(4n) { height: 42%; }
+  .wave i:nth-child(4n+1) { height: 22%; }
+  .wave i:nth-child(4n+2) { height: 70%; }
+  .wave i:nth-child(4n+3) { height: 34%; }
+  .wave i:nth-child(5n) { height: 88%; }
+  .playing .wave i:nth-child(3n) { animation-duration: .72s; }
+  .playing .wave i:nth-child(3n+1) { animation-duration: 1.15s; }
+  @keyframes bar { 50% { transform: scaleY(1.55); } }
 
-  .codebox {
-    background: var(--dark); color: var(--dark-ink);
-    border-radius: var(--radius);
-    font-family: var(--mono); font-size: .82rem; line-height: 1.7;
-    padding: 1.1rem 1.3rem; overflow-x: auto; white-space: pre;
-    position: relative;
+  /* pad door */
+  .door {
+    display: block; text-decoration: none; color: inherit;
+    margin-top: 1.4rem; padding: 1.5rem 1.6rem;
+    border-radius: 20px;
+    background:
+      linear-gradient(135deg, rgba(143,176,255,.1), transparent 42%),
+      linear-gradient(180deg, #161C26, #10151C);
+    border: 1px solid rgba(220,228,238,.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    transition: border-color .16s ease, transform .16s ease;
   }
-  .codebox .cm { color: #78716C; }           /* comment */
-  .codebox .kw { color: var(--emerald-bright); } /* keyword / key */
-  .codebox .st { color: #FBBF24; }           /* string */
-  .codebox .fn { color: #93C5FD; }           /* function */
-  .codebox .num { color: #FCA5A5; }
+  .door:hover { border-color: rgba(143,176,255,.45); transform: translateY(-2px); }
+  .door .go { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+  .door h3 { font-size: 1.8rem; font-weight: 300; letter-spacing: -0.03em; }
+  .door .arrow {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .14em;
+    color: var(--accent);
+  }
+  .door p { margin-top: .45rem; color: var(--mute); font-weight: 300; max-width: 38rem; }
 
-  .copy-btn {
-    position: absolute; top: .6rem; right: .6rem;
-    font-family: var(--mono); font-size: .68rem;
-    color: var(--dark-ink-2); background: var(--dark-2);
-    border: 1px solid #292524; border-radius: 6px;
-    padding: .25rem .6rem; cursor: pointer; transition: color .15s, border-color .15s;
+  /* library */
+  .lib-row { display: flex; gap: .45rem; margin-top: 1.1rem; }
+  .lib-row button {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .04em;
+    color: var(--mute); background: transparent;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: .45rem .85rem; cursor: pointer;
   }
-  .copy-btn:hover { color: #fff; border-color: var(--emerald); }
-  @media (max-width: 560px) { .codebox { font-size: .74rem; } }
+  .lib-row button.active, .lib-row button:hover {
+    color: var(--cream); border-color: rgba(220,228,238,.28);
+  }
+  .cmd {
+    margin-top: .8rem;
+    font-family: var(--mono); font-size: .88rem;
+    background: #10151C; border: 1px solid var(--line);
+    border-radius: 12px; padding: .9rem 1rem;
+    display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  }
+  .cmd button {
+    font-family: var(--mono); font-size: .65rem; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--mute);
+    background: none; border: 1px solid var(--line); border-radius: 999px;
+    padding: .4rem .75rem; cursor: pointer; min-height: 36px;
+  }
+  .cmd button:hover { color: var(--cream); }
 
-  /* ---------- hero ---------- */
-  .hero { padding: 7rem 0 5.5rem; text-align: center; position: relative; }
-  .hero::before {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(ellipse 60% 45% at 50% 0%, rgba(4,120,87,.06), transparent 70%);
+  footer {
+    margin-top: 4.5rem; padding: 1.6rem 0 2.6rem;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .08em;
+    color: var(--faint);
   }
-  .hero .wrap { position: relative; }
-  .hero h1 { margin: 1rem 0 2.2rem; }
-  .say-line {
-    display: inline-flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: center;
-    background: var(--dark); border-radius: 14px; padding: 1.1rem 1.5rem;
-    font-family: var(--mono); font-size: clamp(.82rem, 2vw, 1rem); color: var(--dark-ink);
-    box-shadow: 0 20px 50px -20px rgba(12,10,9,.35);
-  }
-  .say-line .play .icon { width: 2.8rem; height: 2.8rem; }
-  .hero-sub { max-width: 42rem; margin: 2.2rem auto 0; color: var(--ink-2); font-size: 1.15rem; }
-  .hero-sub em { color: var(--ink); }
-  .hero-sub a { color: var(--emerald); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-  .hero-sub a:hover { color: var(--ink); }
+  footer .wrap { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  footer a { color: var(--mute); text-decoration: none; }
+  footer a:hover { color: var(--cream); }
 
-  .install { margin-top: 2.8rem; display: inline-block; text-align: left; }
-  .install-tabs { display: flex; gap: 1.1rem; padding: 0 .3rem; margin-bottom: .45rem; }
-  .install-tabs button {
-    font-family: var(--mono); font-size: .74rem; color: var(--ink-3);
-    background: none; border: none; cursor: pointer; padding: .1rem 0;
-    border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+  .sr-status {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
   }
-  .install-tabs button.active { color: var(--emerald); border-bottom-color: var(--emerald); }
-  .install .codebox { padding-right: 4.5rem; }
-  .hero-links { margin-top: 1.4rem; display: flex; gap: 1.6rem; justify-content: center; }
-  .hero-links a {
-    font-family: var(--mono); font-size: .78rem; color: var(--ink-2); text-decoration: none;
-    border-bottom: 1px solid var(--hairline); padding-bottom: 1px; transition: color .15s, border-color .15s;
-  }
-  .hero-links a:hover { color: var(--emerald); border-bottom-color: var(--emerald); }
-  .hero-stats {
-    margin-top: 3rem; font-family: var(--mono); font-size: .72rem; color: var(--ink-3);
-    display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;
-  }
-  .hero-stats span::before { content: "· "; color: var(--hairline); }
-  .hero-stats span:first-child::before { content: ""; }
 
-  /* ---------- voice board ---------- */
-  .voices { border-top: 1px solid var(--hairline); }
-  .section-head { text-align: center; max-width: 40rem; margin: 0 auto 3.5rem; }
-  .section-head .eyebrow { display: block; margin-bottom: .9rem; }
-  .section-head p { margin-top: 1rem; color: var(--ink-2); }
-  .voice-row {
-    display: grid; grid-template-columns: repeat(5, 1fr); gap: .9rem;
-  }
-  .voice-row > * { min-width: 0; }
-  @media (max-width: 900px) { .voice-row { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 560px) { .voice-row { grid-template-columns: 1fr; } }
-  .voice-card {
-    position: relative;
-    border: 1px solid var(--hairline); border-radius: var(--radius);
-    background: #fff; padding: 1.2rem 1.1rem 1.1rem;
-    display: flex; flex-direction: column; gap: .35rem;
-    transition: border-color .2s, box-shadow .2s;
-  }
-  .voice-card:hover { border-color: #D8D2C6; box-shadow: 0 10px 30px -18px rgba(12,10,9,.25); }
-  .voice-card.playing-card { border-color: var(--emerald); }
-  .voice-card .name { font-family: var(--mono); font-size: .82rem; font-weight: 500; display: flex; align-items: center; gap: .5rem; }
-  .voice-card .note { font-size: .85rem; color: var(--ink-2); line-height: 1.45; flex: 1; }
-  .voice-card .tag {
-    position: absolute; bottom: 1.35rem; right: 1.1rem;
-    font-family: var(--mono); font-size: .58rem; text-transform: uppercase; letter-spacing: .08em;
-    color: var(--emerald); border: 1px solid rgba(4,120,87,.35); border-radius: 4px; padding: .05rem .3rem;
-  }
-  .voice-card .play { margin-top: .8rem; }
-  .voice-card .play .icon { width: 2rem; height: 2rem; }
-  .fallback-note { max-width: 34rem; margin: 3rem auto 0; }
-  .fallback-note .codebox { font-size: .76rem; text-align: left; }
-
-  /* ---------- agent loop (dark) ---------- */
-  .agent { padding: 2.5rem 1.5rem; }
-  .agent .wrap {
-    background: var(--dark); color: var(--dark-ink);
-    border-radius: 20px; padding: 5.5rem 3.5rem;
-    box-shadow: 0 30px 60px -30px rgba(12,10,9,.35);
-  }
-  @media (max-width: 640px) {
-    .agent { padding: 1rem .75rem; }
-    .agent .wrap { padding: 3.5rem 1.4rem; border-radius: 16px; }
-  }
-  .agent .eyebrow { color: var(--emerald-bright); }
-  .agent h2 { color: #FAFAF9; }
-  .agent .lead { color: var(--dark-ink-2); max-width: 38rem; margin-top: 1.2rem; font-size: 1.1rem; }
-  .agent-grid {
-    display: grid; grid-template-columns: 1.05fr .95fr; gap: 3.5rem; margin-top: 3.5rem; align-items: start;
-  }
-  @media (max-width: 860px) { .agent-grid { grid-template-columns: 1fr; } }
-  .agent .codebox { background: var(--dark-2); border: 1px solid #292524; }
-  .notif-list { display: flex; flex-direction: column; gap: .7rem; }
-  .notif {
-    display: flex; align-items: center; gap: 1rem;
-    border: 1px solid #292524; border-radius: var(--radius);
-    padding: .9rem 1.1rem; background: var(--dark-2);
-    transition: border-color .2s;
-  }
-  .notif:hover { border-color: #44403C; }
-  .notif.playing-card { border-color: var(--emerald-bright); }
-  .notif .label { flex: 1; font-size: .98rem; color: var(--dark-ink); }
-  .notif .src { font-family: var(--mono); font-size: .65rem; color: var(--dark-ink-2); }
-  .agent-closing {
-    margin-top: 3.5rem; font-family: var(--mono); font-size: .82rem; color: var(--emerald-bright);
-    border-top: 1px solid #292524; padding-top: 1.6rem;
-  }
-  .agent-closing .dim { color: var(--dark-ink-2); }
-
-  /* ---------- claims ---------- */
-  .claims-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5rem; }
-  .claims-grid > * { min-width: 0; }
-  @media (max-width: 860px) { .claims-grid { grid-template-columns: 1fr; } }
-  .claim { display: flex; flex-direction: column; border-top: 1px solid var(--hairline); padding-top: 1.7rem; }
-  .claim h3 { font-weight: 500; font-size: 1.25rem; letter-spacing: -0.01em; margin-bottom: .6rem; line-height: 1.3; }
-  @media (min-width: 861px) { .claim h3 { min-height: 2.6em; } }
-  .claim h3 .n { font-family: var(--mono); font-size: .75rem; color: var(--emerald); vertical-align: super; margin-right: .35rem; }
-  .claim p { font-size: .98rem; color: var(--ink-2); margin-bottom: 1.2rem; }
-  .claim p a { color: var(--emerald); text-decoration: none; border-bottom: 1px solid rgba(4,120,87,.3); }
-  .claim .codebox { margin-top: auto; font-size: .72rem; padding: .9rem 1.1rem; }
-
-  /* ---------- api / closing ---------- */
-  .api { background: var(--paper-warm); border-top: 1px solid var(--hairline); }
-  .api-block { max-width: 40rem; margin: 0 auto; }
-  .api-bar { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
-  .api-copy {
-    position: static; color: var(--ink-3); background: none;
-    border: 1px solid var(--hairline); flex: none;
-  }
-  .api-copy:hover { color: var(--ink); border-color: var(--ink-3); }
-  .api-tabs { display: flex; gap: 1.1rem; margin-bottom: .45rem; padding-left: .3rem; }
-  .api-tabs button {
-    font-family: var(--mono); font-size: .74rem; color: var(--ink-3);
-    background: none; border: none; cursor: pointer;
-    border-bottom: 2px solid transparent; padding: .1rem 0;
-    transition: color .15s, border-color .15s;
-  }
-  .api-tabs button.active { color: var(--emerald); border-bottom-color: var(--emerald); }
-  .api-cta { display: flex; gap: 1rem; justify-content: center; margin-top: 2.5rem; flex-wrap: wrap; }
-  .btn-primary {
-    font-family: var(--mono); font-size: .82rem; font-weight: 500;
-    background: var(--dark); color: var(--dark-ink); border: none; border-radius: var(--radius);
-    padding: .8rem 1.5rem; cursor: pointer; transition: background .15s, transform .15s;
-  }
-  .btn-primary:hover { background: var(--emerald-deep); color: #fff; transform: translateY(-1px); }
-  .btn-ghost {
-    font-family: var(--mono); font-size: .82rem;
-    background: none; color: var(--ink); border: 1px solid var(--hairline); border-radius: var(--radius);
-    padding: .8rem 1.5rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
-    transition: border-color .15s;
-  }
-  .btn-ghost:hover { border-color: var(--ink-3); }
-
-  /* ---------- codex banner ---------- */
-  .codex { padding: 3rem 0; }
-  .codex-inner {
-    border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
-    padding: 2rem 0; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
-  }
-  @media (max-width: 640px) {
-    .codex-inner { align-items: flex-start; }
-    .codex-inner .new { margin-top: .3rem; }
-  }
-  .codex-inner .new {
-    font-family: var(--mono); font-size: .62rem; text-transform: uppercase; letter-spacing: .1em;
-    color: var(--emerald); border: 1px solid rgba(4,120,87,.35); border-radius: 4px; padding: .2rem .5rem; flex: none;
-  }
-  .codex-inner .txt { flex: 1; min-width: 16rem; }
-  .codex-inner .txt strong { font-weight: 500; }
-  .codex-inner .txt span { color: var(--ink-2); font-size: .95rem; }
-  .codex-inner a {
-    font-family: var(--mono); font-size: .8rem; color: var(--emerald); text-decoration: none; flex: none;
-  }
-  .codex-inner a:hover { text-decoration: underline; }
-
-  /* ---------- footer ---------- */
-  footer { padding: 3rem 0 3.5rem; }
-  footer .wrap { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
-  footer .links { display: flex; gap: 1.4rem; }
-  footer .links a { font-family: var(--mono); font-size: .74rem; color: var(--ink-2); text-decoration: none; }
-  footer .links a:hover { color: var(--emerald); }
-  footer .made { font-size: .85rem; color: var(--ink-3); }
-
-  /* ---------- small screens ---------- */
-  @media (max-width: 640px) {
-    .nav-pill { display: none; }
-    .nav-links { gap: 1rem; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .script { transform: none; }
   }
 </style>
 </head>
 <body>
+<div class="doc" data-view="you">
+<a class="skip" href="#dispatch">Skip to tell your agent</a>
 
 <nav>
   <div class="wrap">
-    <a class="wordmark" href="#">SpeakEasy</a>
+    <a class="wordmark" href="/">SpeakEasy</a>
+    <div class="view-switch" role="radiogroup" aria-label="Page view">
+      <button type="button" role="radio" aria-checked="true" tabindex="0" data-view="you" id="viewYou">You</button>
+      <button type="button" role="radio" aria-checked="false" tabindex="-1" data-view="agent" id="viewAgent">Agent</button>
+    </div>
     <div class="nav-links">
+      <a href="{{releaseDownloadUrl}}">Download DMG</a>
       <a href="/docs/">Docs</a>
       <a href="https://github.com/arach/SpeakEasy">GitHub</a>
-      <a href="https://www.npmjs.com/package/@arach/speakeasy">npm</a>
-      <a class="nav-pill" href="/codex/"><span class="dot"></span>Introducing Codex →</a>
+      <a class="pad" href="/codex/">The Pad</a>
     </div>
   </div>
 </nav>
 
-<!-- 1 · HERO -->
-<header class="hero">
-  <div class="wrap">
-    <span class="eyebrow">@arach/speakeasy</span>
-    <h1>One API. Every voice.</h1>
-
-    <div class="say-line">
-      <button class="play" data-src="/audio/tagline-demo.mp3" aria-label="Play the tagline">
-        <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
-      </button>
-      <span><span class="kw">await</span> <span class="fn">say</span>(<span class="st">"Text to speech, with nothing in the way."</span>);</span>
-      <span class="eq"><span></span><span></span><span></span><span></span></span>
-    </div>
-
-    <p class="hero-sub">
-      One function, every voice: macOS system voices, OpenAI, ElevenLabs, Groq, and Gemini.
-      The system voice needs no key and works out of the box, so the first line you write
-      already makes sound. <em>Want your coding agent to speak its own summaries?</em>
-      <a href="/codex/">That's the Codex companion</a>.
+<header class="wrap hero">
+  <div>
+    <p class="kicker">A voice layer for coding agents</p>
+    <h1>Every agent needs its own <em>voice.</em></h1>
+    <p class="lede">
+      SpeakEasy is how an agent talks, and how you talk back. The primitives
+      are the same in every harness. Codex and Claude have a turnkey hook.
+      Everywhere else, the agent reads the runbook and does the last mile.
     </p>
-
-    <div class="install">
-      <div class="install-tabs" id="installTabs">
-        <button class="active" data-cmd="bun add @arach/speakeasy">bun</button>
-        <button data-cmd="npm install @arach/speakeasy">npm</button>
-        <button data-cmd="pnpm add @arach/speakeasy">pnpm</button>
-      </div>
-      <!-- Kept on one line deliberately: .codebox is white-space: pre, so a
-           newline before the copy button renders as blank lines in the box. -->
-      <div class="codebox"><span class="prompt">$ </span><span id="installCmd">bun add @arach/speakeasy</span><button class="copy-btn" data-copy-target="installCmd">copy</button></div>
-    </div>
-
-    <div class="hero-links">
-      <a href="/agent.md">Point your agent here</a>
-      <a href="/docs/">Read the docs</a>
-      <a href="https://github.com/arach/SpeakEasy">Star on GitHub</a>
-    </div>
-
-    <div class="hero-stats">
-      <span>~950 downloads/mo</span>
-      <span>zero runtime dependencies</span>
-      <span>Node ≥ 22.12 or Bun</span>
-    </div>
+    <svg class="trace" viewBox="0 0 440 52" aria-hidden="true">
+      <path class="ghost" d="M0 28 C28 28 32 10 52 10 C78 10 80 42 108 42 C132 42 138 16 164 16 C194 16 196 36 224 36 C250 36 256 8 286 8 C318 8 322 44 352 44 C378 44 386 22 412 22 L440 22"/>
+      <path class="live" d="M0 28 C28 28 32 10 52 10 C78 10 80 42 108 42 C132 42 138 16 164 16 C194 16 196 36 224 36 C250 36 256 8 286 8 C318 8 322 44 352 44 C378 44 386 22 412 22 L440 22"/>
+    </svg>
   </div>
+
+  <aside class="script" id="dispatch">
+    <div class="head">
+      <span class="to">Tell your agent</span>
+      <span>SE–DISPATCH</span>
+    </div>
+    <p class="prompt" id="askText" translate="no">Read <u>https://speakeasy.arach.dev/agent.md</u> and follow it.</p>
+    <div class="actions">
+      <button class="copy" id="copyDispatch" type="button">Copy this sentence</button>
+      <a class="read" href="{{releaseDownloadUrl}}">Download Mac app · {{releaseVersion}}</a>
+    </div>
+    <span class="sr-status" id="copyStatus" aria-live="polite"></span>
+    <div class="split">
+      <div>
+        <h3>The agent does</h3>
+        <ul>
+          <li>Picks the smallest path that matches what you asked.</li>
+          <li>Verifies before anything is spoken.</li>
+          <li>Stops if a check fails. It does not improvise.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>You do</h3>
+        <ul>
+          <li>Paste this into whichever agent you have open.</li>
+          <li>Name the agent if you care. Otherwise it uses the primitives.</li>
+          <li>Click Allow only when macOS asks you to.</li>
+        </ul>
+      </div>
+    </div>
+  </aside>
 </header>
 
-<!-- 2 · VOICE BOARD -->
-<section class="voices">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">// the proof</span>
-      <h2>Five providers. One sentence.</h2>
-      <p>The same words, synthesized five ways. Press play — this is the whole pitch.</p>
+<main>
+  <section class="wrap band" id="hooks">
+    <div class="band-head">
+      <h2>Each system gets a hook</h2>
+      <p>The primitives are the product. A turnkey hook is just the last mile, packaged. If there isn’t one, the agent wires it.</p>
     </div>
-
-    <div class="voice-row">
-      <div class="voice-card" data-card>
-        <span class="name">macOS System <span class="tag">fallback</span></span>
-        <span class="note">Free. No key. Always there.</span>
-        <button class="play" data-src="/audio/welcome-demo.mp3">
-          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
-          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
-        </button>
-      </div>
-      <div class="voice-card" data-card>
-        <span class="name">OpenAI</span>
-        <span class="note">tts-1 · nova · warm &amp; reliable</span>
-        <button class="play" data-src="/audio/tagline-demo.mp3">
-          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
-          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
-        </button>
-      </div>
-      <div class="voice-card" data-card>
-        <span class="name">ElevenLabs</span>
-        <span class="note">voice IDs · premium quality</span>
-        <button class="play" data-src="/audio/build-complete.mp3">
-          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
-          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
-        </button>
-      </div>
-      <div class="voice-card" data-card>
-        <span class="name">Groq</span>
-        <span class="note">Orpheus · very fast</span>
-        <button class="play" data-src="/audio/permission.mp3">
-          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
-          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
-        </button>
-      </div>
-      <div class="voice-card" data-card>
-        <span class="name">Gemini</span>
-        <span class="note">2.5 Flash TTS</span>
-        <button class="play" data-src="/audio/waiting-for-you.mp3">
-          <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
-          <span class="lbl">Play</span><span class="eq"><span></span><span></span><span></span><span></span></span>
-        </button>
-      </div>
-    </div>
-
-    <div class="fallback-note">
-      <div class="codebox"><span class="cm">// missing key? rate limit? offline?
-// → falls back to the system voice.
-//   It always says something.</span></div>
-    </div>
-  </div>
-</section>
-
-<!-- 3 · AGENT LOOP (dark) -->
-<section class="agent">
-  <div class="wrap">
-    <span class="eyebrow">// the use case</span>
-    <h2>Your agent finished ten minutes ago.<br>You were making coffee.</h2>
-    <p class="lead">
-      Hook SpeakEasy into Claude Code, Cursor, or Codex and your tools speak a one-line
-      summary when they stop. No API key — the system voice is free.
-    </p>
-
-    <div class="agent-grid">
-      <div class="codebox"><span class="cm">// ~/.claude/settings.json</span>
-{
-  <span class="kw">"hooks"</span>: {
-    <span class="kw">"Stop"</span>: [{
-      <span class="kw">"command"</span>: <span class="st">"npx @arach/speakeasy \"$SUMMARY\""</span>
-    }]
-  }
-}</div>
-
-      <div class="notif-list">
-        <div class="notif" data-card>
-          <button class="play" data-src="/audio/build-complete.mp3" aria-label="Play notification">
-            <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
-          </button>
-          <span class="label">"Build completed successfully."</span>
-          <span class="eq"><span></span><span></span><span></span><span></span></span>
-          <span class="src">system voice</span>
+    <div class="bay">
+      <article class="jack primitives">
+        <div class="who">
+          <span class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 1 1-6 0V6a3 3 0 0 1 3-3zm-7 9a1 1 0 0 1 1 1 6 6 0 0 0 12 0 1 1 0 1 1 2 0 8 8 0 0 1-7 7.94V22a1 1 0 1 1-2 0v-1.06A8 8 0 0 1 4 13a1 1 0 0 1 1-1z"/></svg>
+          </span>
+          Any agent
         </div>
-        <div class="notif" data-card>
-          <button class="play" data-src="/audio/permission.mp3" aria-label="Play notification">
-            <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
-          </button>
-          <span class="label">"Claude needs your permission."</span>
-          <span class="eq"><span></span><span></span><span></span><span></span></span>
-          <span class="src">system voice</span>
+        <div>
+          <div class="tags"><span>Supported</span><span class="mode">Primitives</span></div>
+          <h3>Speak, verify, stop</h3>
+          <p>One sentence, macOS system voice, nothing written into the project. No API key. This is what “follow it” means if you do not name a hook.</p>
+          <div class="tell">
+            <button type="button" class="tell-btn" data-copy="Install SpeakEasy and set up TTS on this Mac. Read https://speakeasy.arach.dev/agent.md and follow Path 1. System voice, no API key, nothing added to the project.">Tell your agent</button>
+            <p class="tell-line">Install SpeakEasy and set up TTS.</p>
+          </div>
         </div>
-        <div class="notif" data-card>
-          <button class="play" data-src="/audio/waiting-input.mp3" aria-label="Play notification">
-            <span class="icon"><svg viewBox="0 0 12 14" fill="currentColor"><path d="M0 0 L12 7 L0 14 Z"/></svg></span>
-          </button>
-          <span class="label">"Waiting for your input."</span>
-          <span class="eq"><span></span><span></span><span></span><span></span></span>
-          <span class="src">system voice</span>
+      </article>
+      <article class="jack turnkey">
+        <div class="who">
+          <span class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.911 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.182a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .511 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.989 5.989 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zm-9.022 12.608a4.476 4.476 0 0 1-2.876-1.041l.142-.08 4.778-2.758a.795.795 0 0 0 .393-.682v-6.736l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.495 4.494zm-9.661-4.125a4.471 4.471 0 0 1-.535-3.014l.142.085 4.783 2.758a.771.771 0 0 0 .781 0l5.843-3.368v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.499 4.499 0 0 1-6.141-1.646zM2.341 7.896A4.485 4.485 0 0 1 4.706 5.924V11.6a.766.766 0 0 0 .388.676l5.814 3.355-2.02 1.168a.076.076 0 0 1-.071 0L3.987 14.013A4.504 4.504 0 0 1 2.341 7.932zm16.596 3.856-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.104v-5.677a.79.79 0 0 0-.407-.667zm2.011-3.023-.142-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.499 4.499 0 0 1 6.681 4.66zM8.306 12.863l-2.02-1.164a.08.08 0 0 1-.038-.057V6.074a4.499 4.499 0 0 1 7.376-3.454l-.142.081L8.704 5.459a.795.795 0 0 0-.393.681zm1.098-2.365 2.602-1.5 2.607 1.5v3l-2.598 1.5-2.606-1.5z"/></svg>
+          </span>
+          Codex
         </div>
-      </div>
-    </div>
-
-    <p class="agent-closing">$ npx @arach/speakeasy "it works" <span class="dim">— try it. that's the install.</span></p>
-  </div>
-</section>
-
-<!-- 4 · THREE CLAIMS -->
-<section class="claims">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">// the engineering</span>
-      <h2>Built like a library, not a landing page.</h2>
-    </div>
-
-    <div class="claims-grid">
-      <div class="claim">
-        <h3><span class="n">01</span>It never stays silent.</h3>
-        <p>Automatic fallback walks your provider order — OpenAI down, key missing, offline — and lands on the system voice. <a href="/docs/providers/">Providers →</a></p>
-        <div class="codebox"><span class="kw">fallbackOrder</span>: [<span class="st">"openai"</span>, <span class="st">"groq"</span>, <span class="st">"system"</span>]</div>
-      </div>
-      <div class="claim">
-        <h3><span class="n">02</span>It never says the same thing twice.</h3>
-        <p>SQLite cache keyed on text, voice, and rate. The second call is a file read, not an API bill. <a href="/docs/configuration/">Cache →</a></p>
-        <div class="codebox"><span class="kw">cache</span>: { <span class="kw">enabled</span>: <span class="num">true</span>, <span class="kw">ttl</span>: <span class="st">"7d"</span> }</div>
-      </div>
-      <div class="claim">
-        <h3><span class="n">03</span>It knows what matters.</h3>
-        <p>A priority queue with interrupt: an error alert cuts the line; a status update waits its turn. <a href="/docs/sdk/">Queue →</a></p>
-        <div class="codebox"><span class="fn">speak</span>(msg, { <span class="kw">priority</span>: <span class="st">"high"</span>, <span class="kw">interrupt</span>: <span class="num">true</span> })</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 5 · THE WHOLE API -->
-<section class="api">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">// the contract</span>
-      <h2>That's the entire API.</h2>
-      <p>If you can read this block, you can ship it.</p>
-    </div>
-
-    <div class="api-block">
-      <div class="api-bar">
-        <div class="api-tabs" id="apiTabs">
-          <button class="active" data-pane="sdk">SDK</button>
-          <button data-pane="cli">CLI</button>
+        <div>
+          <div class="tags"><span>Supported</span><span class="mode">Turnkey</span></div>
+          <h3>Talk both ways, into the exact task</h3>
+          <p>Spoken replies through the skill and player. Talk back through the Mac app. The Pad is that loop on a tablet.</p>
+          <div class="tell">
+            <button type="button" class="tell-btn" data-copy="Install the SpeakEasy Codex hook on this Mac. Read https://speakeasy.arach.dev/agent.md and follow Path 2. If I want talk-back, dictation, or the Pad, that's Path 3.">Tell your agent</button>
+            <p class="tell-line">Install the Codex hook and set up TTS.</p>
+          </div>
         </div>
-        <button class="copy-btn api-copy" data-copy-target="sdkCode">copy</button>
+      </article>
+      <article class="jack turnkey">
+        <div class="who">
+          <span class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M17.304 3.541h-3.672l6.696 16.918H24Zm-10.608 0L0 20.459h3.744l1.369-3.553h7.005l1.369 3.553h3.745L10.536 3.541Zm-.371 10.223 2.291-5.946 2.292 5.946Z"/></svg>
+          </span>
+          Claude
+        </div>
+        <div>
+          <div class="tags"><span>Supported</span><span class="mode">Turnkey</span></div>
+          <h3>Skill and player, its own hook</h3>
+          <p>Queue, pause, speed, transcript. Talk-back into a Claude task uses the same two-way shape as Codex.</p>
+          <div class="tell">
+            <button type="button" class="tell-btn" data-copy="Install the SpeakEasy skill for Claude Code and set up TTS. Read https://speakeasy.arach.dev/agent.md and follow Path 2 with npx @arach/speakeasy plugin claude.">Tell your agent</button>
+            <p class="tell-line">Install the Claude skill and set up TTS.</p>
+          </div>
+        </div>
+      </article>
+      <article class="jack primitives">
+        <div class="who">
+          <span class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M11.925 24 22.35 18l-10.425-6L1.5 18l10.425 6z"/><path d="M22.35 18V6L11.925 0v12l10.425 6z" opacity=".8"/><path d="M11.925 12V0L1.5 6v12l10.425-6z" opacity=".6"/></svg>
+          </span>
+          Cursor · others
+        </div>
+        <div>
+          <div class="tags"><span>Supported</span><span class="mode">Primitives</span></div>
+          <h3>Same primitives. The agent does the last mile.</h3>
+          <p>There is no packaged hook yet. The runbook is enough: speak, verify, stop. The agent wires that into the harness it is already running in.</p>
+          <div class="tell">
+            <button type="button" class="tell-btn" data-copy="I'm on Cursor. Install SpeakEasy and set up TTS. Read https://speakeasy.arach.dev/agent.md and follow Path 1. Wire it with a stop hook or a skill file — there is no packaged hook.">Tell your agent</button>
+            <p class="tell-line">Install SpeakEasy and wire TTS into Cursor.</p>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap band" id="hear">
+    <div class="band-head">
+      <h2>What a sentence sounds like</h2>
+      <p>System voice, no key. This is the default path making sound.</p>
+    </div>
+    <div class="hear" id="hearDeck">
+      <button class="play" data-src="/audio/tagline-demo.mp3" aria-label="Play a spoken sentence">
+        <svg viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M0 0 L12 7 L0 14 Z"/></svg>
+      </button>
+      <p class="copyline">“<em>Text to speech, with nothing in the way.</em>”</p>
+      <div class="wave" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
       </div>
-      <div class="codebox" data-pane="sdk"><span id="sdkCode"><span class="kw">import</span> { SpeakEasy } <span class="kw">from</span> <span class="st">"@arach/speakeasy"</span>;
-
-<span class="kw">const</span> speaker = <span class="kw">new</span> <span class="fn">SpeakEasy</span>({
-  <span class="kw">provider</span>: <span class="st">"openai"</span>,
-  <span class="kw">openaiVoice</span>: <span class="st">"nova"</span>,
-  <span class="kw">rate</span>: <span class="num">180</span>,
-  <span class="kw">cache</span>: { <span class="kw">enabled</span>: <span class="num">true</span> },
-});
-
-<span class="kw">await</span> speaker.<span class="fn">speak</span>(<span class="st">"Hello, world."</span>);</span></div>
-      <div class="codebox" data-pane="cli" hidden><span id="cliCode"><span class="cm"># speak</span>
-$ speakeasy <span class="st">"Hello, world."</span> --provider openai --voice nova
-
-<span class="cm"># save to file</span>
-$ speakeasy <span class="st">"Build done"</span> --out build.mp3
-
-<span class="cm"># health check</span>
-$ speakeasy --doctor</span></div>
     </div>
+  </section>
 
-    <div class="api-cta">
-      <button class="btn-primary" id="ctaInstall">bun add @arach/speakeasy</button>
-      <a class="btn-ghost" href="/docs/">Browse the docs</a>
+  <section class="wrap band" id="pad">
+    <div class="band-head">
+      <h2>Talk-back, first on Codex</h2>
+      <p>The Pad is the Codex hook made visible. Other agents will get a surface in the same shape, not a different product.</p>
     </div>
-  </div>
-</section>
-
-<!-- 6 · CODEX BANNER -->
-<section class="codex">
-  <div class="wrap">
-    <div class="codex-inner">
-      <span class="new">New</span>
-      <div class="txt">
-        <strong>Introducing SpeakEasy for Codex</strong><br>
-        <span>A Mac app and iPad control surface built on this library. Speak to the task you're in; hear the answer come back.</span>
+    <a class="door" href="/codex/">
+      <div class="go">
+        <h3>The Pad</h3>
+        <span class="arrow">SEE IT →</span>
       </div>
-      <a href="/codex/">See it →</a>
-    </div>
-  </div>
-</section>
+      <p>Nine lanes for Codex tasks already running. Hold to speak, hear the same task answer. The Mac is required. The iPad build is still coming.</p>
+    </a>
+  </section>
 
-<!-- 7 · FOOTER -->
+  <section class="wrap band" id="library">
+    <div class="band-head">
+      <h2>If you are writing an app</h2>
+      <p>The original library is still here. Add it only when you asked for a dependency.</p>
+    </div>
+    <div class="lib-row" id="libTabs">
+      <button type="button" class="active" data-cmd="bun add @arach/speakeasy">bun</button>
+      <button type="button" data-cmd="npm install @arach/speakeasy">npm</button>
+      <button type="button" data-cmd="pnpm add @arach/speakeasy">pnpm</button>
+    </div>
+    <div class="cmd">
+      <span id="libCmd">bun add @arach/speakeasy</span>
+      <button type="button" id="copyLib">Copy</button>
+    </div>
+  </section>
+</main>
+
 <footer>
   <div class="wrap">
-    <a class="wordmark" href="#">SpeakEasy</a>
-    <div class="links">
-      <a href="/docs/">Docs</a>
-      <a href="https://github.com/arach/SpeakEasy">GitHub</a>
-      <a href="https://www.npmjs.com/package/@arach/speakeasy">npm</a>
-      <a href="/codex/">Codex</a>
-    </div>
-    <span class="made">Made by <a href="https://arach.dev" style="color:var(--emerald);text-decoration:none;">Arach</a></span>
+    <span>SPEAKEASY · MACOS · CODEX FIRST</span>
+    <span>
+      <a href="/agent.md">agent.md</a>
+      &nbsp;·&nbsp;
+      <a href="/llms.txt">llms.txt</a>
+      &nbsp;·&nbsp;
+      <a href="/docs/">docs</a>
+    </span>
   </div>
 </footer>
+</div>
 
 <script>
-  // ---- shared audio: one element, one thing playing at a time ----
-  const audio = new Audio();
-  let current = null;
+(function () {
+  var DISPATCH = "Read https://speakeasy.arach.dev/agent.md and follow it.";
 
-  function stopCurrent() {
+  function textOf(id) {
+    var el = document.getElementById(id);
+    return el ? el.textContent.replace(/\s+/g, " ").trim() : "";
+  }
+  function viewRoot() {
+    return document.querySelector(".doc") || document.documentElement;
+  }
+  function tellRest(btn) {
+    var open = btn.parentNode && btn.parentNode.classList.contains("open");
+    var agent = viewRoot().getAttribute("data-view") === "agent";
+    return (open || agent) ? "Copy" : "Tell your agent";
+  }
+  function copyText(text, btn, live, doneLabel, restLabel) {
+    var finish = function () {
+      if (btn) {
+        btn.textContent = doneLabel;
+        btn.classList.add("done");
+        window.setTimeout(function () {
+          btn.textContent = typeof restLabel === "function" ? restLabel() : restLabel;
+          btn.classList.remove("done");
+        }, 1600);
+      }
+      if (live) live.textContent = "Copied.";
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(finish, finish);
+    } else { finish(); }
+  }
+  function copyFrom(id, btn, live, doneLabel, restLabel) {
+    copyText(textOf(id), btn, live, doneLabel, restLabel);
+  }
+
+  var live = document.getElementById("copyStatus");
+
+  function viewFromLocation() {
+    try {
+      if (new URLSearchParams(location.search).get("view") === "agent") return "agent";
+    } catch (e) {}
+    if (location.hash === "#agent") return "agent";
+    return "you";
+  }
+
+  function setView(view, opts) {
+    var next = view === "agent" ? "agent" : "you";
+    viewRoot().setAttribute("data-view", next);
+    ["viewYou", "viewAgent"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var on = (id === "viewAgent") === (next === "agent");
+      el.setAttribute("aria-checked", on ? "true" : "false");
+      el.tabIndex = on ? 0 : -1;
+    });
+    document.querySelectorAll(".tell-btn").forEach(function (btn) {
+      if (!btn.classList.contains("done")) btn.textContent = tellRest(btn);
+    });
+    if (live) live.textContent = next === "agent" ? "Agent view." : "Your view.";
+    if (!opts || !opts.skipUrl) {
+      var url = new URL(location.href);
+      if (next === "agent") url.searchParams.set("view", "agent");
+      else url.searchParams.delete("view");
+      if (url.hash === "#agent") url.hash = "";
+      var nextHref = url.pathname + url.search + url.hash;
+      if (nextHref !== location.pathname + location.search + location.hash) {
+        history.replaceState(null, "", nextHref);
+      }
+    }
+  }
+
+  document.querySelectorAll(".view-switch button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      setView(btn.getAttribute("data-view"));
+    });
+  });
+  var group = document.querySelector(".view-switch");
+  if (group) {
+    group.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
+      e.preventDefault();
+      var next = (e.key === "ArrowRight" || e.key === "End") ? "agent" : "you";
+      setView(next);
+      var el = document.getElementById(next === "agent" ? "viewAgent" : "viewYou");
+      if (el) el.focus();
+    });
+  }
+
+  var copyDispatch = document.getElementById("copyDispatch");
+  if (copyDispatch) {
+    copyDispatch.addEventListener("click", function () {
+      copyText(DISPATCH, copyDispatch, live, "Copied — paste it", "Copy this sentence");
+    });
+  }
+
+  document.querySelectorAll(".tell-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var wrap = btn.parentNode;
+      if (wrap) wrap.classList.add("open");
+      copyText(btn.getAttribute("data-copy") || DISPATCH, btn, live, "Copied", function () {
+        return tellRest(btn);
+      });
+    });
+  });
+
+  // After parse/hydrate. Running setView during HTML parse rewrites the mock
+  // markup (aria, button labels) and trips React's hydration check.
+  window.setTimeout(function () {
+    setView(viewFromLocation(), { skipUrl: true });
+  }, 0);
+  window.addEventListener("popstate", function () {
+    setView(viewFromLocation(), { skipUrl: true });
+  });
+
+  var copyLib = document.getElementById("copyLib");
+  if (copyLib) {
+    copyLib.addEventListener("click", function () {
+      copyFrom("libCmd", copyLib, null, "Copied", "Copy");
+    });
+  }
+  document.querySelectorAll("#libTabs button").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      document.querySelectorAll("#libTabs button").forEach(function (t) { t.classList.remove("active"); });
+      tab.classList.add("active");
+      var cmd = document.getElementById("libCmd");
+      if (cmd) cmd.textContent = tab.getAttribute("data-cmd");
+    });
+  });
+
+  var audio = new Audio();
+  var deck = document.getElementById("hearDeck");
+  var current = null;
+  function stop() {
     if (!current) return;
     current.classList.remove("playing");
-    const card = current.closest("[data-card]");
-    if (card) card.classList.remove("playing-card");
+    if (deck) deck.classList.remove("playing");
     current = null;
     audio.pause();
   }
-
-  document.querySelectorAll(".play").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (current === btn) { stopCurrent(); return; }
-      stopCurrent();
-      audio.src = btn.dataset.src;
-      audio.play().catch(() => {});
+  document.querySelectorAll(".play").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      if (current === btn) { stop(); return; }
+      stop();
+      audio.src = btn.getAttribute("data-src");
+      audio.play().catch(function () {});
       current = btn;
       btn.classList.add("playing");
-      const card = btn.closest("[data-card]");
-      if (card) card.classList.add("playing-card");
+      if (deck) deck.classList.add("playing");
     });
   });
-  audio.addEventListener("ended", stopCurrent);
-
-  // ---- install tabs ----
-  const installCmd = document.getElementById("installCmd");
-  document.querySelectorAll("#installTabs button").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      document.querySelectorAll("#installTabs button").forEach(t => t.classList.remove("active"));
-      tab.classList.add("active");
-      installCmd.textContent = tab.dataset.cmd;
-    });
-  });
-
-  // ---- api tabs ----
-  document.querySelectorAll("#apiTabs button").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      document.querySelectorAll("#apiTabs button").forEach(t => t.classList.remove("active"));
-      tab.classList.add("active");
-      document.querySelectorAll(".codebox[data-pane]").forEach(p => {
-        p.hidden = p.dataset.pane !== tab.dataset.pane;
-      });
-      document.querySelector(".api-copy").dataset.copyTarget = tab.dataset.pane + "Code";
-    });
-  });
-
-  // ---- copy buttons ----
-  document.querySelectorAll(".copy-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const el = document.getElementById(btn.dataset.copyTarget);
-      await navigator.clipboard.writeText(el.textContent).catch(() => {});
-      btn.textContent = "copied";
-      setTimeout(() => (btn.textContent = "copy"), 1500);
-    });
-  });
-
-  // ---- closing CTA copies install command ----
-  const cta = document.getElementById("ctaInstall");
-  cta.addEventListener("click", async () => {
-    await navigator.clipboard.writeText("bun add @arach/speakeasy").catch(() => {});
-    const old = cta.textContent;
-    cta.textContent = "copied ✓";
-    setTimeout(() => (cta.textContent = old), 1500);
-  });
+  audio.addEventListener("ended", stop);
+})();
 </script>
-
 </body>
 </html>

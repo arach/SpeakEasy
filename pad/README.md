@@ -1,6 +1,6 @@
-# SpeakEasy Pad
+# Deck
 
-The first SpeakEasy iPad companion is a responsive, installable web control surface. It keeps the Mac authoritative: the Pad selects a lane and requests semantic listening/playback actions, while the Mac owns task locks, microphone capture, Codex submission, narration, and state revisions.
+Deck is OpenScout's responsive, installable local control surface. It keeps the Mac authoritative: Deck selects a lane and requests semantic listening/playback actions, while the Mac owns task locks, microphone capture, Codex submission, narration, and state revisions.
 
 ## Run it
 
@@ -19,7 +19,7 @@ The production bundle is written to `pad/dist/`.
 
 ## Deck themes
 
-The finish picker (topbar → layout button) includes built-in themes and any custom deck themes created on the device. A custom theme is a Chrome-extension-style manifest — metadata, design-token `colors`, custom `css`, and optional `html` chrome — created or imported in the appearance sheet. Theme HTML mounts app regions through slots and interaction attributes defined by **Pad Theme Contract v1** in `docs/theme-contract.md`.
+The finish picker (topbar → layout button) includes built-in themes and any custom deck themes created on the device. A custom theme is a Chrome-extension-style manifest — metadata, design-token `colors`, custom `css`, and optional `html` chrome — created or imported in the appearance sheet. Theme HTML mounts app regions through slots and interaction attributes defined by **Deck Theme Contract v1** in `docs/theme-contract.md`.
 
 ## Live transport seam
 

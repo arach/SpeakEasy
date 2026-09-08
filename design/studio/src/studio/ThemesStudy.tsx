@@ -46,14 +46,14 @@ const SEEDS: Seed[] = [
   {
     name: "flight",
     scheme: "dark",
-    blurb: "Full dark with the SpeakEasy signal teal, plate included.",
+    blurb: "Void graphite chassis; mint only as signal — not a teal wash.",
     swatches: [
-      { token: "page-bg", value: "#05090b" },
-      { token: "panel", value: "#0c161a" },
-      { token: "ink", value: "#e8f0ee" },
+      { token: "page-bg", value: "#06080a" },
+      { token: "panel", value: "#0d1114" },
+      { token: "ink", value: "#f2f5f6" },
       { token: "accent", value: "#74f2ce" },
     ],
-    note: "Replaces the plate tokens too — pad-face, plate-bg, led states.",
+    note: "Chassis stays cool neutral so #74f2ce reads as a lamp.",
   },
 ];
 

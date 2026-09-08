@@ -20,12 +20,12 @@ export async function buildPad(): Promise<void> {
 
   if (!result.success) {
     for (const log of result.logs) console.error(log);
-    throw new Error("SpeakEasy Pad bundle failed.");
+    throw new Error("Deck bundle failed.");
   }
 
   await Bun.write(resolve(outdir, "index.html"), Bun.file(resolve(root, "index.html")));
   await cp(resolve(root, "public"), outdir, { recursive: true });
-  console.log(`SpeakEasy Pad built at ${outdir}`);
+  console.log(`Deck built at ${outdir}`);
 }
 
 if (import.meta.main) await buildPad();

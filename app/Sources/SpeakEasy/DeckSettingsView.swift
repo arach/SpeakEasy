@@ -39,7 +39,7 @@ struct DeckSettingsView: View {
         GlassSection(title: "Get Started", icon: "checklist", color: .clear) {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Three checks, then talk to Codex")
+                    Text("Three checks, then connect an agent")
                         .font(.headline)
                         .foregroundColor(theme.text)
                     Text("The app carries the runtime and secure bridge. There are no server packages or Caddy steps to configure.")
@@ -56,10 +56,10 @@ struct DeckSettingsView: View {
 
                 setupRow(
                     number: 2,
-                    title: "Codex",
+                    title: "Agent connection",
                     detail: codexReadinessDetail,
-                    ready: bridge.codexPath != nil,
-                    buttonTitle: bridge.readinessChecked && bridge.codexPath == nil ? "Check Again" : nil,
+                    ready: bridge.agentConnectionAvailable,
+                    buttonTitle: bridge.readinessChecked && !bridge.agentConnectionAvailable ? "Check Again" : nil,
                     action: bridge.checkReadiness
                 )
 
@@ -70,7 +70,7 @@ struct DeckSettingsView: View {
                     ready: bridge.running && bridge.snapshot != nil && !bridge.unreachable,
                     buttonTitle: bridge.running ? nil : "Start Deck",
                     action: bridge.start,
-                    buttonDisabled: bridge.codexPath == nil || bridge.actionInFlight
+                    buttonDisabled: !bridge.agentConnectionAvailable || bridge.actionInFlight
                 )
 
                 if let error = bridge.actionError {
@@ -89,11 +89,14 @@ struct DeckSettingsView: View {
     }
 
     private var codexReadinessDetail: String {
+        if bridge.herdrAvailable {
+            return bridge.codexPath != nil ? "Codex found · Herdr socket found" : "Herdr socket found · choose an agent in lane setup"
+        }
         if let path = bridge.codexPath {
             return "Found \(URL(fileURLWithPath: path).lastPathComponent)"
         }
         return bridge.readinessChecked
-            ? "Open the Codex desktop app or add codex to your login shell"
+            ? "Open Herdr or install Codex, then check again"
             : "Checking your login shell…"
     }
 

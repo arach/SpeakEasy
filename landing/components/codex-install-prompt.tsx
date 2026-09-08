@@ -35,7 +35,7 @@ export default function CodexInstallPrompt() {
         </div>
         <h3 className="mt-2 font-display text-2xl font-medium tracking-tight text-slate-900">Paste once.</h3>
         <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-500">
-          Codex downloads the pinned release, inspects it, verifies every trust boundary, replaces the app safely, finishes setup, and launches SpeakEasy with the paired browser/iPad Deck.
+          Codex inspects the pinned installer, verifies the release, installs SpeakEasy, and opens Settings → Deck to check the runtime and Codex connection.
         </p>
       </header>
 
@@ -59,7 +59,7 @@ export default function CodexInstallPrompt() {
               </span>
             ))}
           </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">Only macOS can grant these permissions.</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">Approve microphone access for dictation and local-network access for the browser/iPad Deck. Using another device also requires installing and trusting a local certificate on that device, then allowing browser microphone access.</p>
         </div>
       </div>
 

@@ -4,10 +4,10 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Check, Copy, ExternalLink, MonitorSpeaker, Terminal } from "lucide-react"
-import { releaseVersion } from "@/lib/release"
+import { codexInstallPrompt } from "@/lib/release"
 
 const agentPrompt = `Read https://speakeasy.arach.dev/agent.md and follow it.`
-const codexPrompt = `Install SpeakEasy ${releaseVersion} on this Mac. Read https://speakeasy.arach.dev/agent.md and follow Path 3. Do not build from source or bypass Gatekeeper. Tell me which human-only steps remain.`
+const codexPrompt = codexInstallPrompt
 
 function CopyPrompt({
   payload,

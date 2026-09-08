@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>SpeakEasy Pad</string>
+	<string>Deck</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -32,7 +32,7 @@
 		<string>_http._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>SpeakEasy Deck finds and drives your Mac over your local network.</string>
+	<string>Deck finds and connects to your Mac over your local network.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Hold to Speak transcribes your voice on this device so your Mac can answer.</string>
 	<key>UILaunchStoryboardName</key>

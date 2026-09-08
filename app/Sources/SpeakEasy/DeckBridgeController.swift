@@ -72,6 +72,27 @@ final class DeckBridgeController: ObservableObject {
     @Published private(set) var actionError: String?
     @Published private(set) var readinessChecked = false
     @Published private(set) var codexPath: String?
+    @Published private(set) var herdrAvailable = false
+    var agentConnectionAvailable: Bool { codexPath != nil || herdrAvailable }
+
+    private func hasHerdrSocket() -> Bool {
+        let files = FileManager.default
+        let root = files.homeDirectoryForCurrentUser.appendingPathComponent(".config/herdr")
+        var candidates = [root.appendingPathComponent("herdr.sock")]
+        if let explicit = ProcessInfo.processInfo.environment["SPEAKEASY_HERDR_SOCKET"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !explicit.isEmpty {
+            return (try? files.attributesOfItem(atPath: explicit)[.type] as? FileAttributeType) == .typeSocket
+        }
+        let sessions = root.appendingPathComponent("sessions")
+        if let entries = try? files.contentsOfDirectory(at: sessions, includingPropertiesForKeys: [.isDirectoryKey]) {
+            for entry in entries where (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                candidates.append(entry.appendingPathComponent("herdr.sock"))
+            }
+        }
+        return candidates.contains { candidate in
+            (try? files.attributesOfItem(atPath: candidate.path)[.type] as? FileAttributeType) == .typeSocket
+        }
+    }
 
     /// True when the discovery pid is alive — the snapshot may still be loading.
     var running: Bool { pidAlive }
@@ -79,7 +100,7 @@ final class DeckBridgeController: ObservableObject {
     /// The setup card disappears only when the real data plane answers. A pid
     /// alone is not a successful first run.
     var onboardingComplete: Bool {
-        readinessChecked && codexPath != nil && running && snapshot != nil && !unreachable
+        readinessChecked && agentConnectionAvailable && running && snapshot != nil && !unreachable
     }
 
     /// Release builds carry the complete deck runtime inside the app bundle.
@@ -142,8 +163,10 @@ final class DeckBridgeController: ObservableObject {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
             let codex = self.resolveCodexCLI()
+            let herdr = self.hasHerdrSocket()
             DispatchQueue.main.async {
                 self.codexPath = codex
+                self.herdrAvailable = herdr
                 self.readinessChecked = true
             }
         }
@@ -471,17 +494,20 @@ final class DeckBridgeController: ObservableObject {
                 }
                 return
             }
-            guard let codex = self.resolveCodexCLI() else {
+            let codex = self.resolveCodexCLI()
+            let herdr = self.hasHerdrSocket()
+            guard codex != nil || herdr else {
                 DispatchQueue.main.async {
                     self.codexPath = nil
                     self.readinessChecked = true
-                    self.actionError = "Codex CLI wasn't found. Make `codex` available in your login shell, then try Start again."
+                    self.actionError = "Open Herdr or install Codex, then try Start again."
                     self.actionInFlight = false
                 }
                 return
             }
             DispatchQueue.main.async {
                 self.codexPath = codex
+                self.herdrAvailable = herdr
                 self.readinessChecked = true
             }
             // Spawn the resolved binary directly — no login shell, so no job
@@ -502,7 +528,7 @@ final class DeckBridgeController: ObservableObject {
                 let cliDir = URL(fileURLWithPath: cli).deletingLastPathComponent().path
                 let loginPath = self.loginShellPath() ?? ""
                 environment["PATH"] = "\(cliDir):\(loginPath):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-                environment["CODEX_BIN"] = codex
+                if let codex { environment["CODEX_BIN"] = codex }
                 if cli == self.bundledCLI, let deckRoot = self.bundledDeckRoot {
                     environment["SPEAKEASY_DECK_ROOT"] = deckRoot
                 }
