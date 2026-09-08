@@ -178,10 +178,10 @@ elif gh release view "$TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
     edit_flags=()
     [ "$PRERELEASE" -eq 0 ] || edit_flags+=(--prerelease=true)
     [ "$DRAFT" -eq 0 ] || edit_flags+=(--draft=true)
-    run gh release edit "$TAG" --repo "$RELEASE_REPO" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" "${edit_flags[@]}"
+    run gh release edit "$TAG" --repo "$RELEASE_REPO" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" ${edit_flags[@]+"${edit_flags[@]}"}
 else
     echo "==> Creating GitHub release $TAG in $RELEASE_REPO..."
-    run gh release create "$TAG" --repo "$RELEASE_REPO" --target "$RELEASE_TARGET" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" "${release_flags[@]}"
+    run gh release create "$TAG" --repo "$RELEASE_REPO" --target "$RELEASE_TARGET" --title "SpeakEasy $VERSION" --notes-file "$NOTES_PATH" ${release_flags[@]+"${release_flags[@]}"}
 fi
 
 echo "==> Uploading release asset(s)..."
