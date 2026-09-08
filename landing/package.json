@@ -3,13 +3,14 @@
   "version": "0.2.1",
   "private": true,
   "scripts": {
-    "build": "bun run build:pad-scene && next build && node scripts/postexport-doc-redirects.mjs",
-    "dev": "bun run build:pad-scene && next dev",
+    "build": "bun run sync:deck-demo && bun run build:pad-scene && next build && node scripts/postexport-doc-redirects.mjs",
+    "dev": "bun run sync:deck-demo && bun run build:pad-scene && next dev",
     "lint": "next lint",
     "start": "next start",
     "export": "bun run build",
     "build:pad-scene": "bun build lib/pad-scene.ts --target=browser --format=esm --minify --outfile=public/scripts/pad-scene.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync:deck-demo": "node scripts/sync-deck-demo.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

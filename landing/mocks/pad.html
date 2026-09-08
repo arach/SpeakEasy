@@ -903,6 +903,15 @@ nav .wrap { height:72px; }
 /* The Blender mesh replaces the CSS fallback only after a successful first frame. */
 .pad-webgl { position:absolute; inset:0; width:100%; height:100%; display:block; }
 .morph-stage.has-webgl .morph-device { visibility:hidden; }
+
+/* The preview embeds the existing Deck rather than duplicating its design. */
+.pad-console-section{background:var(--bg);color:var(--text)}
+.console-intro{display:grid;grid-template-columns:1.1fr 1fr;gap:70px;align-items:end;margin-bottom:42px}.console-intro h2{font-size:clamp(34px,4.6vw,58px);line-height:1.08;margin-top:18px}.console-intro h2 em{color:var(--accent)}.console-intro p{font-size:16px;line-height:1.7;color:var(--muted);max-width:490px}.console-intro p+p{margin-top:12px}
+.deck-preview-frame{border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 24px 65px -35px #342b2255;background:#f5f1ea}.deck-preview-frame{position:relative;aspect-ratio:1200/816}.deck-preview-frame iframe{display:block;width:1200px;height:816px;border:0;transform-origin:top left}.deck-preview-note{font-size:12px;color:var(--muted);margin-top:16px}
+.console-benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:34px}.console-benefits b{display:block;font-size:15px;font-weight:500}.console-benefits span{display:block;font-size:13px;color:var(--muted);line-height:1.6;margin-top:9px}
+@media(max-width:800px){.console-intro{grid-template-columns:1fr;gap:24px}.console-body{grid-template-columns:1fr}.console-bank{border-right:0;border-bottom:1px solid #354b4655}.console-key{min-height:94px}.console-benefits{grid-template-columns:1fr;gap:22px}.console-preview-tag{font-size:7px;padding:8px}.console-top{padding:16px 12px}.console-mission{padding:22px 16px}.console-bank{padding:22px 16px}.console-speak{gap:9px;padding:22px 12px}.console-speak strong{font-size:12px}.console-footer{font-size:6px;letter-spacing:.02em}.console-demo{padding:6px}}
+
+.speech-example{max-width:700px;margin:32px auto;padding:26px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.speech-example p{font-family:Georgia,serif;font-size:clamp(22px,3vw,32px);font-style:italic;line-height:1.4;margin-top:14px}.speech-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;text-align:left;margin:36px auto 0;max-width:960px}.speech-steps h3{font-size:19px;font-weight:500;margin:14px 0 10px}.speech-steps p{font-size:14px;line-height:1.6;color:var(--muted)}.speech-demo-note{font-size:12px;color:var(--muted);margin-top:32px}@media(max-width:700px){.speech-steps{grid-template-columns:1fr;gap:26px}}
 </style>
 </head>
 <body>
@@ -1032,87 +1041,33 @@ nav .wrap { height:72px; }
 </section>
 
 <!-- ============ 3 · LANES ============ -->
-<section class="sec hairline-t" id="lanes">
+<section class="sec hairline-t pad-console-section" id="lanes">
   <div class="wrap">
-    <div class="lanegrid">
-      <div class="bigpad">
-        <span class="num">LN 1 · BOUND 04:12:07</span>
-        <div class="proj">speakeasy</div>
-        <div class="branch">~/dev/SpeakEasy · codex/native-ipad-deck · thread f89f1953</div>
-        <div class="snip">"Testing one two one two. Let's see, let's go." — arrived on lane 1, in the Codex task that lane is bound to.</div>
-        <div class="divider"></div>
-        <div class="meta">
-          <span class="wave play"></span>
-          <span class="state live mono" style="font-size:10px;letter-spacing:.2em;color:var(--accent);"><span class="led on breathe" style="display:inline-block;margin-right:6px;"></span>LIVE · THREAD ATTACHED</span>
-        </div>
-      </div>
-      <div>
-        <span class="label acc">WHAT A LANE HOLDS</span>
-        <h2 class="display" style="font-size:clamp(30px,3.6vw,46px);margin-top:18px;">Each key holds<br>whatever you put on it.</h2>
-        <p style="margin-top:20px;font-size:15.5px;font-weight:300;line-height:1.7;color:var(--muted);">
-        You pick what goes on each key. Today that's <b style="color:var(--text);font-weight:500;">one exact Codex task</b> —
-        the key shows the project, the git branch, the last exchange, and whether that task is live, idle, or queued.
-        Routing is by task ID, so nothing depends on which window is focused
-        or what the most recent thread is called.</p>
-        <ul class="checklist">
-          <li><span class="tick">01</span><span><b>You assign it, and it stays assigned.</b> A key keeps its task across reloads until you move it.</span></li>
-          <li><span class="tick">02</span><span><b>The task ID is the address.</b> Each send revalidates the binding with Codex Desktop first.</span></li>
-          <li><span class="tick">03</span><span><b>It fails closed.</b> If the binding can't be verified, the send stops — it won't pick a different task.</span></li>
-          <li><span class="tick">04</span><span><b>State is on the key.</b> Live, idle, or queued, readable without opening anything.</span></li>
-        </ul>
-      </div>
+    <div class="console-intro">
+      <div><span class="label acc">YOUR TASKS, WITHIN REACH</span><h2 class="display">One key for each<br><em>Codex task.</em></h2></div>
+      <div><p>Choose a task. See where it left off. Hold to speak when you’re ready to move it forward.</p><p>Your message goes to the task you selected, and its reply comes back here. Switch keys to pick up another conversation.</p></div>
     </div>
-
-    <!-- micro deck -->
-    <div class="microdeck">
-      <div class="md-grid">
-        <div class="md-key hot"><span class="k">A1</span><span class="v">spk-web</span></div>
-        <div class="md-key"><span class="k">A2</span><span class="v">scout</span></div>
-        <div class="md-key"><span class="k">A3</span><span class="v">dewey</span></div>
-        <div class="md-key"><span class="k">A4</span><span class="v">landing</span></div>
-        <div class="md-key"><span class="k">B1</span><span class="v">cache-fix</span></div>
-        <div class="md-key blank"><span class="k">B2</span><span class="v">—</span></div>
-        <div class="md-key blank"><span class="k">B3</span><span class="v">—</span></div>
-        <div class="md-key blank"><span class="k">B4</span><span class="v">—</span></div>
-        <div class="md-key blank"><span class="k">C1</span><span class="v">—</span></div>
-        <div class="md-key blank"><span class="k">C2</span><span class="v">—</span></div>
-        <div class="md-key blank"><span class="k">C3</span><span class="v">—</span></div>
-        <div class="md-key blank"><span class="k">C4</span><span class="v">—</span></div>
-        <div class="md-key hot"><span class="k">D1</span><span class="v">RPLY</span></div>
-        <div class="md-key"><span class="k">D2</span><span class="v">STOP</span></div>
-        <div class="md-key"><span class="k">D3</span><span class="v">AUTO</span></div>
-        <div class="md-key"><span class="k">D4</span><span class="v">ACTV</span></div>
-      </div>
-      <div>
-        <span class="label acc">MICRO DECK · 4×4 KEY BANK</span>
-        <h3 class="display" style="font-size:clamp(26px,3vw,38px);margin-top:18px;">More than nine tasks?<br>Use the 4×4.</h3>
-        <p style="margin-top:20px;font-size:15px;font-weight:300;line-height:1.7;color:var(--muted);max-width:460px;">
-        The Micro Deck is a 4×4 key bank with the same binding model: one exact task per key,
-        same fail-closed check. The bottom row is transport, which leaves twelve lanes.</p>
-      </div>
+    <div class="deck-preview-frame">
+      <iframe title="SpeakEasy Deck interactive demo" src="/implementation/deck-demo.html?demo=1&amp;theme=paper" loading="lazy" sandbox="allow-scripts allow-same-origin" allow="microphone 'none'; camera 'none'"></iframe>
     </div>
+    <p class="deck-preview-note">Explore the Deck · Select a channel to see its conversation. Example tasks shown.</p>
+    <div class="console-benefits"><p><b>Pick up where you left off.</b><span>The selected task’s latest reply is right in front of you.</span></p><p><b>Talk to the right task.</b><span>Each key keeps its assignment until you change it.</span></p><p><b>Room for more.</b><span>Micro Deck offers twelve task keys plus playback controls.</span></p></div>
   </div>
 </section>
 
 <!-- ============ 4 · HOLD TO SPEAK ============ -->
 <section class="sec speak-sec" id="speech">
   <div class="wrap" style="text-align:center;">
-    <span class="label acc">THE BIG BAR</span>
-    <h2 class="display" style="font-size:clamp(34px,4.6vw,60px);margin-top:18px;">Your Mac does<br>the transcribing.</h2>
-    <p style="margin:20px auto 0;max-width:560px;font-size:16px;font-weight:300;line-height:1.7;color:var(--muted);">
-    Hold the bar and talk. The iPad records the audio and hands it to your Mac over the local network,
-    where SpeakEasy's Parakeet model produces the transcript. Nothing goes to a speech server.
-    Let go and the transcript is sent once, to the task bound to that lane.</p>
-    <div class="speakbar bigbar" style="max-width:860px;margin-left:auto;margin-right:auto;">
-      <span class="mic">●</span>
-      <span class="t">HOLD TO SPEAK</span>
-      <span class="s">MOMENTARY · PARAKEET ON YOUR MAC · LANE 01</span>
+    <span class="label acc">KEEP THE CONVERSATION GOING</span>
+    <h2 class="display" style="font-size:clamp(34px,4.6vw,60px);margin-top:18px;">Your next instruction.<br>Just say it.</h2>
+    <p style="margin:20px auto 0;max-width:600px;font-size:16px;line-height:1.7;color:var(--muted);">A task needs your direction. Choose its channel, hold the speak bar, and tell it what to do next. Release to send your words to that same Codex conversation—without reaching for the keyboard.</p>
+    <blockquote class="speech-example"><span class="label acc">FOR EXAMPLE</span><p>“Make the sidebar warmer, then show me the updated preview.”</p></blockquote>
+    <div class="speech-steps">
+      <div><span class="label acc">01 · CHOOSE</span><h3>Pick the task.</h3><p>The selected channel is where your message will go.</p></div>
+      <div><span class="label acc">02 · HOLD & TALK</span><h3>Say what’s next.</h3><p>Keep the bar pressed while you speak. Your Mac turns your voice into text.</p></div>
+      <div><span class="label acc">03 · RELEASE</span><h3>Continue the conversation.</h3><p>Let go to send. The task’s reply comes back to its channel, ready to read or hear.</p></div>
     </div>
-    <div class="specline">
-      <span>TRANSCRIPTION: ON YOUR MAC</span><span class="sep">·</span>
-      <span>ROUTING: EXACT TASK ID</span><span class="sep">·</span>
-      <span>DELIVERY: EXACTLY ONCE</span>
-    </div>
+    <p class="speech-demo-note">Voice input works in the connected app. The preview above uses example conversations.</p>
   </div>
 </section>
 
@@ -1434,6 +1389,14 @@ nav .wrap { height:72px; }
     window.addEventListener('resize',requestMorph,{passive:true});
     motionQuery.addEventListener('change',requestMorph);
     drawMorph();
+  }
+
+
+  var deckFrame=document.querySelector('.deck-preview-frame');
+  if(deckFrame){
+    var sizeDeck=function(){deckFrame.querySelector('iframe').style.transform='scale('+(deckFrame.clientWidth/1200)+')';};
+    new ResizeObserver(sizeDeck).observe(deckFrame);
+    sizeDeck();
   }
 
   // Theme switching — the page is skinned with the same tokens as the deck.
