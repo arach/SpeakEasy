@@ -56,6 +56,7 @@ targets:
         NSBonjourServices:
           - _http._tcp
         NSLocalNetworkUsageDescription: Deck finds and connects to your Mac over your local network.
+        NSSpeechRecognitionUsageDescription: Deck uses speech recognition to turn your spoken messages into text for the selected agent conversation.
         NSMicrophoneUsageDescription: Hold to Speak transcribes your voice on this device so your Mac can answer.
         UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations:
@@ -69,7 +70,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.arach.speakeasy.deck
         MARKETING_VERSION: "0.3.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
         GENERATE_INFOPLIST_FILE: NO
         SUPPORTS_MACCATALYST: NO
         # Tells actool which set in Assets.xcassets is the app icon, and makes
