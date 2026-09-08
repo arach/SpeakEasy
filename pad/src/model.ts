@@ -139,7 +139,7 @@ export const DEMO_SNAPSHOT: PadSnapshot = {
   activeTaskTitle: "Secure companion transport",
   inputDeviceName: "MacBook Air Microphone",
   lanes: [
-    { number: 1, label: "SpeakEasy", taskTitle: "Build the iPad command pad", isActive: false, canActivate: true },
+    { number: 1, label: "OpenScout", taskTitle: "Build the local agent deck", isActive: false, canActivate: true },
     { number: 2, label: "Hudson", taskTitle: "Secure companion transport", isActive: true, canActivate: true },
     { number: 3, label: "Talkie", taskTitle: "Nearby Mac approval UX", isActive: false, canActivate: true },
     { number: 4, label: "Vox", taskTitle: "Cue latency budget", isActive: false, canActivate: true },

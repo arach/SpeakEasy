@@ -316,7 +316,7 @@ export function reconnectDecision(options: {
   return { retry: true, delayMilliseconds: Math.round(base * jitter) };
 }
 
-export function makeLANBootstrapMessage(payload: BootstrapPayload, deviceName = "SpeakEasy Pad") {
+export function makeLANBootstrapMessage(payload: BootstrapPayload, deviceName = "Deck") {
   return {
     type: "bootstrap.redeem" as const,
     protocolVersion: 1 as const,
@@ -327,7 +327,7 @@ export function makeLANBootstrapMessage(payload: BootstrapPayload, deviceName = 
   };
 }
 
-export function makeLANResumeMessage(session: StoredLANSession, deviceName = "SpeakEasy Pad") {
+export function makeLANResumeMessage(session: StoredLANSession, deviceName = "Deck") {
   return {
     type: "session.resume" as const,
     protocolVersion: 1 as const,
@@ -434,16 +434,16 @@ export class LANPadTransport implements PadTransport {
         if (this.bootstrap && !this.#authenticated && !this.#session) {
           socket.send(JSON.stringify(makeLANBootstrapMessage(
             this.bootstrap,
-            navigator.userAgent.includes("iPad") ? "iPad" : "SpeakEasy Pad",
+            navigator.userAgent.includes("iPad") ? "iPad" : "Deck",
           )));
         } else if (this.#session) {
           socket.send(JSON.stringify(makeLANResumeMessage(
             this.#session,
-            navigator.userAgent.includes("iPad") ? "iPad" : "SpeakEasy Pad",
+            navigator.userAgent.includes("iPad") ? "iPad" : "Deck",
           )));
         } else {
           clearTimeout(timeout);
-          reject(new Error("Scan a fresh SpeakEasy Pad code on your Mac."));
+          reject(new Error("Scan a fresh Deck code on your Mac."));
         }
       });
       socket.addEventListener("message", (event) => {
@@ -470,7 +470,7 @@ export class LANPadTransport implements PadTransport {
         if (this.#socket === socket) this.#socket = undefined;
         this.#authenticated = false;
         const detail = socketCloseDetail(event);
-        console.warn(`[SpeakEasy Pad] ${detail}`);
+        console.warn(`[Deck] ${detail}`);
         this.#emit({ type: "link", health: "offline", detail });
         this.#rejectPending(new Error("The Mac connection closed before acknowledging the command."));
         this.#scheduleReconnect(event.code);
@@ -538,7 +538,7 @@ export class LANPadTransport implements PadTransport {
     this.#reconnectAttempt = 0;
     if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
     this.#reconnectTimer = undefined;
-    this.#emit({ type: "session", hostName: "SpeakEasy Mac", leaseExpiresAt: message.expiresAtMilliseconds, security: message.security });
+    this.#emit({ type: "session", hostName: "Local Mac", leaseExpiresAt: message.expiresAtMilliseconds, security: message.security });
     this.#emit({ type: "snapshot", snapshot: message.snapshot });
     this.#emit({ type: "link", health: "healthy", detail: message.security === "lan-prototype-v1" ? "Trusted-LAN pilot · daily lease" : "End-to-end encrypted · daily lease" });
   }
@@ -611,7 +611,7 @@ export function createTransport(
   if (bootstrap) return new LANPadTransport(bootstrap);
   if (typeof localStorage !== "undefined" && readStoredLANSession()) return new LANPadTransport();
   if (globalThis.location?.hostname === "localhost" || globalThis.location?.hostname === "127.0.0.1") return new MockPadTransport();
-  return new UnavailableLiveTransport("Scan a fresh SpeakEasy Pad code on your Mac.");
+  return new UnavailableLiveTransport("Scan a fresh Deck code on your Mac.");
 }
 
 export function linkAllowsCommands(health: LinkHealth): boolean {

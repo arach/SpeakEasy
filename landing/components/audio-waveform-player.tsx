@@ -36,8 +36,7 @@ export default function AudioWaveformPlayer({ audioUrl, className = '' }: AudioW
         barGap: 1,
         height: 40,
         normalize: true,
-        backend: 'WebAudio',
-        responsive: true
+        backend: 'WebAudio'
       })
 
       wavesurferRef.current = wavesurfer
@@ -74,7 +73,7 @@ export default function AudioWaveformPlayer({ audioUrl, className = '' }: AudioW
         }
       })
 
-      wavesurfer.on('seek', () => {
+      wavesurfer.on('seeking', () => {
         if (!isDestroyed && wavesurfer) {
           setCurrentTime(wavesurfer.getCurrentTime())
         }

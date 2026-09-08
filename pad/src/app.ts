@@ -31,7 +31,7 @@ import {
 import { applyPadMode, PAD_MODE_COPY, PAD_MODE_IDS, readPadMode, savePadMode, type PadMode } from "./mode.ts";
 
 const mount = document.querySelector<HTMLDivElement>("#app");
-if (!mount) throw new Error("SpeakEasy Pad could not find its app mount.");
+if (!mount) throw new Error("Deck could not find its app mount.");
 const root: HTMLDivElement = mount;
 const PAD_BUILD = "0802.1";
 
@@ -45,7 +45,7 @@ if (demoAudio) {
 }
 
 let snapshot: PadSnapshot = structuredClone(DEMO_SNAPSHOT);
-let hostName = "SpeakEasy Mac";
+let hostName = "Local Mac";
 let leaseExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
 let sessionSecurity: "demo" | "lan-prototype-v1" | "e2ee-v1" = transport.mode === "demo" ? "demo" : "lan-prototype-v1";
 let health: LinkHealth = "connecting";
@@ -403,7 +403,7 @@ function pttMarkup(extraClass = ""): string {
 }
 
 function commandRailMarkup(extraClass = ""): string {
-  return `<nav class="command-rail ${extraClass}" aria-label="SpeakEasy commands">
+  return `<nav class="command-rail ${extraClass}" aria-label="Deck commands">
     ${commandButton("system.ping", "Ping Mac", "link")}
     ${commandButton("listening.cancel", "Cancel", "stop", true)}
     ${commandButton("playback.replay", "Replay", "replay")}
@@ -670,11 +670,11 @@ function sheetMarkup(): string {
     <section class="sheet install-sheet" role="dialog" aria-modal="true" aria-labelledby="install-title" tabindex="-1" data-focus-id="dialog">
       <button class="sheet-close" type="button" data-dismiss-sheet data-focus-id="sheet-close" aria-label="Close install instructions">${icons.close}</button>
       <p class="eyebrow">FULL-SCREEN CONTROL SURFACE</p>
-      <h2 id="install-title">Add SpeakEasy Pad to Home Screen</h2>
+      <h2 id="install-title">Add Deck to Home Screen</h2>
       <ol>
         <li><span>01</span>Open this page in Safari.</li>
         <li><span>02</span>Tap Share, then “Add to Home Screen.”</li>
-        <li><span>03</span>Launch SpeakEasy from the new icon.</li>
+        <li><span>03</span>Launch Deck from the new icon.</li>
       </ol>
       ${deferredInstall ? '<button type="button" class="sheet-primary" data-install-now>INSTALL NOW</button>' : ""}
       <p class="sheet-note">Installed mode removes the browser toolbar and keeps the Pad focused on your active lanes.</p>
@@ -731,15 +731,15 @@ function fastenersMarkup(): string {
 function topbarMarkup(): string {
   const link = LINK_COPY[health];
   return `<header class="topbar">
-    <div class="brand" aria-label="SpeakEasy Pad">
-      <span class="brand-mark">SE</span>
-      <span class="brand-copy"><strong>SPEAKEASY</strong><small>PAD / CONTROL SURFACE</small></span>
+    <div class="brand" aria-label="Deck, an OpenScout control surface">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 224 236" fill="none"><path d="M103.01 13.21Q112 8 120.99 13.21L198.01 57.79Q207 63 207 73.39V162.61Q207 173 198.01 178.21L120.99 222.79Q112 228 103.01 222.79L25.99 178.21Q17 173 17 162.61V73.39Q17 63 25.99 57.79Z" stroke="currentColor" stroke-width="24" stroke-linejoin="round"/><path d="M112 70 154 94v48l-42 24-42-24V94Z" fill="currentColor"/></svg></span>
+      <span class="brand-copy"><strong>DECK</strong><small>OPENSCOUT / LOCAL CONTROL</small></span>
     </div>
     <div class="topbar-actions">
       <button class="theme-button" type="button" data-appearance data-focus-id="appearance-trigger" aria-label="Change layout and deck theme. Current layout ${PAD_MODE_COPY[mode].label}, ${esc(theme.name)} theme">
         <span class="theme-swatch" aria-hidden="true"></span>${icons.theme}<span>${PAD_MODE_COPY[mode].label}</span>
       </button>
-      <button class="install-button" type="button" data-install data-focus-id="install-trigger" aria-label="Install SpeakEasy Pad">${icons.install}<span>INSTALL</span></button>
+      <button class="install-button" type="button" data-install data-focus-id="install-trigger" aria-label="Install Deck">${icons.install}<span>INSTALL</span></button>
       <button class="link-chip" type="button" data-connection data-focus-id="connection-trigger" data-health="${health}" aria-label="${esc(link.label)}. ${esc(linkDetail || link.detail)}">
         ${mode === "micro" ? `<span class="link-measure">${health === "offline" ? "OFF" : lastAckLatencyMs === undefined ? "— MS" : `${lastAckLatencyMs} MS`}</span>` : barsMarkup(link.bars)}
         <span><strong>${transport.mode === "demo" ? "LOCAL DEMO" : mode === "micro" ? "COMMAND RTT" : esc(link.label)}</strong><small>${transport.mode === "demo" ? "AUDIO ON THIS DEVICE" : esc(hostName)}</small></span>
@@ -753,7 +753,7 @@ function statusRailMarkup(): string {
   return `<footer class="status-rail">
     <span><i class="status-light"></i>${transport.mode === "demo" ? "INTERACTIVE DEMO" : sessionSecurity === "e2ee-v1" ? "SECURE PAD" : "LOCAL PAD"}</span>
     <span class="status-message" aria-live="polite">${esc(notice || snapshot.lastError || (disabled ? linkDetail : transport.mode === "demo" ? "HUDSON TTS · ELEVENLABS · MAC COMMANDS ARE SIMULATED" : "ALL COMMANDS ACKNOWLEDGED BY MAC"))}</span>
-    <span>pad.speakeasy.local:8255 · BUILD ${PAD_BUILD}</span>
+    <span>deck.openscout.app · BUILD ${PAD_BUILD}</span>
   </footer>`;
 }
 
@@ -901,7 +901,7 @@ async function send(
     };
     acknowledgedCommandCount += 1;
     addActivity("ACKNOWLEDGED", successMessage ?? laneDetail, "ok");
-    console.info(`[SpeakEasy Pad] acknowledged ${command.method}`);
+    console.info(`[Deck] acknowledged ${command.method}`);
     notifyNative("acknowledged");
     if (successMessage) showNotice(successMessage);
     return true;
@@ -1043,7 +1043,7 @@ function requestSheetDismiss(): void {
 
 function connectionDiagnostics(): string {
   return [
-    "SpeakEasy Pad diagnostics",
+    "Deck diagnostics",
     `Build: ${PAD_BUILD}`,
     `Host: ${hostName}`,
     `Transport: ${transport.mode}`,

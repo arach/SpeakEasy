@@ -84,7 +84,7 @@ export default function DocsMarkdown({ content }: { content: string }) {
           pre: (props) => {
             const child = props.children as { props?: { className?: string; children?: string } }
             const code = child?.props
-            if (code?.className?.includes("language-")) {
+            if (code?.className?.includes("language-") && typeof code.children === "string") {
               return <CodeBlock className={code.className} children={code.children} />
             }
             return (
@@ -98,7 +98,7 @@ export default function DocsMarkdown({ content }: { content: string }) {
             const { className, children, ...otherProps } = props
             const isInline = !className?.includes("language-")
             if (isInline) {
-              return <CodeBlock inline className={className} children={children} />
+              return <CodeBlock inline className={className} children={String(children ?? "")} />
             }
             return (
               <code className={className} {...otherProps}>

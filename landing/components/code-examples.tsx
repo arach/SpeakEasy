@@ -190,7 +190,7 @@ export default function CodeExamples() {
                 {Object.entries(codeExamples).map(([key, example]) => (
                   <div
                     key={key}
-                    ref={(el) => (contentRefs.current[key] = el)}
+                    ref={(el) => { contentRefs.current[key] = el }}
                     className={`transition-all duration-300 ease-out overflow-x-auto ${
                       activeTab === key 
                         ? 'opacity-100 transform translate-y-0' 

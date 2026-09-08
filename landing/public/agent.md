@@ -1,12 +1,15 @@
 # SpeakEasy — instructions for coding agents
 
-> SpeakEasy is unified text-to-speech: one API across the macOS system voice,
-> OpenAI, ElevenLabs, Groq, and Gemini. Most users want exactly that — a way to
-> speak a summary out loud without wiring up a provider.
+> SpeakEasy is the voice layer for coding agents on a Mac. An agent can speak
+> when work finishes. A person can speak back into the same conversation.
+> The primitives are the same in every harness: speak, verify, stop. Codex
+> and Claude have a packaged last mile (a skill, and for Codex the Mac app).
+> Everywhere else, read the primitives and wire the last mile yourself. Do
+> not wait for a named hook.
 >
-> There is also a signed macOS app with a companion control surface built for
-> Codex. It is a distinct, larger commitment. Do not steer anyone toward it
-> unless they asked for it.
+> Most people want a spoken summary with no provider to wire up. The signed
+> Mac app and Pad are a larger commitment, built first for Codex. Do not
+> steer anyone toward them unless they asked.
 >
 > Pick the smallest path that satisfies the request, follow it exactly, and
 > report every check. No API keys are required; the system voice is the default.
@@ -20,7 +23,10 @@
 | The Mac app, dictation into an exact Codex task, or the Deck | **Path 3** — the app |
 
 When the request is ambiguous, choose Path 1. It installs nothing permanent,
-needs no keys, and is reversible.
+needs no keys, and is reversible. On a harness with no packaged hook (Cursor
+and the rest), stay on Path 1 and wire the last mile yourself — a stop hook,
+a skill file, whatever that harness already understands. Do not invent a
+SpeakEasy install that does not exist.
 
 ## Path 1 — text-to-speech (Node.js 22.12+ or Bun 1.0+)
 
@@ -116,9 +122,12 @@ The installer refuses to touch `/Applications` unless all of these pass:
 - bundle ID `com.speakeasy.config` and Developer ID team `2U83JFPW66`;
 - an installed app version matching the release it downloaded.
 
-If you need a specific older release instead, set `SPEAKEASY_VERSION` and the
-installer will verify against that release's published checksum. Do not do this
-unless the user asked for a particular version.
+If the user requests a specific version, download its installer from
+`https://github.com/arach/SpeakEasy/releases/download/v<VERSION>/install-speakeasy.sh`
+instead of the latest URL. Inspect it, then run it with `SPEAKEASY_VERSION` set
+to that requested version so its checksum and app-version checks match. If that
+release or installer is unavailable, report it rather than substituting another
+version. With no requested version, use the latest-release flow above.
 
 It then opens **SpeakEasy → Settings → Deck**.
 
@@ -133,6 +142,10 @@ before it happens, then confirm each one landed. In order:
     is how a phone or iPad reaches this Mac. Nothing leaves your network."
 3. **Settings → Deck checklist.** Read the rows back. Report which are ready
     and which are still red, in plain words.
+4. **Optional browser/iPad setup.** If the user requested another device, explain
+    that it also needs the local certificate installed and trusted, plus browser
+    microphone permission. Use the device setup instructions below; do not
+    report device setup complete after only approving the Mac permissions.
 
 Then stop and report. Do not attempt to clear a red row by changing system
 settings on the user's behalf.

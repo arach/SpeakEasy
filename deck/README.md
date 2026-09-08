@@ -1,6 +1,6 @@
-# Speakeasy Deck — embeddable control surface
+# Deck
 
-A single self-contained control surface: a 9-pad hardware plate on the left, a lane console
+OpenScout's embeddable local control surface: a 9-pad hardware plate on the left, a lane console
 with conversation, audio scrubbing and a trace rail on the right. One HTML file, vanilla JS —
 no framework, no build step, no CDN.
 
@@ -46,8 +46,9 @@ exists only for explicit local development; a normal start fails closed instead
 of presenting an insecure device link. Is it running? Use
 `curl http://localhost:<port>/healthz` on the printed bootstrap port.
 
-Run SpeakEasy on more Macs to add machines. Each advertises its own `SpeakEasy Deck (<host>)`
-Bonjour service; the native iPad shell lists them in a machine menu and remembers the last choice.
+Run SpeakEasy on more Macs to add machines. Each advertises its own Deck Bonjour service; the
+underlying compatibility identifier remains `SpeakEasy Deck (<host>)`. The native iPad shell lists
+them in a machine menu and remembers the last choice.
 
 ## Set lanes from the deck
 

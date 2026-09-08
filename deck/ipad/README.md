@@ -1,6 +1,6 @@
-# SpeakEasy Deck — iOS app
+# Deck — iOS app
 
-A hybrid iPad and iPhone control surface for `speakeasy deck`. It finds every
+OpenScout's hybrid iPad and iPhone control surface for `speakeasy deck`. It finds every
 Mac on the local network and remembers the selected one. The latency-sensitive
 controls are native SwiftUI; the presentation-heavy lane viewer remains a
 WebKit surface. iPad presents the two as a split. iPhone is intentionally a
@@ -9,8 +9,8 @@ No QR, URL entry, or pin.
 
 ## How it works
 
-- `DeckDiscovery` browses `_http._tcp` for every `SpeakEasy Deck (<mac>)`
-  service advertised over Bonjour. With multiple Macs, a native machine menu
+- `DeckDiscovery` browses `_http._tcp` for every Deck service advertised over
+  Bonjour (using the compatibility identifier `SpeakEasy Deck (<mac>)`). With multiple Macs, a native machine menu
   switches between them and remembers the last selection.
 - `DeckConnection` owns a native `URLSessionWebSocketTask`. The Mac runtime is
   still authoritative: it publishes `snapshot` messages and receives the same
@@ -67,6 +67,12 @@ unchanged unless `surface=console` is explicitly requested by the iPad shell.
 
 ## Build
 
+The current HudsonVoice dependency requires iPadOS/iOS 26 or later. The device
+build script pins Vox to the revision compatible with HudsonVoice's playback
+APIs. The native app now defaults to a compact monochrome terminal layout with
+channel summaries, an adjustable sidebar, native recording and native playback.
+
+
 Requires a sibling `hudson` checkout (`../../../hudson`) for the `HudsonVoice`
 product, which embeds Vox/Parakeet. The macOS app's prebuilt HudsonKit
 XCFrameworks are macOS-only and ship no voice product, so this target consumes
@@ -110,3 +116,43 @@ no certificate profile and remains connected when it is opened normally later.
 | `Sources/DeckTheme.swift` | persistent native/WebKit theme palettes |
 | `Sources/DeckWebView.swift` | presentation-only WebKit lane viewer and paired-host trust |
 | `Sources/Info.plist` | Bonjour, local-network, and microphone permissions |
+
+## TestFlight release
+
+`./release-testflight.sh export` creates a Release archive and App Store signed
+IPA under `.release/0.3.0-1/`. It uses the installed **SpeakEasy Pad App Store**
+provisioning profile and distribution certificate from Keychain. The generated
+project keeps development signing for ordinary device builds; distribution
+signing is scoped to the app’s Release configuration.
+
+Set `SPEAKEASY_RELEASE_VERSION` and a new `SPEAKEASY_RELEASE_BUILD` for each
+upload. `SPEAKEASY_RELEASE_PROFILE` and `SPEAKEASY_RELEASE_DIR` can override the
+profile name and artifact directory.
+
+After creating the **SpeakEasy Deck** App Store Connect app record for
+`dev.arach.speakeasy.deck`, authenticate the `asc` CLI using its Keychain-backed
+profile, then run:
+
+```sh
+ASC_APP_ID='<App Store Connect app ID>' ./release-testflight.sh upload
+```
+
+Set `SPEAKEASY_TESTFLIGHT_GROUP` to an existing beta group when distributing to
+that group. The command waits for Apple processing and installs build testing
+notes. External testers additionally require beta review; an exported IPA or a
+successful upload alone does not mean the build is available to testers.
+
+The native transcript queue binds held speech to the paired Mac and conversation
+that were selected during capture. Changed or unidentified destinations remain
+visible for review rather than being delivered to the currently selected lane.
+Run its destination regression checks without an iPad:
+
+```sh
+swiftc Sources/DeckTranscriptOutbox.swift Tests/TranscriptOutboxTests.swift \
+  -o /tmp/speakeasy-outbox-tests
+/tmp/speakeasy-outbox-tests
+```
+
+For this beta, use an existing agent conversation for dictation. A newly created
+lane without a conversation identity keeps its transcript for manual review; unidentified speech is never guessed onto a
+replacement conversation.

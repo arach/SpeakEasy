@@ -1,7 +1,7 @@
 {
   "name": "@arach/speakeasy",
-  "version": "0.2.19",
-  "description": "Convenient TTS CLI for Mac — centralized credentials + configurable caching so all your apps and agents can speak.",
+  "version": "0.3.0",
+  "description": "Convenient TTS CLI for Mac \u2014 centralized credentials + configurable caching so all your apps and agents can speak.",
   "homepage": "https://speakeasy.arach.dev",
   "repository": {
     "type": "git",

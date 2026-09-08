@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>Pair this device — SpeakEasy Deck</title>
+<title>Pair this device — Deck</title>
 <style>
 /* Light is the complete default on bare :root; dark only overrides. */
 :root {
@@ -36,9 +36,12 @@ body {
 .wrap { width:100%; max-width:30rem; }
 header { margin-bottom:28px; }
 .eyebrow {
+  display:flex; align-items:center; gap:8px;
   font-size:.6875rem; letter-spacing:.14em; text-transform:uppercase;
   color:var(--faint); font-weight:600; margin-bottom:6px;
 }
+.eyebrow svg { width:15px; height:16px; color:var(--text); }
+.eyebrow .parent { color:var(--faint); font-size:.625rem; }
 h1 { font-size:1.5rem; line-height:1.25; letter-spacing:-.01em; font-weight:650; }
 .sub { color:var(--muted); margin-top:8px; font-size:.9375rem; }
 
@@ -104,9 +107,12 @@ kbd {
 <div class="wrap">
 
   <header>
-    <div class="eyebrow">SpeakEasy Deck</div>
+    <div class="eyebrow">
+      <svg viewBox="0 0 224 236" fill="none" aria-hidden="true"><path d="M103.01 13.21Q112 8 120.99 13.21L198.01 57.79Q207 63 207 73.39V162.61Q207 173 198.01 178.21L120.99 222.79Q112 228 103.01 222.79L25.99 178.21Q17 173 17 162.61V73.39Q17 63 25.99 57.79Z" stroke="currentColor" stroke-width="24" stroke-linejoin="round"/><path d="M112 70 154 94v48l-42 24-42-24V94Z" fill="currentColor"/></svg>
+      <span>Deck</span><span class="parent">OpenScout</span>
+    </div>
     <h1>Pair this device</h1>
-    <p class="sub">Three steps, about a minute. Afterwards the deck opens straight from your home screen.</p>
+    <p class="sub">Three steps, about a minute. Afterwards Deck opens straight from your home screen.</p>
   </header>
 
   <!-- No token: nothing here works without one, so say so plainly. -->
@@ -138,9 +144,9 @@ kbd {
     </li>
 
     <li class="step" id="s3">
-      <h2>Open the deck</h2>
-      <p>Once trust is on, this opens the deck over HTTPS — which is also what lets the microphone work. Then <kbd>Share</kbd> → <kbd>Add to Home Screen</kbd>.</p>
-      <a class="btn" id="go" href="#" aria-disabled="true">Open the deck</a>
+      <h2>Open Deck</h2>
+      <p>Once trust is on, this opens Deck over HTTPS — which is also what lets the microphone work. Then <kbd>Share</kbd> → <kbd>Add to Home Screen</kbd>.</p>
+      <a class="btn" id="go" href="#" aria-disabled="true">Open Deck</a>
       <a class="btn ghost" id="retry" href="#">Re-check trust</a>
     </li>
   </ol>

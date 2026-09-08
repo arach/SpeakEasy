@@ -22,7 +22,8 @@ Mac, a browser, or an iPad on your local network.
 
 Paste this bounded task into Codex Desktop:
 
-> Install SpeakEasy on this Mac. Read https://speakeasy.arach.dev/agent.md and
+> Install the latest signed SpeakEasy release on this Mac. Read
+> https://speakeasy.arach.dev/agent.md and
 > follow Path 3. Do not build from source or bypass Gatekeeper. Tell me which
 > version you installed and which human-only steps remain.
 
@@ -169,15 +170,16 @@ For the complete macOS app—local dictation, exact Codex task lanes, native
 narration, and the Deck—the recommended installation flow is a bounded Codex
 task. Paste this into Codex:
 
-> Install SpeakEasy on this Mac. Read https://speakeasy.arach.dev/agent.md and
+> Install the latest signed SpeakEasy release on this Mac. Read
+> https://speakeasy.arach.dev/agent.md and
 > follow Path 3. Do not build from source or bypass Gatekeeper. Tell me which
 > version you installed and which human-only steps remain.
 
 Codex downloads and inspects the installer, verifies the published checksum,
 Gatekeeper acceptance, Developer ID, and the app version against the release it
-downloaded, safely replaces the app, and opens **Settings → Deck**. You only
-approve the microphone and local-network prompts that macOS requires a person to
-handle.
+downloaded, safely replaces the app, and opens **Settings → Deck**. Approve
+microphone access for dictation and local-network access when prompted for the
+browser/iPad Deck.
 
 For a manual install, download the same signed and notarized release:
 
@@ -189,7 +191,18 @@ For a manual install, download the same signed and notarized release:
 
 The release is self-contained and requires an Apple silicon Mac running macOS
 14 or newer. Codex Desktop is required for exact-task voice lanes; the macOS
-system voice works without an API key.
+system voice works without an API key. The packaged app needs no Bun, Node,
+Xcode, or source checkout.
+
+**Optional browser/iPad setup:** connect the device to the same local network,
+open the bootstrap link in **Settings → Deck**, and follow its instructions to
+install and trust the local certificate authority on the device. Then open the
+paired HTTPS link and allow browser microphone access. On iPad, certificate
+setup takes several steps in iOS Settings; it is not needed for Mac-only use.
+See the [quickstart](docs/quickstart.mdx) for the first voice turn and device setup.
+
+Development builds also offer [Herdr channels](docs/herdr.mdx) in the Deck lane
+picker for existing local terminal agents.
 
 For a source build or release development:
 
@@ -219,10 +232,16 @@ Repeat the install on another Mac and it advertises itself separately. The
 native iPad shell shows every available Mac in its machine menu and remembers
 the last one; any laptop can use the QR/copy link from that Mac's Deck tab.
 
-For the TypeScript library or CLI only:
+For the TypeScript library or CLI only, use Node.js 22.12+ or Bun 1.0+ on macOS:
 
 ```bash
+# Add the library to a project
 bun add @arach/speakeasy
+
+# Or install the CLI globally
+bun add --global @arach/speakeasy
+speakeasy --doctor
+speakeasy "Hello, world!" --provider system
 ```
 
 ## Quick Start

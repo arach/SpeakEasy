@@ -40,6 +40,10 @@ jobs:
         working-directory: ./landing
         run: bun install --frozen-lockfile
 
+      - name: Typecheck landing page
+        working-directory: ./landing
+        run: bun run typecheck
+
       - name: Build and export landing page
         working-directory: ./landing
         run: bun run build

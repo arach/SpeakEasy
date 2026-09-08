@@ -1,4 +1,4 @@
-# SpeakEasy Deck — serve the control surface on your LAN.
+# Deck — serve the OpenScout control surface on your LAN.
 # Run from this directory:  caddy run
 # or anywhere:              caddy run --config /path/to/deck/Caddyfile
 # The CLI (`speakeasy deck`) generates an equivalent config automatically.

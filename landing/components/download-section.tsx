@@ -11,9 +11,9 @@ import {
 } from "@/lib/release"
 
 const steps = [
-  ["1", "Give Codex the prompt", "It downloads and inspects the pinned release installer—never a floating latest build."],
+  ["1", "Give Codex the prompt", "It downloads and inspects the installer for the version shown here."],
   ["2", "Let it verify everything", "Checksum, Gatekeeper, Developer ID, version, and safe app replacement are checked in order."],
-  ["3", "Approve the human steps", "You grant microphone and local-network access; Settings verifies Codex and the live bridge."],
+  ["3", "Approve the human steps", "Approve microphone access for dictation and local-network access for the Deck. Browser/iPad use also needs certificate trust and browser microphone access on that device."],
 ]
 
 export default function DownloadSection() {
@@ -33,7 +33,7 @@ export default function DownloadSection() {
               </span>
             </h2>
             <p className="mt-6 max-w-2xl text-lg font-light leading-8 text-white/58">
-              No repository, Bun, Xcode, or server setup. Give Codex one bounded installation task; it verifies and opens the notarized app, then tells you exactly which human permissions remain. The paired browser/iPad Deck is included.
+              No repository, Bun, Xcode, or server setup. Give Codex one bounded installation task; it verifies and opens the notarized app, then reports the remaining setup steps. The included browser/iPad Deck needs a local certificate installed and trusted on each device.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">

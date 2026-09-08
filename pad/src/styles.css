@@ -138,7 +138,7 @@ button:disabled { cursor: not-allowed; }
 .fastener-se { bottom: 11px; right: 11px; }
 
 .topbar {
-  min-height: 54px;
+  min-height: 58px;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -150,23 +150,28 @@ button:disabled { cursor: not-allowed; }
 }
 
 .brand, .brand-copy, .brand-copy small, .topbar-actions, .link-chip, .link-chip > span:last-child, .mission-id, .phase-line, .task-meta, .status-rail span { display: flex; align-items: center; }
-.brand { gap: 11px; }
+.brand { gap: 12px; }
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border: 1px solid var(--rule-strong);
-  border-radius: 7px;
+  border-radius: 8px;
   font: 600 10px/1 var(--mono);
   letter-spacing: 0.1em;
   color: var(--signal);
   background: rgba(var(--signal-rgb), 0.06);
   box-shadow: inset 0 1px rgba(255,255,255,.05);
 }
+.brand-mark svg {
+  width: 21px;
+  height: 22px;
+  overflow: visible;
+}
 .brand-copy { flex-direction: column; align-items: flex-start; gap: 2px; }
-.brand-copy strong { font: 600 13px/1 var(--display); letter-spacing: 0.14em; }
-.brand-copy small { font: 500 8px/1 var(--mono); letter-spacing: 0.16em; color: var(--ink-3); }
+.brand-copy strong { font: 600 14px/1 var(--display); letter-spacing: 0.14em; }
+.brand-copy small { font: 500 7.5px/1 var(--mono); letter-spacing: 0.16em; color: var(--ink-3); }
 .topbar-actions { gap: 8px; }
 
 .theme-button, .install-button, .link-chip {
@@ -835,7 +840,11 @@ button:disabled { cursor: not-allowed; }
 
 @container pad (max-width: 620px) {
   .pad { padding-left: max(6px, env(safe-area-inset-left)); padding-right: max(6px, env(safe-area-inset-right)); }
-  .topbar { padding: 0 12px; min-height: 50px; }
+  .topbar { padding: 0 12px; min-height: 54px; }
+  .brand { gap: 9px; }
+  .brand-mark { width: 32px; height: 32px; }
+  .brand-mark svg { width: 19px; height: 20px; }
+  .brand-copy strong { font-size: 13px; }
   .brand-copy small, .install-button span, .theme-button > span:last-child { display: none; }
   .theme-button { width: 38px; justify-content: center; padding: 0; }
   .theme-swatch { display: none; }
@@ -863,6 +872,69 @@ button:disabled { cursor: not-allowed; }
   .rail-button { flex-direction: column; gap: 5px; font-size: 6.5px; }
   .status-rail { grid-template-columns: 1fr auto; padding: 0 12px; }
   .status-message { display: none !important; }
+}
+
+/* Flight Deck keeps the nine-channel mixer in wide landscape. On portrait and
+   near-square canvases, six shallow strips fit comfortably across; the final
+   three fill a second row and the controls remain full-width underneath. */
+@media (max-aspect-ratio: 6 / 5) and (min-width: 621px) {
+  .pad[data-mode="deck"] .topbar { min-height: 64px; }
+  .pad[data-mode="deck"] .brand-mark { width: 38px; height: 38px; }
+  .pad[data-mode="deck"] .brand-mark svg { width: 23px; height: 24px; }
+  .pad[data-mode="deck"] .brand-copy strong { font-size: 15px; }
+
+  .deck-surface {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 78px auto 272px 32px minmax(0, 1fr);
+  }
+  .deck-header { grid-column: 1 / -1; grid-row: 1; padding: 0 22px; }
+  .deck-header h1 { font-size: 30px; }
+  .deck-header span { font-size: 12px; }
+  .deck-quadrant {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-height: 0;
+    padding: 16px 22px 12px;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: repeat(2, 180px);
+    align-content: start;
+    gap: 8px;
+  }
+  .deck-strip:nth-child(n + 7) { grid-column: span 2; }
+  .deck-strip { grid-template-rows: 38px minmax(0, 1fr) 28px 9px; }
+  .deck-name { font-size: 7.5px; }
+  .deck-action-bar {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    height: 272px;
+    min-height: 0;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-rows: 176px 72px;
+    padding: 4px 22px 12px;
+    gap: 8px;
+  }
+  .deck-action-bar > .rail-button {
+    min-height: 0;
+    flex-direction: row;
+    font-size: 8.5px;
+  }
+  .deck-ptt {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-height: 0;
+    height: 100%;
+    grid-template-columns: 50px 1fr;
+    padding: 16px 18px;
+  }
+  .deck-ptt .ptt-icon { width: 46px; height: 46px; }
+  .deck-ptt .ptt-icon svg { width: 23px; height: 23px; }
+  .deck-ptt .ptt-copy { gap: 7px; }
+  .deck-ptt .ptt-copy strong { font-size: 18px; }
+  .deck-ptt .ptt-copy small { font-size: 9px; }
+  .deck-tape {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
 }
 
 @container pad (max-height: 660px) and (min-width: 901px) {

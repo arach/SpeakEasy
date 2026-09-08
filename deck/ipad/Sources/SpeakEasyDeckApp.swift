@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SpeakEasyDeckApp: App {
+struct DeckApp: App {
     var body: some Scene {
         WindowGroup {
             DeckRootView()

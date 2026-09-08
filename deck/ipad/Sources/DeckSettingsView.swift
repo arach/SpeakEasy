@@ -560,7 +560,7 @@ struct DeckCompanionView: View {
 
     private var diagnostics: String {
         [
-            "SpeakEasy Deck diagnostics",
+            "Deck diagnostics",
             "Mac: \(deck.displayName)",
             "Host: \(deck.url.host ?? "unknown")",
             "Transport: \(deck.url.scheme ?? "unknown")",

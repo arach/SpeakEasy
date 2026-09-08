@@ -128,3 +128,15 @@ describe('Deck transcript delivery', () => {
     });
   });
 });
+
+
+test('holds a transcript if its conversation was rebound before delivery', async () => {
+  const { runtime, calls } = harness();
+  const rejected = await runtime.apply({ name: 'capture.end', lane: 0, text: 'private turn', utteranceId: 'bound-test', expectedThreadId: 'old-conversation', expectedOrigin: 'herdr' });
+  expect(rejected.ok).toBe(false);
+  expect(calls).toHaveLength(0);
+  const retry = await runtime.apply({ name: 'capture.end', lane: 0, text: 'private turn', utteranceId: 'bound-test' });
+  expect(retry.ok).toBe(true);
+  expect(calls).toHaveLength(1);
+  runtime.destroy();
+});

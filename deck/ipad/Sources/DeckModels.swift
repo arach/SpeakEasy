@@ -35,6 +35,15 @@ struct DeckThreadInfo: Decodable, Identifiable {
     let at: Double
     let originator: String
     let isPinned: Bool?
+    let hostName: String?
+    let herdrSession: String?
+    let agentName: String?
+    let agentStatus: String?
+
+    var channelContext: String {
+        guard let herdrSession else { return "\(displayProject.uppercased()) · \(alias)" }
+        return "\(hostName ?? "Mac") › Herdr › \(herdrSession)"
+    }
 
     var displayProject: String {
         if let project, !project.isEmpty { return project }
@@ -66,7 +75,7 @@ struct DeckLaneInfo: Decodable, Identifiable {
 
     /// A deck-created thread has no codex thread id until its first turn
     /// answers, so ownership — not the id — is what makes a lane assigned.
-    var isAssigned: Bool { state != .empty && (threadId != nil || origin == "deck") }
+    var isAssigned: Bool { state != .empty && (threadId != nil || origin == "deck" || origin == "herdr") }
 
     /// True while this lane holds a fresh deck thread that has not spoken yet.
     var isNewDeckThread: Bool { origin == "deck" && threadId == nil }

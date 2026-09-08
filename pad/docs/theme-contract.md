@@ -1,6 +1,6 @@
-# Pad Theme Contract v1
+# Deck Theme Contract v1
 
-A **deck theme** is a Chrome-extension-style manifest that reskins the SpeakEasy Pad control surface. Themes can adjust design tokens (`colors`), add arbitrary `css`, and provide full `html` chrome. As long as a theme plays by this contract, every interaction — push-to-talk, lane selection, commands, sheets, demo audio — keeps working unchanged.
+A **deck theme** is a Chrome-extension-style manifest that reskins the Deck control surface. Themes can adjust design tokens (`colors`), add arbitrary `css`, and provide full `html` chrome. As long as a theme plays by this contract, every interaction — push-to-talk, lane selection, commands, sheets, demo audio — keeps working unchanged.
 
 Themes pin the contract with `pad_theme.contract: 1`. Additions within v1 are backward-compatible.
 

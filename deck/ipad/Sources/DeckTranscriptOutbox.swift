@@ -13,6 +13,13 @@ import OSLog
 /// replays utterances in the order they were spoken and no single index file
 /// can corrupt the whole queue.
 struct DeckTranscriptOutbox {
+    struct Target: Codable, Equatable {
+        let host: String
+        let origin: String
+        let threadId: String?
+        let sessionAlias: String?
+    }
+
     struct Entry: Codable, Equatable, Identifiable {
         let id: String
         let text: String
@@ -21,6 +28,13 @@ struct DeckTranscriptOutbox {
         /// happen minutes later, so the target travels with the transcript
         /// rather than being inferred from wherever the Mac has landed since.
         let lane: Int
+        /// Optional only to decode older entries safely. Untagged entries stay held.
+        let target: Target?
+
+        func matches(_ current: Target?) -> Bool {
+            guard let target, let current else { return false }
+            return target == current
+        }
     }
 
     private let directory: URL
@@ -45,12 +59,13 @@ struct DeckTranscriptOutbox {
     }
 
     @discardableResult
-    func enqueue(text: String, lane: Int, capturedAt: Date = Date()) -> Entry? {
+    func enqueue(text: String, lane: Int, target: Target? = nil, capturedAt: Date = Date()) -> Entry? {
         let entry = Entry(
             id: UUID().uuidString,
             text: text,
             capturedAt: capturedAt.timeIntervalSince1970,
-            lane: lane
+            lane: lane,
+            target: target
         )
 
         do {

@@ -1,6 +1,7 @@
 import AVFAudio
 import Combine
 import Foundation
+import CryptoKit
 import OSLog
 import Security
 
@@ -37,6 +38,56 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
     /// Live narration level and envelope. A separate observable on purpose --
     /// see `DeckPlaybackMeter` -- so 20 Hz metering does not invalidate the deck.
     let meter = DeckPlaybackMeter()
+    @Published private(set) var waveformPreviews: [String: [Double]] = [:]
+    private var waveformRequests = Set<String>()
+
+    func loadWaveform(path: String) {
+        guard waveformPreviews[path] == nil, !waveformRequests.contains(path),
+              let audioURL = deckURL?.deckEndpoint(path: path), let session else { return }
+        waveformRequests.insert(path)
+        session.dataTask(with: audioURL) { [weak self, weak session] data, response, error in
+            let valid = error == nil && (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } == true
+            let envelope = valid ? data.flatMap { Self.decodeWaveform($0) } : nil
+            DispatchQueue.main.async {
+                guard let self, self.session === session else { return }
+                self.waveformRequests.remove(path)
+                if let envelope {
+                    // Each envelope is only 120 numbers; keep earlier visible replies intact.
+                    self.waveformPreviews[path] = envelope
+                }
+            }
+        }.resume()
+    }
+
+    private static func decodeWaveform(_ data: Data) -> [Double]? {
+        guard !data.isEmpty, data.count <= 32 * 1024 * 1024 else { return nil }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".audio")
+        defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            try data.write(to: url)
+            let file = try AVAudioFile(forReading: url)
+            guard file.length > 0, file.length <= 60 * 60 * 192000,
+                  let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 4096) else { return nil }
+            var peaks = Array(repeating: 0.0, count: 120)
+            var offset: AVAudioFramePosition = 0
+            while offset < file.length {
+                try file.read(into: buffer, frameCount: 4096)
+                guard buffer.frameLength > 0, let channels = buffer.floatChannelData else { break }
+                for frame in 0..<Int(buffer.frameLength) {
+                    let bucket = min(119, Int((offset + Int64(frame)) * 120 / file.length))
+                    for channel in 0..<Int(buffer.format.channelCount) {
+                        let sample = Double(abs(channels[channel][frame]))
+                        if sample.isFinite { peaks[bucket] = max(peaks[bucket], sample) }
+                    }
+                }
+                offset += Int64(buffer.frameLength)
+            }
+            guard offset > 0 else { return nil }
+            let maximum = max(0.01, peaks.max() ?? 0)
+            return peaks.map { min(1, sqrt($0 / maximum)) }
+        } catch { return nil }
+    }
+
 
     /// Every intent acknowledgement, on the main thread. `DeckVoice` uses this
     /// to retire transcripts by id, and returns true for the ones it owns.
@@ -47,12 +98,19 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
     var isCapturing = false
 
     private let logger = Logger(subsystem: "dev.arach.speakeasy.deck", category: "native-connection")
+    /// Stable across reconnects, distinct across paired hosts; never persist the capability URL.
+    var transcriptHostIdentity: String? {
+        guard let deckURL else { return nil }
+        return SHA256.hash(data: Data(deckURL.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
     private var deckURL: URL?
     private var pairedHost: String?
     private var session: URLSession?
     private var socket: URLSessionWebSocketTask?
     private var reconnectWork: DispatchWorkItem?
     private var generation = 0
+    private var lastSnapshotRevision = -1
     private var intentID = 0
     private let httpFallbackIntents: Set<String> = ["playback.stop", "capture.cancel", "turn.abort"]
 
@@ -79,6 +137,8 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         reconnectWork?.cancel()
         reconnectWork = nil
         closeTransport()
+        lastSnapshotRevision = -1
+        if deckURL != url { snapshot = nil; waveformPreviews.removeAll() }
 
         deckURL = url
         pairedHost = url.host
@@ -89,6 +149,7 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.timeoutIntervalForRequest = 185
         let newSession = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+        waveformRequests.removeAll()
         session = newSession
         guard let socketURL = url.deckEndpoint(path: "/ws", webSocket: true) else {
             connectionLost("INVALID DECK ADDRESS", generation: currentGeneration)
@@ -164,7 +225,8 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
             }
             DispatchQueue.main.async { [weak self, weak task] in
                 guard let self, let task, self.socket === task else { return }
-                guard next.rev > (self.snapshot?.rev ?? -1) else { return }
+                guard next.rev > self.lastSnapshotRevision else { return }
+                self.lastSnapshotRevision = next.rev
                 self.snapshot = next
                 self.state = .connected
                 self.localStatus = nil
@@ -172,8 +234,8 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
             }
         case "ack":
             guard let ack = try? JSONDecoder().decode(DeckAck.self, from: data) else { return }
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+            DispatchQueue.main.async { [weak self, weak task] in
+                guard let self, let task, self.socket === task else { return }
                 // Voice claims the acks for its own intents and reports them in
                 // its own words; everything else falls through to transport status.
                 if self.onAck?(ack) == true { return }
@@ -380,15 +442,19 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
             audioPlayingID = id
             guard let audioURL = deckURL?.deckEndpoint(path: audioPath), let session else { return }
             let expectedID = id
+            let expectedGeneration = generation
             let task = session.dataTask(with: audioURL) { [weak self] data, response, error in
                 DispatchQueue.main.async {
                     guard let self, self.audioPlayingID == expectedID,
+                          self.generation == expectedGeneration, !self.isCapturing,
+                          let current = self.snapshot, current.playing == expectedID,
                           error == nil,
                           let http = response as? HTTPURLResponse,
                           (200..<300).contains(http.statusCode),
                           let data,
                           let player = try? AVAudioPlayer(data: data) else {
-                        if self?.audioPlayingID == expectedID {
+                        if self?.audioPlayingID == expectedID && self?.generation == expectedGeneration {
+                            self?.audioPlayingID = nil
                             self?.localStatus = "AUDIO PLAYBACK FAILED"
                         }
                         return
@@ -398,10 +464,11 @@ final class DeckConnection: NSObject, ObservableObject, URLSessionDelegate, URLS
                     player.enableRate = true
                     player.isMeteringEnabled = true
                     self.lastLocalSeek = nil
-                    self.configure(player, from: snapshot)
+                    self.configure(player, from: current)
+                    player.currentTime = min(max(0, current.pos), player.duration)
                     player.prepareToPlay()
                     self.meter.begin(id: expectedID, duration: player.duration)
-                    if !snapshot.paused { player.play() }
+                    if !current.paused { player.play() }
                     self.startProgressTimer()
                 }
             }

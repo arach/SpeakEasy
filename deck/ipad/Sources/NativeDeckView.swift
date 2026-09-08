@@ -6,6 +6,19 @@ extension View {
     }
 }
 
+struct SpeakEasyMark: View {
+    let size: CGFloat
+
+    var body: some View {
+        Image("SpeakEasyMark")
+            .resizable()
+            .renderingMode(.original)
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.18))
+    }
+}
+
 struct NativeDeckView: View {
     @ObservedObject var connection: DeckConnection
     @ObservedObject var voice: DeckVoice
@@ -14,6 +27,7 @@ struct NativeDeckView: View {
     let onFindDecks: () -> Void
     @AppStorage(DeckThemeSelection.defaultsKey) private var selectedThemeRaw = DeckThemeID.flight.rawValue
     @AppStorage(DeckSurfaceSelection.defaultsKey) private var selectedSurfaceRaw = DeckSurfaceID.micro.rawValue
+    @AppStorage("speakeasy.deck.terminal-layout") private var usesTerminalLayout = true
     @State private var showingLaneSetup = false
     @State private var showingAppearance = {
         #if DEBUG
@@ -44,7 +58,11 @@ struct NativeDeckView: View {
             let compact = geometry.size.width < 620
             Group {
                 if let snapshot = connection.snapshot {
-                    if compact {
+                    if usesTerminalLayout {
+                        TerminalDeckView(connection: connection, voice: voice, snapshot: snapshot,
+                                         showSetup: { showingLaneSetup = true },
+                                         showConnection: { showingCompanion = true })
+                    } else if compact {
                         KeypadPanel(
                             connection: connection,
                             voice: voice,
@@ -134,8 +152,8 @@ struct NativeDeckView: View {
             .padding(.top, compact ? 6 : 8)
             .padding(.bottom, compact ? 6 : 10)
         }
-        .background(DeckPalette.page.ignoresSafeArea())
-        .preferredColorScheme(selectedTheme.colorScheme)
+        .background(Color.black.ignoresSafeArea())
+        .preferredColorScheme(.dark)
         .onAppear { laneViewer.theme = selectedTheme }
         .onChange(of: selectedThemeRaw) { _, _ in laneViewer.theme = selectedTheme }
         .sheet(isPresented: $showingLaneSetup) {
@@ -164,6 +182,15 @@ struct NativeDeckView: View {
     private var nativeLinkPlaceholder: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
+                SpeakEasyMark(size: 17)
+                Text("DECK")
+                    .deckMono(10, weight: .semibold)
+                    .tracking(1.8)
+                    .foregroundStyle(DeckPalette.ink)
+                Rectangle()
+                    .fill(DeckPalette.lineSoft)
+                    .frame(width: 1, height: 17)
+
                 Button { showingCompanion = true } label: {
                     HStack(spacing: 7) {
                         Circle()
@@ -350,6 +377,15 @@ struct KeypadPanel: View {
     /// chrome on the right. No second title bar above the plate.
     private var panelHeader: some View {
         HStack(spacing: compact ? 6 : 8) {
+            SpeakEasyMark(size: compact ? 14 : 15)
+            Text("DECK")
+                .deckMono(compact ? 8.5 : 9, weight: .semibold)
+                .tracking(compact ? 1.2 : 1.5)
+                .foregroundStyle(DeckPalette.ink)
+            Rectangle()
+                .fill(DeckPalette.lineSoft)
+                .frame(width: 1, height: compact ? 14 : 15)
+
             Button(action: showCompanion) {
                 HStack(spacing: 7) {
                     Circle()
@@ -2180,11 +2216,11 @@ struct LaneSetupView: View {
                     .deckMono(8.5, weight: .semibold)
                     .tracking(1.3)
                     .foregroundStyle(DeckPalette.accent)
-                Text(currentLane?.title ?? "Unassigned — choose a Codex task")
+                Text(currentLane?.title ?? "Unassigned — choose an agent channel")
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
                     .foregroundStyle(DeckPalette.ink)
                     .lineLimit(1)
-                TextField("Search Codex task titles or projects", text: $query)
+                TextField("Search agents, task titles or projects", text: $query)
                     .textFieldStyle(.plain)
                     .deckMono(11)
                     .padding(.horizontal, 12)
@@ -2225,12 +2261,16 @@ struct LaneSetupView: View {
                             connection.assignLane(laneIndex, threadID: thread.id)
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
+                                if let agent = thread.agentName {
+                                    Text("\(agent.uppercased()) · \(thread.agentStatus ?? "unknown")")
+                                        .deckMono(8, weight: .semibold).foregroundStyle(DeckPalette.ink2)
+                                }
                                 Text(thread.snippet)
                                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                                     .foregroundStyle(DeckPalette.ink)
                                     .lineLimit(2)
                                 HStack {
-                                    Text("\(thread.displayProject.uppercased()) · \(thread.alias)")
+                                    Text(thread.channelContext)
                                         .deckMono(7.5, weight: .medium)
                                         .tracking(0.7)
                                         .foregroundStyle(DeckPalette.ink3)
@@ -2251,7 +2291,7 @@ struct LaneSetupView: View {
                     }
 
                     if filteredCatalog.isEmpty {
-                        Text(connection.snapshot?.catalogError ?? "No matching Codex tasks")
+                        Text(connection.snapshot?.catalogError ?? "No matching agent channels")
                             .deckMono(9)
                             .foregroundStyle(DeckPalette.ink3)
                             .padding(30)
@@ -2354,7 +2394,7 @@ struct LaneSetupView: View {
         let terms = query.lowercased().split(whereSeparator: \.isWhitespace)
         guard !terms.isEmpty else { return catalog }
         return catalog.filter { thread in
-            let haystack = "\(thread.displayProject) \(thread.snippet) \(thread.preview ?? "") \(thread.cwd) \(thread.id)".lowercased()
+            let haystack = "\(thread.channelContext) \(thread.agentName ?? "") \(thread.displayProject) \(thread.snippet) \(thread.preview ?? "") \(thread.cwd) \(thread.id)".lowercased()
             return terms.allSatisfy { haystack.contains($0) }
         }
     }
@@ -2478,5 +2518,393 @@ struct PlateFasteners: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Native counterpart to the compact monochrome browser terminal.
+/// Audio capture, durable delivery, and playback stay with the existing owners.
+private struct TerminalDeckView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject var connection: DeckConnection
+    @ObservedObject var voice: DeckVoice
+    let snapshot: DeckSnapshot
+    let showSetup: () -> Void
+    let showConnection: () -> Void
+    @AppStorage("speakeasy.terminal.sidebar") private var sidebarWidth = 250.0
+    @State private var dragWidth: Double?
+    @State private var holding = false
+    @State private var showingExplore = false
+    private let accent = Color(red: 0.80, green: 0.85, blue: 0.51)
+    private let rule = Color(white: 0.22)
+    private let secondary = Color(white: 0.67)
+
+    var body: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    SpeakEasyMark(size: 23)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("SPEAKEASY").deckMono(12, weight: .semibold).tracking(2)
+                        Text("VOICE TERMINAL").deckMono(8).tracking(1.5).foregroundStyle(secondary)
+                    }
+                    Spacer()
+                    Button(action: showConnection) {
+                        Label(snapshot.host.uppercased(), systemImage: "network")
+                            .deckMono(10).foregroundStyle(secondary)
+                    }
+                    Button("EXPLORE") { showingExplore = true }
+                        .deckMono(10, weight: .medium).padding(12)
+                    Button("SET LANES", action: showSetup)
+                        .deckMono(10, weight: .medium).padding(.horizontal, 14).padding(.vertical, 12)
+                        .background(Color(white: 0.08), in: RoundedRectangle(cornerRadius: 5))
+                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(rule))
+                }.padding(.horizontal, 16).frame(height: 52)
+                Rectangle().fill(rule).frame(height: 1)
+                HStack(spacing: 0) {
+                    channels.frame(width: min(max(160, sidebarWidth), max(160, geometry.size.width - 330)))
+                    Rectangle().fill(Color(white: 0.07)).frame(width: 14)
+                        .overlay(Capsule().fill(secondary).frame(width: 2, height: 32))
+                        .contentShape(Rectangle())
+                        .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+                            if dragWidth == nil { dragWidth = sidebarWidth }
+                            sidebarWidth = min(max(160, (dragWidth ?? sidebarWidth) + value.translation.width), max(160, min(440, geometry.size.width - 330)))
+                        }.onEnded { _ in dragWidth = nil })
+                        .accessibilityLabel("Channel sidebar width")
+                        .accessibilityValue("\(Int(sidebarWidth)) points")
+                        .accessibilityAdjustableAction { direction in
+                            sidebarWidth = min(440, max(160, sidebarWidth + (direction == .increment ? 16 : -16)))
+                        }
+                    conversation
+                }
+            }
+            .foregroundStyle(Color(white: 0.95))
+            .background(Color.black)
+            .buttonStyle(.plain)
+        }
+        .sheet(isPresented: $showingExplore) {
+            HerdrExploreView(connection: connection).presentationDetents([.large])
+        }
+        .onDisappear { if holding { holding = false; voice.pttCancelled() } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active && holding { holding = false; voice.pttCancelled() }
+        }
+    }
+
+    private var channels: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("[ CHANNELS ]").deckMono(9).tracking(1.5).foregroundStyle(secondary).padding(14)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(snapshot.lanes.enumerated()), id: \.offset) { index, lane in
+                            Button {
+                                guard !holding else { return }
+                                connection.selectLane(index)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    HStack {
+                                        Text(lane.num).deckMono(14, weight: .semibold)
+                                        Spacer()
+                                        Circle().fill(lane.state == .working || lane.state == .speaking ? accent : Color(white: 0.3)).frame(width: 5, height: 5)
+                                    }
+                                    Text(lane.project ?? lane.name).deckMono(10, weight: .medium).lineLimit(1)
+                                    Text(lane.title).deckMono(11).lineLimit(2).multilineTextAlignment(.leading)
+                                    Text(lane.branch ?? snapshot.lastAgentMessage(in: index)?.text ?? "No replies yet")
+                                        .deckMono(9).foregroundStyle(secondary).lineLimit(1)
+                                    HStack {
+                                        Text(lane.isAssigned ? lane.state.rawValue.uppercased() : "UNASSIGNED")
+                                        Spacer()
+                                        Text("\(replyCount(index)) REPLIES")
+                                    }.deckMono(8).foregroundStyle(secondary)
+                                }
+                                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(index == snapshot.lane ? Color(white: 0.14) : Color(white: 0.045))
+                                .overlay(alignment: .leading) { if index == snapshot.lane { Rectangle().fill(accent).frame(width: 2) } }
+                                .overlay(alignment: .bottom) { Rectangle().fill(rule).frame(height: 0.5) }
+                            }.id(index)
+                        }
+                    }
+                }
+                .onAppear { proxy.scrollTo(snapshot.lane, anchor: .center) }
+                .onChange(of: snapshot.lane) { _, lane in proxy.scrollTo(lane, anchor: .center) }
+            }
+            Button("+ CONNECT CHANNEL", action: showSetup)
+                .deckMono(10).frame(maxWidth: .infinity, minHeight: 44)
+                .overlay(alignment: .top) { Rectangle().fill(rule).frame(height: 1) }
+        }.background(Color(white: 0.045))
+    }
+
+    private func replyCount(_ index: Int) -> Int {
+        snapshot.threads.indices.contains(index) ? snapshot.threads[index].filter { $0.role == "agent" }.count : 0
+    }
+
+    private var conversation: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 9) {
+                Text("ACTIVE LANE \(snapshot.activeLane?.num ?? "—")").deckMono(8).tracking(1.5).foregroundStyle(secondary)
+                Text(snapshot.activeLane?.title ?? "Choose a channel").deckMono(20, weight: .semibold).lineLimit(2)
+                HStack(alignment: .top, spacing: 20) {
+                    fact("PROJECT", snapshot.activeLane?.project ?? "—")
+                    fact("BRANCH", snapshot.activeLane?.branch ?? "—")
+                }
+                fact("WORKSPACE", snapshot.activeLane?.cwd ?? "—")
+            }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            Rectangle().fill(rule).frame(height: 1)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 18) {
+                        HStack {
+                            Text("CONVERSATION")
+                            Spacer()
+                            Text("\(snapshot.activeMessages.count) MESSAGES")
+                        }.deckMono(8).tracking(1).foregroundStyle(secondary)
+                        ForEach(Array(snapshot.activeMessages.enumerated()), id: \.offset) { index, message in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(message.role == "you" ? "YOU" : "AGENT").deckMono(8).foregroundStyle(secondary)
+                                Text(message.text).deckMono(13).lineSpacing(5).textSelection(.enabled)
+                                if message.hasAudio {
+                                    HStack(spacing: 14) {
+                                        Button {
+                                            connection.sendIntent("playback.toggle", ["id": "\(snapshot.lane):\(index)"])
+                                        } label: {
+                                            Image(systemName: snapshot.playing == "\(snapshot.lane):\(index)" && !snapshot.paused ? "pause.fill" : "play.fill")
+                                                .frame(width: 36, height: 36).background(accent, in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(.black)
+                                        }.accessibilityLabel("Play or pause reply")
+                                        TerminalReplyWave(meter: connection.meter,
+                                                          messageID: "\(snapshot.lane):\(index)",
+                                                          duration: message.dur,
+                                                          preview: connection.waveformPreviews[message.audioUrl ?? ""],
+                                                          accent: accent) { fraction in
+                                            connection.sendIntent("playback.scrub", ["id": "\(snapshot.lane):\(index)", "frac": fraction])
+                                        }.frame(height: 38)
+                                            .task(id: message.audioUrl) {
+                                                if let path = message.audioUrl { connection.loadWaveform(path: path) }
+                                            }
+                                        Text(String(format: "%.0fs", message.dur)).deckMono(10).foregroundStyle(secondary)
+                                        Spacer()
+                                        Button(DeckPlaybackSpeeds.label(at: snapshot.speedIx)) { connection.sendIntent("playback.speed") }.deckMono(11).frame(minWidth: 44, minHeight: 36)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, message.role == "you" ? 16 : 2)
+                            .padding(.vertical, message.role == "you" ? 12 : 8)
+                            .background {
+                                if message.role == "you" {
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .fill(Color(white: 0.12))
+                                }
+                            }
+                            .padding(.leading, message.role == "you" ? 36 : 0)
+                            .padding(.trailing, message.role == "you" ? 0 : 20)
+                            .frame(maxWidth: .infinity, alignment: message.role == "you" ? .trailing : .leading)
+                            .id(index)
+                        }
+                        Color.clear.frame(height: 1).id("end")
+                    }.padding(16)
+                }
+                .onChange(of: snapshot.activeMessages.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+                .onChange(of: snapshot.lane) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+            }
+            controls
+        }.background(Color(white: 0.025))
+    }
+
+    private func fact(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label).deckMono(8).foregroundStyle(secondary)
+            Text(value).deckMono(10).lineLimit(1).truncationMode(.middle)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var controls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(systemName: "mic").font(.system(size: 20))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(holding ? "RELEASE TO SEND" : "HOLD TO SPEAK").deckMono(11, weight: .semibold)
+                        Text(voice.phase == .recording ? "Microphone on" : holding ? "Starting microphone" : "Microphone off").deckMono(9)
+                    }
+                    Spacer()
+                    HStack(spacing: 2) {
+                        ForEach(0..<18) { index in
+                            Rectangle().frame(width: 2, height: holding ? 3 + voice.inputLevel * Double(8 + (index % 5) * 4) : 2)
+                        }
+                    }.frame(height: 28).accessibilityHidden(true)
+                }
+                .foregroundStyle(.black).padding(14).frame(minHeight: 62)
+                .background(holding ? accent : Color(white: 0.92), in: RoundedRectangle(cornerRadius: 5))
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0).onChanged { _ in
+                    if !holding && !voice.phase.isBusy && snapshot.activeLane?.isAssigned == true { holding = true; voice.pttBegan() }
+                }.onEnded { _ in if holding { holding = false; voice.pttEnded() } })
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(holding ? "Send recording" : "Start recording")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction {
+                    if holding { holding = false; voice.pttEnded() }
+                    else if !voice.phase.isBusy && snapshot.activeLane?.isAssigned == true { holding = true; voice.pttBegan() }
+                }
+                Button {
+                    holding = false; voice.stopCapture(); connection.stop()
+                } label: { Image(systemName: "stop.fill").frame(width: 44, height: 44) }
+                .accessibilityLabel("Stop")
+            }
+            HStack {
+                Text(connection.localStatus ?? voice.status ?? voice.phase.label).lineLimit(2)
+                Spacer()
+                Slider(value: Binding(get: { snapshot.vol }, set: { connection.sendIntent("playback.volume", ["vol": $0]) }), in: 0...1)
+                    .tint(Color(white: 0.7)).frame(width: 110).accessibilityLabel("Narration volume")
+            }.deckMono(8).foregroundStyle(secondary)
+        }.padding(12).background(Color(white: 0.055))
+            .overlay(alignment: .top) { Rectangle().fill(rule).frame(height: 1) }
+    }
+}
+
+/// Full-file audio preview with progress from the native player.
+private struct TerminalReplyWave: View {
+    @ObservedObject var meter: DeckPlaybackMeter
+    let messageID: String
+    let duration: Double
+    let preview: [Double]?
+    let accent: Color
+    let seek: (Double) -> Void
+    private var progress: Double {
+        meter.id == messageID ? min(1, max(0, meter.position / max(duration, 0.01))) : 0
+    }
+    var body: some View {
+        GeometryReader { geometry in
+            Canvas { context, size in
+                let count = 64
+                let slot = size.width / Double(count)
+                for index in 0..<count {
+                    let bucket = index * DeckPlaybackMeter.bucketCount / count
+                    let level = preview?.indices.contains(bucket) == true ? preview![bucket] : 0
+                    let height = max(2, min(1, level) * (size.height - 4))
+                    let rect = CGRect(x: Double(index) * slot, y: (size.height - height) / 2, width: max(1, slot - 2), height: height)
+                    context.fill(Path(roundedRect: rect, cornerRadius: 1), with: .color(Double(index) / Double(count) < progress ? accent : Color(white: 0.34)))
+                }
+                if meter.id == messageID {
+                    let rect = CGRect(x: max(0, min(size.width - 1, progress * size.width)), y: 2, width: 1, height: size.height - 4)
+                    context.fill(Path(rect), with: .color(Color(white: 0.85)))
+                }
+            }
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onEnded { value in
+                seek(min(1, max(0, value.location.x / max(1, geometry.size.width))))
+            })
+        }
+        .accessibilityLabel("Reply waveform and playback position")
+        .accessibilityValue("\(Int(progress * 100)) percent")
+        .accessibilityAdjustableAction { direction in seek(min(1, max(0, progress + (direction == .increment ? 0.1 : -0.1)))) }
+    }
+}
+
+
+private struct HerdrExploreView: View {
+    @ObservedObject var connection: DeckConnection
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    private var agents: [DeckThreadInfo] {
+        (connection.snapshot?.catalog ?? []).filter { $0.originator == "herdr" }
+    }
+    private var matches: [DeckThreadInfo] {
+        agents.filter { query.isEmpty || "\($0.channelContext) \($0.snippet) \($0.agentName ?? "") \($0.cwd) \($0.agentStatus ?? "")".localizedCaseInsensitiveContains(query) }
+    }
+    private var sessions: [String] { Array(Set(matches.map(\.channelContext))).sorted() }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top, spacing: 16) {
+                        Image(systemName: "desktopcomputer")
+                            .font(.system(size: 28, weight: .light))
+                            .frame(width: 56, height: 56)
+                            .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("CONNECTED HOST").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).foregroundStyle(.secondary)
+                            Text(connection.snapshot?.host ?? "Disconnected")
+                                .font(.system(size: 22, weight: .semibold))
+                            Text("Your Herdr landscape").font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                    HStack(spacing: 22) {
+                        metric("SESSIONS", Set(agents.compactMap(\.herdrSession)).count)
+                        metric("AGENTS", agents.count)
+                        metric("WORKING", agents.filter { $0.agentStatus == "working" }.count)
+                        metric("ATTENTION", agents.filter { $0.agentStatus == "blocked" || $0.agentStatus == "unlinked" }.count)
+                    }.padding(.top, 6)
+                }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(white: 0.055), in: RoundedRectangle(cornerRadius: 20))
+                ForEach(sessions, id: \.self) { session in
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 9) {
+                            Image(systemName: "square.stack.3d.up").foregroundStyle(.secondary)
+                            Text(matches.first { $0.channelContext == session }?.herdrSession ?? session)
+                                .font(.system(size: 16, weight: .semibold))
+                            Spacer()
+                            Text("\(matches.filter { $0.channelContext == session }.count) agents")
+                                .font(.caption.monospaced()).foregroundStyle(.secondary)
+                        }.padding(.bottom, 14)
+
+                        ForEach(matches.filter { $0.channelContext == session }) { agent in
+                            DisclosureGroup {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    LabeledContent("Agent", value: agent.agentName ?? "Unknown")
+                                    LabeledContent("State", value: agent.agentStatus ?? "unknown")
+                                    Text(agent.cwd).textSelection(.enabled)
+                                    let lanes = (connection.snapshot?.lanes ?? []).filter { $0.threadId == agent.id }
+                                    Text(lanes.isEmpty ? "Not assigned to a lane" : "Lane " + lanes.map(\.num).joined(separator: ", "))
+                                        .foregroundStyle(.secondary)
+                                    if agent.agentStatus == "unlinked" {
+                                        Text("Session integration is required before voice can target this conversation.")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }.font(.footnote.monospaced()).padding(.vertical, 8)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Circle().fill(agent.agentStatus == "working" ? Color(red: 0.80, green: 0.85, blue: 0.51) : Color(white: 0.42))
+                                        .frame(width: 6, height: 6)
+                                    VStack(alignment: .leading, spacing: 5) {
+                                    Text(agent.snippet).font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
+                                    Text("\(agent.agentName ?? "Agent") · \(agent.agentStatus ?? "unknown")")
+                                        .font(.caption.monospaced()).foregroundStyle(.secondary)
+                                    }
+                                }.padding(.vertical, 10)
+                            }
+                            Rectangle().fill(Color(white: 0.14)).frame(height: 1)
+                        }
+                    }
+                }
+                if matches.isEmpty {
+                    Text(query.isEmpty ? "No Herdr agents found on this Mac. Open a Herdr session, then refresh." : "No matching agents")
+                        .foregroundStyle(.secondary)
+                }
+                if let error = connection.snapshot?.catalogError {
+                    Text(error).font(.footnote).foregroundStyle(.secondary)
+                }
+                }.padding(20).frame(maxWidth: 900).frame(maxWidth: .infinity)
+            }
+            .background(Color.black)
+            .searchable(text: $query, prompt: "Sessions, agents, workspaces or states")
+            .navigationTitle("Explore")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Refresh", systemImage: "arrow.clockwise") { connection.refreshCatalog() }
+                }
+                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
+            }
+            .onAppear { connection.refreshCatalog() }
+        }.preferredColorScheme(.dark).tint(.white)
+    }
+
+    private func metric(_ title: String, _ value: Int) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(String(value)).font(.system(size: 20, weight: .medium, design: .monospaced)).monospacedDigit()
+            Text(title).font(.system(size: 8, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
+        }
     }
 }

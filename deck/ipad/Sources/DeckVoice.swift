@@ -72,9 +72,17 @@ final class DeckVoice: ObservableObject {
     private var isArming = false
     private var hasActivated = false
 
-    private static func lane(fromContext context: String?) -> Int? {
-        guard let context, context.hasPrefix("lane:") else { return nil }
-        return Int(context.dropFirst("lane:".count))
+    private struct CaptureDestination: Codable {
+        let lane: Int
+        let target: DeckTranscriptOutbox.Target?
+    }
+
+    private func target(for lane: Int) -> DeckTranscriptOutbox.Target? {
+        guard let connection, let host = connection.transcriptHostIdentity,
+              let snapshot = connection.snapshot, snapshot.lanes.indices.contains(lane) else { return nil }
+        let info = snapshot.lanes[lane]
+        guard let origin = info.origin, let thread = info.threadId else { return nil }
+        return .init(host: host, origin: origin, threadId: thread, sessionAlias: info.sessionAlias)
     }
 
     init() {
@@ -197,7 +205,9 @@ final class DeckVoice: ObservableObject {
         // with the socket down, and the transcript waits its turn. The lane
         // travels with the audio so speech held through a model download lands
         // where it was spoken, not wherever the operator has since navigated.
-        dictation.captureContext = "lane:\(snapshot?.lane ?? 0)"
+        let captureLane = snapshot?.lane ?? 0
+        let destination = CaptureDestination(lane: captureLane, target: target(for: captureLane))
+        dictation.captureContext = (try? JSONEncoder().encode(destination)).flatMap { String(data: $0, encoding: .utf8) }
         isArming = true
         status = DeckCapturePhase.arming.label
         connection?.beginCapture()
@@ -238,16 +248,15 @@ final class DeckVoice: ObservableObject {
     // MARK: - Delivery
 
     private func accept(transcript: String) {
-        let text = String(transcript.trimmingCharacters(in: .whitespacesAndNewlines).prefix(500))
+        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             refreshPhase()
             return
         }
         // For a held utterance this is the lane from capture time, not now.
-        let lane = Self.lane(fromContext: dictation.lastFinalContext)
-            ?? connection?.snapshot?.lane
-            ?? 0
-        guard outbox.enqueue(text: text, lane: lane) != nil else {
+        let destination = dictation.lastFinalContext.flatMap { $0.data(using: .utf8) }
+            .flatMap { try? JSONDecoder().decode(CaptureDestination.self, from: $0) }
+        guard outbox.enqueue(text: text, lane: destination?.lane ?? 0, target: destination?.target) != nil else {
             status = "COULD NOT SAVE TRANSCRIPT"
             return
         }
@@ -265,8 +274,21 @@ final class DeckVoice: ObservableObject {
             refreshPhase()
             return
         }
+        // The runtime currently accepts 500 UTF-16 code units. Preserve the
+        // complete text for review rather than silently sending a prefix.
+        guard entry.text.utf16.count <= 500 else {
+            status = "LONG TRANSCRIPT HELD · REVIEW IN CONNECTION"
+            refreshPhase()
+            return
+        }
         guard let connection, connection.state == .connected else {
             status = "\(undelivered) TRANSCRIPT\(undelivered == 1 ? "" : "S") WAITING FOR MAC"
+            refreshPhase()
+            return
+        }
+
+        guard entry.matches(target(for: entry.lane)) else {
+            status = "DESTINATION CHANGED · TRANSCRIPT HELD FOR REVIEW"
             refreshPhase()
             return
         }
@@ -275,6 +297,8 @@ final class DeckVoice: ObservableObject {
             "text": entry.text,
             "utteranceId": entry.id,
             "lane": entry.lane,
+            "expectedThreadId": entry.target?.threadId ?? NSNull() as Any,
+            "expectedOrigin": entry.target?.origin ?? NSNull() as Any,
         ]) else {
             scheduleRetry(after: 2.5)
             return

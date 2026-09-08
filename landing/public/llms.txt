@@ -1,21 +1,28 @@
 # SpeakEasy
 
-> SpeakEasy is a text-to-speech CLI and SDK for macOS that gives coding agents a
-> voice: spoken task summaries, a word-synced HUD, and an iPad control deck. Works
-> with zero API keys via the macOS system voice; OpenAI, ElevenLabs, Groq, and
-> Gemini voices are optional.
+> Voice layer for coding agents on macOS. The agent can speak when a task
+> finishes. A person can speak back into the same conversation. The
+> primitives (speak, verify, stop) work in every harness. Codex and Claude
+> have a packaged last mile. Everywhere else, the agent wires it from the
+> primitives. No API key required for the macOS system voice.
 
-## Agent instructions
+## Start here
 
-- [agent.md](https://speakeasy.arach.dev/agent.md): runbook a coding agent can follow to install, verify, and speak for its user
+- [agent.md](https://speakeasy.arach.dev/agent.md): the runbook. Read it and follow the smallest path that matches the request. When the request is ambiguous, use Path 1 (CLI, no install). Do not install a harness hook the user did not name.
+
+## Paths (do not upgrade unless asked)
+
+1. Primitives, any agent — `npx @arach/speakeasy`, system voice, nothing added to the project. If no packaged hook exists, wire the last mile from this.
+2. Packaged last mile — `npx @arach/speakeasy plugin codex` or `plugin claude`
+3. Signed Mac app + Deck / Pad — Codex talk-back only, and only when the user asks for the app, dictation, or the Pad
 
 ## Docs
 
-- [Docs](https://speakeasy.arach.dev/docs): full CLI reference and configuration
-- [npm package](https://www.npmjs.com/package/@arach/speakeasy): install, versions
-- [GitHub](https://github.com/arach/SpeakEasy): source code and issues
-- [Codex plugin](https://github.com/arach/SpeakEasy/tree/master/plugins/speakeasy): native macOS skill with menu-bar player and word-synced HUD
+- [Docs](https://speakeasy.arach.dev/docs): CLI and SDK reference
+- [npm](https://www.npmjs.com/package/@arach/speakeasy): package
+- [GitHub](https://github.com/arach/SpeakEasy): source
+- [The Pad](https://speakeasy.arach.dev/codex/): Codex talk-back surface (iPad app not shipping yet)
 
 ## Optional
 
-- [Landing page](https://speakeasy.arach.dev): human-facing quickstart and demos
+- [Landing page](https://speakeasy.arach.dev): the human-facing dispatch. Each hook has a short job for the agent; Copy pastes a fuller prompt. Add `?view=agent` to show those jobs.

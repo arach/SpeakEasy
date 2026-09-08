@@ -1,6 +1,9 @@
 #!/bin/zsh
 set -euo pipefail
 
+# Match HudsonVoice's playback APIs without pulling the newer optional ASR graph.
+export HUDSON_VOX_GIT_REVISION="${HUDSON_VOX_GIT_REVISION:-0989a058e04da9a5b012d38a577c772d13906745}"
+
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 PROJECT="$ROOT/SpeakEasyDeck.xcodeproj"
 SCHEME="SpeakEasyDeck"

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="porcelain">
+<html lang="en" data-theme="porcelain" data-mode="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -57,25 +57,25 @@
 /* Porcelain is the default finish: it is the bare :root fallback as well as an
    explicitly selectable theme, so an unset data-theme lands here, not on flight. */
 :root, :root[data-theme="porcelain"], .theme-porcelain {
-  --f-text:#1D2328; --f-muted:#5F6C75; --f-faint:#78868F;
-  --f-accent:#2E7D8C; --f-accent-ink:#F2F7F8; --f-amber:#9A6421; --f-red:#B4443C;
-  --f-slab-hi:#FFFFFF; --f-slab-lo:#E4EAEE; --f-slab-edge:#C2CED6;
-  --f-pad-hi:#FFFFFF; --f-pad-lo:#EAF0F3; --f-pad-edge:#C6D2DA; --f-pad-text:#2A343B;
-  --f-floor:rgba(60,75,85,.18);
-  --f-bev-hi:rgba(255,255,255,.95); --f-bev-lo:rgba(42,64,78,.17);
-  --f-metal-a:#CBD6DD; --f-metal-b:#8494A0;
+  --f-text:#151C21; --f-muted:#5A666F; --f-faint:#73818A;
+  --f-accent:#1A8A9C; --f-accent-ink:#F3FBFC; --f-amber:#9A6421; --f-red:#B4443C;
+  --f-slab-hi:#FFFFFF; --f-slab-lo:#E1E8ED; --f-slab-edge:#B6C4CD;
+  --f-pad-hi:#FFFFFF; --f-pad-lo:#E6EEF2; --f-pad-edge:#B8C7D0; --f-pad-text:#1E282E;
+  --f-floor:rgba(40,58,70,.18);
+  --f-bev-hi:rgba(255,255,255,.95); --f-bev-lo:rgba(28,52,66,.18);
+  --f-metal-a:#C5D2D9; --f-metal-b:#7A8B95;
 }
 
 /* ---- page mode: light (complete default on bare :root) ---- */
 :root {
   color-scheme:light;
-  --bg:#FBFAF7; --bg2:#F3EFE5; --panel:#FDFCF8; --hairline:#E4DECF; --hairline2:#D1C8B2;
-  --text:#262219; --muted:#6E6554; --faint:#857B67;
-  --accent:#1E7A54; --accent-ink:#F1FAF5; --amber:#8A5F1C; --red:#B4443C;
-  --floor:rgba(88,74,50,.30);
+  --bg:#FBFCFD; --bg2:#F4F7F9; --panel:#FFFFFF; --hairline:#E4EAEE; --hairline2:#D0D8DE;
+  --text:#151C21; --muted:#5A666F; --faint:#73818A;
+  --accent:#1A8A9C; --accent-ink:#F3FBFC; --amber:#8A5F1C; --red:#B4443C;
+  --floor:rgba(40,58,70,.16);
   /* page-card lighting: one raised-paper treatment shared by every flat panel */
   --card-hi:rgba(255,255,255,.9);
-  --card-sh:0 1px 1px rgba(74,62,40,.04), 0 10px 26px -20px rgba(74,62,40,.45);
+  --card-sh:0 1px 1px rgba(28,52,66,.04), 0 10px 26px -20px rgba(28,52,66,.40);
   /* finish aliases, so page-level chrome (e.g. .key.ghost) can borrow the instrument skin */
   --slab-hi:var(--f-slab-hi); --slab-lo:var(--f-slab-lo); --slab-edge:var(--f-slab-edge);
   --pad-hi:var(--f-pad-hi); --pad-lo:var(--f-pad-lo); --pad-edge:var(--f-pad-edge); --pad-text:var(--f-pad-text);
@@ -87,9 +87,9 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-mode="light"]) {
     color-scheme:dark;
-    --bg:#2A2722; --bg2:#211E1A; --panel:#35312A; --hairline:#3E392F; --hairline2:#4F4839;
-    --text:#EDE7D9; --muted:#A79C88; --faint:#8B816D;
-    --accent:#6FE3B4; --accent-ink:#062A1E; --amber:#F0B45A; --red:#F0645A;
+    --bg:#14181C; --bg2:#101418; --panel:#1C2228; --hairline:#2A323A; --hairline2:#3A444C;
+    --text:#E8EEF2; --muted:#8B969E; --faint:#6E7A82;
+    --accent:#7EC9D4; --accent-ink:#062228; --amber:#F0B45A; --red:#F0645A;
     --floor:rgba(0,0,0,.5);
     --card-hi:rgba(255,255,255,.05);
     --card-sh:0 1px 1px rgba(0,0,0,.22), 0 12px 30px -22px rgba(0,0,0,.85);
@@ -97,9 +97,9 @@
 }
 :root[data-mode="dark"] {
   color-scheme:dark;
-  --bg:#2A2722; --bg2:#211E1A; --panel:#35312A; --hairline:#3E392F; --hairline2:#4F4839;
-  --text:#EDE7D9; --muted:#A79C88; --faint:#8B816D;
-  --accent:#6FE3B4; --accent-ink:#062A1E; --amber:#F0B45A; --red:#F0645A;
+  --bg:#14181C; --bg2:#101418; --panel:#1C2228; --hairline:#2A323A; --hairline2:#3A444C;
+  --text:#E8EEF2; --muted:#8B969E; --faint:#6E7A82;
+  --accent:#7EC9D4; --accent-ink:#062228; --amber:#F0B45A; --red:#F0645A;
   --floor:rgba(0,0,0,.5);
   --card-hi:rgba(255,255,255,.05);
   --card-sh:0 1px 1px rgba(0,0,0,.22), 0 12px 30px -22px rgba(0,0,0,.85);
@@ -136,7 +136,7 @@ body {
 .label.acc { color:var(--accent); }
 /* Letterspaced caps carry a trailing sidebearing; flush-right labels pull it back
    with a -1ch-ish negative margin at their own tracking (see .unit-head, .swlabel, footer). */
-.wrap { max-width:1180px; margin:0 auto; padding:0 28px; }
+.wrap { max-width:1220px; margin:0 auto; padding:0 28px; }
 section { position:relative; }
 .hairline-t { border-top:1px solid var(--hairline); }
 a { color:inherit; text-decoration:none; }
@@ -154,13 +154,13 @@ h1,h2,h3 { font-weight:300; letter-spacing:-.02em; }
 /* ============ NAV ============ */
 nav {
   position:fixed; top:0; left:0; right:0; z-index:50;
-  background:color-mix(in srgb, var(--bg) 82%, transparent);
-  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  background:color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter:blur(18px) saturate(1.1); -webkit-backdrop-filter:blur(18px) saturate(1.1);
   border-bottom:1px solid var(--hairline);
 }
-nav .wrap { display:flex; align-items:center; justify-content:space-between; height:54px; }
+nav .wrap { display:flex; align-items:center; justify-content:space-between; height:56px; }
 .wordmark { display:flex; align-items:baseline; gap:10px; }
-.wordmark .se { font-weight:600; font-size:14px; letter-spacing:.02em; }
+.wordmark .se { font-weight:500; font-size:14px; letter-spacing:.02em; color:var(--text); }
 .wordmark .ptag { font-family:ui-monospace,Menlo,monospace; font-size:10px; letter-spacing:.28em; color:var(--accent); }
 .navlinks { display:flex; gap:26px; }
 .navlinks a {
@@ -174,7 +174,7 @@ nav .wrap { display:flex; align-items:center; justify-content:space-between; hei
   background:var(--accent); transform:scaleX(0); transform-origin:left;
   transition:transform .16s ease;
 }
-.navlinks a:hover { color:var(--accent); }
+.navlinks a:hover { color:var(--text); }
 .navlinks a:hover::after { transform:scaleX(1); }
 .mac-live { display:flex; align-items:center; gap:7px; font-family:ui-monospace,Menlo,monospace; font-size:9px; letter-spacing:.2em; color:var(--muted); }
 .mode-toggle {
@@ -186,9 +186,12 @@ nav .wrap { display:flex; align-items:center; justify-content:space-between; hei
   transition:color .16s ease, border-color .16s ease, background-color .16s ease;
 }
 .mode-toggle::before { content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:100%; min-width:44px; height:44px; }
-.mode-toggle:hover { color:var(--accent); border-color:color-mix(in srgb, var(--accent) 60%, var(--hairline2)); }
+.mode-toggle:hover { color:var(--accent); border-color:color-mix(in srgb, var(--accent) 45%, var(--hairline2)); }
 .mode-toggle:active { background:var(--bg2); }
-@media (max-width:820px){ .navlinks { display:none; } }
+@media (max-width:820px){
+  .navlinks { display:none; }
+  .mac-live { display:none; }
+}
 
 /* ============ LED ============
    A lit indicator is a lens, not a dot: hotspot toward the light, saturated body,
@@ -214,21 +217,33 @@ nav .wrap { display:flex; align-items:center; justify-content:space-between; hei
 @keyframes breathe { 0%,100%{opacity:1} 50%{opacity:.42} }
 
 /* ============ HERO ============ */
-.hero { min-height:100vh; display:flex; align-items:center; padding:120px 0 80px; overflow:hidden; }
-.hero .wrap { display:grid; grid-template-columns:minmax(320px,.85fr) 1.15fr; gap:56px; align-items:center; width:100%; }
-@media (max-width:980px){ .hero .wrap { grid-template-columns:1fr; gap:64px; } }
-.placard { display:flex; gap:10px; margin-bottom:26px; flex-wrap:wrap; }
-/* child combinator: #chipFinish is a nested span and must not draw its own chip */
-.placard > span {
-  border:1px solid var(--hairline2); border-radius:6px; padding:6px 10px;
-  letter-spacing:.18em; color:var(--muted);
-  background:color-mix(in srgb, var(--panel) 65%, transparent);
-  box-shadow:inset 0 1px 0 var(--card-hi);
+.hero {
+  position:relative; min-height:100vh; display:flex; align-items:center;
+  padding:128px 0 108px; overflow:hidden; color:var(--text);
+  background:var(--bg);
 }
-.placard > span.acc { color:var(--accent); border-color:color-mix(in srgb, var(--accent) 40%, var(--hairline2)); }
-.hero h1 { font-size:clamp(44px,5.6vw,74px); margin:0 0 22px; }
-.hero h1 em { font-style:normal; color:var(--accent); }
-.hero .sub { font-size:17px; font-weight:300; line-height:1.65; color:var(--muted); max-width:440px; margin-bottom:36px; }
+.hero .wrap {
+  position:relative; z-index:1; display:grid;
+  grid-template-columns:minmax(300px,.84fr) minmax(0,1.16fr);
+  gap:48px 40px; align-items:center; width:100%;
+}
+@media (max-width:980px){
+  .hero { padding:108px 0 72px; }
+  .hero .wrap { grid-template-columns:1fr; gap:56px; }
+}
+.hero-meta {
+  margin-bottom:22px; letter-spacing:.22em; color:var(--accent);
+}
+.hero h1 {
+  font-size:clamp(32px,3.7vw,48px); font-weight:200;
+  letter-spacing:-.036em; line-height:1.08;
+  margin:0 0 22px; color:var(--text);
+}
+.hero h1 em { font-style:italic; font-weight:200; color:inherit; }
+.hero .sub {
+  font-size:17px; font-weight:300; line-height:1.65;
+  color:var(--muted); max-width:26rem; margin-bottom:34px;
+}
 
 /* transport-key CTAs */
 .keys { display:flex; gap:12px; flex-wrap:wrap; }
@@ -252,11 +267,22 @@ nav .wrap { display:flex; align-items:center; justify-content:space-between; hei
 .key.ghost:hover { border-color:color-mix(in srgb, var(--accent) 50%, var(--pad-edge)); box-shadow:inset 0 1px 0 var(--bev-hi), inset 0 -3px 0 var(--bev-lo), 0 6px 16px -10px var(--floor); }
 .key:active { transform:translateY(2px); box-shadow:inset 0 1px 0 var(--bev-hi), inset 0 -1px 0 var(--bev-lo); }
 .key.solid:active { box-shadow:inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.26); }
+.hero .aside { font-family:ui-monospace,Menlo,monospace; font-size:9px; letter-spacing:.2em; color:var(--faint); margin-top:22px; }
 
 /* ============ THE UNIT (CSS instrument) ============ */
-.plinth { perspective:1400px; }
+.plinth { perspective:1600px; position:relative; margin-right:-5vw; }
+.plinth::after {
+  content:""; position:absolute; z-index:0; pointer-events:none;
+  left:14%; right:10%; bottom:-18px; height:40px;
+  background:radial-gradient(ellipse, rgba(40,58,70,.18), transparent 72%);
+  filter:blur(8px);
+}
+@media (max-width:980px){
+  .plinth { margin-right:0; }
+  .hero .unit { transform:none; }
+}
 .unit {
-  position:relative;
+  position:relative; z-index:1;
   background:linear-gradient(180deg, var(--slab-hi), var(--slab-lo) 65%);
   border:1px solid var(--slab-edge);
   border-radius:26px;
@@ -265,9 +291,9 @@ nav .wrap { display:flex; align-items:center; justify-content:space-between; hei
     inset 0 1px 0 var(--bev-hi),
     inset 0 -2px 0 var(--bev-lo),
     inset 0 -14px 24px -18px var(--bev-lo),
-    0 40px 80px -30px var(--floor),
-    0 90px 140px -50px var(--floor);
-  transform:rotateX(var(--tilt,9deg));
+    0 30px 50px -28px rgba(0,0,0,.55),
+    0 70px 120px -40px rgba(0,0,0,.7);
+  transform:rotateX(var(--tilt,8deg)) rotateY(-5.5deg) rotateZ(.35deg);
   transform-style:preserve-3d;
   transition:transform .1s linear;
 }
@@ -429,15 +455,15 @@ nav .wrap { display:flex; align-items:center; justify-content:space-between; hei
 
 /* ============ SECTION FURNITURE ============
    One vertical rhythm everywhere: eyebrow →18px→ headline →20px→ body →26px→ detail. */
-.sec { padding:120px 0; }
+.sec { padding:132px 0; }
 .sec-head { margin-bottom:64px; max-width:640px; }
 .sec-head.roomy { margin-bottom:88px; } /* heads that lost a line keep their vertical mass */
 .sec-head h2 { font-size:clamp(32px,4vw,52px); margin-top:18px; }
 .sec-head p { margin-top:20px; font-size:16px; font-weight:300; line-height:1.65; color:var(--muted); }
 
 /* ============ ARGUMENT ============ */
-.argument { text-align:left; }
-.argument h2 { font-size:clamp(40px,6vw,84px); font-weight:200; letter-spacing:-.03em; line-height:1.05; }
+.argument { text-align:left; padding-top:108px; padding-bottom:120px; }
+.argument h2 { font-size:clamp(40px,6vw,84px); font-weight:200; letter-spacing:-.034em; line-height:1.04; }
 .argument h2 .dim { color:var(--faint); }
 .argument h2 .acc { color:var(--accent); }
 .argument .kicker { margin-top:32px; }
@@ -682,6 +708,201 @@ footer .wrap > div:last-child { margin-right:-.22em; }
   *, *::before, *::after { animation:none !important; transition:none !important; }
   .unit { transform:none !important; }
 }
+
+/* Studio presentation: generous type, a full instrument, and quiet material contrast. */
+:root[data-mode="light"] {
+  --bg:#F8F7F4; --bg2:#F0EFEB; --panel:#FFFDF9;
+  --hairline:#E1E1DB; --hairline2:#CFD3CD;
+  --text:#242E2B; --muted:#65706A; --faint:#778179;
+  --accent:#326C60; --accent-ink:#F7FCF9;
+}
+body { font-family:var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif; }
+.wrap { max-width:1240px; padding-inline:40px; }
+section[id] { scroll-margin-top:88px; }
+nav .wrap { height:72px; }
+.wordmark .se { font-size:17px; font-weight:600; letter-spacing:-.045em; }
+.wordmark .ptag { padding-left:13px; border-left:1px solid var(--hairline2); font-size:9px; letter-spacing:.18em; }
+.navlinks { gap:22px; }
+.navlinks a { font-size:9px; letter-spacing:.13em; }
+.mode-toggle { border-radius:30px; font-size:9px; padding:9px 13px; background:transparent; }
+.mac-live { font-size:8px; letter-spacing:.13em; }
+.hero {
+  min-height:0; padding:142px 0 68px;
+  background:radial-gradient(ellipse at 50% 62%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 64%), var(--bg);
+}
+.hero .wrap { grid-template-columns:minmax(0,1fr); gap:56px; }
+.hero .wrap > div:first-child { text-align:center; }
+.hero-meta { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:26px; font-size:9px; letter-spacing:.18em; }
+.hero-signal { width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 8%, transparent); }
+.meta-divider { color:var(--hairline2); margin-inline:4px; }
+.hero h1 { font-size:clamp(48px,6.5vw,88px); font-weight:450; letter-spacing:-.065em; line-height:1.02; margin-bottom:24px; }
+.hero h1 em { font-family:Georgia, 'Times New Roman', serif; font-weight:400; letter-spacing:-.065em; color:var(--accent); }
+.hero .sub { max-width:540px; margin:0 auto 26px; font-size:17px; line-height:1.7; font-weight:400; letter-spacing:-.025em; }
+.hero .keys { justify-content:center; gap:12px; }
+.hero .key { min-height:48px; padding:14px 22px; border-radius:9px; font-size:10px; letter-spacing:.12em; gap:20px; }
+.hero .key.solid { background:var(--accent); box-shadow:inset 0 1px 0 #ffffff20, 0 3px 5px #122b2010; }
+.hero .key.ghost { background:transparent; color:var(--text); border-color:var(--hairline2); box-shadow:0 1px 2px #122b2005; }
+.hero .key:hover { transform:translateY(-2px); }
+.hero .aside { margin-top:20px; font-size:8px; letter-spacing:.15em; }
+.hero .aside span { margin-inline:9px; }
+.plinth { width:100%; max-width:860px; margin:0 auto; perspective:2200px; }
+.stage-label { display:flex; justify-content:space-between; padding:0 12px; margin-bottom:24px; font-size:8px; letter-spacing:.15em; }
+.hero .unit { width:100%; transform:rotateX(var(--tilt,8deg)) rotateY(-2deg); box-shadow:inset 0 1px 0 var(--bev-hi), inset 0 -2px 0 var(--bev-lo), 0 12px 14px -12px var(--floor), 0 34px 54px -26px var(--floor), 0 65px 90px -45px var(--floor); }
+.hero .unit-body { grid-template-columns:92px minmax(0,1fr); }
+.hero .pads { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.hero .pad { min-height:122px; padding:12px 14px; }
+.hero .unit-bottom { grid-template-columns:minmax(0,1fr) auto; }
+.hero .speakbar { padding:17px 18px; gap:12px; min-width:0; }
+.hero .speakbar .t { font-size:11px; letter-spacing:.18em; }
+.hero .speakbar .s { font-size:7px; letter-spacing:.06em; white-space:normal; max-width:105px; }
+.hero .tkey { min-width:48px; padding-inline:8px; }
+.spec-strip { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); padding-top:30px; padding-bottom:38px; gap:30px; }
+.spec-strip > div { display:flex; align-items:center; gap:18px; justify-content:center; }
+.spec-strip > div + div { border-left:1px solid var(--hairline); }
+.spec-number, .spec-symbol { font-size:32px; letter-spacing:-.06em; font-weight:300; color:var(--accent); }
+.spec-copy { display:flex; flex-direction:column; gap:5px; }
+.spec-copy b { font-size:11px; font-weight:500; letter-spacing:-.015em; }
+.spec-copy > span { font-size:10px; color:var(--muted); }
+.sec { padding-block:108px; }
+.display { font-weight:350; letter-spacing:-.045em; }
+.argument { background:var(--bg2); }
+.argument h2 { font-weight:350; font-size:clamp(36px,5.4vw,70px); letter-spacing:-.05em; line-height:1.1; }
+.argument h2 .dim { color:var(--muted); }
+.argument h2 .acc { font-family:Georgia, 'Times New Roman', serif; font-style:italic; font-weight:400; }
+.sec-head .label, .lanegrid > div > .label { font-size:9px; }
+.plate, .step { border-radius:20px; }
+.swatch { border-radius:16px; }
+@media (max-width:1100px) { .navlinks { gap:16px; } .mac-live { display:none; } }
+@media (max-width:820px) {
+  .wrap { padding-inline:24px; }
+  nav .wrap { height:64px; }
+  .hero { padding:112px 0 44px; }
+  .hero .wrap { gap:44px; }
+  .hero .unit-body { grid-template-columns:minmax(0,1fr); }
+  .hero .unit-side { flex-direction:row; padding:0 6px 10px; }
+  .hero .encoder { width:44px; height:44px; }
+  .hero .encoder .face { inset:8px; }
+  .hero .grille { width:72px; height:36px; }
+  .hero .side-leds { flex-direction:row; gap:14px; }
+  .hero .unit-bottom { grid-template-columns:minmax(0,1fr); }
+  .hero .tkey { padding:10px; }
+  .hero .speakbar { justify-content:center; }
+  .spec-strip { gap:20px; padding-bottom:32px; }
+  .spec-strip > div { flex-direction:column; align-items:flex-start; gap:10px; padding-left:16px; }
+  .spec-copy { gap:7px; }
+  .spec-copy b, .spec-copy > span { line-height:1.5; }
+}
+@media (max-width:520px) {
+  .wrap { padding-inline:20px; }
+  .hero h1 { font-size:clamp(44px,11vw,57px); }
+  .hero .sub { font-size:15px; }
+  .hero-meta { font-size:8px; gap:7px; letter-spacing:.1em; }
+  .hero .key { padding:13px 16px; font-size:9px; gap:10px; }
+  .stage-label { font-size:7px; padding:0; letter-spacing:.06em; }
+  .hero .unit { padding:17px 11px 13px; border-radius:20px; transform:none; }
+  .hero .unit-head { padding-inline:4px; }
+  .hero .unit-head .label { font-size:7px; letter-spacing:.1em; }
+  .hero .unit-side > .label, .hero .grille { display:none; }
+  .hero .side-leds { gap:12px; }
+  .hero .side-leds .label { font-size:7px; }
+  .hero .pads { gap:7px; }
+  .hero .pad { padding:8px 7px; min-height:114px; border-radius:9px; }
+  .hero .pad .proj { font-size:9px; overflow:hidden; text-overflow:ellipsis; }
+  .hero .pad .num, .hero .pad .branch { font-size:7px; }
+  .hero .pad .snip { font-size:9px; }
+  .hero .pad .foot { gap:2px; }
+  .hero .pad .state { font-size:6px; letter-spacing:.03em; gap:3px; }
+  .hero .pad .wave { margin-right:3px; }
+  .hero .pad .led { width:4px; height:4px; }
+  .spec-strip { grid-template-columns:1fr; gap:0; padding-top:0; }
+  .spec-strip > div { flex-direction:row; align-items:center; justify-content:flex-start; padding:18px 8px; gap:22px; }
+  .spec-strip > div + div { border-left:0; border-top:1px solid var(--hairline); }
+  .spec-number, .spec-symbol { width:36px; text-align:center; }
+  .spec-copy b { font-size:12px; }
+  .sec { padding-block:72px; }
+}
+
+
+/* A shared-element controller → iPad scroll study. The same nine keys persist. */
+.hero { padding-bottom:66px; }
+.morph-story { position:relative; height:260vh; background:var(--bg2); border-block:1px solid var(--hairline); }
+.morph-sticky { position:sticky; top:64px; height:calc(100svh - 64px); min-height:640px; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; padding:26px 24px 18px; background:var(--bg2); }
+.morph-heading { text-align:center; position:relative; z-index:2; flex:none; }
+.morph-heading .label { font-size:8px; letter-spacing:.18em; }
+.morph-heading h2 { font-size:clamp(30px,3.6vw,48px); font-weight:450; letter-spacing:-.055em; line-height:1.06; margin-top:14px; }
+.morph-heading h2 em { font-family:Georgia,serif; color:var(--accent); font-weight:400; }
+.morph-description { font-size:12px; line-height:1.6; color:var(--muted); margin-top:14px; }
+.morph-stage { width:100%; max-width:940px; height:540px; max-height:56vh; position:relative; flex:none; perspective:1800px; }
+.morph-device { position:absolute; width:840px; height:520px; left:50%; top:50%; margin-left:-420px; margin-top:-260px; transform-style:preserve-3d; --digital:0; --physical:1; --morph:0; }
+.morph-shell { position:absolute; border:1px solid #bec6c2; background:linear-gradient(145deg,#fafdfb,#dce4df 70%,#c4d2cc); box-shadow:inset 0 2px 2px #fff, inset 0 -8px 0 #aebbb0, 0 14px 0 -3px #b6c4bd,0 45px 55px -26px #2b443f55,0 80px 90px -40px #293e3740; }
+.morph-screen { position:absolute; inset:14px; border-radius:25px; background:linear-gradient(150deg,#f7faf8,#e7ede9); opacity:var(--digital); border:1px solid #ffffff30; }
+.morph-camera { position:absolute; left:5px; top:254px; width:5px; height:5px; border-radius:50%; background:#26323c; box-shadow:inset 1px 1px 1px #ffffff25; opacity:var(--digital); }
+.morph-hardware { opacity:var(--physical); position:absolute; }
+.morph-dial { left:253px; top:63px; width:60px; height:60px; border-radius:50%; background:repeating-conic-gradient(#e7ede8 0deg 5deg,#c3cec6 5deg 10deg); box-shadow:0 9px 0 #b1bfb5,0 13px 12px #21372822; }
+.morph-dial i { position:absolute; inset:7px; border-radius:50%; background:linear-gradient(140deg,#fff,#e1e8e2); box-shadow:inset 0 1px 1px white; }
+.morph-dial i::after { content:''; position:absolute; top:7px; left:50%; width:3px; height:12px; background:#778d80; border-radius:3px; }
+.morph-stick { left:531px; top:67px; width:42px; height:42px; border-radius:50%; background:linear-gradient(140deg,#38483e,#18281e); box-shadow:0 12px 0 #1d2c23,0 20px 0 3px #aebdb3,0 23px 12px #172e2925; }
+.morph-engraving { position:absolute; top:352px; left:248px; width:336px; font:7px ui-monospace,monospace; letter-spacing:.13em; color:#6e8074; opacity:var(--physical); display:flex; justify-content:space-between; }
+.morph-apphead { position:absolute; left:40px; right:40px; top:34px; display:flex; justify-content:space-between; align-items:center; color:#3c5145; opacity:var(--digital); }
+.morph-apphead b { font-size:14px; letter-spacing:-.03em; }
+.morph-apphead b span { font:8px ui-monospace,monospace; letter-spacing:.2em; color:#7d8b81; margin-left:10px; }
+.morph-apphead > span { font:7px ui-monospace,monospace; letter-spacing:.15em; display:flex; gap:7px; align-items:center; }
+.morph-apphead i { width:5px; height:5px; border-radius:50%; background:#4d9774; box-shadow:0 0 5px #4d977466; }
+.morph-lane { position:absolute; transform-origin:top left; border:1px solid #c3cec7; border-radius:12px; background:linear-gradient(150deg,#fafffc,#e2e9e4); color:#30463a; box-shadow:inset 0 1px 1px #fff,0 calc(8px * var(--physical)) 0 #aabbb0,0 calc(11px * var(--physical)) 0 #6c7e71,0 calc(16px * var(--physical)) 9px -5px #35473933; overflow:hidden; }
+.morph-lane::before { content:''; position:absolute; inset:5px; border-radius:9px; border:1px solid #ffffffa0; opacity:var(--physical); background:linear-gradient(145deg,#ffffff99,transparent); }
+.morph-cap { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:34px; line-height:1; color:var(--key-color); text-shadow:0 2px 2px #57625b22; opacity:calc(1 - var(--digital)); }
+.morph-detail { position:absolute; inset:13px 15px; opacity:var(--digital); display:flex; flex-direction:column; }
+.morph-lane-number { display:flex; align-items:center; justify-content:space-between; font:7px ui-monospace,monospace; letter-spacing:.14em; color:#7c8a80; }
+.morph-lane-number i { width:5px; height:5px; border-radius:50%; background:var(--key-color); }
+.morph-detail > b { font-size:13px; font-weight:600; letter-spacing:-.025em; margin-top:9px; }
+.morph-branch { font:8px ui-monospace,monospace; color:#8a968d; margin-top:3px; }
+.morph-detail p { font-size:9px; line-height:1.45; color:#6e7c72; margin-top:8px; }
+.morph-lane-foot { display:flex; align-items:center; justify-content:space-between; margin-top:auto; font:6px ui-monospace,monospace; letter-spacing:.1em; color:#78897e; }
+.morph-meter { color:var(--key-color); font-size:12px; letter-spacing:1px; }
+.morph-talk { position:absolute; display:flex; align-items:center; justify-content:center; gap:14px; border-radius:12px; border:1px solid #b4c5b9; background:linear-gradient(150deg,#f8fdf9,#dce6df); color:#5f7768; box-shadow:0 calc(7px * var(--physical)) 0 #a3b6a9,0 calc(10px * var(--physical)) 0 #6e8275; }
+.morph-talk-icon { font-size:15px; }
+.morph-talk b { font:600 10px ui-monospace,monospace; letter-spacing:.18em; }
+.morph-talk-note { font:7px ui-monospace,monospace; letter-spacing:.1em; opacity:var(--digital); }
+.morph-extra { left:514px; top:285px; width:70px; height:54px; border-radius:11px; border:1px solid #c1cdc3; box-shadow:0 7px 0 #9caf9e,0 10px 0 #6f8274; background:linear-gradient(140deg,#f8fdfa,#d8e3db); display:flex; align-items:center; justify-content:center; color:#7a8e80; font-size:23px; }
+.morph-extra-command { left:502px; top:214px; width:70px; height:56px; }
+.morph-home { position:absolute; width:110px; height:4px; background:#7a8980; border-radius:4px; bottom:22px; left:365px; opacity:var(--digital); }
+.morph-caption { width:min(100%,520px); flex:none; margin-top:8px; }
+.morph-caption-label,.morph-endpoints { display:flex; justify-content:space-between; gap:10px; font:8px ui-monospace,monospace; letter-spacing:.12em; color:var(--muted); }
+.morph-caption-label > span:first-child { color:var(--accent); }
+.morph-scroll-hint { font-size:7px; color:var(--faint); }
+.morph-track { height:2px; background:var(--hairline2); margin:14px 0 10px; overflow:hidden; }
+.morph-track > span { display:block; width:100%; height:100%; background:var(--accent); transform:scaleX(0); transform-origin:left; }
+.morph-endpoints { font-size:7px; color:var(--faint); }
+.morph-credit { font-size:9px; color:var(--faint); text-align:center; margin-top:22px; line-height:1.5; }
+.morph-credit a { text-decoration:underline; text-underline-offset:3px; }
+@media (max-height:800px) and (min-width:601px) {
+  .morph-sticky { min-height:0; padding-top:16px; }
+  .morph-heading h2 { font-size:32px; }
+  .morph-heading .label, .morph-description { display:none; }
+  .morph-stage { max-height:60vh; }
+  .morph-credit { margin-top:14px; }
+}
+@media (max-width:600px) {
+  .hero { padding-bottom:54px; }
+  .morph-story { height:225vh; }
+  .morph-sticky { padding:28px 18px 18px; min-height:0; }
+  .morph-heading h2 { font-size:32px; }
+  .morph-description { font-size:11px; max-width:270px; margin-inline:auto; }
+  .morph-stage { height:360px; max-height:48svh; }
+  .morph-caption-label { font-size:7px; letter-spacing:.04em; }
+  .morph-scroll-hint { font-size:6px; }
+  .morph-credit { max-width:280px; font-size:8px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .morph-story { height:auto; }
+  .morph-sticky { position:relative; top:0; height:auto; min-height:0; padding-block:54px; }
+  .morph-scroll-hint { display:none; }
+}
+
+
+/* The Blender mesh replaces the CSS fallback only after a successful first frame. */
+.pad-webgl { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.morph-stage.has-webgl .morph-device { visibility:hidden; }
 </style>
 </head>
 <body>
@@ -702,7 +923,7 @@ footer .wrap > div:last-child { margin-right:-.22em; }
       <a href="#install">INSTALL</a>
     </div>
     <div style="display:flex; align-items:center; gap:14px;">
-      <button class="mode-toggle" id="modeToggle" type="button" aria-label="Toggle light and dark page mode"></button>
+      <button class="mode-toggle" id="modeToggle" type="button" aria-label="Toggle light and dark page mode">&#x25D0; LIGHT</button>
       <div class="mac-live"><span class="led on breathe"></span>MAC LIVE</div>
     </div>
   </div>
@@ -712,103 +933,94 @@ footer .wrap > div:last-child { margin-right:-.22em; }
 <section class="hero" id="surface">
   <div class="wrap">
     <div>
-      <div class="placard label">
-        <span>MODEL SE-1</span>
-        <span>IPAD APP · 9 LANES</span>
-        <span class="acc"><span id="chipFinish">PORCELAIN</span> / MINT</span>
-      </div>
-      <h1 class="display">A pad for the Codex tasks<br><em>you're already running.</em></h1>
-      <p class="sub">An iPad app with nine lanes — one Codex task each.
-      Hold the bar to talk to a lane, and the reply gets read back to you.</p>
+      <p class="hero-meta label"><span class="hero-signal" aria-hidden="true"></span> THE PAD FOR CODEX <span class="meta-divider">/</span> <span id="chipFinish">PORCELAIN</span></p>
+      <h1 class="display">Your Codex tasks.<br><em>Within reach.</em></h1>
+      <p class="sub">Nine lanes for the work already in motion.<br>Hold to talk. Let your Mac answer back.</p>
       <div class="keys">
-        <a class="key solid" href="#install">▶&nbsp;&nbsp;GET THE APP</a>
-        <a class="key ghost" href="#lanes">HOW IT WORKS&nbsp;&nbsp;↓</a>
+        <a class="key solid" href="#install">GET THE APP <span aria-hidden="true">↗</span></a>
+        <a class="key ghost" href="#transformation">EXPLORE THE PAD <span aria-hidden="true">↓</span></a>
       </div>
-      <p class="label" style="margin-top:26px;">IPADOS APP · FINDS YOUR MAC ON ITS OWN</p>
+      <p class="aside">MADE FOR iPAD <span>·</span> CONNECTED TO YOUR MAC</p>
     </div>
 
-    <!-- the instrument -->
-    <div class="plinth">
-      <div class="unit" id="heroUnit">
-        <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
-        <div class="unit-head">
-          <span class="label">SPEAKEASY — THE PAD</span>
-          <span class="label">UNIT 001 · <span id="unitFinish">PORCELAIN</span></span>
-        </div>
-        <div class="unit-body">
-          <div class="unit-side">
-            <div>
-              <div class="encoder"><div class="ring"></div><div class="face"></div></div>
-              <p class="label" style="text-align:center;margin-top:8px;">NARRATION</p>
-            </div>
-            <div class="side-leds">
-              <div class="row"><span class="led on"></span><span class="label">BRIDGE</span></div>
-              <div class="row"><span class="led"></span><span class="label">MIC</span></div>
-              <div class="row"><span class="led amber"></span><span class="label">QUEUE 2</span></div>
-            </div>
-            <div class="grille"></div>
-          </div>
-          <div class="pads">
-            <div class="pad active">
-              <div><span class="num">LN 1</span><div class="proj">speakeasy</div><div class="branch">codex/native-ipad-deck</div>
-              <div class="snip">Arrived on lane 1, in the Codex task that lane is bound to.</div></div>
-              <div class="foot"><span class="wave play"></span><span class="state live"><span class="led on breathe"></span>LIVE</span></div>
-            </div>
-            <div class="pad">
-              <div><span class="num">LN 2</span><div class="proj">scout</div><div class="branch">feat/broker-retry</div>
-              <div class="snip">I could not reach the exact Codex task. Open the…</div></div>
-              <div class="foot"><span class="wave dimmer"></span><span class="state">IDLE</span></div>
-            </div>
-            <div class="pad empty">
-              <div><span class="num">LN 3</span><div class="proj">— unassigned</div></div>
-              <div class="foot"><span></span><span class="state">HOLD TO BIND</span></div>
-            </div>
-            <div class="pad">
-              <div><span class="num">LN 4</span><div class="proj">dewey</div><div class="branch">docs/restructure</div>
-              <div class="snip">**Partially.** The navigation groups…</div></div>
-              <div class="foot"><span class="wave dimmer"></span><span class="state">IDLE</span></div>
-            </div>
-            <div class="pad">
-              <div><span class="num">LN 5</span><div class="proj">speakeasy</div><div class="branch">fix/cache-ttl</div>
-              <div class="snip">Waiting on your review of the eviction…</div></div>
-              <div class="foot"><span class="wave amber"></span><span class="state queued"><span class="led amber"></span>QUEUED</span></div>
-            </div>
-            <div class="pad empty">
-              <div><span class="num">LN 6</span><div class="proj">— unassigned</div></div>
-              <div class="foot"><span></span><span class="state">HOLD TO BIND</span></div>
-            </div>
-            <div class="pad">
-              <div><span class="num">LN 7</span><div class="proj">landing</div><div class="branch">landing-polish</div>
-              <div class="snip">Rebuilt the hero in flight. Ready to…</div></div>
-              <div class="foot"><span class="wave dimmer"></span><span class="state">IDLE</span></div>
-            </div>
-            <div class="pad empty">
-              <div><span class="num">LN 8</span><div class="proj">— unassigned</div></div>
-              <div class="foot"><span></span><span class="state">HOLD TO BIND</span></div>
-            </div>
-            <div class="pad empty">
-              <div><span class="num">LN 9</span><div class="proj">— unassigned</div></div>
-              <div class="foot"><span></span><span class="state">HOLD TO BIND</span></div>
-            </div>
-          </div>
-        </div>
-        <div class="unit-bottom">
-          <div class="speakbar">
-            <span class="mic">●</span>
-            <span class="t">HOLD TO SPEAK</span>
-            <span class="s">PARAKEET ON YOUR MAC · LANE 01</span>
-          </div>
-          <div class="transport">
-            <div class="tkey">RPLY<small>REPLAY</small></div>
-            <div class="tkey stop">■<small>STOP</small></div>
-            <div class="tkey">AUTO<small>ON</small></div>
-            <div class="tkey">ACTV<small>2 NEW</small></div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </section>
+
+<section class="morph-story" id="transformation" aria-labelledby="morph-title">
+  <div class="morph-sticky">
+    <div class="morph-heading">
+      <p class="label acc">FROM PHYSICAL TO POSSIBLE</p>
+      <h2 id="morph-title">A familiar feeling.<br><em>A whole new surface.</em></h2>
+      <p class="morph-description">The idea of a dedicated controller. The possibilities of an iPad.</p>
+    </div>
+    <div class="morph-stage" role="img" aria-label="A compact tactile controller transforms into an iPad with nine SpeakEasy task lanes as you scroll.">
+      <div class="morph-device">
+        <div class="morph-shell"></div>
+        <div class="morph-screen"></div>
+        <div class="morph-camera"></div>
+        <div class="morph-hardware morph-dial"><i></i></div>
+        <div class="morph-hardware morph-stick"><i></i></div>
+        <div class="morph-engraving">SPEAKEASY <span>MICRO → PAD</span></div>
+        <div class="morph-apphead"><b>SpeakEasy <span>THE PAD</span></b><span><i></i> MAC CONNECTED</span></div>
+        <div class="morph-lanes">
+          <div class="morph-lane" data-lane="0" style="--key-color:#83aa9b">
+            <span class="morph-cap" aria-hidden="true">◉</span>
+            <div class="morph-detail"><span class="morph-lane-number">LANE 02<i></i></span><b>speakeasy</b><span class="morph-branch">feat/voice-lanes</span><p>Your voice has a place. Ready when you are.</p><span class="morph-lane-foot"><span class="morph-meter">▥▥▥▥▥</span>LIVE</span></div>
+          </div>
+          <div class="morph-lane" data-lane="1" style="--key-color:#c4b4e7">
+            <span class="morph-cap" aria-hidden="true">◉</span>
+            <div class="morph-detail"><span class="morph-lane-number">LANE 03<i></i></span><b>scout</b><span class="morph-branch">feat/broker-retry</span><p>The connection is back. All tasks are in sync.</p><span class="morph-lane-foot"><span class="morph-meter">▥▥▥▥▥</span>THINKING</span></div>
+          </div>
+          <div class="morph-lane" data-lane="2" style="--key-color:#a7bdd8">
+            <span class="morph-cap" aria-hidden="true">◉</span>
+            <div class="morph-detail"><span class="morph-lane-number">LANE 01<i></i></span><b>dewey</b><span class="morph-branch">docs/restructure</span><p>The new navigation is ready for a look.</p><span class="morph-lane-foot"><span class="morph-meter">▥▥▥▥▥</span>COMPLETE</span></div>
+          </div>
+          <div class="morph-lane" data-lane="3" style="--key-color:#d9bd7b">
+            <span class="morph-cap" aria-hidden="true">◉</span>
+            <div class="morph-detail"><span class="morph-lane-number">LANE 04<i></i></span><b>speakeasy</b><span class="morph-branch">fix/cache-ttl</span><p>Waiting on your review of the cache update.</p><span class="morph-lane-foot"><span class="morph-meter">▥▥▥▥▥</span>NEEDS INPUT</span></div>
+          </div>
+          <div class="morph-lane" data-lane="4" style="--key-color:#a7c7b6">
+            <span class="morph-cap" aria-hidden="true">◉</span>
+            <div class="morph-detail"><span class="morph-lane-number">LANE 05<i></i></span><b>landing</b><span class="morph-branch">design/pad</span><p>A little more space. A whole new surface.</p><span class="morph-lane-foot"><span class="morph-meter">▥▥▥▥▥</span>COMPLETE</span></div>
+          </div>
+          <div class="morph-lane" data-lane="5" style="--key-color:#b8b2d1">
+            <span class="morph-cap" aria-hidden="true">◉</span>
+            <div class="morph-detail"><span class="morph-lane-number">LANE 06<i></i></span><b>research</b><span class="morph-branch">explore/next</span><p>Comparing the options for the next step.</p><span class="morph-lane-foot"><span class="morph-meter">▥▥▥▥▥</span>THINKING</span></div>
+          </div>
+          <div class="morph-lane" data-lane="6" style="--key-color:#b0bab5">
+            <span class="morph-cap" aria-hidden="true">↗</span>
+            <div class="morph-detail"><span class="morph-lane-number">LANE 07<i></i></span><b>Your next task</b><span class="morph-branch">— unassigned</span><p>Hold this lane to make it yours.</p><span class="morph-lane-foot"><span class="morph-meter">▥▥▥▥▥</span>AVAILABLE</span></div>
+          </div>
+          <div class="morph-lane" data-lane="7" style="--key-color:#b0bab5">
+            <span class="morph-cap" aria-hidden="true">✳</span>
+            <div class="morph-detail"><span class="morph-lane-number">LANE 08<i></i></span><b>Room to explore</b><span class="morph-branch">— unassigned</span><p>A space for another idea.</p><span class="morph-lane-foot"><span class="morph-meter">▥▥▥▥▥</span>AVAILABLE</span></div>
+          </div>
+          <div class="morph-lane" data-lane="8" style="--key-color:#b0bab5">
+            <span class="morph-cap" aria-hidden="true">↶</span>
+            <div class="morph-detail"><span class="morph-lane-number">LANE 09<i></i></span><b>Something new</b><span class="morph-branch">— unassigned</span><p>Pick a task. Keep it close.</p><span class="morph-lane-foot"><span class="morph-meter">▥▥▥▥▥</span>AVAILABLE</span></div>
+          </div>
+
+        </div>
+        <div class="morph-talk"><span class="morph-talk-icon">●</span><b>HOLD TO SPEAK</b><span class="morph-talk-note">RELEASE TO SEND</span></div>
+        <div class="morph-extra morph-hardware">⌘</div>
+        <div class="morph-extra morph-extra-command morph-hardware">⊕</div>
+        <div class="morph-home"></div>
+      </div>
+    </div>
+    <div class="morph-caption">
+      <div class="morph-caption-label"><span id="morphPhase">01 — THE TACTILE IDEA</span><span class="morph-scroll-hint">SCROLL TO TRANSFORM ↓</span></div>
+      <div class="morph-track"><span></span></div>
+      <div class="morph-endpoints"><span>MICRO CONTROLLER</span><span>THE iPAD APP</span></div>
+    </div>
+    <p class="morph-credit">A concept inspired by <a href="https://worklouder.cc/codex-micro" target="_blank" rel="noopener noreferrer">Work Louder’s Codex Micro ↗</a>. Reimagined for SpeakEasy.</p>
+  </div>
+</section>
+
+<div class="spec-strip wrap" aria-label="At a glance">
+  <div><span class="spec-number">09</span><span class="spec-copy"><b>A place for every task</b><span>One Codex task per lane</span></span></div>
+  <div><span class="spec-symbol" aria-hidden="true">↗</span><span class="spec-copy"><b>A direct line to your Mac</b><span>Hold to speak, release to send</span></span></div>
+  <div><span class="spec-symbol" aria-hidden="true">≋</span><span class="spec-copy"><b>Keep the conversation going</b><span>Replies read back to you</span></span></div>
+</div>
 
 <!-- ============ 2 · ARGUMENT ============ -->
 <section class="sec argument hairline-t" id="argument">
@@ -1066,8 +1278,8 @@ footer .wrap > div:last-child { margin-right:-.22em; }
       <p>THE PAD is an <b>iPadOS app</b>, and it does not work alone. It needs SpeakEasy and
       <b>Codex Desktop</b> running on an Apple silicon Mac. That Mac holds the Parakeet model,
       the narration voices, and the bridge the nine lanes bind to.</p>
-      <p>There is no pairing step — <b>no QR code, no URL to type, no pin</b>. Put both on the
-      same Wi-Fi and the Mac shows up.</p>
+      <p>Put both on the <b>same Wi-Fi</b> and choose your Mac in the app.
+      Complete the connection and permission steps shown in Settings → Deck.</p>
       <p class="fine">INTEGRATION BOUNDARY — THE CODEX BRIDGE USES PRIVATE, VERSION-CHECKED CODEX DESKTOP IPC AND FAILS
       CLOSED ON INCOMPATIBILITY. IT IS NOT PRESENTED AS A SUPPORTED PUBLIC CODEX API. SPEECH IS TRANSCRIBED
       BY THE PAIRED MAC; NO ARACH SPEECH SERVER SITS IN THE PATH.</p>
@@ -1079,28 +1291,27 @@ footer .wrap > div:last-child { margin-right:-.22em; }
 <section class="sec install hairline-t" id="install" style="background:var(--bg2);">
   <div class="wrap">
     <span class="label acc">GET THE PAD</span>
-    <h2 class="display" style="font-size:clamp(34px,4.6vw,58px);margin-top:18px;">One step, for now.</h2>
+    <h2 class="display" style="font-size:clamp(34px,4.6vw,58px);margin-top:18px;">Start with your Mac.</h2>
     <p style="margin:20px auto 0;max-width:480px;font-size:15.5px;font-weight:300;line-height:1.7;color:var(--muted);">
-    The Mac half works today. The iPad half is going to TestFlight first — once both are
-    on, they find each other with nothing to pair.</p>
+    Download the Mac app, then connect from the browser Deck. The native iPad app is
+    coming to TestFlight; join the list for an invite when it is available.</p>
 
     <div class="twostep">
       <div class="step">
         <span class="n">STEP 01 · ON YOUR MAC</span>
-        <h3>Ask your agent to set it up.</h3>
-        <p>You already have Codex open. Give it this and it installs the SpeakEasy skill,
-        starts the runtime the Pad talks to, and tells you what needs your approval.</p>
+        <h3>Download SpeakEasy for Mac.</h3>
+        <p>Open the DMG, drag SpeakEasy to Applications, and launch it. Settings → Deck
+        walks you through connecting your agents and devices. No source build required.</p>
+        <p><a class="key solid" href="{{releaseDownloadUrl}}">DOWNLOAD DMG · {{releaseVersion}}</a></p>
         <div class="ask">
           <div class="head">
             <span class="label">PASTE INTO CODEX</span>
             <button class="copy" id="copyBtn" data-copy-target="askText">COPY</button>
           </div>
-          <p class="body" id="askText">Set up SpeakEasy on this Mac so I can talk to my Codex tasks from an iPad.
-          Read https://speakeasy.arach.dev/agent.md and follow Path 2, then start the Deck and leave it
-          running. Tell me what you installed and which permissions I still need to approve myself.</p>
+          <p class="body" id="askText">{{codexInstallPrompt}}</p>
         </div>
-        <p class="orelse">Rather do it by hand? <code>bunx @arach/speakeasy plugin codex</code>, then
-        <code>speakeasy deck</code>.</p>
+        <p class="orelse">Signed and notarized. <a href="{{releasePageUrl}}">Release notes and checksums</a>.
+        Prefer agent-assisted setup? Copy the prompt above.</p>
         <p class="foot">MACOS 14+ APPLE SILICON · CODEX DESKTOP</p>
       </div>
       <div class="step">
@@ -1108,14 +1319,14 @@ footer .wrap > div:last-child { margin-right:-.22em; }
         <h3>Not out yet.</h3>
         <p>The Pad goes to TestFlight before the App Store. Say you want it and I'll send an
         invite when the build is up — that is the only thing this does with your address.
-        Once it's installed there's nothing to pair: same Wi-Fi, and the nine lanes fill in.</p>
+        Once installed, choose your Mac on the same Wi-Fi and connect your lanes.</p>
         <form class="interest" id="interestForm" novalidate>
           <input type="email" id="interestEmail" name="email" required autocomplete="email"
                  placeholder="you@example.com" aria-label="Your email address">
           <button class="key solid" type="submit" id="interestSubmit">TELL ME WHEN</button>
         </form>
         <p class="interest-note" id="interestNote" role="status" aria-live="polite"></p>
-        <p class="foot">IPADOS 17+ · IPAD AND IPHONE · <a href="/privacy/">HOW WE HANDLE YOUR EMAIL</a></p>
+        <p class="foot">IPADOS 26+ · IPAD · <a href="/privacy/">HOW WE HANDLE YOUR EMAIL</a></p>
       </div>
     </div>
   </div>
@@ -1138,6 +1349,80 @@ footer .wrap > div:last-child { margin-right:-.22em; }
 <script>
 (function () {
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+
+  // Scroll is the playhead. Each pose can be reached directly and in either direction.
+  var story = document.getElementById('transformation');
+  if (story) {
+    var stage = story.querySelector('.morph-stage');
+    var device = story.querySelector('.morph-device');
+    var shell = story.querySelector('.morph-shell');
+    var screen = story.querySelector('.morph-screen');
+    var talk = story.querySelector('.morph-talk');
+    var lanes = Array.from(story.querySelectorAll('.morph-lane'));
+    var track = story.querySelector('.morph-track > span');
+    var phase = document.getElementById('morphPhase');
+    var motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var scheduled = false;
+    import('/scripts/pad-scene.js').then(function(module) { return module.mountPadScene(stage); }).catch(function(error) { console.warn('3D preview unavailable; keeping the illustrated transition.',error); });
+    var clamp = function(v) { return Math.max(0, Math.min(1,v)); };
+    var smooth = function(v) { v=clamp(v); return v*v*(3-2*v); };
+    var mix = function(a,b,t) { return a+(b-a)*t; };
+    var box = function(el,a,b,t) {
+      el.style.transform='translate('+mix(a[0],b[0],t).toFixed(2)+'px,'+mix(a[1],b[1],t).toFixed(2)+'px)';
+      el.style.width=mix(a[2],b[2],t).toFixed(2)+'px';
+      el.style.height=mix(a[3],b[3],t).toFixed(2)+'px';
+    };
+    var targetSlots = [1,2,0,3,4,5,6,7,8];
+    var physicalKeys = [[326,65],[420,65],[244,142],[330,142],[416,142],[502,142],[244,214],[330,214],[416,214]];
+    function drawMorph() {
+      scheduled=false;
+      var rect=story.getBoundingClientRect();
+      var sticky=story.querySelector('.morph-sticky');
+      var distance=Math.max(1,rect.height-sticky.clientHeight);
+      var raw=motionQuery.matches ? 1 : clamp((64-rect.top)/distance);
+      stage.dataset.progress=raw.toFixed(5);
+      stage.dispatchEvent(new CustomEvent('pad-progress',{detail:raw}));
+      var progress=smooth((raw-.10)/.77);
+      var digital=smooth((raw-.72)/.15);
+      var physical=1-smooth((raw-.23)/.30);
+      var fit=Math.min(stage.clientWidth/900,stage.clientHeight/610,1);
+      // Start larger on narrow screens so the physical controller stays legible.
+      var startFit=Math.min(stage.clientWidth/450,stage.clientHeight/530,1);
+      var scale=mix(startFit,fit,progress);
+      device.style.transform='scale('+scale.toFixed(4)+') rotateX('+mix(20,0,progress).toFixed(2)+'deg) rotateY('+mix(-13,0,progress).toFixed(2)+'deg) rotateZ('+mix(-8,0,progress).toFixed(2)+'deg)';
+      device.style.setProperty('--digital',digital.toFixed(4));
+      device.style.setProperty('--physical',physical.toFixed(4));
+      device.style.setProperty('--morph',progress.toFixed(4));
+      box(shell,[221,40,389,346],[0,0,840,520],progress);
+      box(screen,[235,54,361,318],[14,14,812,492],progress);
+      screen.style.inset='0 auto auto 0';
+      screen.style.opacity=smooth((raw-.30)/.38).toFixed(4);
+      shell.style.borderRadius=mix(30,36,progress)+'px';
+      shell.style.background='linear-gradient(145deg, rgb('+[mix(250,70,progress),mix(253,79,progress),mix(251,74,progress)].map(Math.round).join(',')+'), rgb('+[mix(202,26,progress),mix(216,35,progress),mix(208,31,progress)].map(Math.round).join(',')+'))';
+      shell.style.boxShadow='inset 0 2px 2px #ffffff80,inset 0 -'+mix(8,2,progress)+'px 0 #64776e66,0 '+mix(14,3,progress)+'px 0 -2px #93a29a,0 40px 70px -25px #203b3540';
+      lanes.forEach(function(lane,i) {
+        var slot=targetSlots[i];
+        box(lane,[physicalKeys[i][0],physicalKeys[i][1],70,56],[38+(slot%3)*258,73+Math.floor(slot/3)*120,248,110],progress);
+        // Contract into compact signals before expanding; the paths never collide.
+        var contract=smooth(progress/.30);
+        var expand=smooth((progress-.60)/.40);
+        lane.style.width=(70-30*contract+208*expand).toFixed(2)+'px';
+        lane.style.height=(56-16*contract+70*expand).toFixed(2)+'px';
+      });
+      box(talk,[244,285,244,54],[38,444,764,40],progress);
+      talk.style.background='linear-gradient(145deg, rgb('+[mix(248,61,digital),mix(253,114,digital),mix(249,92,digital)].map(Math.round).join(',')+'), rgb('+[mix(220,44,digital),mix(230,88,digital),mix(223,69,digital)].map(Math.round).join(',')+'))';
+      talk.style.color=digital>.5?'#eff8f1':'#5f7768';
+      track.style.transform='scaleX('+raw.toFixed(4)+')';
+      phase.textContent=stage.classList.contains('has-webgl') ? (raw<.15?'01 — THE TACTILE IDEA':raw<.43?'02 — A CLOSER LOOK':raw<.82?'03 — ROOM TO BECOME MORE':'04 — YOUR TASKS, WITHIN REACH') : (raw<.30?'01 — THE TACTILE IDEA':raw<.76?'02 — ROOM TO BECOME MORE':'03 — YOUR TASKS, WITHIN REACH');
+      story.dataset.phase=raw<.30?'micro':raw<.76?'transform':'ipad';
+    }
+    function requestMorph() { if(!scheduled) { scheduled=true; requestAnimationFrame(drawMorph); } }
+    window.addEventListener('scroll',requestMorph,{passive:true});
+    window.addEventListener('resize',requestMorph,{passive:true});
+    motionQuery.addEventListener('change',requestMorph);
+    drawMorph();
+  }
 
   // Theme switching — the page is skinned with the same tokens as the deck.
   var swatches = document.querySelectorAll('[data-set-theme]');
@@ -1163,22 +1448,6 @@ footer .wrap > div:last-child { margin-right:-.22em; }
     });
   });
 
-  // Hero plinth tilt: eases toward flat as you scroll, like a product shot settling.
-  var unit = document.getElementById('heroUnit');
-  if (unit && !reduced) {
-    var tilt = 9;
-    var target = 9;
-    window.addEventListener('scroll', function () {
-      var y = Math.min(window.scrollY / (window.innerHeight * 0.7), 1);
-      target = 9 - y * 7;
-    }, { passive: true });
-    (function tick() {
-      tilt += (target - tilt) * 0.08;
-      unit.style.setProperty('--tilt', tilt.toFixed(2) + 'deg');
-      requestAnimationFrame(tick);
-    })();
-  }
-
   // Page mode toggle — explicit [data-mode] override wins in both directions;
   // with no override the page follows prefers-color-scheme.
   var modeBtn = document.getElementById('modeToggle');
@@ -1190,6 +1459,7 @@ footer .wrap > div:last-child { margin-right:-.22em; }
     var renderMode = function () {
       modeBtn.textContent = effectiveMode() === 'dark' ? '\u25D1 DARK' : '\u25D0 LIGHT';
     };
+    new MutationObserver(renderMode).observe(document.documentElement,{attributes:true,attributeFilter:['data-mode']});
     modeBtn.addEventListener('click', function () {
       document.documentElement.setAttribute('data-mode', effectiveMode() === 'dark' ? 'light' : 'dark');
       renderMode();

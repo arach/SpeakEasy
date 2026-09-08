@@ -10,6 +10,7 @@ import {
   type DeckAgentClient,
   type DeckAgentClientOptions,
 } from './deck-agent-client.js';
+import { herdrBindingSchema, herdrChannelId, listHerdrChannels, turnHerdrChannel, type HerdrBinding } from './herdr-channel.js';
 import { CodexDesktopSession } from './codex-desktop-submit.js';
 import {
   findCodexRollout,
@@ -97,6 +98,10 @@ export interface DeckThreadInfo {
   at: number;
   originator: string;
   isPinned?: boolean;
+  hostName?: string;
+  herdrSession?: string;
+  agentName?: string;
+  agentStatus?: string;
 }
 
 export interface DeckLaneInfo {
@@ -121,7 +126,7 @@ export interface DeckLaneInfo {
   origin?: DeckLaneOrigin;
 }
 
-export type DeckLaneOrigin = 'codex' | 'deck';
+export type DeckLaneOrigin = 'codex' | 'deck' | 'herdr';
 
 export interface DeckSnapshot {
   type: 'snapshot';
@@ -177,6 +182,7 @@ const intentSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('playback.stop') }),
   z.object({ name: z.literal('playback.replay') }),
   z.object({ name: z.literal('capture.start') }),
+  z.object({ name: z.literal('capture.release') }),
   z.object({ name: z.literal('capture.cancel'), reason: z.string().max(60).optional() }),
   /** Take back a turn already sent. See the handler for why this is separate
    *  from `capture.cancel` and from `playback.stop`. */
@@ -187,6 +193,8 @@ const intentSchema = z.discriminatedUnion('name', [
     /** Idempotency key. A client that never loses a transcript must be free to
      *  retry one whose ack it never saw; the same id is accepted exactly once. */
     utteranceId: z.string().max(64).optional(),
+    expectedThreadId: z.string().max(256).nullable().optional(),
+    expectedOrigin: z.enum(['codex', 'deck', 'herdr']).nullable().optional(),
     /** The lane the operator was addressing when they spoke. Delivery can lag
      *  capture by minutes, so the target travels with the words. */
     lane: z.number().int().min(0).max(8).optional(),
@@ -262,6 +270,7 @@ const CANONICAL_OWNER_TIMEOUT_MS = 9_000;
 export type DeckTurnRoute =
   | { kind: 'canonical'; taskId: string }
   | { kind: 'deck'; index: number }
+  | { kind: 'herdr'; channelId: string }
   | { kind: 'unassigned' }
   | { kind: 'overview' };
 
@@ -279,6 +288,9 @@ export function resolveDeckTurnRoute(
   // sets 'deck', and binding a Codex task always rotates the lane key away.
   if (origin === 'deck') return { kind: 'deck', index: laneIx };
   const exactTaskId = taskId?.trim();
+  if (origin === 'herdr' || exactTaskId?.startsWith('herdr:')) {
+    return exactTaskId?.startsWith('herdr:') ? { kind: 'herdr', channelId: exactTaskId } : { kind: 'unassigned' };
+  }
   // A lane bound to a Desktop task is answered by that task or not at all.
   // This is deliberately NOT a fallback to a session — the silent shadow
   // session is what 38ed6d6 removed.
@@ -445,7 +457,7 @@ export class DeckRuntime extends EventEmitter {
     ...Array.from({ length: LANE_COUNT }, (_, i) => ({
       num: String(i + 1).padStart(2, '0'),
       name: `LANE ${i + 1}`,
-      title: 'assign a Codex task before speaking',
+      title: 'assign an agent channel before speaking',
       state: 'idle' as const,
     })),
     {
@@ -461,6 +473,7 @@ export class DeckRuntime extends EventEmitter {
   private laneClients = new Map<number, { key: string; client: DeckAgentClient }>();
   /** One direct turn currently owned by the Codex Desktop bridge. */
   private canonicalTurnAbort: AbortController | null = null;
+  private herdrTurnActive = false;
   /** Warm exact-task channel. Owner discovery is intentionally amortized
    * across turns because mature Codex task snapshots can be hundreds of MB. */
   private canonicalSession: CodexDesktopSession | null = null;
@@ -487,6 +500,7 @@ export class DeckRuntime extends EventEmitter {
   private trace: DeckTraceEntry[] = [];
   private host = hostname().replace(/\.(local|lan)$/, '');
   private catalog: DeckThreadInfo[] = [];
+  private herdrChannels = new Map<string, HerdrBinding>();
   private catalogError: string | null = null;
   private catalogRefresh: Promise<void> | null = null;
   private ticker: NodeJS.Timeout | null = null;
@@ -542,6 +556,9 @@ export class DeckRuntime extends EventEmitter {
   private refreshThreadCatalog(): Promise<void> {
     if (this.catalogRefresh) return this.catalogRefresh;
     this.catalogRefresh = (async () => {
+      // Discover both sources independently so a missing Codex installation cannot hide Herdr.
+      const herdrDiscovery = listHerdrChannels().then(bindings => ({ bindings, error: null as string | null }))
+        .catch(() => ({ bindings: [] as HerdrBinding[], error: 'Herdr is unavailable — open it and refresh channels.' }));
       let next: DeckThreadInfo[] | null = null;
       let fallback = false;
       try {
@@ -554,13 +571,26 @@ export class DeckRuntime extends EventEmitter {
         next = references?.map(deckThreadInfo) ?? null;
         fallback = references !== null;
       }
+      const herdr = await herdrDiscovery;
       if (this.destroyed) return;
-      if (next) {
+      this.herdrChannels = new Map(herdr.bindings.map(binding => [herdrChannelId(binding), binding]));
+      if (next || herdr.bindings.length) {
         const master = this.masterThreadId();
-        this.catalog = master ? next.filter((thread) => thread.id !== master) : next;
+        this.catalog = [...(next ?? []).filter(thread => thread.id !== master), ...herdr.bindings.map(binding => ({
+          id: herdrChannelId(binding),
+          cwd: binding.agent.foreground_cwd || binding.agent.cwd || '',
+          snippet: binding.agent.title || binding.agent.name || binding.agent.terminal_title_stripped || binding.agent.display_agent || binding.agent.agent || 'Herdr agent',
+          hostName: hostname(),
+          herdrSession: path.basename(path.dirname(binding.socketPath)) === 'herdr' ? 'Default' : path.basename(path.dirname(binding.socketPath)),
+          agentName: binding.agent.display_agent || binding.agent.agent || 'Agent',
+          agentStatus: binding.agent.agent_session ? binding.agent.agent_status : 'unlinked',
+          preview: binding.agent.agent_session ? binding.agent.agent_status : 'Session integration required',
+          project: 'Herdr · ' + (path.basename(binding.agent.foreground_cwd || binding.agent.cwd || '') || binding.agent.display_agent || binding.agent.agent || 'Agent'),
+          at: Date.now(), originator: 'herdr',
+        }))];
         this.catalogError = fallback
           ? 'Codex task titles are unavailable — showing rollout references.'
-          : null;
+          : herdr.error;
         // A catalog refresh also upgrades restored lane labels from a rollout
         // snippet to the exact title currently shown by the Codex app.
         for (let i = 0; i < LANE_COUNT; i++) {
@@ -592,6 +622,21 @@ export class DeckRuntime extends EventEmitter {
       // writes codex-thread-id.txt for a deck thread too, so keying off that
       // file alone would silently hand the lane to the Desktop bridge, which
       // can never reach a thread no Desktop window owns.
+      const herdr = this.laneHerdrBinding(i);
+      if (herdr) {
+        const id = herdrChannelId(herdr);
+        if (claimed.has(id)) {
+          this.laneKeys[i] = `speakeasy-deck-lane-${i}-${Date.now().toString(36)}`;
+          rotated = true;
+          return;
+        }
+        claimed.add(id);
+        Object.assign(this.lanes[i], { origin: 'herdr', threadId: id, sessionAlias: herdr.agent.pane_id,
+          title: herdr.agent.title || herdr.agent.name || herdr.agent.terminal_title_stripped || 'Herdr agent',
+          project: 'Herdr · ' + (path.basename(herdr.agent.foreground_cwd || herdr.agent.cwd || '') || herdr.agent.display_agent || herdr.agent.agent || 'Agent'),
+          cwd: herdr.agent.foreground_cwd || herdr.agent.cwd || undefined });
+        return;
+      }
       const deckCwd = this.laneDeckOrigin(i);
       if (deckCwd) {
         const lane = this.lanes[i];
@@ -690,7 +735,7 @@ export class DeckRuntime extends EventEmitter {
     // Origin alone decides this. A deck thread has a codex-thread-id.txt of its
     // own once it has answered, so the id file says nothing about ownership.
     const deckOwned = ix === MASTER_IX || this.lanes[ix]?.origin === 'deck';
-    if (!deckOwned) throw new Error('Assign a Codex task to this lane before speaking.');
+    if (!deckOwned) throw new Error('Assign an agent channel to this lane before speaking.');
     const key = ix === MASTER_IX ? MASTER_REUSE_KEY : this.laneKeys[ix];
     const existing = this.laneClients.get(ix);
     if (existing && existing.key === key) return existing.client;
@@ -748,6 +793,8 @@ export class DeckRuntime extends EventEmitter {
 
   /** The exact Codex task assigned to a worker pad, if one was recorded. */
   private laneThreadId(index: number): string | null {
+    const herdr = this.laneHerdrBinding(index);
+    if (herdr) return herdrChannelId(herdr);
     return storedThreadId(this.laneKeys[index]);
   }
 
@@ -755,6 +802,12 @@ export class DeckRuntime extends EventEmitter {
    * assignment when threadId is null. Only ever called while no response is in
    * flight (apply() rejects lane.cycle/lane.assign when busy), so this never
    * touches another lane's turn. */
+  private laneHerdrBinding(index: number): HerdrBinding | null {
+    try {
+      return herdrBindingSchema.parse(JSON.parse(readFileSync(path.join(deckAgentRuntimeDir(this.laneKeys[index]), 'herdr-channel.json'), 'utf8')));
+    } catch { return null; }
+  }
+
   private assignLane(index: number, threadId: string | null): void {
     // re-affirming the current binding must be a no-op — rekeying would close
     // the warm session and clear the visible thread for nothing
@@ -779,7 +832,13 @@ export class DeckRuntime extends EventEmitter {
       try {
         const dir = deckAgentRuntimeDir(key);
         mkdirSync(dir, { recursive: true });
-        writeFileSync(path.join(dir, 'codex-thread-id.txt'), threadId);
+        if (threadId.startsWith('herdr:')) {
+          const binding = this.herdrChannels.get(threadId);
+          if (!binding) throw new Error('Herdr channel unavailable');
+          writeFileSync(path.join(dir, 'herdr-channel.json'), JSON.stringify(binding), { mode: 0o600 });
+        } else {
+          writeFileSync(path.join(dir, 'codex-thread-id.txt'), threadId);
+        }
         bound = true;
       } catch {
         bound = false;
@@ -800,7 +859,7 @@ export class DeckRuntime extends EventEmitter {
     lane.state = 'idle';
     // The key rotated above, so any deck-thread marker under the old key is
     // already unreachable; clear the in-memory flag to match.
-    lane.origin = threadId && bound ? 'codex' : undefined;
+    lane.origin = threadId && bound ? (threadId.startsWith('herdr:') ? 'herdr' : 'codex') : undefined;
     if (threadId && bound) {
       const info = this.catalog.find((t) => t.id === threadId);
       if (info) this.applyThreadIdentity(lane, info);
@@ -821,7 +880,7 @@ export class DeckRuntime extends EventEmitter {
       // Initial last-20 hydration from the local rollout via readTaskTail.
       void this.syncLaneTaskTail(index, { reason: 'assign', forceInitial: true });
     } else {
-      lane.title = 'assign a Codex task before speaking';
+      lane.title = 'assign an agent channel before speaking';
       lane.threadId = undefined;
       lane.sessionAlias = undefined;
       lane.project = undefined;
@@ -922,7 +981,7 @@ export class DeckRuntime extends EventEmitter {
     index: number,
     options: { reason: string; forceInitial?: boolean } = { reason: 'sync' },
   ): void {
-    if (this.destroyed || index === MASTER_IX) return;
+    if (this.destroyed || index === MASTER_IX || this.lanes[index]?.origin === 'herdr') return;
     if (this.laneTailInFlight.has(index)) return;
     const taskId = this.lanes[index]?.threadId?.trim();
     if (!taskId) return;
@@ -1275,8 +1334,14 @@ export class DeckRuntime extends EventEmitter {
         this.log('VOICE COMMAND', `${this.laneLabel(this.laneIx)} · recording`);
         this.changed();
         return { ok: true, rev: this.rev };
-      case 'capture.cancel':
+      case 'capture.release':
         if (!this.listening) return { ok: false, rev: this.rev, error: 'not recording' };
+        this.listening = false;
+        this.setPhase('transcribing', 'TRANSCRIBING · MIC OFF');
+        this.changed();
+        return { ok: true, rev: this.rev };
+      case 'capture.cancel':
+        if (!this.listening && this.phase !== 'transcribing') return { ok: false, rev: this.rev, error: 'not recording' };
         this.listening = false;
         this.setPhase('idle', intent.reason ?? 'READY');
         this.log('VOICE COMMAND', intent.reason ?? 'cancelled');
@@ -1309,7 +1374,7 @@ export class DeckRuntime extends EventEmitter {
         // handshake. `cancelAgentWork()` stays teardown-only.
         this.stopPlayer();
         this.clearPlayback();
-        this.setPhase('idle', 'CANCELLED');
+        this.setPhase('idle', this.herdrTurnActive ? 'REPLY CANCELLED · HERDR AGENT MAY CONTINUE' : 'CANCELLED');
         this.log('TURN ABORTED', this.laneLabel(this.laneIx));
         this.changed();
         return { ok: true, rev: this.rev };
@@ -1333,6 +1398,11 @@ export class DeckRuntime extends EventEmitter {
         }
         const laneIx = intent.lane ?? this.laneIx;
         if (!this.threads[laneIx]) return { ok: false, rev: this.rev, error: 'unknown lane' };
+        const target = this.lanes[laneIx];
+        if ((intent.expectedThreadId !== undefined && intent.expectedThreadId !== (target.threadId ?? null))
+          || (intent.expectedOrigin !== undefined && intent.expectedOrigin !== (target.origin ?? null))) {
+          return { ok: false, rev: this.rev, error: 'Conversation changed — transcript held for review' };
+        }
         if (intent.utteranceId) {
           this.acceptedUtterances.push(intent.utteranceId);
           if (this.acceptedUtterances.length > 64) this.acceptedUtterances.shift();
@@ -1367,7 +1437,13 @@ export class DeckRuntime extends EventEmitter {
         if (intent.threadId && intent.threadId === this.masterThreadId()) {
           return { ok: false, rev: this.rev, error: 'that thread belongs to the overview lane' };
         }
+        if (intent.threadId?.startsWith('herdr:') && !this.herdrChannels.has(intent.threadId)) {
+          return { ok: false, rev: this.rev, error: 'Herdr channel unavailable — refresh and select it again' };
+        }
         this.assignLane(intent.index, intent.threadId);
+        if (intent.threadId && this.lanes[intent.index]?.threadId !== intent.threadId) {
+          return { ok: false, rev: this.rev, error: 'Could not save the channel binding' };
+        }
         // Mapping from the Deck is also a destination choice. Do this only
         // after the exact binding is visible, so a failed write cannot switch
         // the microphone to a lane that merely looks assigned.
@@ -1525,7 +1601,7 @@ export class DeckRuntime extends EventEmitter {
     try {
       if (route.kind === 'unassigned') {
         this.log('LANE UNASSIGNED', `lane ${laneIx + 1} · no Codex task`);
-        return 'Assign a Codex task to this lane, or start a new thread from the picker.';
+        return 'Assign an agent channel to this lane, or start a new Codex thread from the picker.';
       }
       // A thread this deck created. It owns the session, so the turn goes over
       // the deck's own app-server client rather than the Desktop owner bridge.
@@ -1543,6 +1619,21 @@ export class DeckRuntime extends EventEmitter {
         const deckText = result.text.trim();
         if (!deckText) throw new Error('empty reply from the deck thread');
         return deckText.length > 600 ? deckText.slice(0, 600).replace(/\s+\S*$/, '') + '…' : deckText;
+      }
+      if (route.kind === 'herdr') {
+        const binding = this.laneHerdrBinding(laneIx);
+        if (!binding || herdrChannelId(binding) !== route.channelId) throw new Error('Select the Herdr channel again.');
+        const controller = new AbortController();
+        this.canonicalTurnAbort = controller;
+        this.herdrTurnActive = true;
+        try {
+          const reply = await turnHerdrChannel(binding, question, { signal: controller.signal });
+          lane.updatedAt = Date.now();
+          return reply;
+        } finally {
+          this.herdrTurnActive = false;
+          if (this.canonicalTurnAbort === controller) this.canonicalTurnAbort = null;
+        }
       }
       if (route.kind === 'canonical') {
         const controller = new AbortController();
@@ -1602,8 +1693,9 @@ export class DeckRuntime extends EventEmitter {
         // one sentence made this undiagnosable.
         return `${describeCanonicalFailure(detail)} SpeakEasy did not send this turn anywhere else.`;
       }
+      if (route.kind === 'herdr') return detail;
       if (route.kind === 'deck') return 'That deck thread did not answer — try again in a moment.';
-      if (route.kind === 'unassigned') return 'Assign a Codex task to this lane before speaking.';
+      if (route.kind === 'unassigned') return 'Assign an agent channel to this lane before speaking.';
       const who = this.lanes[laneIx]?.name.toLowerCase();
       return who
         ? `${who[0].toUpperCase() + who.slice(1)} didn't answer that one — try again in a moment.`
