@@ -2521,7 +2521,7 @@ window.speakeasyDeck = {
 host.post('ready', { lanes: LANES.length });
 
 // First paint waits on the variant layer, so a boot variant never flashes the base.
-bootVariant().then(() => { paint(); bootLive(); });
+bootVariant().then(() => { paint(); if (!DEMO_MODE) bootLive(); });
 
 })();
 </script>
