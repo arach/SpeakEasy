@@ -336,7 +336,7 @@ struct KeypadPanel: View {
                         onCancel: voice.pttCancelled
                     )
                     VStack(spacing: 6) {
-                        CompactDeckButton("LANES", action: showLaneSetup)
+                        CompactDeckButton("SESSIONS", action: showLaneSetup)
                         CompactDeckButton("STOP", action: stopEverything)
                     }
                     .frame(width: compact ? 64 : 76)
@@ -356,7 +356,7 @@ struct KeypadPanel: View {
                             connection.selectLane(9)
                         }
                     }
-                    CompactDeckButton("SET LANES", action: showLaneSetup)
+                    CompactDeckButton("SESSIONS", action: showLaneSetup)
                     CompactDeckButton("CANCEL", action: stopEverything)
                     CompactDeckButton("REPLAY", action: connection.replay)
                     CompactDeckButton(snapshot.autoplay ? "AUTO ON" : "AUTO OFF", action: connection.toggleAutoplay)
@@ -2144,27 +2144,17 @@ struct LaneSetupView: View {
     @ObservedObject var connection: DeckConnection
     @Environment(\.dismiss) private var dismiss
     @State private var laneIndex = 0
-    @State private var query = ""
 
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                if geometry.size.width >= 700 {
-                    HStack(spacing: 0) {
-                        lanePicker.frame(width: 280)
-                        Rectangle().fill(DeckPalette.lineSoft).frame(width: 1)
-                        catalog
-                    }
-                } else {
-                    VStack(spacing: 0) {
-                        lanePicker.frame(height: 190)
-                        Rectangle().fill(DeckPalette.lineSoft).frame(height: 1)
-                        catalog
-                    }
-                }
-            }
+            DeckSessionBrowserView(
+                connection: connection,
+                laneIndex: $laneIndex,
+                dismissAfterAssign: false,
+                onDismiss: { dismiss() }
+            )
             .background(DeckPalette.panel)
-            .navigationTitle("Set lanes")
+            .navigationTitle("Sessions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -2177,230 +2167,6 @@ struct LaneSetupView: View {
             laneIndex = min(8, max(0, connection.snapshot?.lane ?? 0))
             connection.refreshCatalog()
         }
-    }
-
-    private var lanePicker: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 7) {
-                ForEach(Array((connection.snapshot?.lanes ?? []).prefix(9).enumerated()), id: \.offset) { index, lane in
-                    Button {
-                        laneIndex = index
-                    } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(String(format: "%02d", index + 1)).deckMono(11, weight: .semibold)
-                            // Ownership, not the presence of a thread id: a deck
-                            // thread acquires an id once it answers, and reading
-                            // "BOUND" would make it look like a Desktop task.
-                            Text(lane.origin == "deck" ? "DECK" : lane.threadId == nil ? "FRESH" : "BOUND")
-                                .deckMono(7, weight: .semibold)
-                                .foregroundStyle(lane.origin == "deck" ? DeckPalette.micTop : lane.threadId == nil ? DeckPalette.ink3 : DeckPalette.accent)
-                            Text(lane.title).deckMono(8).lineLimit(2).foregroundStyle(DeckPalette.ink2)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                        .padding(9)
-                        .background(laneIndex == index ? DeckPalette.accentDark : DeckPalette.cell, in: RoundedRectangle(cornerRadius: 8))
-                        .overlay { RoundedRectangle(cornerRadius: 8).stroke(laneIndex == index ? DeckPalette.accent : DeckPalette.line) }
-                    }
-                    .buttonStyle(DeckPressButtonStyle())
-                }
-            }
-            .padding(12)
-        }
-        .background(DeckPalette.panelHead)
-    }
-
-    private var catalog: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 9) {
-                Text("PAD \(String(format: "%02d", laneIndex + 1))")
-                    .deckMono(8.5, weight: .semibold)
-                    .tracking(1.3)
-                    .foregroundStyle(DeckPalette.accent)
-                Text(currentLane?.title ?? "Unassigned — choose an agent channel")
-                    .font(.system(size: 14, weight: .medium, design: .monospaced))
-                    .foregroundStyle(DeckPalette.ink)
-                    .lineLimit(1)
-                TextField("Search agents, task titles or projects", text: $query)
-                    .textFieldStyle(.plain)
-                    .deckMono(11)
-                    .padding(.horizontal, 12)
-                    .frame(height: 40)
-                    .background(DeckPalette.cell, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay { RoundedRectangle(cornerRadius: 8).stroke(DeckPalette.line) }
-            }
-            .padding(14)
-            .overlay(alignment: .bottom) { Rectangle().fill(DeckPalette.lineSoft).frame(height: 1) }
-
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    newThreadSection
-                    Text("OR RESUME A CODEX TASK")
-                        .deckMono(8, weight: .medium)
-                        .tracking(1.4)
-                        .foregroundStyle(DeckPalette.ink4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 4)
-
-                    Button {
-                        connection.assignLane(laneIndex, threadID: nil)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("CLEAR ASSIGNMENT").deckMono(9, weight: .semibold).tracking(1.1).foregroundStyle(DeckPalette.accent)
-                            Text("Leave this pad unassigned. Speaking will not create a shadow task.")
-                                .deckMono(8.5).foregroundStyle(DeckPalette.ink3)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(DeckPalette.accentDark, in: RoundedRectangle(cornerRadius: 9))
-                        .overlay { RoundedRectangle(cornerRadius: 9).stroke(DeckPalette.accentEdge, style: StrokeStyle(lineWidth: 1, dash: [5])) }
-                    }
-                    .buttonStyle(DeckPressButtonStyle())
-
-                    ForEach(filteredCatalog) { thread in
-                        Button {
-                            connection.assignLane(laneIndex, threadID: thread.id)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                if let agent = thread.agentName {
-                                    Text("\(agent.uppercased()) · \(thread.agentStatus ?? "unknown")")
-                                        .deckMono(8, weight: .semibold).foregroundStyle(DeckPalette.ink2)
-                                }
-                                Text(thread.snippet)
-                                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                                    .foregroundStyle(DeckPalette.ink)
-                                    .lineLimit(2)
-                                HStack {
-                                    Text(thread.channelContext)
-                                        .deckMono(7.5, weight: .medium)
-                                        .tracking(0.7)
-                                        .foregroundStyle(DeckPalette.ink3)
-                                    Spacer()
-                                    if boundLane(for: thread.id) != nil {
-                                        Text("PAD \((boundLane(for: thread.id) ?? 0) + 1)")
-                                            .deckMono(7.5, weight: .semibold)
-                                            .foregroundStyle(DeckPalette.accent)
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .background(currentLane?.threadId == thread.id ? DeckPalette.accentDark : DeckPalette.cell, in: RoundedRectangle(cornerRadius: 9))
-                            .overlay { RoundedRectangle(cornerRadius: 9).stroke(currentLane?.threadId == thread.id ? DeckPalette.accentEdge : DeckPalette.line) }
-                        }
-                        .buttonStyle(DeckPressButtonStyle())
-                    }
-
-                    if filteredCatalog.isEmpty {
-                        Text(connection.snapshot?.catalogError ?? "No matching agent channels")
-                            .deckMono(9)
-                            .foregroundStyle(DeckPalette.ink3)
-                            .padding(30)
-                    }
-                }
-                .padding(14)
-            }
-        }
-    }
-
-    /// The picker's primary action. A new thread is the common case when the
-    /// pad is empty, so it leads the sheet instead of hiding under the task
-    /// list — resuming an existing Codex task is the alternative below it.
-    private var newThreadSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button {
-                connection.newThread(laneIndex)
-                dismiss()
-            } label: {
-                HStack(spacing: 11) {
-                    Text("＋")
-                        .font(.system(size: 21, weight: .light, design: .monospaced))
-                        .foregroundStyle(DeckPalette.ink)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("NEW THREAD")
-                            .deckMono(11, weight: .semibold)
-                            .tracking(1.3)
-                            .foregroundStyle(DeckPalette.ink)
-                        Text("Fresh Codex thread on this pad. Hold to speak and it starts.")
-                            .deckMono(8.5)
-                            .foregroundStyle(DeckPalette.ink2)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 13)
-                .background(
-                    LinearGradient(
-                        colors: [DeckPalette.micTop, DeckPalette.micBottom],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    in: RoundedRectangle(cornerRadius: 9)
-                )
-                .overlay { RoundedRectangle(cornerRadius: 9).stroke(DeckPalette.accentEdge) }
-            }
-            .buttonStyle(DeckPressButtonStyle())
-
-            if !recentProjects.isEmpty {
-                Text("START IT IN")
-                    .deckMono(7.5, weight: .medium)
-                    .tracking(1.3)
-                    .foregroundStyle(DeckPalette.ink4)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(recentProjects, id: \.cwd) { project in
-                            Button {
-                                connection.newThread(laneIndex, cwd: project.cwd)
-                                dismiss()
-                            } label: {
-                                Text(project.name.uppercased())
-                                    .deckMono(8.5, weight: .semibold)
-                                    .tracking(0.8)
-                                    .foregroundStyle(DeckPalette.ink2)
-                                    .padding(.horizontal, 10)
-                                    .frame(height: 28)
-                                    .background(DeckPalette.cell, in: RoundedRectangle(cornerRadius: 7))
-                                    .overlay { RoundedRectangle(cornerRadius: 7).stroke(DeckPalette.line) }
-                            }
-                            .buttonStyle(DeckPressButtonStyle())
-                        }
-                    }
-                    .padding(.horizontal, 1)
-                }
-            }
-        }
-    }
-
-    /// Distinct checkouts from the Codex catalog, newest first — the working
-    /// directories the operator actually uses, without a file browser.
-    private var recentProjects: [(name: String, cwd: String)] {
-        var seen = Set<String>()
-        var out: [(name: String, cwd: String)] = []
-        for thread in connection.snapshot?.catalog ?? [] {
-            guard !thread.cwd.isEmpty, seen.insert(thread.cwd).inserted else { continue }
-            out.append((thread.displayProject, thread.cwd))
-            if out.count == 6 { break }
-        }
-        return out
-    }
-
-    private var currentLane: DeckLaneInfo? {
-        guard let lanes = connection.snapshot?.lanes, lanes.indices.contains(laneIndex) else { return nil }
-        return lanes[laneIndex]
-    }
-
-    private var filteredCatalog: [DeckThreadInfo] {
-        let catalog = connection.snapshot?.catalog ?? []
-        let terms = query.lowercased().split(whereSeparator: \.isWhitespace)
-        guard !terms.isEmpty else { return catalog }
-        return catalog.filter { thread in
-            let haystack = "\(thread.channelContext) \(thread.agentName ?? "") \(thread.displayProject) \(thread.snippet) \(thread.preview ?? "") \(thread.cwd) \(thread.id)".lowercased()
-            return terms.allSatisfy { haystack.contains($0) }
-        }
-    }
-
-    private func boundLane(for threadID: String) -> Int? {
-        connection.snapshot?.lanes.prefix(9).firstIndex(where: { $0.threadId == threadID })
     }
 }
 
@@ -2533,7 +2299,6 @@ private struct TerminalDeckView: View {
     @AppStorage("speakeasy.terminal.sidebar") private var sidebarWidth = 250.0
     @State private var dragWidth: Double?
     @State private var holding = false
-    @State private var showingExplore = false
     private let accent = Color(red: 0.80, green: 0.85, blue: 0.51)
     private let rule = Color(white: 0.22)
     private let secondary = Color(white: 0.67)
@@ -2552,9 +2317,7 @@ private struct TerminalDeckView: View {
                         Label(snapshot.host.uppercased(), systemImage: "network")
                             .deckMono(10).foregroundStyle(secondary)
                     }
-                    Button("EXPLORE") { showingExplore = true }
-                        .deckMono(10, weight: .medium).padding(12)
-                    Button("SET LANES", action: showSetup)
+                    Button("SESSIONS", action: showSetup)
                         .deckMono(10, weight: .medium).padding(.horizontal, 14).padding(.vertical, 12)
                         .background(Color(white: 0.08), in: RoundedRectangle(cornerRadius: 5))
                         .overlay(RoundedRectangle(cornerRadius: 5).stroke(rule))
@@ -2580,9 +2343,6 @@ private struct TerminalDeckView: View {
             .foregroundStyle(Color(white: 0.95))
             .background(Color.black)
             .buttonStyle(.plain)
-        }
-        .sheet(isPresented: $showingExplore) {
-            HerdrExploreView(connection: connection).presentationDetents([.large])
         }
         .onDisappear { if holding { holding = false; voice.pttCancelled() } }
         .onChange(of: scenePhase) { _, phase in
@@ -2628,7 +2388,7 @@ private struct TerminalDeckView: View {
                 .onAppear { proxy.scrollTo(snapshot.lane, anchor: .center) }
                 .onChange(of: snapshot.lane) { _, lane in proxy.scrollTo(lane, anchor: .center) }
             }
-            Button("+ CONNECT CHANNEL", action: showSetup)
+            Button("ASSIGN SESSION", action: showSetup)
                 .deckMono(10).frame(maxWidth: .infinity, minHeight: 44)
                 .overlay(alignment: .top) { Rectangle().fill(rule).frame(height: 1) }
         }.background(Color(white: 0.045))
@@ -2801,110 +2561,3 @@ private struct TerminalReplyWave: View {
 }
 
 
-private struct HerdrExploreView: View {
-    @ObservedObject var connection: DeckConnection
-    @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
-    private var agents: [DeckThreadInfo] {
-        (connection.snapshot?.catalog ?? []).filter { $0.originator == "herdr" }
-    }
-    private var matches: [DeckThreadInfo] {
-        agents.filter { query.isEmpty || "\($0.channelContext) \($0.snippet) \($0.agentName ?? "") \($0.cwd) \($0.agentStatus ?? "")".localizedCaseInsensitiveContains(query) }
-    }
-    private var sessions: [String] { Array(Set(matches.map(\.channelContext))).sorted() }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 22) {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack(alignment: .top, spacing: 16) {
-                        Image(systemName: "desktopcomputer")
-                            .font(.system(size: 28, weight: .light))
-                            .frame(width: 56, height: 56)
-                            .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("CONNECTED HOST").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).foregroundStyle(.secondary)
-                            Text(connection.snapshot?.host ?? "Disconnected")
-                                .font(.system(size: 22, weight: .semibold))
-                            Text("Your Herdr landscape").font(.subheadline).foregroundStyle(.secondary)
-                        }
-                    }
-                    HStack(spacing: 22) {
-                        metric("SESSIONS", Set(agents.compactMap(\.herdrSession)).count)
-                        metric("AGENTS", agents.count)
-                        metric("WORKING", agents.filter { $0.agentStatus == "working" }.count)
-                        metric("ATTENTION", agents.filter { $0.agentStatus == "blocked" || $0.agentStatus == "unlinked" }.count)
-                    }.padding(.top, 6)
-                }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(white: 0.055), in: RoundedRectangle(cornerRadius: 20))
-                ForEach(sessions, id: \.self) { session in
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(spacing: 9) {
-                            Image(systemName: "square.stack.3d.up").foregroundStyle(.secondary)
-                            Text(matches.first { $0.channelContext == session }?.herdrSession ?? session)
-                                .font(.system(size: 16, weight: .semibold))
-                            Spacer()
-                            Text("\(matches.filter { $0.channelContext == session }.count) agents")
-                                .font(.caption.monospaced()).foregroundStyle(.secondary)
-                        }.padding(.bottom, 14)
-
-                        ForEach(matches.filter { $0.channelContext == session }) { agent in
-                            DisclosureGroup {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    LabeledContent("Agent", value: agent.agentName ?? "Unknown")
-                                    LabeledContent("State", value: agent.agentStatus ?? "unknown")
-                                    Text(agent.cwd).textSelection(.enabled)
-                                    let lanes = (connection.snapshot?.lanes ?? []).filter { $0.threadId == agent.id }
-                                    Text(lanes.isEmpty ? "Not assigned to a lane" : "Lane " + lanes.map(\.num).joined(separator: ", "))
-                                        .foregroundStyle(.secondary)
-                                    if agent.agentStatus == "unlinked" {
-                                        Text("Session integration is required before voice can target this conversation.")
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }.font(.footnote.monospaced()).padding(.vertical, 8)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Circle().fill(agent.agentStatus == "working" ? Color(red: 0.80, green: 0.85, blue: 0.51) : Color(white: 0.42))
-                                        .frame(width: 6, height: 6)
-                                    VStack(alignment: .leading, spacing: 5) {
-                                    Text(agent.snippet).font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
-                                    Text("\(agent.agentName ?? "Agent") · \(agent.agentStatus ?? "unknown")")
-                                        .font(.caption.monospaced()).foregroundStyle(.secondary)
-                                    }
-                                }.padding(.vertical, 10)
-                            }
-                            Rectangle().fill(Color(white: 0.14)).frame(height: 1)
-                        }
-                    }
-                }
-                if matches.isEmpty {
-                    Text(query.isEmpty ? "No Herdr agents found on this Mac. Open a Herdr session, then refresh." : "No matching agents")
-                        .foregroundStyle(.secondary)
-                }
-                if let error = connection.snapshot?.catalogError {
-                    Text(error).font(.footnote).foregroundStyle(.secondary)
-                }
-                }.padding(20).frame(maxWidth: 900).frame(maxWidth: .infinity)
-            }
-            .background(Color.black)
-            .searchable(text: $query, prompt: "Sessions, agents, workspaces or states")
-            .navigationTitle("Explore")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Refresh", systemImage: "arrow.clockwise") { connection.refreshCatalog() }
-                }
-                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
-            }
-            .onAppear { connection.refreshCatalog() }
-        }.preferredColorScheme(.dark).tint(.white)
-    }
-
-    private func metric(_ title: String, _ value: Int) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(String(value)).font(.system(size: 20, weight: .medium, design: .monospaced)).monospacedDigit()
-            Text(title).font(.system(size: 8, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
-        }
-    }
-}

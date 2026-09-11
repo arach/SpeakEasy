@@ -5,7 +5,7 @@ An original Blender model inspired by the tactile layout of Work Louder’s Code
 - `speakeasy-micro.blend`: editable geometry, named component groups, materials, camera, and studio lights.
 - `build.py`: reproducible model generator (Blender 5.2).
 - `../../landing/public/models/speakeasy-micro.glb`: web export.
-- `../../landing/lib/pad-scene.ts`: Three.js lighting, scroll poses, and the iPad screen texture.
+- `../../landing/lib/pad-scene.ts`: Three.js lighting, scroll poses, and the iPad screen texture (a presentation snapshot of the current Pad Console design, with lane bank, active task, waveform and speech controls).
 
 Rebuild from the repository root:
 

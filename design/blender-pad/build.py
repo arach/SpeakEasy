@@ -109,7 +109,28 @@ for j in range(64):
     a=j*math.tau/64;cylinder('Knurl',(math.cos(a)*.405,math.sin(a)*.405,.22),.014,.19,edge,g,vertices=8)
 cylinder('Dial cap',(0,0,.35),.41,.05,silver,g)
 box('Dial index',(0,.17,.38),(.026,.25,.007),ink,.005,g)
-g=group('Joystick',(1.50,1.14,.34));cylinder('Stick socket',(0,0,.01),.30,.08,silver,g);cylinder('Stick stem',(0,0,.19),.14,.31,black,g);cylinder('Thumb rest',(0,0,.37),.29,.16,black,g);cylinder('Thumb inset',(0,0,.455),.22,.008,ink,g)
+# Contoured thumb cup, seated in a dark socket instead of a flat colored disk.
+g=group('Joystick',(1.50,1.14,.34))
+thumb=material('Thumb rubber',(.024,.028,.033),0,.60)
+cylinder('Socket trim',(0,0,.012),.345,.018,silver,g)
+cylinder('Stick socket',(0,0,.025),.325,.055,black,g)
+cylinder('Stick stem',(0,0,.16),.12,.23,black,g)
+profile=[(.001,.29),(.23,.29),(.285,.31),(.308,.345),(.316,.385),(.302,.42),(.278,.442),(.245,.447),(.20,.435),(.13,.417),(.001,.410)]
+verts=[];faces=[];segments=96
+for r,z in profile:
+    for j in range(segments):
+        a=j*math.tau/segments;verts.append((r*math.cos(a),r*math.sin(a),z))
+for ring in range(len(profile)-1):
+    for j in range(segments):
+        k=(j+1)%segments;faces.append((ring*segments+j,ring*segments+k,(ring+1)*segments+k,(ring+1)*segments+j))
+faces.append(tuple(reversed(range(segments))));faces.append(tuple((len(profile)-1)*segments+j for j in range(segments)))
+mesh=bpy.data.meshes.new('Sculpted thumb cup');mesh.from_pydata(verts,[],faces);mesh.update()
+o=bpy.data.objects.new('Sculpted thumb cup',mesh);bpy.context.collection.objects.link(o);o.data.materials.append(thumb);parent(o,g)
+for f in mesh.polygons:f.use_smooth=True
+# Discreet molded directional marks at the rim.
+for j in range(4):
+    a=j*math.tau/4
+    mark=box('Thumb direction',(math.cos(a)*.245,math.sin(a)*.245,.448),(.045,.012,.004),thumb,.005,g);mark.rotation_euler.z=a
 g=group('Talk',(-.49,-1.73,.36));box('Space switch',(0,0,0),(2.73,.49,.11),black,.07,g);box('Space cap',(0,0,.12),(2.88,.61,.22),white,.09,g);text('Space label','H O L D   T O   S P E A K',(0,0,.237),.10,ink,g)
 for name,x,y,glyph in [('Extra',1.50,-1.73,'+'),('Command',1.50,-.91,'x')]:
     g=group(name,(x,y,.36));box('Command switch',(0,0,0),(.71,.55,.11),black,.06,g);box('Command cap',(0,0,.12),(.88,.64 if name=='Extra' else .86,.22),white,.09,g);text('Action label',glyph,(0,0,.237),.22,ink,g)

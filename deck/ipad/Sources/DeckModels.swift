@@ -34,15 +34,66 @@ struct DeckThreadInfo: Decodable, Identifiable {
     let project: String?
     let at: Double
     let originator: String
+    let harness: String?
     let isPinned: Bool?
     let hostName: String?
     let herdrSession: String?
     let agentName: String?
     let agentStatus: String?
 
+    var harnessKey: String {
+        if let harness, !harness.isEmpty { return harness.lowercased() }
+        if originator == "herdr" {
+            return DeckThreadInfo.normalizeHarness(agentName: agentName)
+        }
+        return DeckThreadInfo.normalizeHarness(source: originator)
+    }
+
+    var harnessLabel: String {
+        Self.harnessDisplayLabel(harnessKey)
+    }
+
     var channelContext: String {
         guard let herdrSession else { return "\(displayProject.uppercased()) · \(alias)" }
-        return "\(hostName ?? "Mac") › Herdr › \(herdrSession)"
+        return "\(hostName ?? "Mac") › \(harnessLabel) › \(herdrSession)"
+    }
+
+    static func normalizeHarness(source: String = "", agentName: String? = nil) -> String {
+        if let agentName, !agentName.isEmpty {
+            let agent = agentName.lowercased()
+            if agent.contains("claude") { return "claude" }
+            if agent.contains("grok") { return "grok" }
+            if agent.contains("kimi") { return "kimi" }
+            if agent.contains("cursor") { return "cursor" }
+            if agent.contains("opencode") { return "opencode" }
+            if agent.contains("codex") { return "codex" }
+            if agent.contains("pi") { return "pi" }
+            let trimmed = agent.replacingOccurrences(of: "[^a-z0-9_-]+", with: "", options: .regularExpression)
+            return trimmed.isEmpty ? "agent" : trimmed
+        }
+        let value = source.lowercased()
+        if value.isEmpty || value.contains("codex") { return "codex" }
+        if value.contains("claude") { return "claude" }
+        if value.contains("grok") { return "grok" }
+        if value.contains("kimi") { return "kimi" }
+        if value.contains("cursor") { return "cursor" }
+        if value.contains("opencode") { return "opencode" }
+        if value.contains("pi") { return "pi" }
+        let trimmed = value.replacingOccurrences(of: "[^a-z0-9_-]+", with: "", options: .regularExpression)
+        return trimmed.isEmpty ? "codex" : trimmed
+    }
+
+    static func harnessDisplayLabel(_ key: String) -> String {
+        switch key {
+        case "codex": "CODEX"
+        case "claude": "CLAUDE"
+        case "grok": "GROK"
+        case "kimi": "KIMI"
+        case "cursor": "CURSOR"
+        case "opencode": "OPENCODE"
+        case "pi": "PI"
+        default: key.uppercased()
+        }
     }
 
     var displayProject: String {

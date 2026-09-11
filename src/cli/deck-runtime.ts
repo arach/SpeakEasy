@@ -97,6 +97,8 @@ export interface DeckThreadInfo {
   project?: string;
   at: number;
   originator: string;
+  /** Normalized harness id for UI filters — codex, claude, grok, … */
+  harness?: string;
   isPinned?: boolean;
   hostName?: string;
   herdrSession?: string;
@@ -334,6 +336,30 @@ export function describeCanonicalFailure(detail: string): string {
   return `The exact Codex task did not answer — ${detail.slice(0, 120)}`;
 }
 
+/** Map catalog originator/agent strings to stable harness ids for lane setup filters. */
+export function normalizeDeckHarness(source: string, agentName?: string | null): string {
+  if (agentName) {
+    const agent = agentName.toLowerCase().trim();
+    if (agent.includes('claude')) return 'claude';
+    if (agent.includes('grok')) return 'grok';
+    if (agent.includes('kimi')) return 'kimi';
+    if (agent.includes('cursor')) return 'cursor';
+    if (agent.includes('opencode')) return 'opencode';
+    if (agent.includes('codex')) return 'codex';
+    if (agent.includes('pi')) return 'pi';
+    return agent.replace(/[^a-z0-9_-]+/g, '') || 'agent';
+  }
+  const value = source.toLowerCase().trim();
+  if (!value || value.includes('codex')) return 'codex';
+  if (value.includes('claude')) return 'claude';
+  if (value.includes('grok')) return 'grok';
+  if (value.includes('kimi')) return 'kimi';
+  if (value.includes('cursor')) return 'cursor';
+  if (value.includes('opencode')) return 'opencode';
+  if (value.includes('pi')) return 'pi';
+  return value.replace(/[^a-z0-9_-]+/g, '') || 'codex';
+}
+
 function deckThreadInfo(thread: CodexThreadCandidate): DeckThreadInfo {
   return {
     id: thread.id,
@@ -343,6 +369,7 @@ function deckThreadInfo(thread: CodexThreadCandidate): DeckThreadInfo {
     project: thread.project,
     at: thread.at,
     originator: thread.source,
+    harness: normalizeDeckHarness(thread.source),
     isPinned: thread.isPinned,
   };
 }
@@ -587,6 +614,7 @@ export class DeckRuntime extends EventEmitter {
           preview: binding.agent.agent_session ? binding.agent.agent_status : 'Session integration required',
           project: 'Herdr · ' + (path.basename(binding.agent.foreground_cwd || binding.agent.cwd || '') || binding.agent.display_agent || binding.agent.agent || 'Agent'),
           at: Date.now(), originator: 'herdr',
+          harness: normalizeDeckHarness('herdr', binding.agent.display_agent || binding.agent.agent || 'agent'),
         }))];
         this.catalogError = fallback
           ? 'Codex task titles are unavailable — showing rollout references.'

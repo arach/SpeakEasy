@@ -91,6 +91,8 @@ export async function mountPadScene(stage: HTMLElement) {
       } else if(/aluminum|Polished/.test(m.name)){
         m.roughness=.32;m.roughnessMap=brush;m.bumpMap=brush;m.bumpScale=.005
         m.anisotropy=.6;m.anisotropyRotation=Math.PI/2;m.envMapIntensity=.95
+      } else if(/Thumb rubber/.test(m.name)){
+        m.roughness=.62;m.bumpMap=rubberGrain;m.bumpScale=.004;m.metalness=0;m.envMapIntensity=.9
       } else if(/elastomer/.test(m.name)){
         m.roughness=.92;m.bumpMap=rubberGrain;m.bumpScale=.012;m.metalness=0
       }
@@ -129,10 +131,10 @@ export async function mountPadScene(stage: HTMLElement) {
   screenShape.lineTo(sw,sh-sr);screenShape.quadraticCurveTo(sw,sh,sw-sr,sh)
   screenShape.lineTo(-sw+sr,sh);screenShape.quadraticCurveTo(-sw,sh,-sw,sh-sr)
   screenShape.lineTo(-sw,-sh+sr);screenShape.quadraticCurveTo(-sw,-sh,-sw+sr,-sh)
-  const panel = new THREE.Mesh(new THREE.ShapeGeometry(screenShape,24), new THREE.MeshPhysicalMaterial({ color: 0xeaf0ec, roughness: .36, metalness: .02, transparent: true, opacity: 0 }))
+  const panel = new THREE.Mesh(new THREE.ShapeGeometry(screenShape,24), new THREE.MeshPhysicalMaterial({ color: 0x0c171a, roughness: .36, metalness: .02, transparent: true, opacity: 0 }))
   panel.rotation.x = -Math.PI / 2; panel.position.y = .302; model.add(panel)
-  const texture = makeScreenTexture()
-  const ink = new THREE.Mesh(new THREE.PlaneGeometry(8.2, 5.7), new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0, depthWrite: false }))
+  const texture = await makeScreenTexture()
+  const ink = new THREE.Mesh(new THREE.PlaneGeometry(8.2, 5.7), new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, transparent: true, opacity: 0, depthWrite: false }))
   ink.rotation.x = -Math.PI / 2; ink.position.y = .36; ink.renderOrder = 3; model.add(ink)
   const shadowCanvas=document.createElement('canvas');shadowCanvas.width=256;shadowCanvas.height=256
   const shadowContext=shadowCanvas.getContext('2d')!
@@ -170,7 +172,7 @@ export async function mountPadScene(stage: HTMLElement) {
     const t = smooth((currentRaw-.32)/.57)
     const explode = smooth((currentRaw-.065)/.18)*(1-smooth((currentRaw-.34)/.20))
     const collapse = smooth((currentRaw-.40)/.30)
-    const digital = smooth((currentRaw-.78)/.14)
+    const digital = smooth((currentRaw-.75)/.14)
     model.rotation.set(Math.PI/2 - mix(.69,0,t) - .22*explode, mix(-.22,0,t), mix(-.30,0,t))
     model.position.y = mix(.10,0,t)-.55*explode
     const aspect=stage.clientWidth/stage.clientHeight
@@ -183,9 +185,11 @@ export async function mountPadScene(stage: HTMLElement) {
       const node=nodes.get(name)!, original=originals.get(name)!
       node.scale.set(original.scale.x*mix(1,8.2/4.55,t),original.scale.y*mix(1,.55,t),original.scale.z*mix(1,5.7/4.24,t))
     }
-    rimMaterial.color.copy(originalRim).lerp(new THREE.Color(0x364239),smooth((currentRaw-.4)/.4))
+    rimMaterial.color.copy(originalRim).lerp(new THREE.Color(0xe5e4df),smooth((currentRaw-.4)/.4))
     rimMaterial.transmission=mix(.70,0,smooth((currentRaw-.4)/.4))
-    deckMaterial.color.copy(originalDeck).lerp(new THREE.Color(0xeaf0ec),t)
+    rimMaterial.bumpScale=mix(.005,0,t)
+    rimMaterial.roughness=mix(.28,.38,t)
+    deckMaterial.color.copy(originalDeck).lerp(new THREE.Color(0xf0efeb),t)
     const lightpipe=nodes.get('Lightpipe')!
     lightpipe.visible=currentRaw<.65
     for (const name of hiddenHardware) {
@@ -204,11 +208,12 @@ export async function mountPadScene(stage: HTMLElement) {
       cap.position.copy(capOriginal.position);cap.position.y+=3.0*explode
       cap.visible=collapse<.94
       const tile=nodes.get('TaskTile'+i)!
-      tile.visible=collapse>=.94
+      tile.visible=collapse>=.94 && digital<.02
       node.children.forEach(child=>{if(/Switch|Stem/i.test(child.name))child.visible=collapse<.94})
     }
     lensMaterials.forEach(m=>{m.opacity=1-digital})
     const talk=nodes.get('Talk')!, talkOrig=originals.get('Talk')!
+    talk.visible=digital<.02
     talk.position.set(mix(talkOrig.position.x,0,t),mix(talkOrig.position.y,.31,t),mix(talkOrig.position.z,2.28,t))
     talk.scale.set(mix(1,7.6/2.88,t),mix(1,.035,collapse),mix(1,.46/.61,t))
     talk.children.forEach(child=>{if(/label|switch/i.test(child.name))child.visible=collapse<.95})
@@ -252,30 +257,22 @@ export async function mountPadScene(stage: HTMLElement) {
   removal.observe(document.body,{childList:true,subtree:true})
 }
 
-function makeScreenTexture() {
-  const canvas=document.createElement('canvas');canvas.width=2460;canvas.height=1710
-  const ctx=canvas.getContext('2d')!;const unit=300
-  const X=(x:number)=>(x+4.1)*unit, Y=(y:number)=>(2.85-y)*unit
-  const label=(text:string,x:number,y:number,size:number,color='#61746a',font='sans-serif')=>{ctx.fillStyle=color;ctx.font=`${size}px ${font}`;ctx.fillText(text,X(x),Y(y))}
-  label('SpeakEasy',-3.78,2.39,43,'#263e31')
-  label('T H E  P A D',-2.57,2.40,21,'#7a8b80','monospace')
-  label('●  MAC CONNECTED',2.40,2.41,19,'#47735b','monospace')
-  const names=['dewey','speakeasy','scout','speakeasy','landing','research','Your next task','Room to explore','Something new']
-  const branches=['docs/restructure','feat/voice-lanes','feat/broker-retry','fix/cache-ttl','design/pad','explore/next','— unassigned','— unassigned','— unassigned']
-  const snippets=['The new navigation is ready.','Your voice has a place.','All tasks are back in sync.','Ready for your review.','A whole new surface.','Comparing the next steps.','Hold to make it yours.','A space for another idea.','Pick a task. Keep it close.']
-  const colors=['#8aaacd','#5e9c7b','#a08bbf','#c49d59','#80a48c','#aa91bc','#a9b6ac','#a9b6ac','#a9b6ac']
-  for(let i=0;i<9;i++){
-    const x=(i%3-1)*2.59-1.03,y=1.43-Math.floor(i/3)*1.30+.37
-    label(`LANE 0${i+1}`,x,y,18,'#7b8e81','monospace')
-    label('●',x+1.91,y,19,colors[i]);label(names[i],x,y-.26,35,'#2d4436')
-    label(branches[i],x,y-.44,19,'#8b9a90','monospace');label(snippets[i],x,y-.68,23,'#687b6e')
-    label('▥▥▥▥▥',x,y-.87,22,colors[i],'monospace')
-    label(['COMPLETE','LIVE','THINKING','REVIEW','COMPLETE','THINKING','AVAILABLE','AVAILABLE','AVAILABLE'][i],x+1.48,y-.87,15,colors[i],'monospace')
-  }
-  ctx.fillStyle='#376c52';ctx.beginPath();ctx.roundRect(X(-3.80),Y(-2.05),7.60*unit,.46*unit,30);ctx.fill()
-  label('●   H O L D  T O  S P E A K',-1.38,-2.33,27,'#eff8f1','monospace')
-  label('RELEASE TO SEND',1.33,-2.33,18,'#b6d1bf','monospace')
-  ctx.fillStyle='#6f8376';ctx.beginPath();ctx.roundRect(X(-.52),Y(-2.66),1.04*unit,.035*unit,5);ctx.fill()
-  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=8
+/** Presentation snapshot of the Pad's Console layout (pad/src/app.ts + styles.css). */
+/** Actual Deck demo capture at 2× resolution, without stretching the interface. */
+async function makeScreenTexture() {
+  const screenshot = new Image()
+  screenshot.src = '/implementation/deck-screen-light.png'
+  await screenshot.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = 2460
+  canvas.height = 1710
+  const ctx = canvas.getContext('2d')!
+  ctx.beginPath()
+  ctx.roundRect(56, 57, 2348, 1596, 92)
+  ctx.clip()
+  ctx.drawImage(screenshot, 56, 57, 2348, 1596)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.anisotropy = 8
   return texture
 }
